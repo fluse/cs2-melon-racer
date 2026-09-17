@@ -107,6 +107,38 @@
     }
 }
 
+/* Dismisses the modal for just this player without leaving the hub trigger
+   (see hub_close_button in melon_drive.js) — they still get pulled into the
+   next heat that starts while they're standing in it, they just don't have
+   to stare at the prompt until then. Pulled up and right via negative
+   margin so it sits in the modal's corner instead of the padding box. */
+.HubCloseButton {
+    horizontal-align: right;
+    vertical-align: top;
+    margin-top: -12px;
+    margin-right: -12px;
+    padding-left: 3px;
+    width: 24px;
+    height: 24px;
+
+    border-radius: 12px;
+    background-color: #ffffff22;
+
+    transition-property: background-color;
+    transition-duration: .1s;
+    &:hover {
+        background-color: #ffffff44;
+    }
+}
+
+.HubCloseIcon {
+    font-size: 14px;
+    font-weight: bold;
+    color: #ffffffcc;
+    horizontal-align: center;
+    vertical-align: center;
+}
+
 .HubTitle {
     font-size: 24px;
     font-weight: bold;

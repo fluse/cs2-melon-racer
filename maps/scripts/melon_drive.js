@@ -45,6 +45,18 @@ const MELON_MAX_HEALTH = 100;
 const IMPACT_DAMAGE_THRESHOLD = 450; // units/sec of sudden velocity change before it starts to hurt
 const IMPACT_DAMAGE_SCALE = 0.2; // health lost per unit/sec beyond the threshold
 
+// When a melon breaks it doesn't respawn instantly — it sits at the crash
+// site, visibly dead (tinted dark, frozen), for BREAK_RESPAWN_DELAY seconds
+// before teleporting back to the last checkpoint. Gives the player a beat to
+// register that it broke instead of it just snapping to the checkpoint.
+const BREAK_RESPAWN_DELAY = 1; // seconds
+const BREAK_TINT = { r: 40, g: 40, b: 40, a: 255 }; // dark/dead look while broken, before the paint color is restored
+// Name of a point_template placed in Hammer holding the break effect (e.g. an
+// info_particle_system with "Start Active" set so it plays as soon as it's
+// spawned, no input needed) — same ForceSpawn-from-a-template convention as
+// MELON_TEMPLATE_NAME.
+const BREAK_PARTICLE_TEMPLATE_NAME = "melon_break_template";
+
 // The map has multiple separate tracks, so a checkpoint's script input
 // parameter names both which track it belongs to and its position along
 // that track: "checkpoint_<trackId>_<index>", e.g. "checkpoint_2_5" is
@@ -141,6 +153,15 @@ function GetTrackOrder() {
 const SPAWN_FORWARD_OFFSET = 80;
 const SPAWN_UP_OFFSET = 40;
 
+// Name of an info_target placed in Hammer purely as a facing reference (a
+// pivot — origin doesn't matter, only its angle) pointing down the track
+// from the hub. A freshly spawned melon (first connect, or any respawn
+// before the racer has picked a track/touched a checkpoint) faces this
+// direction instead of wherever the player's camera happened to be looking
+// on connect, which has no relation to the track layout. Optional — if it's
+// not placed, spawning falls back to the player's eye yaw like before.
+const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
+
 // Race-flow teleports (heat start, return-to-hub) target a trigger_multiple's
 // raw GetAbsOrigin() — Hammer mappers commonly sink a trigger's brush a bit
 // into the floor so a fast-moving physics prop reliably touches it instead
@@ -157,9 +178,12 @@ const TELEPORT_UP_OFFSET = 40;
 // it turns out to exceed the map's compiled bounds.
 const PAWN_PARK_HEIGHT = 3000;
 
-// Offsets for CameraFollowConfig — behind and above the melon.
+// Offsets for CameraFollowConfig — behind and above the melon. cameraOffset
+// is rotated by the player's eye angles: x is forward (negative = behind),
+// z is up. Pulled further back and lowered closer to the ground for a wider,
+// more ground-level third-person view.
 const FOLLOW_OFFSET = { x: 0, y: 0, z: 20 };
-const CAMERA_OFFSET = { x: -220, y: 0, z: 110 };
+const CAMERA_OFFSET = { x: -320, y: 0, z: 80 };
 
 // Name of the custom_hud_layout entity (place one in Hammer pointing at
 // panorama/layout/custom_game/speedometer.vxml) that shows the speedometer.
@@ -182,6 +206,7 @@ function Debug(text) {
  *   health: number, lastVelocity: { x: number, y: number, z: number } | undefined,
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
+ *   breaking: boolean,
  * }} Kart
  */
 /** @type {Map<number, Kart>} */
@@ -581,6 +606,20 @@ function UpdateRaceFlow(now) {
     }
 }
 
+/**
+ * Yaw a freshly spawned melon should face: the hub_spawn_facing pivot's
+ * angle if the mapper placed one, otherwise the player's own eye yaw (the
+ * old behavior, and a reasonable fallback for a solo/dev map with no hub).
+ * @param {any} pawn
+ */
+function GetSpawnFacingYaw(pawn) {
+    const pivot = Instance.FindEntityByName(HUB_SPAWN_FACING_NAME);
+    if (pivot) {
+        return pivot.GetAbsAngles().yaw;
+    }
+    return pawn.GetEyeAngles().yaw;
+}
+
 function SpawnMelonFor(pawn) {
     const template = Instance.FindEntityByName(MELON_TEMPLATE_NAME);
     if (!template) {
@@ -592,17 +631,20 @@ function SpawnMelonFor(pawn) {
         return undefined;
     }
     const origin = pawn.GetAbsOrigin();
-    const eyeAngles = pawn.GetEyeAngles();
+    const yaw = GetSpawnFacingYaw(pawn);
     // Spawn a bit in front of the player, not exactly on top of them —
     // spawning overlapping the player's own hitbox causes the physics
     // engine to violently shove the melon away the instant it appears.
-    const rad = (eyeAngles.yaw * Math.PI) / 180;
+    // Offset along the same yaw it'll face, not the player's own facing, so
+    // it consistently appears "ahead, toward the track" regardless of which
+    // way the player happens to be looking when they connect.
+    const rad = (yaw * Math.PI) / 180;
     const spawnPos = {
         x: origin.x + Math.cos(rad) * SPAWN_FORWARD_OFFSET,
         y: origin.y + Math.sin(rad) * SPAWN_FORWARD_OFFSET,
         z: origin.z + SPAWN_UP_OFFSET,
     };
-    const spawned = template.ForceSpawn(spawnPos, { pitch: 0, yaw: eyeAngles.yaw, roll: 0 });
+    const spawned = template.ForceSpawn(spawnPos, { pitch: 0, yaw, roll: 0 });
     if (!spawned || spawned.length === 0) {
         Debug(`SpawnMelonFor: ForceSpawn() returned nothing — check the point_template's Template entries in Hammer`);
         return undefined;
@@ -618,11 +660,20 @@ function HidePawnModel(pawn) {
     pawn.SetColor({ r: 255, g: 255, b: 255, a: 0 });
 }
 
-/** @param {any} pawn */
-function ParkPawn(pawn) {
-    // Must run AFTER the melon has been spawned from this pawn's original
-    // ground position — otherwise the melon would spawn way up in the sky.
-    const origin = pawn.GetAbsOrigin();
+/** @param {any} pawn @param {any} melon */
+function ParkPawn(pawn, melon) {
+    // Anchored to the melon's own (always ground-level) position, not the
+    // pawn's current origin. OnPlayerReset can fire more than once for the
+    // same life (e.g. a retry after GetOrCreateKart failed because the
+    // template entity wasn't ready yet), and anchoring to the pawn's own
+    // origin would stack PAWN_PARK_HEIGHT on top of itself each time,
+    // eventually parking it absurdly high. Anchoring to the melon makes
+    // re-parking idempotent, and also keeps this from ever running before a
+    // melon exists (see the call site's `if (kart)` guard) — a pawn parked
+    // with no melon yet would otherwise leave its real spawn origin
+    // unrecoverable, which is exactly what corrupted checkpointPosition
+    // (the parked pawn's own position) into a valid-looking respawn target.
+    const origin = melon.GetAbsOrigin();
     pawn.Teleport({ position: { x: origin.x, y: origin.y, z: origin.z + PAWN_PARK_HEIGHT } });
 }
 
@@ -635,7 +686,7 @@ function AttachCamera(pawn, melon) {
         followEntity: melon,
         followOffset: FOLLOW_OFFSET,
         cameraOffset: CAMERA_OFFSET,
-        clipCameraOffset: true,
+        clipCameraOffset: false,
     });
     Debug(`AttachCamera: mode=${camera.GetMode()} for slot=${pawn.GetPlayerController()?.GetPlayerSlot()}`);
 }
@@ -660,24 +711,42 @@ function GetOrCreateKart(pawn) {
             moderatorSlot = slot;
             Debug(`GetOrCreateKart: slot ${slot} is the first player on the map, assigned as moderator`);
         }
-        // No checkpoint reached yet — fall back to the player's own spawn
-        // point/facing as the "respawn here if it breaks" location.
-        kart = {
-            pawn,
-            melon,
-            nextJumpTime: 0,
-            health: MELON_MAX_HEALTH,
-            lastVelocity: undefined,
-            trackId: undefined,
-            checkpointIndex: 0,
-            checkpointPosition: pawn.GetAbsOrigin(),
-            checkpointAngles: { pitch: 0, yaw: pawn.GetEyeAngles().yaw, roll: 0 },
-            lapsCompleted: 0,
-            inHub: false,
-            racing: false,
-            finished: false,
-            locked: false,
-        };
+        if (kart) {
+            // The old kart's melon went invalid (e.g. it tunneled out of the
+            // world after a hard crash) but the kart itself already had race
+            // progress — keep checkpoint/track/lap state instead of
+            // resetting it from the pawn's current position. The pawn may
+            // already be parked (invisible, high above the map) by this
+            // point, and falling back to its position here is exactly what
+            // used to make a broken melon respawn at the invisible player's
+            // spot.
+            kart.pawn = pawn;
+            kart.melon = melon;
+            kart.nextJumpTime = 0;
+            kart.health = MELON_MAX_HEALTH;
+            kart.lastVelocity = undefined;
+            kart.breaking = false;
+        } else {
+            // Truly new — no prior checkpoint, so fall back to the player's
+            // own current spawn point/facing as the "respawn here" location.
+            kart = {
+                pawn,
+                melon,
+                nextJumpTime: 0,
+                health: MELON_MAX_HEALTH,
+                lastVelocity: undefined,
+                trackId: undefined,
+                checkpointIndex: 0,
+                checkpointPosition: pawn.GetAbsOrigin(),
+                checkpointAngles: { pitch: 0, yaw: GetSpawnFacingYaw(pawn), roll: 0 },
+                lapsCompleted: 0,
+                inHub: false,
+                racing: false,
+                finished: false,
+                locked: false,
+                breaking: false,
+            };
+        }
         karts.set(slot, kart);
     } else {
         kart.pawn = pawn;
@@ -704,18 +773,36 @@ function UpdateKart(slot, kart, dt) {
         return;
     }
 
+    // Broken and waiting out BREAK_RESPAWN_DELAY (see BreakMelon) — unlike
+    // `locked` above, freeze completely (gravity included). It's already
+    // sitting wherever it crashed, tinted dark, and should just hold still
+    // until the delayed respawn teleports it away rather than keep tumbling
+    // (which would also spuriously re-trigger the impact check below).
+    if (kart.breaking) {
+        melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
+        kart.lastVelocity = undefined;
+        return;
+    }
+
     const currentVelocity = melon.GetAbsVelocity();
     if (kart.lastVelocity) {
-        const impactSpeed = Math.hypot(
-            currentVelocity.x - kart.lastVelocity.x,
-            currentVelocity.y - kart.lastVelocity.y,
-            currentVelocity.z - kart.lastVelocity.z
-        );
+        const impactDelta = {
+            x: currentVelocity.x - kart.lastVelocity.x,
+            y: currentVelocity.y - kart.lastVelocity.y,
+            z: currentVelocity.z - kart.lastVelocity.z,
+        };
+        const impactSpeed = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
         if (impactSpeed > IMPACT_DAMAGE_THRESHOLD) {
             ApplyImpactDamage(slot, kart, impactSpeed);
             if (kart.health <= 0) {
-                BreakMelon(slot, kart);
-                return; // teleported/reset this tick — nothing else to update
+                // impactDelta is the sudden change physics forced onto the
+                // velocity we commanded — i.e. roughly the direction the
+                // wall shoved the melon back in, not wherever it happened to
+                // be tumbling toward. That's what the break particles should
+                // point along, not the melon's own (essentially random while
+                // rolling) orientation.
+                BreakMelon(slot, kart, impactDelta, impactSpeed);
+                return; // now broken/frozen this tick — nothing else to update
             }
         }
     }
@@ -787,18 +874,75 @@ function ApplyImpactDamage(slot, kart, impactSpeed) {
     );
 }
 
-/** @param {number} slot @param {Kart} kart */
-function BreakMelon(slot, kart) {
-    Debug(`slot ${slot}: melon broke — respawning at checkpoint ${kart.checkpointIndex}`);
-    kart.melon.Teleport({
-        position: kart.checkpointPosition,
-        angles: kart.checkpointAngles,
-        velocity: { x: 0, y: 0, z: 0 },
-    });
-    kart.health = MELON_MAX_HEALTH;
-    // Cleared, not measured against zero: the teleport above is our own
-    // intentional velocity reset, not a physical impact to react to.
+/**
+ * Converts a direction vector into the pitch/yaw/roll a particle template
+ * should spawn with to visually point along it (Source's angle convention:
+ * yaw rotates around Z, pitch is negative-up/positive-down from horizontal).
+ * @param {{ x: number, y: number, z: number }} dir @param {number} length
+ */
+function DirectionToAngles(dir, length) {
+    const yaw = (Math.atan2(dir.y, dir.x) * 180) / Math.PI;
+    const pitch = -(Math.asin(Math.min(1, Math.max(-1, dir.z / length))) * 180) / Math.PI;
+    return { pitch, yaw, roll: 0 };
+}
+
+/** @param {any} position @param {any} angles */
+function SpawnBreakParticles(position, angles) {
+    const template = Instance.FindEntityByName(BREAK_PARTICLE_TEMPLATE_NAME);
+    if (!template) {
+        Debug(`SpawnBreakParticles: no entity named "${BREAK_PARTICLE_TEMPLATE_NAME}" found — add a point_template in Hammer with a "Start Active" particle system to see break effects`);
+        return;
+    }
+    if (!(template instanceof PointTemplate)) {
+        Debug(`SpawnBreakParticles: entity "${BREAK_PARTICLE_TEMPLATE_NAME}" exists but is a ${template.GetClassName()}, not a point_template`);
+        return;
+    }
+    template.ForceSpawn(position, angles);
+}
+
+/** @param {number} slot @param {Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed */
+function BreakMelon(slot, kart, impactDir, impactSpeed) {
+    if (kart.breaking) {
+        return; // already broken and counting down to its respawn
+    }
+    kart.breaking = true;
+    const breakPosition = kart.melon.GetAbsOrigin();
+    // Oriented along the velocity change the impact caused, not the melon's
+    // own orientation — while rolling, that's an essentially random tumble
+    // unrelated to which way it just got hit.
+    const breakAngles = DirectionToAngles(impactDir, impactSpeed);
+    // Remembered so the player's melon_paint color survives the respawn —
+    // BREAK_TINT below only covers it up temporarily.
+    const paintColor = kart.melon.GetColor();
+    Debug(`slot ${slot}: melon broke at ${JSON.stringify(breakPosition)} — respawning at checkpoint ${kart.checkpointIndex} in ${BREAK_RESPAWN_DELAY}s`);
+
+    kart.melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
+    // Cleared, not measured against zero: this is our own intentional
+    // velocity reset, not a physical impact to react to.
     kart.lastVelocity = undefined;
+    kart.melon.SetColor(BREAK_TINT);
+    SpawnBreakParticles(breakPosition, breakAngles);
+
+    Instance.Delay(BREAK_RESPAWN_DELAY).then(() => {
+        kart.breaking = false;
+        if (!kart.melon.IsValid()) {
+            return; // pruned meanwhile (e.g. the player disconnected)
+        }
+        kart.melon.SetColor(paintColor);
+        kart.health = MELON_MAX_HEALTH;
+        if (kart.locked) {
+            // The race flow moved on while this melon was mid-break (heat
+            // aborted, or a fresh BeginHeat/ReturnAllToHub already placed
+            // it) — that already-current teleport wins, don't stomp it with
+            // our now-stale checkpointPosition.
+            return;
+        }
+        kart.melon.Teleport({
+            position: kart.checkpointPosition,
+            angles: kart.checkpointAngles,
+            velocity: { x: 0, y: 0, z: 0 },
+        });
+    });
 }
 
 /** Fraction of the jump cooldown that has recharged, 0 (just used) to 1 (ready). */
@@ -893,8 +1037,15 @@ Instance.OnScriptReload({
 Instance.OnPlayerReset(({ player }) => {
     Debug(`OnPlayerReset: slot=${player.GetPlayerController()?.GetPlayerSlot()}`);
     player.SetMoveType(CSMoveType.NONE);
-    GetOrCreateKart(player);
-    ParkPawn(player);
+    const kart = GetOrCreateKart(player);
+    // Only park once we actually have a melon to anchor against — see
+    // ParkPawn's comment. If GetOrCreateKart failed (e.g. melon_template
+    // isn't spawned in yet), leave the pawn at its real origin so the next
+    // OnPlayerReset retry captures a valid ground position instead of an
+    // already-parked one.
+    if (kart) {
+        ParkPawn(player, kart.melon);
+    }
 });
 
 Instance.OnPlayerDisconnect(({ playerSlot }) => {
@@ -960,7 +1111,14 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
         return;
     }
     kart.checkpointIndex = index;
-    kart.checkpointPosition = trigger.GetAbsOrigin();
+    // + TELEPORT_UP_OFFSET for the same reason BeginHeat/ReturnAllToHub add
+    // it to their teleport targets: mappers commonly sink a checkpoint
+    // trigger's brush into the floor so a fast-moving melon reliably
+    // touches it, and teleporting to that exact (embedded) height would
+    // otherwise make a later respawn (e.g. after BreakMelon) tunnel the
+    // melon down through the floor instead of landing on it.
+    const origin = trigger.GetAbsOrigin();
+    kart.checkpointPosition = { x: origin.x, y: origin.y, z: origin.z + TELEPORT_UP_OFFSET };
     kart.checkpointAngles = trigger.GetAbsAngles();
     Debug(`checkpoint_${trackId}_${index}: kart advanced to checkpoint ${index} on track ${trackId}`);
 }
@@ -1093,6 +1251,11 @@ Instance.OnCustomHudClicked((event) => {
     }
     if (event.buttonId === "hub_start_button") {
         TryStartRace();
+    } else if (event.buttonId === "hub_close_button") {
+        // Dismiss just for the player who clicked it — doesn't touch
+        // kart.inHub, so they're still pulled into the next heat that starts
+        // while they're standing in hub_start_trigger, same as before.
+        HideHubModal(event.player.GetPlayerSlot());
     } else if (event.buttonId === "hub_abort_button") {
         const slot = event.player.GetPlayerSlot();
         if (IsModerator(slot)) {

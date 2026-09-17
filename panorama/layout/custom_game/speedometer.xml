@@ -25,13 +25,16 @@
 		     While a heat is running, the moderator (IsModerator class) sees
 		     an abort button instead of the plain waiting message. -->
 		<Panel id="hub_modal" class="HubModal Hidden">
-			<Label class="HubTitle" text="Bereit zum Start?" />
+			<Button id="hub_close_button" class="HubCloseButton">
+				<Label class="HubCloseIcon" text="✕" />
+			</Button>
+			<Label class="HubTitle" text="Ready for racing?" />
 			<Button id="hub_start_button" class="HubStartButton">
-				<Label text="Jetzt starten" />
+				<Label text="Start race" />
 			</Button>
 			<Label class="HubWaitingLabel" text="Rennen läuft bereits…" />
 			<Button id="hub_abort_button" class="HubAbortButton">
-				<Label text="Rennen abbrechen" />
+				<Label text="Cancel race" />
 			</Button>
 		</Panel>
 
