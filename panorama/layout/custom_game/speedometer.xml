@@ -1,0 +1,34 @@
+<root>
+	<styles>
+		<include src="file://{resources}/styles/custom_game/speedometer.css" />
+	</styles>
+
+	<Panel class="Root">
+		<Panel id="checkpoint_panel" class="CheckpointPanel Hidden">
+			<Label class="CheckpointLabel" text="CHECKPOINT" />
+			<Panel class="CheckpointRow">
+				<Label id="checkpoint_current" class="CheckpointCurrent" text="{s:current}" />
+				<Label class="CheckpointSlash" text="/" />
+				<Label id="checkpoint_total" class="CheckpointTotal" text="{s:total}" />
+			</Panel>
+		</Panel>
+
+		<Panel id="speed_panel" class="SpeedPanel">
+			<Label id="speed_value" class="SpeedValue" text="{s:speed}" />
+			<Label class="SpeedUnit" text="KM/H" />
+		</Panel>
+
+		<Panel id="jump_bar" class="JumpBar">
+			<Panel id="jump_seg_0" class="JumpSegment" />
+			<Panel id="jump_seg_1" class="JumpSegment" />
+			<Panel id="jump_seg_2" class="JumpSegment" />
+			<Panel id="jump_seg_3" class="JumpSegment" />
+			<Panel id="jump_seg_4" class="JumpSegment" />
+			<Panel id="jump_seg_5" class="JumpSegment" />
+			<Panel id="jump_seg_6" class="JumpSegment" />
+			<Panel id="jump_seg_7" class="JumpSegment" />
+			<Panel id="jump_seg_8" class="JumpSegment" />
+			<Panel id="jump_seg_9" class="JumpSegment" />
+		</Panel>
+	</Panel>
+</root>

@@ -1,0 +1,129 @@
+.Root {
+    width: 100%;
+    height: 100%;
+}
+
+/* Only shown while the kart is on a track (script toggles "Hidden" via
+   SetHasClassForPlayer once kart.trackId is set). */
+.CheckpointPanel {
+    horizontal-align: center;
+    vertical-align: top;
+    margin-top: 30px;
+
+    flow-children: down;
+
+    padding: 8px 20px;
+    background-color: #000000aa;
+    border: 2px solid #ffffff55;
+    border-radius: 8px;
+
+    transition-property: opacity;
+    transition-duration: .15s;
+    opacity: 1;
+
+    &.Hidden {
+        opacity: 0;
+    }
+}
+
+.CheckpointLabel {
+    font-size: 14px;
+    letter-spacing: 1px;
+    color: #ffffffaa;
+    horizontal-align: center;
+}
+
+.CheckpointRow {
+    flow-children: right;
+    horizontal-align: center;
+}
+
+.CheckpointCurrent {
+    font-size: 32px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 2px 2px 2px black;
+}
+
+.CheckpointSlash {
+    font-size: 32px;
+    color: #ffffff77;
+    margin-left: 4px;
+    margin-right: 4px;
+}
+
+.CheckpointTotal {
+    font-size: 32px;
+    color: #ffffffcc;
+}
+
+#speed_panel {
+    horizontal-align: right;
+    vertical-align: bottom;
+    margin-right: 40px;
+    margin-bottom: 60px;
+
+    flow-children: down;
+
+    padding: 10px 24px;
+    background-color: #000000aa;
+    border: 2px solid #ffffff55;
+    border-radius: 8px;
+}
+
+.SpeedValue {
+    font-size: 48px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 2px 2px 2px black;
+    horizontal-align: center;
+}
+
+.SpeedUnit {
+    font-size: 16px;
+    color: #ffffffaa;
+    horizontal-align: center;
+    margin-top: -4px;
+}
+
+/* Jump recharge bar: a row of segments that light up left-to-right as the
+   cooldown refills, driven from script via SetHasClassForPlayer("Filled"). */
+.JumpBar {
+    horizontal-align: right;
+    vertical-align: bottom;
+    margin-right: 40px;
+    margin-bottom: 20px;
+
+    flow-children: right;
+
+    padding: 6px;
+    background-color: #000000aa;
+    border: 2px solid #ffffff55;
+    border-radius: 6px;
+
+    transition-property: border-color;
+    transition-duration: .15s;
+
+    &.Ready {
+        border-color: #ffe066;
+    }
+}
+
+.JumpSegment {
+    width: 16px;
+    height: 16px;
+    margin-left: 3px;
+    background-color: #ffffff33;
+    border-radius: 3px;
+
+    transition-property: background-color;
+    transition-duration: .1s;
+
+    &:first-child {
+        margin-left: 0px;
+    }
+
+    &.Filled {
+        background-color: #ffe066;
+    }
+}
