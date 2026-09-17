@@ -319,3 +319,160 @@
         background-color: #ffe066;
     }
 }
+
+/* General user menu (USE to toggle) — same modal look/pattern as .HubModal,
+   kept separate since the two aren't shown for the same reason and can grow
+   independently (see melon_drive.js's SetUserMenuOpen). */
+.UserMenu {
+    width: 360px;
+    horizontal-align: center;
+    vertical-align: center;
+
+    flow-children: down;
+
+    padding: 24px;
+    background-color: #000000ee;
+    border: 1px solid #ffe066;
+    border-radius: 8px;
+
+    transition-property: opacity;
+    transition-duration: .15s;
+    opacity: 1;
+
+    &.Hidden {
+        opacity: 0;
+    }
+}
+
+.UserMenuCloseButton {
+    horizontal-align: right;
+    vertical-align: top;
+    margin-top: -12px;
+    margin-right: -12px;
+    padding-left: 3px;
+    width: 24px;
+    height: 24px;
+
+    border-radius: 12px;
+    background-color: #ffffff22;
+
+    transition-property: background-color;
+    transition-duration: .1s;
+    &:hover {
+        background-color: #ffffff44;
+    }
+}
+
+.UserMenuCloseIcon {
+    font-size: 14px;
+    font-weight: bold;
+    color: #ffffffcc;
+    horizontal-align: center;
+    vertical-align: center;
+}
+
+.UserMenuTitle {
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+    horizontal-align: center;
+    margin-bottom: 16px;
+}
+
+.UserMenuActionButton {
+    horizontal-align: center;
+    border-radius: 4px;
+    padding: 10px 20px;
+    font-size: 16px;
+
+    background-color: #ffffff22;
+    color: white;
+
+    transition-property: background-color;
+    transition-duration: .1s;
+    &:hover {
+        background-color: #ffffff33;
+    }
+}
+
+.UserMenuSectionLabel {
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: #ffffff88;
+    horizontal-align: center;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.UserMenuColorRow {
+    flow-children: right;
+    horizontal-align: center;
+}
+
+/* Plain flat swatches, not tied to melon_paint's r/g/b-in-the-name trigger
+   convention — usermenu_color_<key> in melon_drive.js's COLOR_PRESETS is the
+   source of truth for the actual applied color, these just need to look
+   like it. Keep new swatches' class colors in sync with COLOR_PRESETS. */
+.ColorSwatch {
+    width: 32px;
+    height: 32px;
+    margin-left: 8px;
+    border-radius: 16px;
+    border: 2px solid #ffffff55;
+
+    transition-property: border-color;
+    transition-duration: .1s;
+
+    &:first-child {
+        margin-left: 0px;
+    }
+
+    &:hover {
+        border-color: #ffffffcc;
+    }
+}
+
+.ColorSwatchRed { background-color: #dc3c3c; }
+.ColorSwatchOrange { background-color: #e68c32; }
+.ColorSwatchYellow { background-color: #ffe066; }
+.ColorSwatchGreen { background-color: #5ac85a; }
+.ColorSwatchBlue { background-color: #5a8ce6; }
+.ColorSwatchPurple { background-color: #aa64dc; }
+.ColorSwatchWhite { background-color: #ffffff; }
+.ColorSwatchBlack { background-color: #282828; }
+
+/* Camera distance "slider" — a row of clickable notch buttons, same visual
+   language as .JumpBar/.JumpSegment above (filled left-to-right up to the
+   current step, driven from melon_drive.js's UpdateCameraDistanceHud). */
+.DistanceSlider {
+    horizontal-align: center;
+    flow-children: right;
+
+    padding: 6px;
+    background-color: #000000aa;
+    border: 2px solid #ffffff55;
+    border-radius: 6px;
+}
+
+.DistanceSegment {
+    width: 24px;
+    height: 16px;
+    margin-left: 3px;
+    background-color: #ffffff33;
+    border-radius: 3px;
+
+    transition-property: background-color;
+    transition-duration: .1s;
+
+    &:first-child {
+        margin-left: 0px;
+    }
+
+    &:hover {
+        background-color: #ffffff55;
+    }
+
+    &.Filled {
+        background-color: #ffe066;
+    }
+}

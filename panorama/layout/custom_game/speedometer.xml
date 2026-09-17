@@ -61,5 +61,52 @@
 			<Panel id="jump_seg_8" class="JumpSegment" />
 			<Panel id="jump_seg_9" class="JumpSegment" />
 		</Panel>
+
+		<!-- Press USE to toggle: a general-purpose settings/actions menu, not
+		     tied to any single map trigger (see UpdateUserMenu/SetUserMenuOpen
+		     and the "usermenu_*" buttonId handling in melon_drive.js). Add more
+		     rows/sections here for future options — each is just another
+		     labeled control, no restructuring needed. -->
+		<Panel id="user_menu" class="UserMenu Hidden">
+			<Button id="usermenu_close_button" class="UserMenuCloseButton">
+				<Label class="UserMenuCloseIcon" text="✕" />
+			</Button>
+			<Label class="UserMenuTitle" text="Menu" />
+
+			<Button id="usermenu_respawn_button" class="UserMenuActionButton">
+				<Label text="Respawn at last checkpoint" />
+			</Button>
+
+			<Label class="UserMenuSectionLabel" text="COLOR" />
+			<Panel class="UserMenuColorRow">
+				<Button id="usermenu_color_red" class="ColorSwatch ColorSwatchRed" />
+				<Button id="usermenu_color_orange" class="ColorSwatch ColorSwatchOrange" />
+				<Button id="usermenu_color_yellow" class="ColorSwatch ColorSwatchYellow" />
+				<Button id="usermenu_color_green" class="ColorSwatch ColorSwatchGreen" />
+				<Button id="usermenu_color_blue" class="ColorSwatch ColorSwatchBlue" />
+				<Button id="usermenu_color_purple" class="ColorSwatch ColorSwatchPurple" />
+				<Button id="usermenu_color_white" class="ColorSwatch ColorSwatchWhite" />
+				<Button id="usermenu_color_black" class="ColorSwatch ColorSwatchBlack" />
+			</Panel>
+
+			<!-- "Slider" for third-person camera distance — CustomHudLayout has
+			     no native slider/drag widget (see melon_drive.js), so this is a
+			     row of clickable notches instead: click one to jump straight to
+			     that distance. Filled up to the current step via the "Filled"
+			     class, same convention as jump_bar's segments above. -->
+			<Label class="UserMenuSectionLabel" text="CAMERA DISTANCE" />
+			<Panel id="camdist_slider" class="DistanceSlider">
+				<Button id="camdist_seg_0" class="DistanceSegment" />
+				<Button id="camdist_seg_1" class="DistanceSegment" />
+				<Button id="camdist_seg_2" class="DistanceSegment" />
+				<Button id="camdist_seg_3" class="DistanceSegment" />
+				<Button id="camdist_seg_4" class="DistanceSegment" />
+				<Button id="camdist_seg_5" class="DistanceSegment" />
+				<Button id="camdist_seg_6" class="DistanceSegment" />
+				<Button id="camdist_seg_7" class="DistanceSegment" />
+				<Button id="camdist_seg_8" class="DistanceSegment" />
+				<Button id="camdist_seg_9" class="DistanceSegment" />
+			</Panel>
+		</Panel>
 	</Panel>
 </root>

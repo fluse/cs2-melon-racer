@@ -95,6 +95,23 @@ const HUB_TRIGGER_NAME = "hub_start_trigger";
 // paint trigger's color is a pure Hammer edit, same convention as
 // track_start_* in GetTrackConfig().
 const PAINT_TRIGGER_NAME_PATTERN = /^paint_trigger_(\d+)_(\d+)_(\d+)$/;
+
+// Color swatches offered by the user menu's color picker (see the
+// "usermenu_color_<key>" buttonId handling below) — a fixed palette rather
+// than a full picker since panorama's CustomHudLayout only supports basic
+// panels/buttons, not input widgets like a color wheel.
+/** @type {Record<string, { r: number, g: number, b: number, a: number }>} */
+const COLOR_PRESETS = {
+    red: { r: 220, g: 60, b: 60, a: 255 },
+    orange: { r: 230, g: 140, b: 50, a: 255 },
+    yellow: { r: 255, g: 224, b: 102, a: 255 },
+    green: { r: 90, g: 200, b: 90, a: 255 },
+    blue: { r: 90, g: 140, b: 230, a: 255 },
+    purple: { r: 170, g: 100, b: 220, a: 255 },
+    white: { r: 255, g: 255, b: 255, a: 255 },
+    black: { r: 40, g: 40, b: 40, a: 255 },
+};
+
 const COUNTDOWN_SECONDS = 3;
 const BREAK_SECONDS = 10; // fixed by the original request
 // Spacing between racers teleported onto the same start line side-by-side,
@@ -180,10 +197,20 @@ const PAWN_PARK_HEIGHT = 3000;
 
 // Offsets for CameraFollowConfig — behind and above the melon. cameraOffset
 // is rotated by the player's eye angles: x is forward (negative = behind),
-// z is up. Pulled further back and lowered closer to the ground for a wider,
-// more ground-level third-person view.
+// z is up. Height/lateral are fixed; only the backward distance is
+// player-adjustable (see CAMERA_DISTANCE_* and GetCameraOffsetFor below, and
+// the user menu's camera distance control).
 const FOLLOW_OFFSET = { x: 0, y: 0, z: 20 };
-const CAMERA_OFFSET = { x: -320, y: 0, z: 80 };
+const CAMERA_HEIGHT = 80;
+const CAMERA_LATERAL = 0;
+const CAMERA_DISTANCE_MIN = 150;
+const CAMERA_DISTANCE_MAX = 600;
+const CAMERA_DISTANCE_DEFAULT = 320; // matches the old fixed CAMERA_OFFSET.x
+// CustomHudLayout only supports Panel/Label/Image/Button — no native
+// slider/drag widget — so the user menu's "distance slider" is really a
+// clickable row of notches the player picks from, same trick as the jump
+// recharge bar (JUMP_BAR_SEGMENTS) below. This is how many notches it has.
+const CAMERA_DISTANCE_STEPS = 10;
 
 // Name of the custom_hud_layout entity (place one in Hammer pointing at
 // panorama/layout/custom_game/speedometer.vxml) that shows the speedometer.
@@ -206,7 +233,8 @@ function Debug(text) {
  *   health: number, lastVelocity: { x: number, y: number, z: number } | undefined,
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
- *   breaking: boolean,
+ *   breaking: boolean, paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean,
+ *   cameraDistance: number,
  * }} Kart
  */
 /** @type {Map<number, Kart>} */
@@ -295,6 +323,43 @@ function UpdateJumpHud(slot, kart) {
     hud.SetHasClassForPlayer(slot, "jump_bar", "Ready", charge >= 1);
 }
 
+// "Slider" for the third-person camera distance — really a clickable row of
+// notches (camdist_seg_0 .. camdist_seg_{CAMERA_DISTANCE_STEPS-1} buttons in
+// speedometer.xml, handled in OnCustomHudClicked), since CustomHudLayout has
+// no native drag/slider widget. Filled the same way the jump bar is, up to
+// the step the current cameraDistance falls on.
+/** @param {number} distance */
+function CameraDistanceStepFor(distance) {
+    const fraction = (distance - CAMERA_DISTANCE_MIN) / (CAMERA_DISTANCE_MAX - CAMERA_DISTANCE_MIN);
+    return Math.round(fraction * (CAMERA_DISTANCE_STEPS - 1));
+}
+
+/** @param {number} step */
+function CameraDistanceForStep(step) {
+    const fraction = CAMERA_DISTANCE_STEPS > 1 ? step / (CAMERA_DISTANCE_STEPS - 1) : 0;
+    return CAMERA_DISTANCE_MIN + fraction * (CAMERA_DISTANCE_MAX - CAMERA_DISTANCE_MIN);
+}
+
+/** @param {Kart} kart */
+function UpdateCameraDistanceHud(kart) {
+    const hud = GetSpeedHud();
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (!hud || slot === undefined) {
+        return;
+    }
+    const filledSegments = CameraDistanceStepFor(kart.cameraDistance) + 1;
+    for (let i = 0; i < CAMERA_DISTANCE_STEPS; i++) {
+        hud.SetHasClassForPlayer(slot, `camdist_seg_${i}`, "Filled", i < filledSegments);
+    }
+}
+
+/** Applies a new camera distance (picked via the user menu's slider) immediately, without waiting for a respawn. @param {Kart} kart @param {number} step */
+function SetCameraDistance(kart, step) {
+    kart.cameraDistance = CameraDistanceForStep(step);
+    ApplyCameraFollow(kart);
+    UpdateCameraDistanceHud(kart);
+}
+
 /** @param {number} slot @param {Kart} kart */
 function UpdateCheckpointHud(slot, kart) {
     const hud = GetSpeedHud();
@@ -369,6 +434,36 @@ function HideHubModal(slot) {
     }
     hud.SetHasClassForPlayer(slot, "hub_modal", "Hidden", true);
     hud.SetInputCaptureEnabled(slot, false);
+}
+
+// User menu: press USE anywhere (regardless of race phase) to open a small
+// panel with actions/settings that aren't tied to any single map trigger —
+// currently "respawn at last checkpoint" and a color picker, with room to
+// add more rows later (see "usermenu_*" buttonId handling in
+// OnCustomHudClicked). Deliberately independent of kart.locked/breaking so
+// it also works as an unstuck button while the melon is frozen.
+/** @param {number} slot @param {Kart} kart @param {boolean} open */
+function SetUserMenuOpen(slot, kart, open) {
+    kart.userMenuOpen = open;
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
+    // NOTE: like hub_modal above, this blindly sets the whole layout's
+    // capture flag rather than combining with hub_modal's own on/off calls.
+    // The two modals are opened from unrelated triggers (standing in the
+    // hub vs. pressing USE anywhere) and aren't expected to be shown at the
+    // same time; if that ever changes, this'll need to track combined state
+    // instead of each panel fighting over one shared flag.
+    hud.SetInputCaptureEnabled(slot, open);
+}
+
+/** @param {number} slot @param {Kart} kart */
+function UpdateUserMenu(slot, kart) {
+    if (kart.pawn.WasInputJustPressed(CSInputs.USE)) {
+        SetUserMenuOpen(slot, kart, !kart.userMenuOpen);
+    }
 }
 
 // Clicking "Jetzt starten" pulls every kart *currently standing in the hub
@@ -677,18 +772,30 @@ function ParkPawn(pawn, melon) {
     pawn.Teleport({ position: { x: origin.x, y: origin.y, z: origin.z + PAWN_PARK_HEIGHT } });
 }
 
-function AttachCamera(pawn, melon) {
-    // CustomPlayerCamera lives on the pawn instance, so this must be
-    // re-called every time the player gets a fresh pawn (each respawn).
-    const camera = pawn.GetCustomCamera();
+/** @param {Kart} kart */
+function GetCameraOffsetFor(kart) {
+    return { x: -kart.cameraDistance, y: CAMERA_LATERAL, z: CAMERA_HEIGHT };
+}
+
+/**
+ * (Re-)applies the third-person follow camera from a kart's current
+ * pawn/melon/cameraDistance. Called both when the camera first needs
+ * attaching (CustomPlayerCamera lives on the pawn instance, so this must be
+ * re-called every time the player gets a fresh pawn, i.e. each respawn) and
+ * whenever the user menu's distance control changes cameraDistance, so the
+ * new distance takes effect immediately instead of waiting for a respawn.
+ * @param {Kart} kart
+ */
+function ApplyCameraFollow(kart) {
+    const camera = kart.pawn.GetCustomCamera();
     camera.SetMode(CustomCameraMode.FOLLOW_POSITION);
     camera.SetFollowConfig({
-        followEntity: melon,
+        followEntity: kart.melon,
         followOffset: FOLLOW_OFFSET,
-        cameraOffset: CAMERA_OFFSET,
+        cameraOffset: GetCameraOffsetFor(kart),
         clipCameraOffset: false,
     });
-    Debug(`AttachCamera: mode=${camera.GetMode()} for slot=${pawn.GetPlayerController()?.GetPlayerSlot()}`);
+    Debug(`ApplyCameraFollow: mode=${camera.GetMode()} distance=${kart.cameraDistance} for slot=${kart.pawn.GetPlayerController()?.GetPlayerSlot()}`);
 }
 
 function GetOrCreateKart(pawn) {
@@ -726,6 +833,7 @@ function GetOrCreateKart(pawn) {
             kart.health = MELON_MAX_HEALTH;
             kart.lastVelocity = undefined;
             kart.breaking = false;
+            kart.melon.SetColor(kart.paintColor); // the fresh melon starts undyed — re-apply the kept paint job
         } else {
             // Truly new — no prior checkpoint, so fall back to the player's
             // own current spawn point/facing as the "respawn here" location.
@@ -745,6 +853,9 @@ function GetOrCreateKart(pawn) {
                 finished: false,
                 locked: false,
                 breaking: false,
+                paintColor: { r: 255, g: 255, b: 255, a: 255 },
+                userMenuOpen: false,
+                cameraDistance: CAMERA_DISTANCE_DEFAULT,
             };
         }
         karts.set(slot, kart);
@@ -754,7 +865,8 @@ function GetOrCreateKart(pawn) {
     }
 
     HidePawnModel(pawn);
-    AttachCamera(pawn, kart.melon);
+    ApplyCameraFollow(kart);
+    UpdateCameraDistanceHud(kart);
     return kart;
 }
 
@@ -900,6 +1012,39 @@ function SpawnBreakParticles(position, angles) {
     template.ForceSpawn(position, angles);
 }
 
+/**
+ * Teleports a kart's melon back to its last checkpoint and resets it to a
+ * fresh, undamaged state — the shared final step of both the automatic
+ * post-break respawn and the manual "Respawn at last checkpoint" user menu
+ * button.
+ * @param {Kart} kart
+ */
+function RespawnKartAtCheckpoint(kart) {
+    kart.melon.Teleport({
+        position: kart.checkpointPosition,
+        angles: kart.checkpointAngles,
+        velocity: { x: 0, y: 0, z: 0 },
+    });
+    kart.health = MELON_MAX_HEALTH;
+    // Cleared, not measured against zero: this is our own intentional
+    // velocity reset, not a physical impact to react to.
+    kart.lastVelocity = undefined;
+}
+
+/**
+ * Sets a kart's melon color and remembers it so it survives a break/respawn
+ * (BreakMelon covers the melon with BREAK_TINT temporarily, without losing
+ * track of the color underneath). Used by both the melon_paint map trigger
+ * and the user menu's color swatches.
+ * @param {Kart} kart @param {{ r: number, g: number, b: number, a: number }} color
+ */
+function SetKartPaintColor(kart, color) {
+    kart.paintColor = color;
+    if (!kart.breaking) {
+        kart.melon.SetColor(color);
+    }
+}
+
 /** @param {number} slot @param {Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed */
 function BreakMelon(slot, kart, impactDir, impactSpeed) {
     if (kart.breaking) {
@@ -911,16 +1056,11 @@ function BreakMelon(slot, kart, impactDir, impactSpeed) {
     // own orientation — while rolling, that's an essentially random tumble
     // unrelated to which way it just got hit.
     const breakAngles = DirectionToAngles(impactDir, impactSpeed);
-    // Remembered so the player's melon_paint color survives the respawn —
-    // BREAK_TINT below only covers it up temporarily.
-    const paintColor = kart.melon.GetColor();
     Debug(`slot ${slot}: melon broke at ${JSON.stringify(breakPosition)} — respawning at checkpoint ${kart.checkpointIndex} in ${BREAK_RESPAWN_DELAY}s`);
 
     kart.melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
-    // Cleared, not measured against zero: this is our own intentional
-    // velocity reset, not a physical impact to react to.
     kart.lastVelocity = undefined;
-    kart.melon.SetColor(BREAK_TINT);
+    kart.melon.SetColor(BREAK_TINT); // kart.paintColor itself is untouched, restored below
     SpawnBreakParticles(breakPosition, breakAngles);
 
     Instance.Delay(BREAK_RESPAWN_DELAY).then(() => {
@@ -928,20 +1068,16 @@ function BreakMelon(slot, kart, impactDir, impactSpeed) {
         if (!kart.melon.IsValid()) {
             return; // pruned meanwhile (e.g. the player disconnected)
         }
-        kart.melon.SetColor(paintColor);
-        kart.health = MELON_MAX_HEALTH;
+        kart.melon.SetColor(kart.paintColor);
         if (kart.locked) {
             // The race flow moved on while this melon was mid-break (heat
             // aborted, or a fresh BeginHeat/ReturnAllToHub already placed
             // it) — that already-current teleport wins, don't stomp it with
             // our now-stale checkpointPosition.
+            kart.health = MELON_MAX_HEALTH;
             return;
         }
-        kart.melon.Teleport({
-            position: kart.checkpointPosition,
-            angles: kart.checkpointAngles,
-            velocity: { x: 0, y: 0, z: 0 },
-        });
+        RespawnKartAtCheckpoint(kart);
     });
 }
 
@@ -979,6 +1115,7 @@ function Think() {
             karts.delete(slot);
             continue;
         }
+        UpdateUserMenu(slot, kart); // checked before UpdateKart's locked/breaking early-returns — USE works as an unstuck button
         UpdateKart(slot, kart, dt);
         UpdateSpeedHud(slot, kart.melon);
         UpdateJumpHud(slot, kart);
@@ -1241,7 +1378,7 @@ Instance.OnScriptInput("melon_paint", ({ caller, activator }) => {
         return;
     }
     const [, r, g, b] = match.map(Number);
-    kart.melon.SetColor({ r, g, b, a: 255 });
+    SetKartPaintColor(kart, { r, g, b, a: 255 });
     Debug(`melon_paint: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} painted (${r}, ${g}, ${b})`);
 });
 
@@ -1262,6 +1399,47 @@ Instance.OnCustomHudClicked((event) => {
             TryAbortRace();
         } else {
             Debug(`hub_abort_button: slot ${slot} clicked but isn't the moderator, ignoring`);
+        }
+    } else if (event.buttonId === "usermenu_close_button") {
+        const slot = event.player.GetPlayerSlot();
+        const kart = karts.get(slot);
+        if (kart) {
+            SetUserMenuOpen(slot, kart, false);
+        }
+    } else if (event.buttonId === "usermenu_respawn_button") {
+        const slot = event.player.GetPlayerSlot();
+        const kart = karts.get(slot);
+        if (!kart) {
+            return;
+        }
+        if (kart.breaking) {
+            // Already mid-respawn from a break — it's about to land at this
+            // same checkpoint on its own, nothing for this click to do.
+            Debug(`usermenu_respawn_button: slot ${slot} kart is already breaking/respawning, ignoring`);
+            return;
+        }
+        RespawnKartAtCheckpoint(kart);
+        SetUserMenuOpen(slot, kart, false);
+    } else if (event.buttonId.startsWith("usermenu_color_")) {
+        const key = event.buttonId.slice("usermenu_color_".length);
+        const preset = COLOR_PRESETS[key];
+        if (!preset) {
+            Debug(`usermenu_color_${key}: no such color preset, ignoring`);
+            return;
+        }
+        const kart = karts.get(event.player.GetPlayerSlot());
+        if (kart) {
+            SetKartPaintColor(kart, preset);
+        }
+    } else if (event.buttonId.startsWith("camdist_seg_")) {
+        const step = Number(event.buttonId.slice("camdist_seg_".length));
+        if (!Number.isInteger(step) || step < 0 || step >= CAMERA_DISTANCE_STEPS) {
+            Debug(`camdist_seg_${step}: not a valid distance step, ignoring`);
+            return;
+        }
+        const kart = karts.get(event.player.GetPlayerSlot());
+        if (kart) {
+            SetCameraDistance(kart, step);
         }
     }
 });
