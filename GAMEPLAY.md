@@ -116,29 +116,155 @@ not yet done in the map:
   at 1).
 
 A kart isn't considered "on" any track until it touches that track's `_1`
-checkpoint — that's what both picks a track (a racer can drive into whichever
-track's start they want) and restarts a lap (driving through `_1` again
-resets progress on that track). Checkpoints past `_1` only advance progress
-if the kart is already on that same track, so cutting across into a
-different track's later checkpoints doesn't skip anything — and, as before,
-progress only ever moves forward, never backward. Progress is tracked per
-kart (keyed by melon entity). The last-touched checkpoint's position/angles
-are also where a broken melon respawns (see above).
+checkpoint — that's what picks a track (a racer can drive into whichever
+track's start they want). Checkpoints past `_1` only advance progress if the
+kart is already on that same track, so cutting across into a different
+track's later checkpoints doesn't skip anything — and, as before, progress
+only ever moves forward, never backward. Progress is tracked per kart (keyed
+by melon entity). The last-touched checkpoint's position/angles are also
+where a broken melon respawns (see above).
+
+Re-touching `_1` while already on that same track does **not** by itself
+restart/complete a lap — that's a separate `finish_<trackId>` input, see
+"Hub → race → next-track flow" below. Splitting "pick a track" from "count a
+completed lap" into two independent script inputs means they can be wired on
+different triggers entirely (e.g. `finish_<trackId>` on the track's own
+`track_start_*` trigger, since that's already sitting on the finish line)
+without caring which one Hammer fires first, or even whether they're the
+same physical trigger at all. It does still move `checkpointIndex` from `0`
+to `1` on that re-touch, same as any other forward progress — `finish_<trackId>`
+is what resets it to `0` when a lap completes, so this is what makes the next
+lap's first leg register at all instead of the HUD sitting at "0" until
+checkpoint 2.
 
 While on a track, the HUD shows `<checkpoints reached> / <total on this
-track>` (hidden entirely otherwise). cs_script has no way to ask Hammer how
-many checkpoint triggers exist for a given track, so the total is a manually
-maintained lookup, `TRACK_CHECKPOINT_COUNTS` in `melon_drive.js` — **update
-it whenever checkpoints are added/removed/reordered on a track in Hammer**,
-or the HUD will show "?" (a track missing from that map) or a wrong total.
+track>` (hidden entirely otherwise). The total (and the laps-to-win count
+used by the flow below) comes from parsing that track's `track_start_*`
+trigger name — see "Hub → race → next-track flow" — so a track missing that
+trigger (or missing from the map) shows "?" instead of guessing.
 
 **Open question this raises**: should different tracks be mutually
 exclusive lap-wise (finishing/leaving one clears `trackId` back to
 "undecided"), or can a racer freely hop between tracks mid-run with each
 track's progress remembered independently? Currently it's the latter by
 accident (switching tracks only overwrites `checkpointIndex`/position, a
-track's own progress isn't stored separately) — fine for now, but worth
-deciding before a real lap/finish system is built on top.
+track's own progress isn't stored separately) — this still holds for casual
+free-roam driving between race heats, but see the next section: while a race
+heat is active, only the currently active track's checkpoints matter for
+win/finish purposes.
+
+## Hub → race → next-track flow (decided, implemented)
+
+The map is one continuous space: a **hub** area where players gather/drive
+around freely, plus the racing tracks (see above). A full run through the
+map is a sequence of race **heats**, one per track, in ascending `trackId`
+order — not free late-joining mid-heat, and not a `changelevel` between
+"maps": the addon only ships a single `.vmap`, so "next map" from the
+original request means *next track in that sequence*, staying in the same
+map. All of this lives in `melon_drive.js` alongside the kart/checkpoint
+state it's tightly coupled to, not a separate `point_script` — same
+reasoning as checkpoints living there instead of their own file.
+
+**Track config lives entirely in the Hammer-authored start trigger**, not in
+a hand-maintained JS lookup: each track has one `trigger_multiple` named
+`track_start_<trackId>_cp<checkpointCount>_laps<lapsToWin>` (e.g.
+`track_start_1_cp8_laps3` = track 1, 8 checkpoints, 3 laps to win). Script
+finds every `trigger_multiple` in the map on first use, parses that name
+pattern, and builds the track list from it — adding/removing a track or
+changing its checkpoint/lap count is a pure Hammer edit, no script change
+needed. This trigger's transform is also where racers are teleported to
+spawn on that track; it does **not** replace the existing
+`checkpoint_<trackId>_1` trigger, which still does the actual
+lap/progress-tracking job every time a kart crosses the start line (first
+lap and every lap after) — the start trigger only supplies the spawn point
+and metadata, so it should be placed at/just behind that track's first
+checkpoint.
+
+Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
+
+1. **HUB** — default state, also the state the whole group returns to after
+   the last track's heat ends. A `trigger_multiple` named
+   `hub_start_trigger`, filtered to `prop_physics` like the checkpoints,
+   fires `hub_enter`/`hub_leave` script inputs on touch/untouch. While a
+   kart is in it, that player sees a modal ("Jetzt starten" button) on the
+   HUD — or, if a heat is already running for other players, a "race in
+   progress" message instead of the button. Clicking the button only starts
+   a heat if the phase is still `HUB`.
+2. Clicking start: **every kart currently standing in the hub trigger**
+   (not every connected player) is pulled into the heat — the ones outside
+   it stay in the hub. This matches the original request ("all players who
+   want to take part must be on the trigger area"). Their laps/checkpoint
+   progress resets and they're teleported to the lowest-`trackId` track's
+   start trigger (small per-racer lateral offset so they don't spawn
+   stacked on each other). `trackId` is set to that track right there,
+   rather than waiting for the physical `checkpoint_<trackId>_1` touch to
+   report it, so the checkpoint/lap HUD is already visible ("0/N", lap "1/M")
+   the instant the countdown starts instead of staying hidden until that
+   trigger fires; `checkpointIndex` itself stays `0` until the racer
+   actually crosses checkpoint 1, same as any other checkpoint.
+3. **COUNTDOWN** — every racing kart is `locked`: `UpdateKart` skips all
+   input/friction handling for a locked kart and just holds its horizontal
+   velocity at zero every tick (vertical velocity is left alone so gravity
+   still applies normally) — melons genuinely cannot be driven until this
+   ends. A large, centered "3…2…1" HUD label (see `speedometer.xml`'s
+   `countdown_label`) counts down for the racers only. `COUNTDOWN_SECONDS`
+   at the top of `melon_drive.js` controls the length.
+4. **RACING** — normal driving, existing checkpoint/lap logic, plus a
+   dedicated `finish_<trackId>` script input (registered for every
+   `1..MAX_TRACKS`, same pattern as `checkpoint_<trackId>_<index>`) that's
+   the sole thing that counts a completed lap. Wire it as an `OnStartTouch`
+   output, `RunScriptInput` with parameter `finish_<trackId>` (e.g. track 2
+   gets `finish_2`), on whichever trigger sits on that track's finish line —
+   the handler only reads *who* touched it (the melon), not *which entity*
+   fired the input, so this can be the track's own
+   `track_start_<trackId>_cp<N>_laps<M>` trigger (a natural fit, since start
+   and finish are normally the same line and that trigger already marks that
+   spot), the `checkpoint_<trackId>_1` trigger, or its own separate volume —
+   whichever matches the map's actual layout. On touch, if the kart is
+   actively racing this active track and has already reached its *last*
+   checkpoint since the previous lap started, that's a completed lap
+   (`kart.lapsCompleted += 1`, `checkpointIndex` reset to `0` — "no
+   checkpoints reached yet" — for the next lap); otherwise it's ignored (lap
+   not actually run yet). Once
+   `lapsCompleted >= lapsToWin`, that kart is marked `finished` (locked in
+   place, out of the way, so it doesn't keep re-triggering checkpoints) — it
+   does **not** end the heat by itself; see next. Kept as a separate input
+   from `checkpoint_<trackId>_1` (which only ever *picks* a track and never
+   touches `lapsCompleted`) specifically so both can be wired as outputs on
+   the same trigger, if that's how a track's laid out, without depending on
+   which one Hammer fires first — see "Multiple tracks & checkpoints" above.
+   `checkpoint_<trackId>_1` *does* still bump `checkpointIndex` from `0` back
+   to `1` on that re-touch, though, since this input is also what crosses the
+   start/finish line for every lap after the first — without that the HUD's
+   checkpoint counter would sit at `0` through the whole first leg of each
+   later lap and then jump straight to `2`.
+5. **BREAK** — once every kart that started this heat is either `finished`
+   or has disconnected (the latter already drops its kart entry via
+   `OnPlayerDisconnect`, so it can't block the group), the heat is over.
+   After a fixed `BREAK_SECONDS` (10, per the original request) the flow
+   either starts a fresh COUNTDOWN on the next track in sequence, or, if
+   that was the last track, teleports the whole group back to the hub
+   trigger's own transform and returns to phase `HUB`.
+
+## Moderator (decided, implemented)
+
+The first player to get a kart (i.e. the first to join the map, tracked via
+`moderatorSlot` in `melon_drive.js`) is the **moderator** for as long as
+they're connected. If they disconnect, the next-oldest remaining player
+(insertion order of the `karts` map) is promoted, so there's always exactly
+one moderator whenever anyone is on the map.
+
+The moderator's one power is aborting a heat that's already running
+(`COUNTDOWN`, `RACING`, or `BREAK`) — useful if a race was started by
+mistake or needs to be redone. There's no separate always-visible button for
+this: the moderator gets it the same way anyone reaches the hub's "start"
+modal — by standing in `hub_start_trigger`. While a heat is running, a
+non-moderator standing there sees the existing "Rennen läuft bereits…"
+message; the moderator sees a "Rennen abbrechen" button instead
+(`hub_abort_button` in `speedometer.xml`, toggled via the `IsModerator` HUD
+class). Clicking it runs the same `ReturnAllToHub` + reset-to-`HUB` path a
+heat normally takes when it finishes on its own, just triggered early
+instead of after the last track's `BREAK`.
 
 ## Movement model (decided)
 
@@ -172,13 +298,35 @@ camera offsets) live at the top of `melon_drive.js` — iterate them in-game
 via hot reload
 rather than guessing.
 
+## Melon painting (implemented)
+
+Driving over a paint trigger recolors that player's melon — intended for the
+hub, so players can pick a color while gathering before a heat, but nothing
+restricts placement to there. Color config lives in the trigger's own name
+(same convention as `track_start_*`, see above), not a hand-maintained
+lookup: a `trigger_multiple` named `paint_trigger_<r>_<g>_<b>` (e.g.
+`paint_trigger_255_0_0` for red), filtered to `prop_physics` like the other
+triggers, with its `OnStartTouch` firing `RunScriptInput` `melon_paint` on
+the `point_script` entity — one shared input handler for every paint
+trigger, since the color comes from parsing the touched trigger's name, not
+the input's parameter. Adding, removing, or recoloring a paint trigger is a
+pure Hammer edit.
+
+The color sticks to that melon (`SetColor`) until it touches a different
+paint trigger — it isn't reset on breaking, finishing a heat, or returning
+to the hub, only overwritten by touching another paint trigger. A freshly
+spawned melon (first join, or after a respawn where the old one was
+invalid) starts unpainted (the model's default color).
+
 ## Open design questions (not yet decided — ask before assuming)
 
-- **Race format**: single lap vs. multiple laps? Free-for-all simultaneous
-  race vs. time-trial (one player at a time, ghost/best-time comparison)?
-- **Win condition**: first across the finish, or best time over N attempts?
-- **Combat**: should weapons/damage be disabled entirely for a pure-racing
-  feel (`OnModifyPlayerDamage` → `{ abort: true }`), or is there an
-  attack/sabotage mechanic between racers?
 - **Respawn-on-death vs. never-die**: given out-of-bounds already teleports
   back to a checkpoint, does the player ever actually need to die/respawn?
+- **Stragglers**: there's no timeout for a kart that's fallen way behind or
+  gotten stuck mid-heat (see "Hub → race → next-track flow" above) other
+  than disconnecting — the group is blocked until every racer finishes.
+  Worth a "force-finish"/skip vote or a hard timeout once this is actually
+  played with real groups.
+- **Winner recognition**: `lapsToWin` decides when a kart is *done* with a
+  heat, but nothing currently records or displays *who got there first* —
+  worth a "1st/2nd/3rd" HUD callout once this is played with real groups.

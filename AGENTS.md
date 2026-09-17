@@ -12,7 +12,9 @@ This file covers the CS2 engine/`cs_script` API and addon-editing rules.
 Everything about the game itself — concept, round flow, checkpoint/timing
 logic, open design questions — lives in [GAMEPLAY.md](GAMEPLAY.md) (imported
 above, so it's always loaded together with this file). Put gameplay-design
-changes there, not here.
+changes there, not here. For the Hammer-side steps to build a new track
+(entity names, triggers, I/O wiring) rather than the design rationale, see
+[TRACK_CREATION.md](TRACK_CREATION.md).
 
 Current addon contents:
 
