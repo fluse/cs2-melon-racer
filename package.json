@@ -1,0 +1,12 @@
+{
+    "name": "melon_racer",
+    "private": true,
+    "description": "Build tooling for the melon_racer CS2 addon's cs_script sources (src/ -> maps/scripts/).",
+    "scripts": {
+        "build": "node build.mjs",
+        "watch": "node build.mjs --watch"
+    },
+    "devDependencies": {
+        "rollup": "^4.63.3"
+    }
+}

@@ -4,5 +4,9 @@
         "target": "es2022",
         "checkJs": true,
         "noEmit": true
-    }
+    },
+    "include": [
+        "**/*.js",
+        "../maps/scripts/point_script.d.ts"
+    ]
 }

@@ -21,16 +21,55 @@ Current addon contents:
 ```
 maps/melon_racer.vmap                    # main map (binary DMX, Hammer-authoritative)
 maps/content_examples/lighting_info.vmap
+maps/scripts/*.js                        # AUTO-GENERATED bundle output, see below — don't hand-edit
 maps/scripts/point_script.d.ts           # cs_script API type declarations (copied from cs_script_demo)
-maps/scripts/tsconfig.json               # editor tooling config for the scripts above
 postprocess/melon_racer.vpost            # post-processing volume settings (KV3)
 postprocess/basic_linear_post.vpost
 soundevents/soundevents_addon.vsndevts   # sound event defs (KV3)
 sounds/*.wav                             # ambience: birds, interior, vent
+src/tsconfig.json                        # editor tooling config for src/**/*.js (references ../maps/scripts/point_script.d.ts)
+src/gamemode/index.js                    # gamemode entry: a single small file
+src/melon_drive/index.js, *.js           # melon_drive entry: split into one file per concern —
+                                          #   constants.js, debug.js, kart-registry.js, track-config.js,
+                                          #   camera.js, hud.js, race-flow.js, kart-spawn.js, kart-physics.js,
+                                          #   checkpoints.js, think.js — index.js just wires them together
+build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
 ```
 
-`maps/scripts/*.js` is where gameplay code goes — create files there as
-needed.
+`src/<entry>/` is where gameplay code goes — one directory per `point_script`
+entity (currently `src/melon_drive/` and `src/gamemode/`), with `index.js` as
+that entry's actual module entry point. Split a growing entry into multiple
+files under its directory (melon_drive.js's split above is the reference
+example — constants and small cross-cutting helpers get their own file,
+`index.js` stays a thin wiring layer over `Instance.On*`/`OnScriptInput`
+registration) and import between them as normal ES modules, plus `import ...
+from "cs_script/point_script"` as usual — that specifier is a virtual module
+the CS2 engine provides at runtime, not a real package, so leave it as a bare
+import. A JSDoc-only type from another sibling file (no runtime import
+needed) is referenced as `@param {import("./other-file.js").TypeName}`.
+
+### Build step: `src/` -> `maps/scripts/*.js`
+
+Hammer's own `.js` -> `.vjs_c` compiler does **not** resolve local imports —
+it just compiles the single file a `point_script` entity's `cs_script` field
+points at. So a Rollup bundler step (`build.mjs`, wired via `npm run build` /
+`npm run watch`, `node_modules` gitignored) turns each `src/<entry>/index.js`
+tree back into one flat file at `maps/scripts/<entry>.js`, which is the file
+Hammer/tools-mode actually reads. `cs_script/point_script` is marked
+`external` so that import passes through untouched instead of being
+inlined/resolved.
+
+**Implication for editing: change `src/<entry>/index.js` (or its
+submodules), never `maps/scripts/<entry>.js` directly** — the latter is
+overwritten by the next build and carries an `AUTO-GENERATED` banner. Run
+`npm run build` after editing `src/` so the compiled file Hammer/tools-mode
+reads is current; `npm run watch` rebuilds on save for iterating against
+tools-mode hot reload. Rollup (not esbuild) was chosen specifically because
+it preserves this codebase's comments through bundling — esbuild strips
+plain comments even unminified. Tree-shaking is disabled in `build.mjs`
+since each entry is a whole program, not a library with dead exports to
+prune, and shaking risks quietly restructuring constant-folded branches
+(e.g. `if (DEBUG)`) away from what the source says.
 
 ## Gameplay logic = `cs_script` (plain JavaScript), not VScript/Squirrel
 
@@ -212,8 +251,10 @@ examples — read these instead of guessing signatures:
   Hammer on save). Make geometry/entity/postfx/soundevent changes in Hammer
   itself; only hand-edit the KV3 files for small targeted additions and
   expect the next Hammer save to reformat them.
-- `maps/scripts/*.js` are plain text and fully agent-owned — normal code,
-  normal editing rules apply. `point_script.d.ts`/`tsconfig.json` give
+- `src/<entry>/*.js` are plain text and fully agent-owned — normal code,
+  normal editing rules apply. `maps/scripts/*.js` are generated from them
+  (see "Build step" above) — edit `src/`, then `npm run build`, never the
+  generated files directly. `point_script.d.ts`/`src/tsconfig.json` give
   editors type-checking against the real API; keep them in sync if Valve
   updates the demo addon's copies.
 - There is no CLI compiler or test harness available here — verifying a
