@@ -7,7 +7,7 @@ import { Debug } from "./debug.js";
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
  *   breaking: boolean, paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean,
- *   cameraDistance: number,
+ *   cameraDistance: number, settled: boolean,
  * }} Kart
  */
 /** @type {Map<number, Kart>} */

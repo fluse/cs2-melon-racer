@@ -58,7 +58,12 @@ Instance.OnScriptReload({
 
 Instance.OnPlayerReset(({ player }) => {
     Debug(`OnPlayerReset: slot=${player.GetPlayerController()?.GetPlayerSlot()}`);
-    player.SetMoveType(CSMoveType.NONE);
+    // NOCLIP, not NONE — NONE stops the pawn moving but leaves its hitbox
+    // solid, so the melon still physically collides with (and breaks
+    // against) the parked pawn. NOCLIP is the same move type the engine's
+    // own noclip cheat uses to pass through world/entities, so it actually
+    // makes the frozen pawn's hitbox non-solid instead of just far away.
+    player.SetMoveType(CSMoveType.NOCLIP);
     const kart = GetOrCreateKart(player);
     // Only park once we actually have a melon to anchor against — see
     // ParkPawn's comment. If GetOrCreateKart failed (e.g. melon_template

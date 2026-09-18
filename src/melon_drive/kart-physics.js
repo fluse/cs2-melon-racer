@@ -14,6 +14,8 @@ import {
     BREAK_RESPAWN_DELAY,
     BREAK_TINT,
     BREAK_PARTICLE_TEMPLATE_NAME,
+    MELON_REST_SPEED,
+    SETTLE_NUDGE_ANGULAR_SPEED,
 } from "./constants.js";
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart @param {number} dt */
@@ -28,6 +30,7 @@ export function UpdateKart(slot, kart, dt) {
         const vel = melon.GetAbsVelocity();
         melon.Move({ velocity: { x: 0, y: 0, z: vel.z } });
         kart.lastVelocity = undefined;
+        kart.settled = false;
         return;
     }
 
@@ -39,6 +42,7 @@ export function UpdateKart(slot, kart, dt) {
     if (kart.breaking) {
         melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
         kart.lastVelocity = undefined;
+        kart.settled = false;
         return;
     }
 
@@ -65,16 +69,49 @@ export function UpdateKart(slot, kart, dt) {
         }
     }
 
+    const forwardInput =
+        (pawn.IsInputPressed(CSInputs.FORWARD) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.BACK) ? 1 : 0);
+    const strafeInput =
+        (pawn.IsInputPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.LEFT) ? 1 : 0);
+    const jumpPressed = pawn.WasInputJustPressed(CSInputs.JUMP);
+
+    if (
+        forwardInput === 0 &&
+        strafeInput === 0 &&
+        !jumpPressed &&
+        Math.hypot(currentVelocity.x, currentVelocity.y) < MELON_REST_SPEED &&
+        Math.abs(currentVelocity.z) < MELON_REST_SPEED
+    ) {
+        // Fully settled: no input, not falling/jumping, negligible velocity
+        // in every axis. Stop commanding it entirely and hand off to
+        // vphysics completely — see MELON_REST_SPEED. lastVelocity is
+        // cleared for the same reason the locked/breaking branches above
+        // clear it: whatever vphysics does to it next (slide, tip, settle)
+        // is real physics, not an "impact" to react to.
+        if (!kart.settled) {
+            // The tick it *first* comes to rest — see SETTLE_NUDGE_ANGULAR_SPEED
+            // for why a one-off random spin nudge belongs here rather than
+            // just leaving it alone.
+            const nudgeAngle = Math.random() * Math.PI * 2;
+            melon.Move({
+                angularVelocity: {
+                    x: Math.cos(nudgeAngle) * SETTLE_NUDGE_ANGULAR_SPEED,
+                    y: 0,
+                    z: Math.sin(nudgeAngle) * SETTLE_NUDGE_ANGULAR_SPEED,
+                },
+            });
+            kart.settled = true;
+        }
+        kart.lastVelocity = undefined;
+        return;
+    }
+    kart.settled = false;
+
     // Direction comes from the player's look direction (mouse), not a
     // separate turn control — this is what makes it "free-look" driving.
     const rad = (pawn.GetEyeAngles().yaw * Math.PI) / 180;
     const forwardDir = { x: Math.cos(rad), y: Math.sin(rad) };
     const rightDir = { x: Math.sin(rad), y: -Math.cos(rad) };
-
-    const forwardInput =
-        (pawn.IsInputPressed(CSInputs.FORWARD) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.BACK) ? 1 : 0);
-    const strafeInput =
-        (pawn.IsInputPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.LEFT) ? 1 : 0);
 
     let vx = currentVelocity.x;
     let vy = currentVelocity.y;
@@ -105,7 +142,7 @@ export function UpdateKart(slot, kart, dt) {
     // wobbles too much while rolling for a ground trace to be reliable),
     // but limited to once per JUMP_COOLDOWN seconds via kart.nextJumpTime.
     let vz = currentVelocity.z;
-    if (pawn.WasInputJustPressed(CSInputs.JUMP)) {
+    if (jumpPressed) {
         const now = Instance.GetGameTime();
         const ready = now >= kart.nextJumpTime;
         Debug(`Jump pressed: ready=${ready} forwardInput=${forwardInput} strafeInput=${strafeInput}`);
@@ -175,6 +212,7 @@ export function RespawnKartAtCheckpoint(kart) {
     // Cleared, not measured against zero: this is our own intentional
     // velocity reset, not a physical impact to react to.
     kart.lastVelocity = undefined;
+    kart.settled = false;
 }
 
 /**
@@ -206,6 +244,7 @@ export function BreakMelon(slot, kart, impactDir, impactSpeed) {
 
     kart.melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
     kart.lastVelocity = undefined;
+    kart.settled = false;
     kart.melon.SetColor(BREAK_TINT); // kart.paintColor itself is untouched, restored below
     SpawnBreakParticles(breakPosition, breakAngles);
 

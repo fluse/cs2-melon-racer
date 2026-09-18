@@ -58,9 +58,6 @@ export function NextTrackId() {
     return order[index + 1];
 }
 
-// Clicking "Jetzt starten" pulls every kart *currently standing in the hub
-// trigger* into the heat — not every connected player — matching the
-// original request that players have to be on that trigger area to race.
 export function TryStartRace() {
     if (phase !== RacePhase.HUB) {
         Debug("TryStartRace: ignored, a heat is already running");
@@ -137,6 +134,7 @@ export function BeginHeat(trackId) {
             velocity: { x: 0, y: 0, z: 0 },
         });
         kart.lastVelocity = undefined;
+        kart.settled = false;
         // trackId is set directly instead of waiting for the physical
         // checkpoint_<trackId>_1 trigger touch to report it, so the
         // checkpoint/lap panel is already visible ("0/N", lap "1/M") the
@@ -188,6 +186,7 @@ export function ReturnAllToHub(returning) {
             });
         }
         kart.lastVelocity = undefined;
+        kart.settled = false;
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot === undefined) {
             continue;

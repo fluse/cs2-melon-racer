@@ -15,12 +15,32 @@ export const REVERSE_ACCEL = 450; // 0.5x forward, matches original's Reverse/Fo
 export const STRAFE_ACCEL = 360; // 0.4x forward, matches original's Strafe/Forward ratio
 export const MAX_SPEED = 650; // units/sec, horizontal speed cap
 export const COAST_FRICTION = 500; // units/sec^2 horizontal slowdown with no input
-export const JUMP_SPEED = 320; // units/sec upward impulse
+export const JUMP_SPEED = 400; // units/sec upward impulse
 // Jump is no longer gated on being grounded (the melon wobbles/bounces
 // enough while rolling that a ground trace was unreliable) — instead it's a
 // simple cooldown: always available, but only once per JUMP_COOLDOWN
 // seconds. The HUD shows a recharge bar so the player can see when it's up.
-export const JUMP_COOLDOWN = 1.5; // seconds
+export const JUMP_COOLDOWN = 0.8; // seconds
+
+// Below this horizontal AND vertical speed, with no steering/jump input,
+// the melon counts as fully settled — UpdateKart stops re-pinning its
+// velocity/spin to zero every tick and lets vphysics run it completely
+// freely, so its own weight and (irregular) resting shape can tip or slide
+// it exactly as real physics dictates instead of gluing it to whatever spot
+// it stopped at.
+export const MELON_REST_SPEED = 2; // units/sec
+
+// The instant a melon crosses into "fully settled" (see MELON_REST_SPEED
+// above), vphysics owns its orientation completely — but a perfectly
+// balanced landing (e.g. resting dead upright on end) is a knife-edge
+// equilibrium that a deterministic physics sim has no numerical noise to
+// break on its own, so it would otherwise freeze there forever instead of
+// tipping onto a stable side. UpdateKart gives it one small, random-direction
+// spin nudge the moment it settles to break that tie; real vphysics then
+// decides — from the melon's actual collision shape and whatever surface
+// it's resting on — whether that nudge grows into a proper topple or just
+// gets damped straight back to rest.
+export const SETTLE_NUDGE_ANGULAR_SPEED = 40; // deg/sec, one-off pitch/roll kick on settling
 
 // Impact damage: every tick we compare the velocity we commanded last tick
 // against the melon's actual velocity now. A big gap means physics forcibly
@@ -107,7 +127,14 @@ export const START_TRIGGER_NAME_PATTERN = /^track_start_(\d+)_cp(\d+)_laps(\d+)$
 // How far in front of (and above) the player to spawn their melon, so it
 // doesn't spawn overlapping the player's own hitbox.
 export const SPAWN_FORWARD_OFFSET = 80;
-export const SPAWN_UP_OFFSET = 40;
+// Deliberately much bigger than TELEPORT_UP_OFFSET: that one only has to
+// clear a trigger brush a mapper sunk a little into the floor, but this one
+// also has to clear hub_spawn (an info_player_start, not a sunk trigger) even
+// if it's sitting at or slightly below the real floor height. ForceSpawn gets
+// no "push out of solid" recovery the way an already-alive prop_physics
+// normally would on landing, so spawning even a little embedded here means
+// falling straight through instead of settling on top.
+export const SPAWN_UP_OFFSET = 128;
 
 // Name of an info_target placed in Hammer purely as a facing reference (a
 // pivot — origin doesn't matter, only its angle) pointing down the track
@@ -117,6 +144,11 @@ export const SPAWN_UP_OFFSET = 40;
 // on connect, which has no relation to the track layout. Optional — if it's
 // not placed, spawning falls back to the player's eye yaw like before.
 export const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
+
+// Name of an info_player_start placed in Hammer in the hub, marking where a
+// freshly spawned melon should appear. Optional — if it's not placed,
+// spawning falls back to the player's own pawn origin (the old behavior).
+export const HUB_SPAWN_NAME = "hub_spawn";
 
 // Race-flow teleports (heat start, return-to-hub) target a trigger_multiple's
 // raw GetAbsOrigin() — Hammer mappers commonly sink a trigger's brush a bit
@@ -128,10 +160,11 @@ export const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
 // just above it, same trick as SPAWN_UP_OFFSET above.
 export const TELEPORT_UP_OFFSET = 40;
 
-// cs_script has no "disable collision" call for a pawn, so instead of
-// fighting the melon's physics forever, park the frozen pawn far enough
-// above the track that its hitbox is physically unreachable. Lower this if
-// it turns out to exceed the map's compiled bounds.
+// The frozen pawn is also set to CSMoveType.NOCLIP (see OnPlayerReset),
+// which makes its hitbox non-solid — this park height is now just a
+// belt-and-suspenders backup (e.g. in case some other code path resets its
+// move type) rather than the only thing keeping the melon off it. Lower
+// this if it turns out to exceed the map's compiled bounds.
 export const PAWN_PARK_HEIGHT = 3000;
 
 // Offsets for CameraFollowConfig — behind and above the melon. cameraOffset

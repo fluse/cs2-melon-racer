@@ -28,12 +28,32 @@ const REVERSE_ACCEL = 450; // 0.5x forward, matches original's Reverse/Forward r
 const STRAFE_ACCEL = 360; // 0.4x forward, matches original's Strafe/Forward ratio
 const MAX_SPEED = 650; // units/sec, horizontal speed cap
 const COAST_FRICTION = 500; // units/sec^2 horizontal slowdown with no input
-const JUMP_SPEED = 320; // units/sec upward impulse
+const JUMP_SPEED = 400; // units/sec upward impulse
 // Jump is no longer gated on being grounded (the melon wobbles/bounces
 // enough while rolling that a ground trace was unreliable) — instead it's a
 // simple cooldown: always available, but only once per JUMP_COOLDOWN
 // seconds. The HUD shows a recharge bar so the player can see when it's up.
-const JUMP_COOLDOWN = 1.5; // seconds
+const JUMP_COOLDOWN = 0.8; // seconds
+
+// Below this horizontal AND vertical speed, with no steering/jump input,
+// the melon counts as fully settled — UpdateKart stops re-pinning its
+// velocity/spin to zero every tick and lets vphysics run it completely
+// freely, so its own weight and (irregular) resting shape can tip or slide
+// it exactly as real physics dictates instead of gluing it to whatever spot
+// it stopped at.
+const MELON_REST_SPEED = 2; // units/sec
+
+// The instant a melon crosses into "fully settled" (see MELON_REST_SPEED
+// above), vphysics owns its orientation completely — but a perfectly
+// balanced landing (e.g. resting dead upright on end) is a knife-edge
+// equilibrium that a deterministic physics sim has no numerical noise to
+// break on its own, so it would otherwise freeze there forever instead of
+// tipping onto a stable side. UpdateKart gives it one small, random-direction
+// spin nudge the moment it settles to break that tie; real vphysics then
+// decides — from the melon's actual collision shape and whatever surface
+// it's resting on — whether that nudge grows into a proper topple or just
+// gets damped straight back to rest.
+const SETTLE_NUDGE_ANGULAR_SPEED = 40; // deg/sec, one-off pitch/roll kick on settling
 
 // Impact damage: every tick we compare the velocity we commanded last tick
 // against the melon's actual velocity now. A big gap means physics forcibly
@@ -120,7 +140,14 @@ const START_TRIGGER_NAME_PATTERN = /^track_start_(\d+)_cp(\d+)_laps(\d+)$/;
 // How far in front of (and above) the player to spawn their melon, so it
 // doesn't spawn overlapping the player's own hitbox.
 const SPAWN_FORWARD_OFFSET = 80;
-const SPAWN_UP_OFFSET = 40;
+// Deliberately much bigger than TELEPORT_UP_OFFSET: that one only has to
+// clear a trigger brush a mapper sunk a little into the floor, but this one
+// also has to clear hub_spawn (an info_player_start, not a sunk trigger) even
+// if it's sitting at or slightly below the real floor height. ForceSpawn gets
+// no "push out of solid" recovery the way an already-alive prop_physics
+// normally would on landing, so spawning even a little embedded here means
+// falling straight through instead of settling on top.
+const SPAWN_UP_OFFSET = 128;
 
 // Name of an info_target placed in Hammer purely as a facing reference (a
 // pivot — origin doesn't matter, only its angle) pointing down the track
@@ -130,6 +157,11 @@ const SPAWN_UP_OFFSET = 40;
 // on connect, which has no relation to the track layout. Optional — if it's
 // not placed, spawning falls back to the player's eye yaw like before.
 const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
+
+// Name of an info_player_start placed in Hammer in the hub, marking where a
+// freshly spawned melon should appear. Optional — if it's not placed,
+// spawning falls back to the player's own pawn origin (the old behavior).
+const HUB_SPAWN_NAME = "hub_spawn";
 
 // Race-flow teleports (heat start, return-to-hub) target a trigger_multiple's
 // raw GetAbsOrigin() — Hammer mappers commonly sink a trigger's brush a bit
@@ -141,10 +173,11 @@ const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
 // just above it, same trick as SPAWN_UP_OFFSET above.
 const TELEPORT_UP_OFFSET = 40;
 
-// cs_script has no "disable collision" call for a pawn, so instead of
-// fighting the melon's physics forever, park the frozen pawn far enough
-// above the track that its hitbox is physically unreachable. Lower this if
-// it turns out to exceed the map's compiled bounds.
+// The frozen pawn is also set to CSMoveType.NOCLIP (see OnPlayerReset),
+// which makes its hitbox non-solid — this park height is now just a
+// belt-and-suspenders backup (e.g. in case some other code path resets its
+// move type) rather than the only thing keeping the melon off it. Lower
+// this if it turns out to exceed the map's compiled bounds.
 const PAWN_PARK_HEIGHT = 3000;
 
 // Offsets for CameraFollowConfig — behind and above the melon. cameraOffset
@@ -184,7 +217,7 @@ const HEARTBEAT_INTERVAL = 1; // seconds
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
  *   breaking: boolean, paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean,
- *   cameraDistance: number,
+ *   cameraDistance: number, settled: boolean,
  * }} Kart
  */
 /** @type {Map<number, Kart>} */
@@ -249,6 +282,7 @@ function UpdateKart(slot, kart, dt) {
         const vel = melon.GetAbsVelocity();
         melon.Move({ velocity: { x: 0, y: 0, z: vel.z } });
         kart.lastVelocity = undefined;
+        kart.settled = false;
         return;
     }
 
@@ -260,6 +294,7 @@ function UpdateKart(slot, kart, dt) {
     if (kart.breaking) {
         melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
         kart.lastVelocity = undefined;
+        kart.settled = false;
         return;
     }
 
@@ -286,16 +321,49 @@ function UpdateKart(slot, kart, dt) {
         }
     }
 
+    const forwardInput =
+        (pawn.IsInputPressed(CSInputs.FORWARD) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.BACK) ? 1 : 0);
+    const strafeInput =
+        (pawn.IsInputPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.LEFT) ? 1 : 0);
+    const jumpPressed = pawn.WasInputJustPressed(CSInputs.JUMP);
+
+    if (
+        forwardInput === 0 &&
+        strafeInput === 0 &&
+        !jumpPressed &&
+        Math.hypot(currentVelocity.x, currentVelocity.y) < MELON_REST_SPEED &&
+        Math.abs(currentVelocity.z) < MELON_REST_SPEED
+    ) {
+        // Fully settled: no input, not falling/jumping, negligible velocity
+        // in every axis. Stop commanding it entirely and hand off to
+        // vphysics completely — see MELON_REST_SPEED. lastVelocity is
+        // cleared for the same reason the locked/breaking branches above
+        // clear it: whatever vphysics does to it next (slide, tip, settle)
+        // is real physics, not an "impact" to react to.
+        if (!kart.settled) {
+            // The tick it *first* comes to rest — see SETTLE_NUDGE_ANGULAR_SPEED
+            // for why a one-off random spin nudge belongs here rather than
+            // just leaving it alone.
+            const nudgeAngle = Math.random() * Math.PI * 2;
+            melon.Move({
+                angularVelocity: {
+                    x: Math.cos(nudgeAngle) * SETTLE_NUDGE_ANGULAR_SPEED,
+                    y: 0,
+                    z: Math.sin(nudgeAngle) * SETTLE_NUDGE_ANGULAR_SPEED,
+                },
+            });
+            kart.settled = true;
+        }
+        kart.lastVelocity = undefined;
+        return;
+    }
+    kart.settled = false;
+
     // Direction comes from the player's look direction (mouse), not a
     // separate turn control — this is what makes it "free-look" driving.
     const rad = (pawn.GetEyeAngles().yaw * Math.PI) / 180;
     const forwardDir = { x: Math.cos(rad), y: Math.sin(rad) };
     const rightDir = { x: Math.sin(rad), y: -Math.cos(rad) };
-
-    const forwardInput =
-        (pawn.IsInputPressed(CSInputs.FORWARD) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.BACK) ? 1 : 0);
-    const strafeInput =
-        (pawn.IsInputPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.LEFT) ? 1 : 0);
 
     let vx = currentVelocity.x;
     let vy = currentVelocity.y;
@@ -326,7 +394,7 @@ function UpdateKart(slot, kart, dt) {
     // wobbles too much while rolling for a ground trace to be reliable),
     // but limited to once per JUMP_COOLDOWN seconds via kart.nextJumpTime.
     let vz = currentVelocity.z;
-    if (pawn.WasInputJustPressed(CSInputs.JUMP)) {
+    if (jumpPressed) {
         const now = Instance.GetGameTime();
         const ready = now >= kart.nextJumpTime;
         Debug(`Jump pressed: ready=${ready} forwardInput=${forwardInput} strafeInput=${strafeInput}`);
@@ -396,6 +464,7 @@ function RespawnKartAtCheckpoint(kart) {
     // Cleared, not measured against zero: this is our own intentional
     // velocity reset, not a physical impact to react to.
     kart.lastVelocity = undefined;
+    kart.settled = false;
 }
 
 /**
@@ -427,6 +496,7 @@ function BreakMelon(slot, kart, impactDir, impactSpeed) {
 
     kart.melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
     kart.lastVelocity = undefined;
+    kart.settled = false;
     kart.melon.SetColor(BREAK_TINT); // kart.paintColor itself is untouched, restored below
     SpawnBreakParticles(breakPosition, breakAngles);
 
@@ -706,6 +776,20 @@ function GetSpawnFacingYaw(pawn) {
     return pawn.GetEyeAngles().yaw;
 }
 
+/**
+ * Origin a freshly spawned melon should appear at: the hub_spawn
+ * info_player_start's position if the mapper placed one, otherwise the
+ * player's own pawn origin (the old behavior).
+ * @param {any} pawn
+ */
+function GetSpawnOrigin(pawn) {
+    const hubSpawn = Instance.FindEntityByName(HUB_SPAWN_NAME);
+    if (hubSpawn) {
+        return hubSpawn.GetAbsOrigin();
+    }
+    return pawn.GetAbsOrigin();
+}
+
 function SpawnMelonFor(pawn) {
     const template = Instance.FindEntityByName(MELON_TEMPLATE_NAME);
     if (!template) {
@@ -716,7 +800,7 @@ function SpawnMelonFor(pawn) {
         Debug(`SpawnMelonFor: entity "${MELON_TEMPLATE_NAME}" exists but is a ${template.GetClassName()}, not a point_template`);
         return undefined;
     }
-    const origin = pawn.GetAbsOrigin();
+    const origin = GetSpawnOrigin(pawn);
     const yaw = GetSpawnFacingYaw(pawn);
     // Spawn a bit in front of the player, not exactly on top of them —
     // spawning overlapping the player's own hitbox causes the physics
@@ -798,6 +882,7 @@ function GetOrCreateKart(pawn) {
             kart.health = MELON_MAX_HEALTH;
             kart.lastVelocity = undefined;
             kart.breaking = false;
+            kart.settled = false;
             kart.melon.SetColor(kart.paintColor); // the fresh melon starts undyed — re-apply the kept paint job
         } else {
             // Truly new — no prior checkpoint, so fall back to the player's
@@ -810,7 +895,7 @@ function GetOrCreateKart(pawn) {
                 lastVelocity: undefined,
                 trackId: undefined,
                 checkpointIndex: 0,
-                checkpointPosition: pawn.GetAbsOrigin(),
+                checkpointPosition: GetSpawnOrigin(pawn),
                 checkpointAngles: { pitch: 0, yaw: GetSpawnFacingYaw(pawn), roll: 0 },
                 lapsCompleted: 0,
                 inHub: false,
@@ -818,6 +903,7 @@ function GetOrCreateKart(pawn) {
                 finished: false,
                 locked: false,
                 breaking: false,
+                settled: false,
                 paintColor: { r: 255, g: 255, b: 255, a: 255 },
                 userMenuOpen: false,
                 cameraDistance: CAMERA_DISTANCE_DEFAULT,
@@ -881,9 +967,6 @@ function NextTrackId() {
     return order[index + 1];
 }
 
-// Clicking "Jetzt starten" pulls every kart *currently standing in the hub
-// trigger* into the heat — not every connected player — matching the
-// original request that players have to be on that trigger area to race.
 function TryStartRace() {
     if (phase !== RacePhase.HUB) {
         Debug("TryStartRace: ignored, a heat is already running");
@@ -960,6 +1043,7 @@ function BeginHeat(trackId) {
             velocity: { x: 0, y: 0, z: 0 },
         });
         kart.lastVelocity = undefined;
+        kart.settled = false;
         // trackId is set directly instead of waiting for the physical
         // checkpoint_<trackId>_1 trigger touch to report it, so the
         // checkpoint/lap panel is already visible ("0/N", lap "1/M") the
@@ -1011,6 +1095,7 @@ function ReturnAllToHub(returning) {
             });
         }
         kart.lastVelocity = undefined;
+        kart.settled = false;
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot === undefined) {
             continue;
@@ -1331,7 +1416,12 @@ Instance.OnScriptReload({
 
 Instance.OnPlayerReset(({ player }) => {
     Debug(`OnPlayerReset: slot=${player.GetPlayerController()?.GetPlayerSlot()}`);
-    player.SetMoveType(CSMoveType.NONE);
+    // NOCLIP, not NONE — NONE stops the pawn moving but leaves its hitbox
+    // solid, so the melon still physically collides with (and breaks
+    // against) the parked pawn. NOCLIP is the same move type the engine's
+    // own noclip cheat uses to pass through world/entities, so it actually
+    // makes the frozen pawn's hitbox non-solid instead of just far away.
+    player.SetMoveType(CSMoveType.NOCLIP);
     const kart = GetOrCreateKart(player);
     // Only park once we actually have a melon to anchor against — see
     // ParkPawn's comment. If GetOrCreateKart failed (e.g. melon_template

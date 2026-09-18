@@ -271,15 +271,17 @@ instead of after the last track's `BREAK`.
 Free-look: each player automatically gets their own `prop_physics` melon
 (spawned per-player from a `point_template` named `melon_template` — see
 `maps/scripts/melon_drive.js`) on every `OnPlayerReset`. The player's own
-pawn is frozen (`CSMoveType.NONE`), hidden (`SetColor` alpha 0), and
-teleported straight up (`PAWN_PARK_HEIGHT`, currently 3000 units) right
-after its melon spawns — it deliberately does **not** track the melon's
-position afterward. An earlier version left it parked at ground level and
-had it follow the melon every tick; either way, cs_script has no
-"disable collision" call for a pawn, so its still-solid hitbox kept
-overlapping the melon's physics collision and the two would violently
-shove each other apart. Parking it high in the sky sidesteps the missing
-API by making it physically unreachable instead. There's no separate turn control —
+pawn is frozen and made non-solid (`CSMoveType.NOCLIP`), hidden (`SetColor`
+alpha 0), and teleported straight up (`PAWN_PARK_HEIGHT`, currently 3000
+units) right after its melon spawns — it deliberately does **not** track the
+melon's position afterward. An earlier version used `CSMoveType.NONE` and
+just parked it out of reach; cs_script has no dedicated "disable collision"
+call for a pawn, but `MOVETYPE_NONE` still leaves the hitbox solid, so the
+melon would violently collide with (and take damage from) the parked pawn
+if it ever got near it. `NOCLIP` — the same move type the engine's own
+noclip cheat uses — actually makes the hitbox non-solid, so the park height
+is now just a backup rather than the only thing preventing contact. There's
+no separate turn control —
 steering direction is wherever the player is looking (mouse): W/S
 accelerate/brake along that look direction, A/D strafe left/right relative
 to it, Space jumps (only while grounded). A third-person

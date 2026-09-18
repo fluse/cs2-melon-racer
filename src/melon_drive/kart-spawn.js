@@ -7,6 +7,7 @@ import {
     SPAWN_FORWARD_OFFSET,
     SPAWN_UP_OFFSET,
     HUB_SPAWN_FACING_NAME,
+    HUB_SPAWN_NAME,
     PAWN_PARK_HEIGHT,
     MELON_MAX_HEALTH,
     CAMERA_DISTANCE_DEFAULT,
@@ -26,6 +27,20 @@ export function GetSpawnFacingYaw(pawn) {
     return pawn.GetEyeAngles().yaw;
 }
 
+/**
+ * Origin a freshly spawned melon should appear at: the hub_spawn
+ * info_player_start's position if the mapper placed one, otherwise the
+ * player's own pawn origin (the old behavior).
+ * @param {any} pawn
+ */
+export function GetSpawnOrigin(pawn) {
+    const hubSpawn = Instance.FindEntityByName(HUB_SPAWN_NAME);
+    if (hubSpawn) {
+        return hubSpawn.GetAbsOrigin();
+    }
+    return pawn.GetAbsOrigin();
+}
+
 export function SpawnMelonFor(pawn) {
     const template = Instance.FindEntityByName(MELON_TEMPLATE_NAME);
     if (!template) {
@@ -36,7 +51,7 @@ export function SpawnMelonFor(pawn) {
         Debug(`SpawnMelonFor: entity "${MELON_TEMPLATE_NAME}" exists but is a ${template.GetClassName()}, not a point_template`);
         return undefined;
     }
-    const origin = pawn.GetAbsOrigin();
+    const origin = GetSpawnOrigin(pawn);
     const yaw = GetSpawnFacingYaw(pawn);
     // Spawn a bit in front of the player, not exactly on top of them —
     // spawning overlapping the player's own hitbox causes the physics
@@ -118,6 +133,7 @@ export function GetOrCreateKart(pawn) {
             kart.health = MELON_MAX_HEALTH;
             kart.lastVelocity = undefined;
             kart.breaking = false;
+            kart.settled = false;
             kart.melon.SetColor(kart.paintColor); // the fresh melon starts undyed — re-apply the kept paint job
         } else {
             // Truly new — no prior checkpoint, so fall back to the player's
@@ -130,7 +146,7 @@ export function GetOrCreateKart(pawn) {
                 lastVelocity: undefined,
                 trackId: undefined,
                 checkpointIndex: 0,
-                checkpointPosition: pawn.GetAbsOrigin(),
+                checkpointPosition: GetSpawnOrigin(pawn),
                 checkpointAngles: { pitch: 0, yaw: GetSpawnFacingYaw(pawn), roll: 0 },
                 lapsCompleted: 0,
                 inHub: false,
@@ -138,6 +154,7 @@ export function GetOrCreateKart(pawn) {
                 finished: false,
                 locked: false,
                 breaking: false,
+                settled: false,
                 paintColor: { r: 255, g: 255, b: 255, a: 255 },
                 userMenuOpen: false,
                 cameraDistance: CAMERA_DISTANCE_DEFAULT,
