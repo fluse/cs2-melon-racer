@@ -3,10 +3,12 @@ import { Debug } from "./debug.js";
 import { GetSpeedHud } from "./hud.js";
 import {
     CAMERA_LATERAL,
-    CAMERA_HEIGHT,
     CAMERA_DISTANCE_MIN,
     CAMERA_DISTANCE_MAX,
     CAMERA_DISTANCE_STEPS,
+    CAMERA_HEIGHT_MIN,
+    CAMERA_HEIGHT_MAX,
+    CAMERA_HEIGHT_STEPS,
     FOLLOW_OFFSET,
 } from "./constants.js";
 
@@ -47,9 +49,45 @@ export function SetCameraDistance(kart, step) {
     UpdateCameraDistanceHud(kart);
 }
 
+// Same notch-slider trick as the distance controls above (camheight_seg_0 ..
+// camheight_seg_{CAMERA_HEIGHT_STEPS-1} in speedometer.xml), for how high
+// above the melon the chase camera sits — lets a player pull it down close
+// to the ground or push it up for more of an overview.
+/** @param {number} height */
+export function CameraHeightStepFor(height) {
+    const fraction = (height - CAMERA_HEIGHT_MIN) / (CAMERA_HEIGHT_MAX - CAMERA_HEIGHT_MIN);
+    return Math.round(fraction * (CAMERA_HEIGHT_STEPS - 1));
+}
+
+/** @param {number} step */
+export function CameraHeightForStep(step) {
+    const fraction = CAMERA_HEIGHT_STEPS > 1 ? step / (CAMERA_HEIGHT_STEPS - 1) : 0;
+    return CAMERA_HEIGHT_MIN + fraction * (CAMERA_HEIGHT_MAX - CAMERA_HEIGHT_MIN);
+}
+
+/** @param {import("./kart-registry.js").Kart} kart */
+export function UpdateCameraHeightHud(kart) {
+    const hud = GetSpeedHud();
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (!hud || slot === undefined) {
+        return;
+    }
+    const filledSegments = CameraHeightStepFor(kart.cameraHeight) + 1;
+    for (let i = 0; i < CAMERA_HEIGHT_STEPS; i++) {
+        hud.SetHasClassForPlayer(slot, `camheight_seg_${i}`, "Filled", i < filledSegments);
+    }
+}
+
+/** Applies a new camera height (picked via the user menu's slider) immediately, without waiting for a respawn. @param {import("./kart-registry.js").Kart} kart @param {number} step */
+export function SetCameraHeight(kart, step) {
+    kart.cameraHeight = CameraHeightForStep(step);
+    ApplyCameraFollow(kart);
+    UpdateCameraHeightHud(kart);
+}
+
 /** @param {import("./kart-registry.js").Kart} kart */
 export function GetCameraOffsetFor(kart) {
-    return { x: -kart.cameraDistance, y: CAMERA_LATERAL, z: CAMERA_HEIGHT };
+    return { x: -kart.cameraDistance, y: CAMERA_LATERAL, z: kart.cameraHeight };
 }
 
 /**
@@ -68,7 +106,7 @@ export function ApplyCameraFollow(kart) {
         followEntity: kart.melon,
         followOffset: FOLLOW_OFFSET,
         cameraOffset: GetCameraOffsetFor(kart),
-        clipCameraOffset: false,
+        clipCameraOffset: true, // pull the camera in instead of letting it clip through walls
     });
     Debug(`ApplyCameraFollow: mode=${camera.GetMode()} distance=${kart.cameraDistance} for slot=${kart.pawn.GetPlayerController()?.GetPlayerSlot()}`);
 }

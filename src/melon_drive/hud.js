@@ -3,7 +3,16 @@ import { Debug } from "./debug.js";
 import { GetJumpChargeFraction } from "./kart-physics.js";
 import { GetTrackConfig } from "./track-config.js";
 import { IsModerator } from "./kart-registry.js";
-import { SPEED_HUD_ENTITY_NAME, UNITS_TO_KMH, JUMP_BAR_SEGMENTS, RacePhase } from "./constants.js";
+import {
+    SPEED_HUD_ENTITY_NAME,
+    UNITS_TO_KMH,
+    JUMP_BAR_SEGMENTS,
+    HEALTH_BAR_SEGMENTS,
+    HEALTH_LOW_FRACTION,
+    HEALTH_CRITICAL_FRACTION,
+    MELON_MAX_HEALTH,
+    RacePhase,
+} from "./constants.js";
 
 /** @type {any} */
 let speedHud = null;
@@ -40,6 +49,21 @@ export function UpdateJumpHud(slot, kart) {
         hud.SetHasClassForPlayer(slot, `jump_seg_${i}`, "Filled", i < filledSegments);
     }
     hud.SetHasClassForPlayer(slot, "jump_bar", "Ready", charge >= 1);
+}
+
+/** @param {number} slot @param {import("./kart-registry.js").Kart} kart */
+export function UpdateHealthHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const fraction = Math.max(0, Math.min(1, kart.health / MELON_MAX_HEALTH));
+    const filledSegments = Math.round(fraction * HEALTH_BAR_SEGMENTS);
+    for (let i = 0; i < HEALTH_BAR_SEGMENTS; i++) {
+        hud.SetHasClassForPlayer(slot, `health_seg_${i}`, "Filled", i < filledSegments);
+    }
+    hud.SetHasClassForPlayer(slot, "health_bar", "Low", fraction <= HEALTH_LOW_FRACTION);
+    hud.SetHasClassForPlayer(slot, "health_bar", "Critical", fraction <= HEALTH_CRITICAL_FRACTION);
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart */

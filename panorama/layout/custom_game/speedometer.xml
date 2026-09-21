@@ -49,6 +49,23 @@
 			<Label class="SpeedUnit" text="KM/H" />
 		</Panel>
 
+		<!-- Melon health: a row of segments that fill left-to-right with
+		     kart.health / MELON_MAX_HEALTH, same segmented-bar look as
+		     JumpBar below. Turns yellow/red as the melon gets close to
+		     breaking, driven from script via UpdateHealthHud. -->
+		<Panel id="health_bar" class="HealthBar">
+			<Panel id="health_seg_0" class="HealthSegment" />
+			<Panel id="health_seg_1" class="HealthSegment" />
+			<Panel id="health_seg_2" class="HealthSegment" />
+			<Panel id="health_seg_3" class="HealthSegment" />
+			<Panel id="health_seg_4" class="HealthSegment" />
+			<Panel id="health_seg_5" class="HealthSegment" />
+			<Panel id="health_seg_6" class="HealthSegment" />
+			<Panel id="health_seg_7" class="HealthSegment" />
+			<Panel id="health_seg_8" class="HealthSegment" />
+			<Panel id="health_seg_9" class="HealthSegment" />
+		</Panel>
+
 		<Panel id="jump_bar" class="JumpBar">
 			<Panel id="jump_seg_0" class="JumpSegment" />
 			<Panel id="jump_seg_1" class="JumpSegment" />
@@ -106,6 +123,23 @@
 				<Button id="camdist_seg_7" class="DistanceSegment" />
 				<Button id="camdist_seg_8" class="DistanceSegment" />
 				<Button id="camdist_seg_9" class="DistanceSegment" />
+			</Panel>
+
+			<!-- Same clickable-notches trick as CAMERA DISTANCE above, for how
+			     high above the melon the chase camera sits (close to the ground
+			     vs. a higher overview angle). -->
+			<Label class="UserMenuSectionLabel" text="CAMERA HEIGHT" />
+			<Panel id="camheight_slider" class="DistanceSlider">
+				<Button id="camheight_seg_0" class="DistanceSegment" />
+				<Button id="camheight_seg_1" class="DistanceSegment" />
+				<Button id="camheight_seg_2" class="DistanceSegment" />
+				<Button id="camheight_seg_3" class="DistanceSegment" />
+				<Button id="camheight_seg_4" class="DistanceSegment" />
+				<Button id="camheight_seg_5" class="DistanceSegment" />
+				<Button id="camheight_seg_6" class="DistanceSegment" />
+				<Button id="camheight_seg_7" class="DistanceSegment" />
+				<Button id="camheight_seg_8" class="DistanceSegment" />
+				<Button id="camheight_seg_9" class="DistanceSegment" />
 			</Panel>
 		</Panel>
 	</Panel>

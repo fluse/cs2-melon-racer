@@ -1,7 +1,7 @@
 import { Instance, PointTemplate } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { karts, moderatorSlot, SetModeratorSlot } from "./kart-registry.js";
-import { ApplyCameraFollow, UpdateCameraDistanceHud } from "./camera.js";
+import { ApplyCameraFollow, UpdateCameraDistanceHud, UpdateCameraHeightHud } from "./camera.js";
 import {
     MELON_TEMPLATE_NAME,
     SPAWN_FORWARD_OFFSET,
@@ -11,6 +11,7 @@ import {
     PAWN_PARK_HEIGHT,
     MELON_MAX_HEALTH,
     CAMERA_DISTANCE_DEFAULT,
+    CAMERA_HEIGHT_DEFAULT,
 } from "./constants.js";
 
 /**
@@ -41,16 +42,34 @@ export function GetSpawnOrigin(pawn) {
     return pawn.GetAbsOrigin();
 }
 
-export function SpawnMelonFor(pawn) {
+/**
+ * Spawns a fresh melon from the melon_template point_template at an explicit
+ * position/angles — the shared primitive behind SpawnMelonFor below (which
+ * works out where a *new* player's melon should appear) and kart-physics.js's
+ * post-break recovery (which respawns one at a kart's own checkpoint).
+ * @param {{ x: number, y: number, z: number }} position @param {{ pitch: number, yaw: number, roll: number }} angles
+ */
+export function SpawnMelonAt(position, angles) {
     const template = Instance.FindEntityByName(MELON_TEMPLATE_NAME);
     if (!template) {
-        Debug(`SpawnMelonFor: no entity named "${MELON_TEMPLATE_NAME}" found at all`);
+        Debug(`SpawnMelonAt: no entity named "${MELON_TEMPLATE_NAME}" found at all`);
         return undefined;
     }
     if (!(template instanceof PointTemplate)) {
-        Debug(`SpawnMelonFor: entity "${MELON_TEMPLATE_NAME}" exists but is a ${template.GetClassName()}, not a point_template`);
+        Debug(`SpawnMelonAt: entity "${MELON_TEMPLATE_NAME}" exists but is a ${template.GetClassName()}, not a point_template`);
         return undefined;
     }
+    const spawned = template.ForceSpawn(position, angles);
+    if (!spawned || spawned.length === 0) {
+        Debug(`SpawnMelonAt: ForceSpawn() returned nothing — check the point_template's Template entries in Hammer`);
+        return undefined;
+    }
+    Debug(`SpawnMelonAt: spawned ${spawned.length} entity(s) at ${JSON.stringify(position)}, using [0] = ${spawned[0].GetClassName()}`);
+    return spawned[0];
+}
+
+/** @param {any} pawn */
+export function SpawnMelonFor(pawn) {
     const origin = GetSpawnOrigin(pawn);
     const yaw = GetSpawnFacingYaw(pawn);
     // Spawn a bit in front of the player, not exactly on top of them —
@@ -65,13 +84,7 @@ export function SpawnMelonFor(pawn) {
         y: origin.y + Math.sin(rad) * SPAWN_FORWARD_OFFSET,
         z: origin.z + SPAWN_UP_OFFSET,
     };
-    const spawned = template.ForceSpawn(spawnPos, { pitch: 0, yaw, roll: 0 });
-    if (!spawned || spawned.length === 0) {
-        Debug(`SpawnMelonFor: ForceSpawn() returned nothing — check the point_template's Template entries in Hammer`);
-        return undefined;
-    }
-    Debug(`SpawnMelonFor: spawned ${spawned.length} entity(s) at ${JSON.stringify(spawnPos)}, using [0] = ${spawned[0].GetClassName()}`);
-    return spawned[0];
+    return SpawnMelonAt(spawnPos, { pitch: 0, yaw, roll: 0 });
 }
 
 /** @param {any} pawn */
@@ -158,6 +171,9 @@ export function GetOrCreateKart(pawn) {
                 paintColor: { r: 255, g: 255, b: 255, a: 255 },
                 userMenuOpen: false,
                 cameraDistance: CAMERA_DISTANCE_DEFAULT,
+                cameraHeight: CAMERA_HEIGHT_DEFAULT,
+                lastKnownPosition: undefined,
+                lastKnownAngles: undefined,
             };
         }
         karts.set(slot, kart);
@@ -169,5 +185,6 @@ export function GetOrCreateKart(pawn) {
     HidePawnModel(pawn);
     ApplyCameraFollow(kart);
     UpdateCameraDistanceHud(kart);
+    UpdateCameraHeightHud(kart);
     return kart;
 }

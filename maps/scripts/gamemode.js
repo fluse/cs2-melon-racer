@@ -11,6 +11,10 @@ const RACE_TEAM = 3; // CT — arbitrary, just the one team everyone shares.
 // ticking down to a real match.
 Instance.ServerCommand("sv_cheats 1");
 Instance.ServerCommand("mp_warmup_enabled 1");
+// mp_warmup_enabled alone isn't reliable on a local/offline listen server
+// (the usual way this map gets tested) — mp_warmup_offline_enabled is the
+// cvar CS2 actually checks there. Setting both covers dedicated servers too.
+Instance.ServerCommand("mp_warmup_offline_enabled 1");
 Instance.ServerCommand("mp_warmup_pausetimer 1");
 Instance.ServerCommand("mp_autoteambalance 0");
 Instance.ServerCommand("mp_limitteams 0");

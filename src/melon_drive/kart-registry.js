@@ -7,7 +7,8 @@ import { Debug } from "./debug.js";
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
  *   breaking: boolean, paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean,
- *   cameraDistance: number, settled: boolean,
+ *   cameraDistance: number, cameraHeight: number, settled: boolean,
+ *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
  * }} Kart
  */
 /** @type {Map<number, Kart>} */

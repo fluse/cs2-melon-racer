@@ -1,5 +1,8 @@
 import { Instance, CSInputs, PointTemplate } from "cs_script/point_script";
 import { Debug } from "./debug.js";
+import { karts } from "./kart-registry.js";
+import { SpawnMelonAt } from "./kart-spawn.js";
+import { ApplyCameraFollow } from "./camera.js";
 import {
     FORWARD_ACCEL,
     REVERSE_ACCEL,
@@ -12,8 +15,9 @@ import {
     IMPACT_DAMAGE_SCALE,
     MELON_MAX_HEALTH,
     BREAK_RESPAWN_DELAY,
-    BREAK_TINT,
+    BREAK_TINT_FALLBACK,
     BREAK_PARTICLE_TEMPLATE_NAME,
+    BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME,
     MELON_REST_SPEED,
     SETTLE_NUDGE_ANGULAR_SPEED,
 } from "./constants.js";
@@ -36,9 +40,9 @@ export function UpdateKart(slot, kart, dt) {
 
     // Broken and waiting out BREAK_RESPAWN_DELAY (see BreakMelon) — unlike
     // `locked` above, freeze completely (gravity included). It's already
-    // sitting wherever it crashed, tinted dark, and should just hold still
-    // until the delayed respawn teleports it away rather than keep tumbling
-    // (which would also spuriously re-trigger the impact check below).
+    // hidden at the crash site, and should just hold still until the delayed
+    // respawn teleports it away rather than keep tumbling invisibly (which
+    // would also spuriously re-trigger the impact check below).
     if (kart.breaking) {
         melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
         kart.lastVelocity = undefined;
@@ -181,18 +185,38 @@ function DirectionToAngles(dir, length) {
     return { pitch, yaw, roll: 0 };
 }
 
-/** @param {any} position @param {any} angles */
-function SpawnBreakParticles(position, angles) {
-    const template = Instance.FindEntityByName(BREAK_PARTICLE_TEMPLATE_NAME);
+/**
+ * Spawns a single named point_template's particle effect, if it's actually
+ * placed in Hammer. @param {string} templateName @param {any} position @param {any} angles
+ * @returns {boolean} whether it actually spawned
+ */
+function SpawnParticleTemplate(templateName, position, angles) {
+    const template = Instance.FindEntityByName(templateName);
     if (!template) {
-        Debug(`SpawnBreakParticles: no entity named "${BREAK_PARTICLE_TEMPLATE_NAME}" found — add a point_template in Hammer with a "Start Active" particle system to see break effects`);
-        return;
+        Debug(`SpawnParticleTemplate: no entity named "${templateName}" found — add a point_template in Hammer with a "Start Active" particle system to see break effects`);
+        return false;
     }
     if (!(template instanceof PointTemplate)) {
-        Debug(`SpawnBreakParticles: entity "${BREAK_PARTICLE_TEMPLATE_NAME}" exists but is a ${template.GetClassName()}, not a point_template`);
-        return;
+        Debug(`SpawnParticleTemplate: entity "${templateName}" exists but is a ${template.GetClassName()}, not a point_template`);
+        return false;
     }
     template.ForceSpawn(position, angles);
+    return true;
+}
+
+/**
+ * Spawns both break effects at the crash site — the main burst plus a
+ * separate melon-chunks template layered on top of it. Independent of each
+ * other (either can be missing from Hammer without the other failing).
+ * @param {any} position @param {any} angles
+ * @returns {boolean} whether at least one of them actually spawned — see
+ * BreakMelon's fallback tint for why callers need to know this, not just
+ * fire-and-forget.
+ */
+function SpawnBreakParticles(position, angles) {
+    const spawnedMain = SpawnParticleTemplate(BREAK_PARTICLE_TEMPLATE_NAME, position, angles);
+    const spawnedChunks = SpawnParticleTemplate(BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, position, angles);
+    return spawnedMain || spawnedChunks;
 }
 
 /**
@@ -217,9 +241,9 @@ export function RespawnKartAtCheckpoint(kart) {
 
 /**
  * Sets a kart's melon color and remembers it so it survives a break/respawn
- * (BreakMelon covers the melon with BREAK_TINT temporarily, without losing
- * track of the color underneath). Used by both the melon_paint map trigger
- * and the user menu's color swatches.
+ * (BreakMelon hides the melon entirely while broken, without losing track of
+ * the color underneath — see ScheduleRespawnAfterBreak). Used by both the
+ * melon_paint map trigger and the user menu's color swatches.
  * @param {import("./kart-registry.js").Kart} kart @param {{ r: number, g: number, b: number, a: number }} color
  */
 export function SetKartPaintColor(kart, color) {
@@ -227,6 +251,57 @@ export function SetKartPaintColor(kart, color) {
     if (!kart.breaking) {
         kart.melon.SetColor(color);
     }
+}
+
+/**
+ * Common tail end of every break, whether it was caught by our own
+ * kart.health tracking (BreakMelon) or discovered after the fact because the
+ * melon vanished on its own (HandleMelonLost): wait out BREAK_RESPAWN_DELAY,
+ * then bring the kart back — reusing the same (hidden) melon where possible,
+ * or spawning a brand new one at the checkpoint if the original is actually
+ * gone.
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+function ScheduleRespawnAfterBreak(slot, kart) {
+    Instance.Delay(BREAK_RESPAWN_DELAY).then(() => {
+        kart.breaking = false;
+        if (!kart.pawn.IsValid() || karts.get(slot) !== kart) {
+            return; // player disconnected, or a fresh kart already replaced this one
+        }
+        if (kart.locked) {
+            // The race flow moved on while this kart was mid-break (heat
+            // aborted, or a fresh BeginHeat/ReturnAllToHub already placed
+            // it) — that already-current teleport wins, don't stomp it with
+            // our now-stale checkpointPosition. Just make sure it's visible
+            // again if our own hidden melon is still the one in play.
+            kart.health = MELON_MAX_HEALTH;
+            if (kart.melon.IsValid()) {
+                kart.melon.SetColor(kart.paintColor);
+            }
+            return;
+        }
+        if (kart.melon.IsValid()) {
+            kart.melon.SetColor(kart.paintColor);
+            RespawnKartAtCheckpoint(kart);
+            return;
+        }
+        // The melon wasn't just hidden by us — it's genuinely gone (the
+        // engine's own physics broke the prop_physics_multiplayer for real
+        // on a hard enough hit, see HandleMelonLost) — spawn a fresh one at
+        // the checkpoint instead of teleporting an entity that no longer
+        // exists.
+        const melon = SpawnMelonAt(kart.checkpointPosition, kart.checkpointAngles);
+        if (!melon) {
+            Debug(`slot ${slot}: could not respawn a melon after it was destroyed, will keep retrying`);
+            return;
+        }
+        kart.melon = melon;
+        kart.melon.SetColor(kart.paintColor);
+        kart.health = MELON_MAX_HEALTH;
+        kart.lastVelocity = undefined;
+        kart.settled = false;
+        ApplyCameraFollow(kart);
+    });
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed */
@@ -245,25 +320,46 @@ export function BreakMelon(slot, kart, impactDir, impactSpeed) {
     kart.melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
     kart.lastVelocity = undefined;
     kart.settled = false;
-    kart.melon.SetColor(BREAK_TINT); // kart.paintColor itself is untouched, restored below
-    SpawnBreakParticles(breakPosition, breakAngles);
+    // Hidden entirely when the break particle actually spawned — it reads as
+    // the melon shredding apart, which a dark husk just sitting there in one
+    // piece doesn't. But without a "melon_break_template" placed in Hammer
+    // there's nothing else marking the crash site: the melon would just
+    // vanish and silently reappear at the checkpoint BREAK_RESPAWN_DELAY
+    // later, which looks like the camera instantly cut to the respawn. Tint
+    // it dark and leave it visible instead, so there's always something at
+    // the crash site to see while it waits out the respawn delay.
+    // kart.paintColor itself is untouched either way, restored in
+    // ScheduleRespawnAfterBreak.
+    const particlesSpawned = SpawnBreakParticles(breakPosition, breakAngles);
+    kart.melon.SetColor(particlesSpawned ? { r: 255, g: 255, b: 255, a: 0 } : BREAK_TINT_FALLBACK);
 
-    Instance.Delay(BREAK_RESPAWN_DELAY).then(() => {
-        kart.breaking = false;
-        if (!kart.melon.IsValid()) {
-            return; // pruned meanwhile (e.g. the player disconnected)
-        }
-        kart.melon.SetColor(kart.paintColor);
-        if (kart.locked) {
-            // The race flow moved on while this melon was mid-break (heat
-            // aborted, or a fresh BeginHeat/ReturnAllToHub already placed
-            // it) — that already-current teleport wins, don't stomp it with
-            // our now-stale checkpointPosition.
-            kart.health = MELON_MAX_HEALTH;
-            return;
-        }
-        RespawnKartAtCheckpoint(kart);
-    });
+    ScheduleRespawnAfterBreak(slot, kart);
+}
+
+/**
+ * Recovery path for a melon that broke for real instead of just being hidden
+ * by BreakMelon above — the engine's own physics can destroy a
+ * prop_physics_multiplayer outright on a hard enough impact, sometimes
+ * before our own kart.health tracking even gets a chance to react. Without
+ * this, that kart would silently lose its melon with no break particle, no
+ * delay, and (since nothing else re-creates it while the player's pawn stays
+ * alive — see gamemode/index.js) no way back at all. Runs the same
+ * particle + delay + checkpoint-respawn sequence as a script-detected break,
+ * using the last position/angles Think() saw the melon at (it's already gone
+ * by the time this runs, so it can't be asked directly).
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+export function HandleMelonLost(slot, kart) {
+    if (kart.breaking) {
+        return; // already mid-break/respawn over this same loss
+    }
+    kart.breaking = true;
+    kart.health = 0;
+    const breakPosition = kart.lastKnownPosition ?? kart.checkpointPosition;
+    const breakAngles = kart.lastKnownAngles ?? kart.checkpointAngles;
+    Debug(`slot ${slot}: melon was destroyed at ${JSON.stringify(breakPosition)} — respawning at checkpoint ${kart.checkpointIndex} in ${BREAK_RESPAWN_DELAY}s`);
+    SpawnBreakParticles(breakPosition, breakAngles);
+    ScheduleRespawnAfterBreak(slot, kart);
 }
 
 /** Fraction of the jump cooldown that has recharged, 0 (just used) to 1 (ready). */

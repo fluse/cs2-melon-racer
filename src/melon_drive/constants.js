@@ -14,7 +14,7 @@ export const FORWARD_ACCEL = 900; // units/sec^2 while holding forward
 export const REVERSE_ACCEL = 450; // 0.5x forward, matches original's Reverse/Forward ratio
 export const STRAFE_ACCEL = 360; // 0.4x forward, matches original's Strafe/Forward ratio
 export const MAX_SPEED = 650; // units/sec, horizontal speed cap
-export const COAST_FRICTION = 500; // units/sec^2 horizontal slowdown with no input
+export const COAST_FRICTION = 120; // units/sec^2 horizontal slowdown with no input — low, so the melon keeps rolling on its own momentum instead of grinding to a stop
 export const JUMP_SPEED = 400; // units/sec upward impulse
 // Jump is no longer gated on being grounded (the melon wobbles/bounces
 // enough while rolling that a ground trace was unreliable) — instead it's a
@@ -47,21 +47,29 @@ export const SETTLE_NUDGE_ANGULAR_SPEED = 40; // deg/sec, one-off pitch/roll kic
 // overrode our command — a wall crash or a hard landing — since gravity and
 // our own steering only ever change velocity gradually. That gap's
 // magnitude is the "impact speed" damage is based on.
-export const MELON_MAX_HEALTH = 100;
+export const MELON_MAX_HEALTH = 80;
 export const IMPACT_DAMAGE_THRESHOLD = 450; // units/sec of sudden velocity change before it starts to hurt
 export const IMPACT_DAMAGE_SCALE = 0.2; // health lost per unit/sec beyond the threshold
 
-// When a melon breaks it doesn't respawn instantly — it sits at the crash
-// site, visibly dead (tinted dark, frozen), for BREAK_RESPAWN_DELAY seconds
-// before teleporting back to the last checkpoint. Gives the player a beat to
-// register that it broke instead of it just snapping to the checkpoint.
+// When a melon breaks it doesn't respawn instantly — it shreds apart at the
+// crash site (hidden immediately, with the break particle standing in for
+// the melon itself) for BREAK_RESPAWN_DELAY seconds before reappearing at the
+// last checkpoint. Gives the player a beat to register that it broke instead
+// of it just snapping to the checkpoint.
 export const BREAK_RESPAWN_DELAY = 1; // seconds
-export const BREAK_TINT = { r: 40, g: 40, b: 40, a: 255 }; // dark/dead look while broken, before the paint color is restored
+// Fallback look while broken when no break particle actually spawned (see
+// SpawnBreakParticles/BreakMelon) — a dark, dead-looking husk visibly marking
+// the crash site instead of the melon just vanishing for BREAK_RESPAWN_DELAY
+// seconds with nothing to look at.
+export const BREAK_TINT_FALLBACK = { r: 40, g: 40, b: 40, a: 255 };
 // Name of a point_template placed in Hammer holding the break effect (e.g. an
 // info_particle_system with "Start Active" set so it plays as soon as it's
 // spawned, no input needed) — same ForceSpawn-from-a-template convention as
 // MELON_TEMPLATE_NAME.
 export const BREAK_PARTICLE_TEMPLATE_NAME = "melon_break_template";
+// Second, separate break effect layered on top of the one above — e.g. flying
+// melon chunks, as opposed to the main burst. Same point_template convention.
+export const BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME = "melon_break_chunks_particle";
 
 // The map has multiple separate tracks, so a checkpoint's script input
 // parameter names both which track it belongs to and its position along
@@ -169,20 +177,27 @@ export const PAWN_PARK_HEIGHT = 3000;
 
 // Offsets for CameraFollowConfig — behind and above the melon. cameraOffset
 // is rotated by the player's eye angles: x is forward (negative = behind),
-// z is up. Height/lateral are fixed; only the backward distance is
-// player-adjustable (see CAMERA_DISTANCE_* and GetCameraOffsetFor in
-// camera.js, and the user menu's camera distance control).
+// z is up. Lateral is fixed; the backward distance and the up height are
+// both player-adjustable (see CAMERA_DISTANCE_*/CAMERA_HEIGHT_* and
+// GetCameraOffsetFor in camera.js, and the user menu's camera controls).
 export const FOLLOW_OFFSET = { x: 0, y: 0, z: 20 };
-export const CAMERA_HEIGHT = 80;
 export const CAMERA_LATERAL = 0;
 export const CAMERA_DISTANCE_MIN = 150;
-export const CAMERA_DISTANCE_MAX = 600;
-export const CAMERA_DISTANCE_DEFAULT = 320; // matches the old fixed CAMERA_OFFSET.x
+export const CAMERA_DISTANCE_MAX = 400;
+export const CAMERA_DISTANCE_DEFAULT = 320;
 // CustomHudLayout only supports Panel/Label/Image/Button — no native
 // slider/drag widget — so the user menu's "distance slider" is really a
 // clickable row of notches the player picks from, same trick as the jump
 // recharge bar (JUMP_BAR_SEGMENTS) below. This is how many notches it has.
 export const CAMERA_DISTANCE_STEPS = 10;
+
+// Same notch-slider trick as CAMERA_DISTANCE_* above, for how high above the
+// melon the chase camera sits — lets players pick a low, close-to-the-ground
+// view or a higher, more overview-ish one.
+export const CAMERA_HEIGHT_MIN = 20;
+export const CAMERA_HEIGHT_MAX = 160;
+export const CAMERA_HEIGHT_DEFAULT = 80; // matches the old fixed CAMERA_HEIGHT
+export const CAMERA_HEIGHT_STEPS = 10;
 
 // Name of the custom_hud_layout entity (place one in Hammer pointing at
 // panorama/layout/custom_game/speedometer.vxml) that shows the speedometer.
@@ -193,6 +208,15 @@ export const UNITS_TO_KMH = 0.0254 * 3.6;
 // Segmented jump-recharge bar — see JUMP_BAR_SEGMENTS panel ids
 // ("jump_seg_0" .. "jump_seg_{N-1}") in speedometer.xml.
 export const JUMP_BAR_SEGMENTS = 10;
+
+// Segmented melon health bar — see HEALTH_BAR_SEGMENTS panel ids
+// ("health_seg_0" .. "health_seg_{N-1}") in speedometer.xml, filled up to
+// kart.health / MELON_MAX_HEALTH. Below these fractions the bar's fill color
+// shifts (green -> yellow -> red, see UpdateHealthHud/speedometer.css) to
+// warn that another hard impact will break the melon.
+export const HEALTH_BAR_SEGMENTS = 10;
+export const HEALTH_LOW_FRACTION = 0.6;
+export const HEALTH_CRITICAL_FRACTION = 0.3;
 
 // Think's debug heartbeat log interval — see think.js.
 export const HEARTBEAT_INTERVAL = 1; // seconds

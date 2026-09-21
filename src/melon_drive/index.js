@@ -21,12 +21,12 @@ import { Instance, CSMoveType } from "cs_script/point_script";
 // think.js for the per-tick driver.
 
 import { Debug } from "./debug.js";
-import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, CAMERA_DISTANCE_STEPS } from "./constants.js";
+import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, CAMERA_DISTANCE_STEPS, CAMERA_HEIGHT_STEPS } from "./constants.js";
 import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, SetModeratorSlot } from "./kart-registry.js";
 import { GetOrCreateKart, ParkPawn } from "./kart-spawn.js";
 import { RespawnKartAtCheckpoint, SetKartPaintColor } from "./kart-physics.js";
 import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen } from "./hud.js";
-import { SetCameraDistance } from "./camera.js";
+import { SetCameraDistance, SetCameraHeight } from "./camera.js";
 import { phase, activeTrackId, phaseEndTime, TryStartRace, TryAbortRace, RestoreRaceFlowSnapshot } from "./race-flow.js";
 import { RegisterCheckpointAndFinishInputs } from "./checkpoints.js";
 import { Think } from "./think.js";
@@ -199,6 +199,16 @@ Instance.OnCustomHudClicked((event) => {
         const kart = karts.get(event.player.GetPlayerSlot());
         if (kart) {
             SetCameraDistance(kart, step);
+        }
+    } else if (event.buttonId.startsWith("camheight_seg_")) {
+        const step = Number(event.buttonId.slice("camheight_seg_".length));
+        if (!Number.isInteger(step) || step < 0 || step >= CAMERA_HEIGHT_STEPS) {
+            Debug(`camheight_seg_${step}: not a valid height step, ignoring`);
+            return;
+        }
+        const kart = karts.get(event.player.GetPlayerSlot());
+        if (kart) {
+            SetCameraHeight(kart, step);
         }
     }
 });

@@ -27,7 +27,7 @@ const FORWARD_ACCEL = 900; // units/sec^2 while holding forward
 const REVERSE_ACCEL = 450; // 0.5x forward, matches original's Reverse/Forward ratio
 const STRAFE_ACCEL = 360; // 0.4x forward, matches original's Strafe/Forward ratio
 const MAX_SPEED = 650; // units/sec, horizontal speed cap
-const COAST_FRICTION = 500; // units/sec^2 horizontal slowdown with no input
+const COAST_FRICTION = 120; // units/sec^2 horizontal slowdown with no input — low, so the melon keeps rolling on its own momentum instead of grinding to a stop
 const JUMP_SPEED = 400; // units/sec upward impulse
 // Jump is no longer gated on being grounded (the melon wobbles/bounces
 // enough while rolling that a ground trace was unreliable) — instead it's a
@@ -60,21 +60,29 @@ const SETTLE_NUDGE_ANGULAR_SPEED = 40; // deg/sec, one-off pitch/roll kick on se
 // overrode our command — a wall crash or a hard landing — since gravity and
 // our own steering only ever change velocity gradually. That gap's
 // magnitude is the "impact speed" damage is based on.
-const MELON_MAX_HEALTH = 100;
+const MELON_MAX_HEALTH = 80;
 const IMPACT_DAMAGE_THRESHOLD = 450; // units/sec of sudden velocity change before it starts to hurt
 const IMPACT_DAMAGE_SCALE = 0.2; // health lost per unit/sec beyond the threshold
 
-// When a melon breaks it doesn't respawn instantly — it sits at the crash
-// site, visibly dead (tinted dark, frozen), for BREAK_RESPAWN_DELAY seconds
-// before teleporting back to the last checkpoint. Gives the player a beat to
-// register that it broke instead of it just snapping to the checkpoint.
+// When a melon breaks it doesn't respawn instantly — it shreds apart at the
+// crash site (hidden immediately, with the break particle standing in for
+// the melon itself) for BREAK_RESPAWN_DELAY seconds before reappearing at the
+// last checkpoint. Gives the player a beat to register that it broke instead
+// of it just snapping to the checkpoint.
 const BREAK_RESPAWN_DELAY = 1; // seconds
-const BREAK_TINT = { r: 40, g: 40, b: 40, a: 255 }; // dark/dead look while broken, before the paint color is restored
+// Fallback look while broken when no break particle actually spawned (see
+// SpawnBreakParticles/BreakMelon) — a dark, dead-looking husk visibly marking
+// the crash site instead of the melon just vanishing for BREAK_RESPAWN_DELAY
+// seconds with nothing to look at.
+const BREAK_TINT_FALLBACK = { r: 40, g: 40, b: 40, a: 255 };
 // Name of a point_template placed in Hammer holding the break effect (e.g. an
 // info_particle_system with "Start Active" set so it plays as soon as it's
 // spawned, no input needed) — same ForceSpawn-from-a-template convention as
 // MELON_TEMPLATE_NAME.
 const BREAK_PARTICLE_TEMPLATE_NAME = "melon_break_template";
+// Second, separate break effect layered on top of the one above — e.g. flying
+// melon chunks, as opposed to the main burst. Same point_template convention.
+const BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME = "melon_break_chunks_particle";
 
 // The map has multiple separate tracks, so a checkpoint's script input
 // parameter names both which track it belongs to and its position along
@@ -182,20 +190,27 @@ const PAWN_PARK_HEIGHT = 3000;
 
 // Offsets for CameraFollowConfig — behind and above the melon. cameraOffset
 // is rotated by the player's eye angles: x is forward (negative = behind),
-// z is up. Height/lateral are fixed; only the backward distance is
-// player-adjustable (see CAMERA_DISTANCE_* and GetCameraOffsetFor in
-// camera.js, and the user menu's camera distance control).
+// z is up. Lateral is fixed; the backward distance and the up height are
+// both player-adjustable (see CAMERA_DISTANCE_*/CAMERA_HEIGHT_* and
+// GetCameraOffsetFor in camera.js, and the user menu's camera controls).
 const FOLLOW_OFFSET = { x: 0, y: 0, z: 20 };
-const CAMERA_HEIGHT = 80;
 const CAMERA_LATERAL = 0;
 const CAMERA_DISTANCE_MIN = 150;
-const CAMERA_DISTANCE_MAX = 600;
-const CAMERA_DISTANCE_DEFAULT = 320; // matches the old fixed CAMERA_OFFSET.x
+const CAMERA_DISTANCE_MAX = 400;
+const CAMERA_DISTANCE_DEFAULT = 320;
 // CustomHudLayout only supports Panel/Label/Image/Button — no native
 // slider/drag widget — so the user menu's "distance slider" is really a
 // clickable row of notches the player picks from, same trick as the jump
 // recharge bar (JUMP_BAR_SEGMENTS) below. This is how many notches it has.
 const CAMERA_DISTANCE_STEPS = 10;
+
+// Same notch-slider trick as CAMERA_DISTANCE_* above, for how high above the
+// melon the chase camera sits — lets players pick a low, close-to-the-ground
+// view or a higher, more overview-ish one.
+const CAMERA_HEIGHT_MIN = 20;
+const CAMERA_HEIGHT_MAX = 160;
+const CAMERA_HEIGHT_DEFAULT = 80; // matches the old fixed CAMERA_HEIGHT
+const CAMERA_HEIGHT_STEPS = 10;
 
 // Name of the custom_hud_layout entity (place one in Hammer pointing at
 // panorama/layout/custom_game/speedometer.vxml) that shows the speedometer.
@@ -207,6 +222,15 @@ const UNITS_TO_KMH = 0.0254 * 3.6;
 // ("jump_seg_0" .. "jump_seg_{N-1}") in speedometer.xml.
 const JUMP_BAR_SEGMENTS = 10;
 
+// Segmented melon health bar — see HEALTH_BAR_SEGMENTS panel ids
+// ("health_seg_0" .. "health_seg_{N-1}") in speedometer.xml, filled up to
+// kart.health / MELON_MAX_HEALTH. Below these fractions the bar's fill color
+// shifts (green -> yellow -> red, see UpdateHealthHud/speedometer.css) to
+// warn that another hard impact will break the melon.
+const HEALTH_BAR_SEGMENTS = 10;
+const HEALTH_LOW_FRACTION = 0.6;
+const HEALTH_CRITICAL_FRACTION = 0.3;
+
 // Think's debug heartbeat log interval — see think.js.
 const HEARTBEAT_INTERVAL = 1; // seconds
 
@@ -217,7 +241,8 @@ const HEARTBEAT_INTERVAL = 1; // seconds
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
  *   breaking: boolean, paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean,
- *   cameraDistance: number, settled: boolean,
+ *   cameraDistance: number, cameraHeight: number, settled: boolean,
+ *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
  * }} Kart
  */
 /** @type {Map<number, Kart>} */
@@ -288,9 +313,9 @@ function UpdateKart(slot, kart, dt) {
 
     // Broken and waiting out BREAK_RESPAWN_DELAY (see BreakMelon) — unlike
     // `locked` above, freeze completely (gravity included). It's already
-    // sitting wherever it crashed, tinted dark, and should just hold still
-    // until the delayed respawn teleports it away rather than keep tumbling
-    // (which would also spuriously re-trigger the impact check below).
+    // hidden at the crash site, and should just hold still until the delayed
+    // respawn teleports it away rather than keep tumbling invisibly (which
+    // would also spuriously re-trigger the impact check below).
     if (kart.breaking) {
         melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
         kart.lastVelocity = undefined;
@@ -433,18 +458,38 @@ function DirectionToAngles(dir, length) {
     return { pitch, yaw, roll: 0 };
 }
 
-/** @param {any} position @param {any} angles */
-function SpawnBreakParticles(position, angles) {
-    const template = Instance.FindEntityByName(BREAK_PARTICLE_TEMPLATE_NAME);
+/**
+ * Spawns a single named point_template's particle effect, if it's actually
+ * placed in Hammer. @param {string} templateName @param {any} position @param {any} angles
+ * @returns {boolean} whether it actually spawned
+ */
+function SpawnParticleTemplate(templateName, position, angles) {
+    const template = Instance.FindEntityByName(templateName);
     if (!template) {
-        Debug(`SpawnBreakParticles: no entity named "${BREAK_PARTICLE_TEMPLATE_NAME}" found — add a point_template in Hammer with a "Start Active" particle system to see break effects`);
-        return;
+        Debug(`SpawnParticleTemplate: no entity named "${templateName}" found — add a point_template in Hammer with a "Start Active" particle system to see break effects`);
+        return false;
     }
     if (!(template instanceof PointTemplate)) {
-        Debug(`SpawnBreakParticles: entity "${BREAK_PARTICLE_TEMPLATE_NAME}" exists but is a ${template.GetClassName()}, not a point_template`);
-        return;
+        Debug(`SpawnParticleTemplate: entity "${templateName}" exists but is a ${template.GetClassName()}, not a point_template`);
+        return false;
     }
     template.ForceSpawn(position, angles);
+    return true;
+}
+
+/**
+ * Spawns both break effects at the crash site — the main burst plus a
+ * separate melon-chunks template layered on top of it. Independent of each
+ * other (either can be missing from Hammer without the other failing).
+ * @param {any} position @param {any} angles
+ * @returns {boolean} whether at least one of them actually spawned — see
+ * BreakMelon's fallback tint for why callers need to know this, not just
+ * fire-and-forget.
+ */
+function SpawnBreakParticles(position, angles) {
+    const spawnedMain = SpawnParticleTemplate(BREAK_PARTICLE_TEMPLATE_NAME, position, angles);
+    const spawnedChunks = SpawnParticleTemplate(BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, position, angles);
+    return spawnedMain || spawnedChunks;
 }
 
 /**
@@ -469,9 +514,9 @@ function RespawnKartAtCheckpoint(kart) {
 
 /**
  * Sets a kart's melon color and remembers it so it survives a break/respawn
- * (BreakMelon covers the melon with BREAK_TINT temporarily, without losing
- * track of the color underneath). Used by both the melon_paint map trigger
- * and the user menu's color swatches.
+ * (BreakMelon hides the melon entirely while broken, without losing track of
+ * the color underneath — see ScheduleRespawnAfterBreak). Used by both the
+ * melon_paint map trigger and the user menu's color swatches.
  * @param {import("./kart-registry.js").Kart} kart @param {{ r: number, g: number, b: number, a: number }} color
  */
 function SetKartPaintColor(kart, color) {
@@ -479,6 +524,57 @@ function SetKartPaintColor(kart, color) {
     if (!kart.breaking) {
         kart.melon.SetColor(color);
     }
+}
+
+/**
+ * Common tail end of every break, whether it was caught by our own
+ * kart.health tracking (BreakMelon) or discovered after the fact because the
+ * melon vanished on its own (HandleMelonLost): wait out BREAK_RESPAWN_DELAY,
+ * then bring the kart back — reusing the same (hidden) melon where possible,
+ * or spawning a brand new one at the checkpoint if the original is actually
+ * gone.
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+function ScheduleRespawnAfterBreak(slot, kart) {
+    Instance.Delay(BREAK_RESPAWN_DELAY).then(() => {
+        kart.breaking = false;
+        if (!kart.pawn.IsValid() || karts.get(slot) !== kart) {
+            return; // player disconnected, or a fresh kart already replaced this one
+        }
+        if (kart.locked) {
+            // The race flow moved on while this kart was mid-break (heat
+            // aborted, or a fresh BeginHeat/ReturnAllToHub already placed
+            // it) — that already-current teleport wins, don't stomp it with
+            // our now-stale checkpointPosition. Just make sure it's visible
+            // again if our own hidden melon is still the one in play.
+            kart.health = MELON_MAX_HEALTH;
+            if (kart.melon.IsValid()) {
+                kart.melon.SetColor(kart.paintColor);
+            }
+            return;
+        }
+        if (kart.melon.IsValid()) {
+            kart.melon.SetColor(kart.paintColor);
+            RespawnKartAtCheckpoint(kart);
+            return;
+        }
+        // The melon wasn't just hidden by us — it's genuinely gone (the
+        // engine's own physics broke the prop_physics_multiplayer for real
+        // on a hard enough hit, see HandleMelonLost) — spawn a fresh one at
+        // the checkpoint instead of teleporting an entity that no longer
+        // exists.
+        const melon = SpawnMelonAt(kart.checkpointPosition, kart.checkpointAngles);
+        if (!melon) {
+            Debug(`slot ${slot}: could not respawn a melon after it was destroyed, will keep retrying`);
+            return;
+        }
+        kart.melon = melon;
+        kart.melon.SetColor(kart.paintColor);
+        kart.health = MELON_MAX_HEALTH;
+        kart.lastVelocity = undefined;
+        kart.settled = false;
+        ApplyCameraFollow(kart);
+    });
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed */
@@ -497,25 +593,46 @@ function BreakMelon(slot, kart, impactDir, impactSpeed) {
     kart.melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
     kart.lastVelocity = undefined;
     kart.settled = false;
-    kart.melon.SetColor(BREAK_TINT); // kart.paintColor itself is untouched, restored below
-    SpawnBreakParticles(breakPosition, breakAngles);
+    // Hidden entirely when the break particle actually spawned — it reads as
+    // the melon shredding apart, which a dark husk just sitting there in one
+    // piece doesn't. But without a "melon_break_template" placed in Hammer
+    // there's nothing else marking the crash site: the melon would just
+    // vanish and silently reappear at the checkpoint BREAK_RESPAWN_DELAY
+    // later, which looks like the camera instantly cut to the respawn. Tint
+    // it dark and leave it visible instead, so there's always something at
+    // the crash site to see while it waits out the respawn delay.
+    // kart.paintColor itself is untouched either way, restored in
+    // ScheduleRespawnAfterBreak.
+    const particlesSpawned = SpawnBreakParticles(breakPosition, breakAngles);
+    kart.melon.SetColor(particlesSpawned ? { r: 255, g: 255, b: 255, a: 0 } : BREAK_TINT_FALLBACK);
 
-    Instance.Delay(BREAK_RESPAWN_DELAY).then(() => {
-        kart.breaking = false;
-        if (!kart.melon.IsValid()) {
-            return; // pruned meanwhile (e.g. the player disconnected)
-        }
-        kart.melon.SetColor(kart.paintColor);
-        if (kart.locked) {
-            // The race flow moved on while this melon was mid-break (heat
-            // aborted, or a fresh BeginHeat/ReturnAllToHub already placed
-            // it) — that already-current teleport wins, don't stomp it with
-            // our now-stale checkpointPosition.
-            kart.health = MELON_MAX_HEALTH;
-            return;
-        }
-        RespawnKartAtCheckpoint(kart);
-    });
+    ScheduleRespawnAfterBreak(slot, kart);
+}
+
+/**
+ * Recovery path for a melon that broke for real instead of just being hidden
+ * by BreakMelon above — the engine's own physics can destroy a
+ * prop_physics_multiplayer outright on a hard enough impact, sometimes
+ * before our own kart.health tracking even gets a chance to react. Without
+ * this, that kart would silently lose its melon with no break particle, no
+ * delay, and (since nothing else re-creates it while the player's pawn stays
+ * alive — see gamemode/index.js) no way back at all. Runs the same
+ * particle + delay + checkpoint-respawn sequence as a script-detected break,
+ * using the last position/angles Think() saw the melon at (it's already gone
+ * by the time this runs, so it can't be asked directly).
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+function HandleMelonLost(slot, kart) {
+    if (kart.breaking) {
+        return; // already mid-break/respawn over this same loss
+    }
+    kart.breaking = true;
+    kart.health = 0;
+    const breakPosition = kart.lastKnownPosition ?? kart.checkpointPosition;
+    const breakAngles = kart.lastKnownAngles ?? kart.checkpointAngles;
+    Debug(`slot ${slot}: melon was destroyed at ${JSON.stringify(breakPosition)} — respawning at checkpoint ${kart.checkpointIndex} in ${BREAK_RESPAWN_DELAY}s`);
+    SpawnBreakParticles(breakPosition, breakAngles);
+    ScheduleRespawnAfterBreak(slot, kart);
 }
 
 /** Fraction of the jump cooldown that has recharged, 0 (just used) to 1 (ready). */
@@ -609,6 +726,21 @@ function UpdateJumpHud(slot, kart) {
         hud.SetHasClassForPlayer(slot, `jump_seg_${i}`, "Filled", i < filledSegments);
     }
     hud.SetHasClassForPlayer(slot, "jump_bar", "Ready", charge >= 1);
+}
+
+/** @param {number} slot @param {import("./kart-registry.js").Kart} kart */
+function UpdateHealthHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const fraction = Math.max(0, Math.min(1, kart.health / MELON_MAX_HEALTH));
+    const filledSegments = Math.round(fraction * HEALTH_BAR_SEGMENTS);
+    for (let i = 0; i < HEALTH_BAR_SEGMENTS; i++) {
+        hud.SetHasClassForPlayer(slot, `health_seg_${i}`, "Filled", i < filledSegments);
+    }
+    hud.SetHasClassForPlayer(slot, "health_bar", "Low", fraction <= HEALTH_LOW_FRACTION);
+    hud.SetHasClassForPlayer(slot, "health_bar", "Critical", fraction <= HEALTH_CRITICAL_FRACTION);
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart */
@@ -736,9 +868,45 @@ function SetCameraDistance(kart, step) {
     UpdateCameraDistanceHud(kart);
 }
 
+// Same notch-slider trick as the distance controls above (camheight_seg_0 ..
+// camheight_seg_{CAMERA_HEIGHT_STEPS-1} in speedometer.xml), for how high
+// above the melon the chase camera sits — lets a player pull it down close
+// to the ground or push it up for more of an overview.
+/** @param {number} height */
+function CameraHeightStepFor(height) {
+    const fraction = (height - CAMERA_HEIGHT_MIN) / (CAMERA_HEIGHT_MAX - CAMERA_HEIGHT_MIN);
+    return Math.round(fraction * (CAMERA_HEIGHT_STEPS - 1));
+}
+
+/** @param {number} step */
+function CameraHeightForStep(step) {
+    const fraction = CAMERA_HEIGHT_STEPS > 1 ? step / (CAMERA_HEIGHT_STEPS - 1) : 0;
+    return CAMERA_HEIGHT_MIN + fraction * (CAMERA_HEIGHT_MAX - CAMERA_HEIGHT_MIN);
+}
+
+/** @param {import("./kart-registry.js").Kart} kart */
+function UpdateCameraHeightHud(kart) {
+    const hud = GetSpeedHud();
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (!hud || slot === undefined) {
+        return;
+    }
+    const filledSegments = CameraHeightStepFor(kart.cameraHeight) + 1;
+    for (let i = 0; i < CAMERA_HEIGHT_STEPS; i++) {
+        hud.SetHasClassForPlayer(slot, `camheight_seg_${i}`, "Filled", i < filledSegments);
+    }
+}
+
+/** Applies a new camera height (picked via the user menu's slider) immediately, without waiting for a respawn. @param {import("./kart-registry.js").Kart} kart @param {number} step */
+function SetCameraHeight(kart, step) {
+    kart.cameraHeight = CameraHeightForStep(step);
+    ApplyCameraFollow(kart);
+    UpdateCameraHeightHud(kart);
+}
+
 /** @param {import("./kart-registry.js").Kart} kart */
 function GetCameraOffsetFor(kart) {
-    return { x: -kart.cameraDistance, y: CAMERA_LATERAL, z: CAMERA_HEIGHT };
+    return { x: -kart.cameraDistance, y: CAMERA_LATERAL, z: kart.cameraHeight };
 }
 
 /**
@@ -757,7 +925,7 @@ function ApplyCameraFollow(kart) {
         followEntity: kart.melon,
         followOffset: FOLLOW_OFFSET,
         cameraOffset: GetCameraOffsetFor(kart),
-        clipCameraOffset: false,
+        clipCameraOffset: true, // pull the camera in instead of letting it clip through walls
     });
     Debug(`ApplyCameraFollow: mode=${camera.GetMode()} distance=${kart.cameraDistance} for slot=${kart.pawn.GetPlayerController()?.GetPlayerSlot()}`);
 }
@@ -790,16 +958,34 @@ function GetSpawnOrigin(pawn) {
     return pawn.GetAbsOrigin();
 }
 
-function SpawnMelonFor(pawn) {
+/**
+ * Spawns a fresh melon from the melon_template point_template at an explicit
+ * position/angles — the shared primitive behind SpawnMelonFor below (which
+ * works out where a *new* player's melon should appear) and kart-physics.js's
+ * post-break recovery (which respawns one at a kart's own checkpoint).
+ * @param {{ x: number, y: number, z: number }} position @param {{ pitch: number, yaw: number, roll: number }} angles
+ */
+function SpawnMelonAt(position, angles) {
     const template = Instance.FindEntityByName(MELON_TEMPLATE_NAME);
     if (!template) {
-        Debug(`SpawnMelonFor: no entity named "${MELON_TEMPLATE_NAME}" found at all`);
+        Debug(`SpawnMelonAt: no entity named "${MELON_TEMPLATE_NAME}" found at all`);
         return undefined;
     }
     if (!(template instanceof PointTemplate)) {
-        Debug(`SpawnMelonFor: entity "${MELON_TEMPLATE_NAME}" exists but is a ${template.GetClassName()}, not a point_template`);
+        Debug(`SpawnMelonAt: entity "${MELON_TEMPLATE_NAME}" exists but is a ${template.GetClassName()}, not a point_template`);
         return undefined;
     }
+    const spawned = template.ForceSpawn(position, angles);
+    if (!spawned || spawned.length === 0) {
+        Debug(`SpawnMelonAt: ForceSpawn() returned nothing — check the point_template's Template entries in Hammer`);
+        return undefined;
+    }
+    Debug(`SpawnMelonAt: spawned ${spawned.length} entity(s) at ${JSON.stringify(position)}, using [0] = ${spawned[0].GetClassName()}`);
+    return spawned[0];
+}
+
+/** @param {any} pawn */
+function SpawnMelonFor(pawn) {
     const origin = GetSpawnOrigin(pawn);
     const yaw = GetSpawnFacingYaw(pawn);
     // Spawn a bit in front of the player, not exactly on top of them —
@@ -814,13 +1000,7 @@ function SpawnMelonFor(pawn) {
         y: origin.y + Math.sin(rad) * SPAWN_FORWARD_OFFSET,
         z: origin.z + SPAWN_UP_OFFSET,
     };
-    const spawned = template.ForceSpawn(spawnPos, { pitch: 0, yaw, roll: 0 });
-    if (!spawned || spawned.length === 0) {
-        Debug(`SpawnMelonFor: ForceSpawn() returned nothing — check the point_template's Template entries in Hammer`);
-        return undefined;
-    }
-    Debug(`SpawnMelonFor: spawned ${spawned.length} entity(s) at ${JSON.stringify(spawnPos)}, using [0] = ${spawned[0].GetClassName()}`);
-    return spawned[0];
+    return SpawnMelonAt(spawnPos, { pitch: 0, yaw, roll: 0 });
 }
 
 /** @param {any} pawn */
@@ -907,6 +1087,9 @@ function GetOrCreateKart(pawn) {
                 paintColor: { r: 255, g: 255, b: 255, a: 255 },
                 userMenuOpen: false,
                 cameraDistance: CAMERA_DISTANCE_DEFAULT,
+                cameraHeight: CAMERA_HEIGHT_DEFAULT,
+                lastKnownPosition: undefined,
+                lastKnownAngles: undefined,
             };
         }
         karts.set(slot, kart);
@@ -918,6 +1101,7 @@ function GetOrCreateKart(pawn) {
     HidePawnModel(pawn);
     ApplyCameraFollow(kart);
     UpdateCameraDistanceHud(kart);
+    UpdateCameraHeightHud(kart);
     return kart;
 }
 
@@ -1355,28 +1539,58 @@ function Think() {
     }
 
     for (const [slot, kart] of karts) {
-        if (!kart.melon.IsValid() || !kart.pawn.IsValid()) {
-            Debug(`Think: slot ${slot} melon/pawn no longer valid, dropping kart`);
+        if (!kart.pawn.IsValid()) {
+            Debug(`Think: slot ${slot} pawn no longer valid, dropping kart`);
             karts.delete(slot);
             continue;
         }
-        UpdateUserMenu(slot, kart); // checked before UpdateKart's locked/breaking early-returns — USE works as an unstuck button
-        UpdateKart(slot, kart, dt);
-        UpdateSpeedHud(slot, kart.melon);
-        UpdateJumpHud(slot, kart);
-        UpdateCheckpointHud(slot, kart);
-        if (kart.inHub) {
-            ApplyHubModalState(slot, phase);
+        if (!kart.melon.IsValid()) {
+            // The melon (a prop_physics_multiplayer) can be destroyed for
+            // real by the engine's own physics damage on a hard enough
+            // impact — separate from (and sometimes faster than) our own
+            // scripted BreakMelon/health system. HandleMelonLost runs it
+            // through the same particle + delay + checkpoint-respawn
+            // sequence as a script-detected break instead of leaving it
+            // gone for good — nothing else would ever call GetOrCreateKart
+            // again while the player's pawn stays alive (no round restarts,
+            // no fall/weapon damage — see gamemode/index.js).
+            HandleMelonLost(slot, kart);
+            // Still lets USE work as an unstuck button while waiting on the
+            // respawn above — it only touches kart.userMenuOpen/the pawn,
+            // never the (currently missing) melon.
+            UpdateUserMenu(slot, kart);
+            continue;
         }
-        if (heartbeat) {
-            const vel = kart.melon.GetAbsVelocity();
-            Debug(
-                `Think: slot ${slot} velocity=(${vel.x.toFixed(0)}, ${vel.y.toFixed(0)}, ${vel.z.toFixed(0)}) ` +
-                `melonPos=${JSON.stringify(kart.melon.GetAbsOrigin())} eyeYaw=${kart.pawn.GetEyeAngles().yaw.toFixed(0)} ` +
-                `input(F/B/L/R/Jump)=${kart.pawn.IsInputPressed(CSInputs.FORWARD)}/${kart.pawn.IsInputPressed(CSInputs.BACK)}/` +
-                `${kart.pawn.IsInputPressed(CSInputs.LEFT)}/${kart.pawn.IsInputPressed(CSInputs.RIGHT)}/` +
-                `${kart.pawn.IsInputPressed(CSInputs.JUMP)}`
-            );
+        kart.lastKnownPosition = kart.melon.GetAbsOrigin();
+        kart.lastKnownAngles = kart.melon.GetAbsAngles();
+        // One kart's update throwing for any other reason must not take down
+        // every other player's kart with it — and, critically, must not skip
+        // the SetNextThink call below, which would silently freeze the
+        // *entire* gamemode (no more movement, HUD, or user-menu input for
+        // anyone) until the next map/script reload.
+        try {
+            UpdateUserMenu(slot, kart); // checked before UpdateKart's locked/breaking early-returns — USE works as an unstuck button
+            UpdateKart(slot, kart, dt);
+            UpdateSpeedHud(slot, kart.melon);
+            UpdateJumpHud(slot, kart);
+            UpdateHealthHud(slot, kart);
+            UpdateCheckpointHud(slot, kart);
+            if (kart.inHub) {
+                ApplyHubModalState(slot, phase);
+            }
+            if (heartbeat) {
+                const vel = kart.melon.GetAbsVelocity();
+                Debug(
+                    `Think: slot ${slot} velocity=(${vel.x.toFixed(0)}, ${vel.y.toFixed(0)}, ${vel.z.toFixed(0)}) ` +
+                    `melonPos=${JSON.stringify(kart.melon.GetAbsOrigin())} eyeYaw=${kart.pawn.GetEyeAngles().yaw.toFixed(0)} ` +
+                    `input(F/B/L/R/Jump)=${kart.pawn.IsInputPressed(CSInputs.FORWARD)}/${kart.pawn.IsInputPressed(CSInputs.BACK)}/` +
+                    `${kart.pawn.IsInputPressed(CSInputs.LEFT)}/${kart.pawn.IsInputPressed(CSInputs.RIGHT)}/` +
+                    `${kart.pawn.IsInputPressed(CSInputs.JUMP)}`
+                );
+            }
+        } catch (err) {
+            Debug(`Think: slot ${slot} update threw, dropping kart to keep the gamemode alive for everyone else: ${err}`);
+            karts.delete(slot);
         }
     }
     EnsureModerator();
@@ -1557,6 +1771,16 @@ Instance.OnCustomHudClicked((event) => {
         const kart = karts.get(event.player.GetPlayerSlot());
         if (kart) {
             SetCameraDistance(kart, step);
+        }
+    } else if (event.buttonId.startsWith("camheight_seg_")) {
+        const step = Number(event.buttonId.slice("camheight_seg_".length));
+        if (!Number.isInteger(step) || step < 0 || step >= CAMERA_HEIGHT_STEPS) {
+            Debug(`camheight_seg_${step}: not a valid height step, ignoring`);
+            return;
+        }
+        const kart = karts.get(event.player.GetPlayerSlot());
+        if (kart) {
+            SetCameraHeight(kart, step);
         }
     }
 });
