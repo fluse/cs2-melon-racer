@@ -1,7 +1,8 @@
 import { Instance, CSInputs } from "cs_script/point_script";
 import { DEBUG, Debug } from "./debug.js";
 import { HEARTBEAT_INTERVAL } from "./constants.js";
-import { karts, EnsureModerator } from "./kart-registry.js";
+import { karts, EnsureModerator, DropKart } from "./kart-registry.js";
+import { GetOrCreateKart, ParkPawn } from "./kart-spawn.js";
 import { UpdateUserMenu, UpdateSpeedHud, UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, ApplyHubModalState } from "./hud.js";
 import { UpdateKart, HandleMelonLost } from "./kart-physics.js";
 import { phase, UpdateRaceFlow } from "./race-flow.js";
@@ -26,7 +27,7 @@ export function Think() {
     for (const [slot, kart] of karts) {
         if (!kart.pawn.IsValid()) {
             Debug(`Think: slot ${slot} pawn no longer valid, dropping kart`);
-            karts.delete(slot);
+            DropKart(slot, kart);
             continue;
         }
         if (!kart.melon.IsValid()) {
@@ -75,7 +76,8 @@ export function Think() {
             }
         } catch (err) {
             Debug(`Think: slot ${slot} update threw, dropping kart to keep the gamemode alive for everyone else: ${err}`);
-            karts.delete(slot);
+            DropKart(slot, kart);
+            ScheduleKartRebuild(slot, kart.pawn);
         }
     }
     EnsureModerator();
@@ -93,4 +95,29 @@ export function Think() {
     // own tick rate means some jump presses land on a tick we never check and
     // are silently lost. Same pattern as cs_script_demo's input.js.
     Instance.SetNextThink(Instance.GetGameTime());
+}
+
+/**
+ * Gives a player whose kart got dropped by Think's error handler a fresh one
+ * — otherwise they'd sit melon-less until the next OnPlayerReset, which on
+ * this map practically never comes (see gamemode/index.js). Delayed, not
+ * immediate, so an error that keeps recurring rebuilds at most once a second
+ * instead of spawning (and dropping) a melon every tick.
+ * @param {number} slot @param {any} pawn
+ */
+function ScheduleKartRebuild(slot, pawn) {
+    Instance.Delay(1).then(() => {
+        if (karts.has(slot) || !pawn.IsValid()) {
+            return; // already rebuilt elsewhere (e.g. OnPlayerReset), or player gone
+        }
+        try {
+            const kart = GetOrCreateKart(pawn);
+            if (kart) {
+                ParkPawn(pawn, kart.melon);
+                Debug(`ScheduleKartRebuild: slot ${slot} got a fresh kart`);
+            }
+        } catch (err) {
+            Debug(`ScheduleKartRebuild: slot ${slot} rebuild threw: ${err}`);
+        }
+    });
 }

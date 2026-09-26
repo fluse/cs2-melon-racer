@@ -171,6 +171,7 @@ export function GetOrCreateKart(pawn) {
                 teleportGen: 0,
                 paintColor: { r: 255, g: 255, b: 255, a: 255 },
                 userMenuOpen: false,
+                hubModalOpen: false,
                 cameraDistance: CAMERA_DISTANCE_DEFAULT,
                 cameraHeight: CAMERA_HEIGHT_DEFAULT,
                 lastKnownPosition: undefined,

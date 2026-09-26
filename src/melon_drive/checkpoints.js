@@ -17,7 +17,7 @@ import { MAX_TRACKS, MAX_CHECKPOINTS_PER_TRACK, TELEPORT_UP_OFFSET } from "./con
 // several tracks in the map. Checkpoints past index 1 only count while the
 // kart is already on that same track (so straying onto a different track's
 // later checkpoints doesn't skip progress), and only ever move progress
-// forward within it. A kart that's racing can't pick a *different* track's
+// forward within it, one checkpoint at a time (no skipping ahead). A kart that's racing can't pick a *different* track's
 // checkpoint 1 mid-heat either (straying into another track's start zone is
 // ignored outright) — letting it through would silently overwrite
 // kart.trackId to the wrong track and then reject the racer's own further
@@ -46,12 +46,34 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
         if (kart.trackId !== trackId) {
             kart.trackId = trackId;
             kart.checkpointIndex = 0;
+        } else {
+            const config = GetTrackConfig()[trackId];
+            if (config && kart.checkpointIndex >= config.checkpoints) {
+                // Crossing the start line with the whole lap already run.
+                // If finish_<trackId> sits on this same trigger, Hammer may
+                // fire this input before it — count the lap right here so the
+                // order doesn't matter (finish_<trackId> firing afterwards
+                // then sees checkpointIndex 1 and is ignored). Outside a heat
+                // TryCompleteLap doesn't count anything, so reset to 0 here
+                // too, or a free-roaming kart could never start a second lap.
+                TryCompleteLap(trackId, kart);
+                if (kart.finished) {
+                    return;
+                }
+                kart.checkpointIndex = 0;
+            }
         }
     } else if (kart.trackId !== trackId) {
         Debug(`checkpoint_${trackId}_${index}: kart is on track ${kart.trackId}, ignoring`);
         return;
     }
-    if (index <= kart.checkpointIndex) {
+    // Strictly the next checkpoint in sequence — skipping ahead (e.g. 1 -> 5
+    // via a shortcut) must not count, or touching just the last checkpoint
+    // would be enough for finish_<trackId> to accept the lap.
+    if (index !== kart.checkpointIndex + 1) {
+        if (index > kart.checkpointIndex) {
+            Debug(`checkpoint_${trackId}_${index}: kart is at checkpoint ${kart.checkpointIndex}, skipped one — ignoring`);
+        }
         return;
     }
     kart.checkpointIndex = index;
@@ -84,6 +106,16 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
 // GAMEPLAY.md.
 /** @param {number} trackId @param {import("./kart-registry.js").Kart} kart */
 function OnFinishTouched(trackId, kart) {
+    TryCompleteLap(trackId, kart);
+}
+
+/**
+ * Counts a completed lap if the kart is actively racing this track and has
+ * reached its last checkpoint — shared by finish_<trackId> and the
+ * checkpoint_<trackId>_1 re-touch (see OnCheckpointTouched).
+ * @param {number} trackId @param {import("./kart-registry.js").Kart} kart
+ */
+function TryCompleteLap(trackId, kart) {
     if (kart.finished) {
         return; // already parked after finishing this heat
     }

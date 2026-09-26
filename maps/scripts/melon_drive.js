@@ -240,7 +240,7 @@ const HEARTBEAT_INTERVAL = 1; // seconds
  *   health: number, lastVelocity: { x: number, y: number, z: number } | undefined,
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
- *   breaking: boolean, paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean,
+ *   breaking: boolean, paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
  *   cameraDistance: number, cameraHeight: number, settled: boolean,
  *   teleportGen: number, // bumped by every race-flow teleport (BeginHeat/ReturnAllToHub) — see ScheduleRespawnAfterBreak
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
@@ -284,6 +284,19 @@ function EnsureModerator() {
 /** @param {number | undefined} slot */
 function IsModerator(slot) {
     return slot !== undefined && slot === moderatorSlot;
+}
+
+/**
+ * Stops tracking a kart and removes its melon from the world with it —
+ * otherwise the melon would stay behind as an orphaned physics prop that the
+ * player's next melon spawns on top of.
+ * @param {number} slot @param {Kart} kart
+ */
+function DropKart(slot, kart) {
+    if (kart.melon.IsValid()) {
+        kart.melon.Remove();
+    }
+    karts.delete(slot);
 }
 
 /** @param {any} melon */
@@ -796,25 +809,40 @@ function ApplyHubModalState(slot, currentPhase) {
     hud.SetHasClassForPlayer(slot, "hub_modal", "IsModerator", IsModerator(slot));
 }
 
-/** @param {number} slot @param {typeof RacePhase[keyof typeof RacePhase]} currentPhase */
-function ShowHubModal(slot, currentPhase) {
+/**
+ * The layout has a single input-capture flag per player, but two independent
+ * modals want it (hub_modal while standing in the hub, user_menu via USE
+ * anywhere) and can be open at the same time. Derived from both instead of
+ * each modal blindly setting it — otherwise closing either one (e.g. the
+ * user menu while standing in the hub, or leaving the hub with the user menu
+ * open) left the other one on screen without a mouse to click it with.
+ * @param {any} hud @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+function SyncInputCapture(hud, slot, kart) {
+    hud.SetInputCaptureEnabled(slot, Boolean(kart.hubModalOpen || kart.userMenuOpen));
+}
+
+/** @param {number} slot @param {import("./kart-registry.js").Kart} kart @param {typeof RacePhase[keyof typeof RacePhase]} currentPhase */
+function ShowHubModal(slot, kart, currentPhase) {
+    kart.hubModalOpen = true;
     const hud = GetSpeedHud();
     if (!hud) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "hub_modal", "Hidden", false);
     ApplyHubModalState(slot, currentPhase);
-    hud.SetInputCaptureEnabled(slot, true);
+    SyncInputCapture(hud, slot, kart);
 }
 
-/** @param {number} slot */
-function HideHubModal(slot) {
+/** @param {number} slot @param {import("./kart-registry.js").Kart} kart */
+function HideHubModal(slot, kart) {
+    kart.hubModalOpen = false;
     const hud = GetSpeedHud();
     if (!hud) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "hub_modal", "Hidden", true);
-    hud.SetInputCaptureEnabled(slot, false);
+    SyncInputCapture(hud, slot, kart);
 }
 
 // User menu: press USE anywhere (regardless of race phase) to open a small
@@ -831,13 +859,7 @@ function SetUserMenuOpen(slot, kart, open) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
-    // NOTE: like hub_modal above, this blindly sets the whole layout's
-    // capture flag rather than combining with hub_modal's own on/off calls.
-    // The two modals are opened from unrelated triggers (standing in the
-    // hub vs. pressing USE anywhere) and aren't expected to be shown at the
-    // same time; if that ever changes, this'll need to track combined state
-    // instead of each panel fighting over one shared flag.
-    hud.SetInputCaptureEnabled(slot, open);
+    SyncInputCapture(hud, slot, kart);
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart */
@@ -1103,6 +1125,7 @@ function GetOrCreateKart(pawn) {
                 teleportGen: 0,
                 paintColor: { r: 255, g: 255, b: 255, a: 255 },
                 userMenuOpen: false,
+                hubModalOpen: false,
                 cameraDistance: CAMERA_DISTANCE_DEFAULT,
                 cameraHeight: CAMERA_HEIGHT_DEFAULT,
                 lastKnownPosition: undefined,
@@ -1187,7 +1210,7 @@ function TryStartRace() {
         kart.racing = true;
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot !== undefined) {
-            HideHubModal(slot);
+            HideHubModal(slot, kart);
         }
     }
     Debug(`TryStartRace: starting heat on track ${order[0]} with ${racers.length} racer(s)`);
@@ -1206,6 +1229,23 @@ function TryAbortRace() {
     ReturnAllToHub(CurrentRacers());
     phase = RacePhase.HUB;
     activeTrackId = undefined;
+}
+
+/**
+ * Spot `i` of `count` karts lined up side by side, centered on `origin` and
+ * perpendicular to `angles`' facing, lifted by TELEPORT_UP_OFFSET (see its
+ * comment) so the melon drops onto the floor instead of into it.
+ * @param {{ x: number, y: number, z: number }} origin @param {{ yaw: number }} angles @param {number} i @param {number} count
+ */
+function LineUpPosition(origin, angles, i, count) {
+    const rad = (angles.yaw * Math.PI) / 180;
+    const rightDir = { x: Math.sin(rad), y: -Math.cos(rad) };
+    const lateral = (i - (count - 1) / 2) * RACE_SPAWN_LATERAL_SPACING;
+    return {
+        x: origin.x + rightDir.x * lateral,
+        y: origin.y + rightDir.y * lateral,
+        z: origin.z + TELEPORT_UP_OFFSET,
+    };
 }
 
 /** @param {number} trackId */
@@ -1227,23 +1267,16 @@ function BeginHeat(trackId) {
     activeTrackId = trackId;
     const origin = start.GetAbsOrigin();
     const angles = start.GetAbsAngles();
-    const rad = (angles.yaw * Math.PI) / 180;
-    // Perpendicular to the start line's facing, to line racers up side by side.
-    const rightDir = { x: Math.sin(rad), y: -Math.cos(rad) };
 
     const racers = CurrentRacers();
     racers.forEach((kart, i) => {
-        const lateral = (i - (racers.length - 1) / 2) * RACE_SPAWN_LATERAL_SPACING;
+        const position = LineUpPosition(origin, angles, i, racers.length);
         // A melon destroyed mid-BREAK is still pending its respawn (see
         // HandleMelonLost) — skip the teleport rather than throw on a dead
         // entity; that respawn lands it at the checkpointPosition set below.
         if (kart.melon.IsValid()) {
             kart.melon.Teleport({
-                position: {
-                    x: origin.x + rightDir.x * lateral,
-                    y: origin.y + rightDir.y * lateral,
-                    z: origin.z + TELEPORT_UP_OFFSET,
-                },
+                position,
                 angles,
                 velocity: { x: 0, y: 0, z: 0 },
             });
@@ -1264,7 +1297,11 @@ function BeginHeat(trackId) {
         kart.lapsCompleted = 0;
         kart.finished = false;
         kart.locked = true;
-        kart.checkpointPosition = { x: origin.x, y: origin.y, z: origin.z + TELEPORT_UP_OFFSET };
+        // Its own lined-up spot, not the start line's center — a respawn
+        // before reaching checkpoint 1 (break, or the user menu's respawn
+        // button during the countdown) would otherwise stack it on whoever
+        // is standing in the middle.
+        kart.checkpointPosition = position;
         kart.checkpointAngles = angles;
     });
 
@@ -1289,7 +1326,7 @@ function ReturnAllToHub(returning) {
     }
     const hubOrigin = hub?.GetAbsOrigin();
     const hubAngles = hub?.GetAbsAngles();
-    for (const kart of returning) {
+    returning.forEach((kart, i) => {
         kart.racing = false;
         kart.finished = false;
         kart.locked = false;
@@ -1302,7 +1339,11 @@ function ReturnAllToHub(returning) {
         kart.checkpointIndex = 0;
         kart.lapsCompleted = 0;
         if (hubOrigin) {
-            const hubPosition = { x: hubOrigin.x, y: hubOrigin.y, z: hubOrigin.z + TELEPORT_UP_OFFSET };
+            // Lined up side by side like BeginHeat's start grid — teleporting
+            // everyone onto the exact same point made the melons spawn inside
+            // each other and violently shove apart, which the impact check
+            // then counted as crash damage.
+            const hubPosition = LineUpPosition(hubOrigin, hubAngles, i, returning.length);
             kart.checkpointPosition = hubPosition;
             kart.checkpointAngles = hubAngles;
             // Same dead-melon guard as BeginHeat — its pending respawn lands
@@ -1320,15 +1361,15 @@ function ReturnAllToHub(returning) {
         kart.settled = false;
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot === undefined) {
-            continue;
+            return;
         }
         // Both labels, since ReturnAllToHub can now be reached from any
         // non-HUB phase (a moderator abort can land mid-COUNTDOWN, not just
         // after a heat finishes normally in BREAK).
         GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", true);
         GetSpeedHud()?.SetHasClassForPlayer(slot, "break_label", "Hidden", true);
-        ShowHubModal(slot, phase);
-    }
+        ShowHubModal(slot, kart, phase);
+    });
 }
 
 /** Drives the COUNTDOWN/RACING/BREAK timers and transitions — called once per Think tick (see think.js). */
@@ -1435,7 +1476,7 @@ function UpdateRaceFlow(now) {
 // several tracks in the map. Checkpoints past index 1 only count while the
 // kart is already on that same track (so straying onto a different track's
 // later checkpoints doesn't skip progress), and only ever move progress
-// forward within it. A kart that's racing can't pick a *different* track's
+// forward within it, one checkpoint at a time (no skipping ahead). A kart that's racing can't pick a *different* track's
 // checkpoint 1 mid-heat either (straying into another track's start zone is
 // ignored outright) — letting it through would silently overwrite
 // kart.trackId to the wrong track and then reject the racer's own further
@@ -1464,12 +1505,34 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
         if (kart.trackId !== trackId) {
             kart.trackId = trackId;
             kart.checkpointIndex = 0;
+        } else {
+            const config = GetTrackConfig()[trackId];
+            if (config && kart.checkpointIndex >= config.checkpoints) {
+                // Crossing the start line with the whole lap already run.
+                // If finish_<trackId> sits on this same trigger, Hammer may
+                // fire this input before it — count the lap right here so the
+                // order doesn't matter (finish_<trackId> firing afterwards
+                // then sees checkpointIndex 1 and is ignored). Outside a heat
+                // TryCompleteLap doesn't count anything, so reset to 0 here
+                // too, or a free-roaming kart could never start a second lap.
+                TryCompleteLap(trackId, kart);
+                if (kart.finished) {
+                    return;
+                }
+                kart.checkpointIndex = 0;
+            }
         }
     } else if (kart.trackId !== trackId) {
         Debug(`checkpoint_${trackId}_${index}: kart is on track ${kart.trackId}, ignoring`);
         return;
     }
-    if (index <= kart.checkpointIndex) {
+    // Strictly the next checkpoint in sequence — skipping ahead (e.g. 1 -> 5
+    // via a shortcut) must not count, or touching just the last checkpoint
+    // would be enough for finish_<trackId> to accept the lap.
+    if (index !== kart.checkpointIndex + 1) {
+        if (index > kart.checkpointIndex) {
+            Debug(`checkpoint_${trackId}_${index}: kart is at checkpoint ${kart.checkpointIndex}, skipped one — ignoring`);
+        }
         return;
     }
     kart.checkpointIndex = index;
@@ -1502,6 +1565,16 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
 // GAMEPLAY.md.
 /** @param {number} trackId @param {import("./kart-registry.js").Kart} kart */
 function OnFinishTouched(trackId, kart) {
+    TryCompleteLap(trackId, kart);
+}
+
+/**
+ * Counts a completed lap if the kart is actively racing this track and has
+ * reached its last checkpoint — shared by finish_<trackId> and the
+ * checkpoint_<trackId>_1 re-touch (see OnCheckpointTouched).
+ * @param {number} trackId @param {import("./kart-registry.js").Kart} kart
+ */
+function TryCompleteLap(trackId, kart) {
     if (kart.finished) {
         return; // already parked after finishing this heat
     }
@@ -1579,7 +1652,7 @@ function Think() {
     for (const [slot, kart] of karts) {
         if (!kart.pawn.IsValid()) {
             Debug(`Think: slot ${slot} pawn no longer valid, dropping kart`);
-            karts.delete(slot);
+            DropKart(slot, kart);
             continue;
         }
         if (!kart.melon.IsValid()) {
@@ -1628,7 +1701,8 @@ function Think() {
             }
         } catch (err) {
             Debug(`Think: slot ${slot} update threw, dropping kart to keep the gamemode alive for everyone else: ${err}`);
-            karts.delete(slot);
+            DropKart(slot, kart);
+            ScheduleKartRebuild(slot, kart.pawn);
         }
     }
     EnsureModerator();
@@ -1646,6 +1720,31 @@ function Think() {
     // own tick rate means some jump presses land on a tick we never check and
     // are silently lost. Same pattern as cs_script_demo's input.js.
     Instance.SetNextThink(Instance.GetGameTime());
+}
+
+/**
+ * Gives a player whose kart got dropped by Think's error handler a fresh one
+ * — otherwise they'd sit melon-less until the next OnPlayerReset, which on
+ * this map practically never comes (see gamemode/index.js). Delayed, not
+ * immediate, so an error that keeps recurring rebuilds at most once a second
+ * instead of spawning (and dropping) a melon every tick.
+ * @param {number} slot @param {any} pawn
+ */
+function ScheduleKartRebuild(slot, pawn) {
+    Instance.Delay(1).then(() => {
+        if (karts.has(slot) || !pawn.IsValid()) {
+            return; // already rebuilt elsewhere (e.g. OnPlayerReset), or player gone
+        }
+        try {
+            const kart = GetOrCreateKart(pawn);
+            if (kart) {
+                ParkPawn(pawn, kart.melon);
+                Debug(`ScheduleKartRebuild: slot ${slot} got a fresh kart`);
+            }
+        } catch (err) {
+            Debug(`ScheduleKartRebuild: slot ${slot} rebuild threw: ${err}`);
+        }
+    });
 }
 
 Instance.SetThink(Think);
@@ -1695,8 +1794,7 @@ Instance.OnPlayerReset(({ player }) => {
 Instance.OnPlayerDisconnect(({ playerSlot }) => {
     const kart = karts.get(playerSlot);
     if (kart) {
-        kart.melon.Remove();
-        karts.delete(playerSlot);
+        DropKart(playerSlot, kart);
     }
     // Promotes the next-oldest remaining player (Map preserves insertion
     // order) so there's always a moderator whenever anyone's still on the
@@ -1722,7 +1820,7 @@ Instance.OnScriptInput("hub_enter", ({ activator }) => {
     kart.inHub = true;
     const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
     if (slot !== undefined) {
-        ShowHubModal(slot, phase);
+        ShowHubModal(slot, kart, phase);
     }
 });
 
@@ -1734,7 +1832,7 @@ Instance.OnScriptInput("hub_leave", ({ activator }) => {
     kart.inHub = false;
     const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
     if (slot !== undefined) {
-        HideHubModal(slot);
+        HideHubModal(slot, kart);
     }
 });
 
@@ -1768,7 +1866,11 @@ Instance.OnCustomHudClicked((event) => {
         // Dismiss just for the player who clicked it — doesn't touch
         // kart.inHub, so they're still pulled into the next heat that starts
         // while they're standing in hub_start_trigger, same as before.
-        HideHubModal(event.player.GetPlayerSlot());
+        const slot = event.player.GetPlayerSlot();
+        const kart = karts.get(slot);
+        if (kart) {
+            HideHubModal(slot, kart);
+        }
     } else if (event.buttonId === "hub_abort_button") {
         const slot = event.player.GetPlayerSlot();
         if (IsModerator(slot)) {
@@ -1806,10 +1908,6 @@ Instance.OnCustomHudClicked((event) => {
         // else keeps going — unlike hub_abort_button, which is moderator-only
         // and ends it for the whole group. ReturnAllToHub already supports a
         // single-kart list (it's the same path a disconnecting racer takes).
-        // Closed before ReturnAllToHub, not after — both toggle the same
-        // shared input-capture flag (see SetUserMenuOpen's note), and
-        // ReturnAllToHub's ShowHubModal needs to be the one left holding it
-        // since that's the modal left on screen.
         SetUserMenuOpen(slot, kart, false);
         ReturnAllToHub([kart]);
     } else if (event.buttonId.startsWith("usermenu_color_")) {

@@ -6,7 +6,7 @@ import { Debug } from "./debug.js";
  *   health: number, lastVelocity: { x: number, y: number, z: number } | undefined,
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
- *   breaking: boolean, paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean,
+ *   breaking: boolean, paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
  *   cameraDistance: number, cameraHeight: number, settled: boolean,
  *   teleportGen: number, // bumped by every race-flow teleport (BeginHeat/ReturnAllToHub) — see ScheduleRespawnAfterBreak
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
@@ -50,6 +50,19 @@ export function EnsureModerator() {
 /** @param {number | undefined} slot */
 export function IsModerator(slot) {
     return slot !== undefined && slot === moderatorSlot;
+}
+
+/**
+ * Stops tracking a kart and removes its melon from the world with it —
+ * otherwise the melon would stay behind as an orphaned physics prop that the
+ * player's next melon spawns on top of.
+ * @param {number} slot @param {Kart} kart
+ */
+export function DropKart(slot, kart) {
+    if (kart.melon.IsValid()) {
+        kart.melon.Remove();
+    }
+    karts.delete(slot);
 }
 
 /** @param {any} melon */

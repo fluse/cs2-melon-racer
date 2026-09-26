@@ -22,7 +22,7 @@ import { Instance, CSMoveType } from "cs_script/point_script";
 
 import { Debug } from "./debug.js";
 import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, CAMERA_DISTANCE_STEPS, CAMERA_HEIGHT_STEPS } from "./constants.js";
-import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, SetModeratorSlot } from "./kart-registry.js";
+import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, SetModeratorSlot, DropKart } from "./kart-registry.js";
 import { GetOrCreateKart, ParkPawn } from "./kart-spawn.js";
 import { RespawnKartAtCheckpoint, SetKartPaintColor } from "./kart-physics.js";
 import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen } from "./hud.js";
@@ -78,8 +78,7 @@ Instance.OnPlayerReset(({ player }) => {
 Instance.OnPlayerDisconnect(({ playerSlot }) => {
     const kart = karts.get(playerSlot);
     if (kart) {
-        kart.melon.Remove();
-        karts.delete(playerSlot);
+        DropKart(playerSlot, kart);
     }
     // Promotes the next-oldest remaining player (Map preserves insertion
     // order) so there's always a moderator whenever anyone's still on the
@@ -105,7 +104,7 @@ Instance.OnScriptInput("hub_enter", ({ activator }) => {
     kart.inHub = true;
     const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
     if (slot !== undefined) {
-        ShowHubModal(slot, phase);
+        ShowHubModal(slot, kart, phase);
     }
 });
 
@@ -117,7 +116,7 @@ Instance.OnScriptInput("hub_leave", ({ activator }) => {
     kart.inHub = false;
     const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
     if (slot !== undefined) {
-        HideHubModal(slot);
+        HideHubModal(slot, kart);
     }
 });
 
@@ -151,7 +150,11 @@ Instance.OnCustomHudClicked((event) => {
         // Dismiss just for the player who clicked it — doesn't touch
         // kart.inHub, so they're still pulled into the next heat that starts
         // while they're standing in hub_start_trigger, same as before.
-        HideHubModal(event.player.GetPlayerSlot());
+        const slot = event.player.GetPlayerSlot();
+        const kart = karts.get(slot);
+        if (kart) {
+            HideHubModal(slot, kart);
+        }
     } else if (event.buttonId === "hub_abort_button") {
         const slot = event.player.GetPlayerSlot();
         if (IsModerator(slot)) {
@@ -189,10 +192,6 @@ Instance.OnCustomHudClicked((event) => {
         // else keeps going — unlike hub_abort_button, which is moderator-only
         // and ends it for the whole group. ReturnAllToHub already supports a
         // single-kart list (it's the same path a disconnecting racer takes).
-        // Closed before ReturnAllToHub, not after — both toggle the same
-        // shared input-capture flag (see SetUserMenuOpen's note), and
-        // ReturnAllToHub's ShowHubModal needs to be the one left holding it
-        // since that's the modal left on screen.
         SetUserMenuOpen(slot, kart, false);
         ReturnAllToHub([kart]);
     } else if (event.buttonId.startsWith("usermenu_color_")) {

@@ -77,7 +77,7 @@ export function TryStartRace() {
         kart.racing = true;
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot !== undefined) {
-            HideHubModal(slot);
+            HideHubModal(slot, kart);
         }
     }
     Debug(`TryStartRace: starting heat on track ${order[0]} with ${racers.length} racer(s)`);
@@ -96,6 +96,23 @@ export function TryAbortRace() {
     ReturnAllToHub(CurrentRacers());
     phase = RacePhase.HUB;
     activeTrackId = undefined;
+}
+
+/**
+ * Spot `i` of `count` karts lined up side by side, centered on `origin` and
+ * perpendicular to `angles`' facing, lifted by TELEPORT_UP_OFFSET (see its
+ * comment) so the melon drops onto the floor instead of into it.
+ * @param {{ x: number, y: number, z: number }} origin @param {{ yaw: number }} angles @param {number} i @param {number} count
+ */
+function LineUpPosition(origin, angles, i, count) {
+    const rad = (angles.yaw * Math.PI) / 180;
+    const rightDir = { x: Math.sin(rad), y: -Math.cos(rad) };
+    const lateral = (i - (count - 1) / 2) * RACE_SPAWN_LATERAL_SPACING;
+    return {
+        x: origin.x + rightDir.x * lateral,
+        y: origin.y + rightDir.y * lateral,
+        z: origin.z + TELEPORT_UP_OFFSET,
+    };
 }
 
 /** @param {number} trackId */
@@ -117,23 +134,16 @@ export function BeginHeat(trackId) {
     activeTrackId = trackId;
     const origin = start.GetAbsOrigin();
     const angles = start.GetAbsAngles();
-    const rad = (angles.yaw * Math.PI) / 180;
-    // Perpendicular to the start line's facing, to line racers up side by side.
-    const rightDir = { x: Math.sin(rad), y: -Math.cos(rad) };
 
     const racers = CurrentRacers();
     racers.forEach((kart, i) => {
-        const lateral = (i - (racers.length - 1) / 2) * RACE_SPAWN_LATERAL_SPACING;
+        const position = LineUpPosition(origin, angles, i, racers.length);
         // A melon destroyed mid-BREAK is still pending its respawn (see
         // HandleMelonLost) — skip the teleport rather than throw on a dead
         // entity; that respawn lands it at the checkpointPosition set below.
         if (kart.melon.IsValid()) {
             kart.melon.Teleport({
-                position: {
-                    x: origin.x + rightDir.x * lateral,
-                    y: origin.y + rightDir.y * lateral,
-                    z: origin.z + TELEPORT_UP_OFFSET,
-                },
+                position,
                 angles,
                 velocity: { x: 0, y: 0, z: 0 },
             });
@@ -154,7 +164,11 @@ export function BeginHeat(trackId) {
         kart.lapsCompleted = 0;
         kart.finished = false;
         kart.locked = true;
-        kart.checkpointPosition = { x: origin.x, y: origin.y, z: origin.z + TELEPORT_UP_OFFSET };
+        // Its own lined-up spot, not the start line's center — a respawn
+        // before reaching checkpoint 1 (break, or the user menu's respawn
+        // button during the countdown) would otherwise stack it on whoever
+        // is standing in the middle.
+        kart.checkpointPosition = position;
         kart.checkpointAngles = angles;
     });
 
@@ -179,7 +193,7 @@ export function ReturnAllToHub(returning) {
     }
     const hubOrigin = hub?.GetAbsOrigin();
     const hubAngles = hub?.GetAbsAngles();
-    for (const kart of returning) {
+    returning.forEach((kart, i) => {
         kart.racing = false;
         kart.finished = false;
         kart.locked = false;
@@ -192,7 +206,11 @@ export function ReturnAllToHub(returning) {
         kart.checkpointIndex = 0;
         kart.lapsCompleted = 0;
         if (hubOrigin) {
-            const hubPosition = { x: hubOrigin.x, y: hubOrigin.y, z: hubOrigin.z + TELEPORT_UP_OFFSET };
+            // Lined up side by side like BeginHeat's start grid — teleporting
+            // everyone onto the exact same point made the melons spawn inside
+            // each other and violently shove apart, which the impact check
+            // then counted as crash damage.
+            const hubPosition = LineUpPosition(hubOrigin, hubAngles, i, returning.length);
             kart.checkpointPosition = hubPosition;
             kart.checkpointAngles = hubAngles;
             // Same dead-melon guard as BeginHeat — its pending respawn lands
@@ -210,15 +228,15 @@ export function ReturnAllToHub(returning) {
         kart.settled = false;
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot === undefined) {
-            continue;
+            return;
         }
         // Both labels, since ReturnAllToHub can now be reached from any
         // non-HUB phase (a moderator abort can land mid-COUNTDOWN, not just
         // after a heat finishes normally in BREAK).
         GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", true);
         GetSpeedHud()?.SetHasClassForPlayer(slot, "break_label", "Hidden", true);
-        ShowHubModal(slot, phase);
-    }
+        ShowHubModal(slot, kart, phase);
+    });
 }
 
 /** Drives the COUNTDOWN/RACING/BREAK timers and transitions — called once per Think tick (see think.js). */

@@ -103,25 +103,40 @@ export function ApplyHubModalState(slot, currentPhase) {
     hud.SetHasClassForPlayer(slot, "hub_modal", "IsModerator", IsModerator(slot));
 }
 
-/** @param {number} slot @param {typeof RacePhase[keyof typeof RacePhase]} currentPhase */
-export function ShowHubModal(slot, currentPhase) {
+/**
+ * The layout has a single input-capture flag per player, but two independent
+ * modals want it (hub_modal while standing in the hub, user_menu via USE
+ * anywhere) and can be open at the same time. Derived from both instead of
+ * each modal blindly setting it — otherwise closing either one (e.g. the
+ * user menu while standing in the hub, or leaving the hub with the user menu
+ * open) left the other one on screen without a mouse to click it with.
+ * @param {any} hud @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+function SyncInputCapture(hud, slot, kart) {
+    hud.SetInputCaptureEnabled(slot, Boolean(kart.hubModalOpen || kart.userMenuOpen));
+}
+
+/** @param {number} slot @param {import("./kart-registry.js").Kart} kart @param {typeof RacePhase[keyof typeof RacePhase]} currentPhase */
+export function ShowHubModal(slot, kart, currentPhase) {
+    kart.hubModalOpen = true;
     const hud = GetSpeedHud();
     if (!hud) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "hub_modal", "Hidden", false);
     ApplyHubModalState(slot, currentPhase);
-    hud.SetInputCaptureEnabled(slot, true);
+    SyncInputCapture(hud, slot, kart);
 }
 
-/** @param {number} slot */
-export function HideHubModal(slot) {
+/** @param {number} slot @param {import("./kart-registry.js").Kart} kart */
+export function HideHubModal(slot, kart) {
+    kart.hubModalOpen = false;
     const hud = GetSpeedHud();
     if (!hud) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "hub_modal", "Hidden", true);
-    hud.SetInputCaptureEnabled(slot, false);
+    SyncInputCapture(hud, slot, kart);
 }
 
 // User menu: press USE anywhere (regardless of race phase) to open a small
@@ -138,13 +153,7 @@ export function SetUserMenuOpen(slot, kart, open) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
-    // NOTE: like hub_modal above, this blindly sets the whole layout's
-    // capture flag rather than combining with hub_modal's own on/off calls.
-    // The two modals are opened from unrelated triggers (standing in the
-    // hub vs. pressing USE anywhere) and aren't expected to be shown at the
-    // same time; if that ever changes, this'll need to track combined state
-    // instead of each panel fighting over one shared flag.
-    hud.SetInputCaptureEnabled(slot, open);
+    SyncInputCapture(hud, slot, kart);
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart */
