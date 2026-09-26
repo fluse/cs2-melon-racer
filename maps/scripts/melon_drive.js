@@ -134,6 +134,7 @@ const COLOR_PRESETS = {
 };
 
 const COUNTDOWN_SECONDS = 3;
+const GO_DISPLAY_SECONDS = 1; // how long "GO!" stays on screen once the countdown ends
 const BREAK_SECONDS = 10; // fixed by the original request
 // Spacing between racers teleported onto the same start line side-by-side,
 // so they don't spawn stacked on top of each other.
@@ -383,12 +384,16 @@ function UpdateKart(slot, kart, dt) {
             // The tick it *first* comes to rest — see SETTLE_NUDGE_ANGULAR_SPEED
             // for why a one-off random spin nudge belongs here rather than
             // just leaving it alone.
+            // Spin axis in the horizontal (x/y) plane, i.e. a tip over in a
+            // random direction — z is the vertical axis in Source, so any z
+            // component would just spin the melon in place on its resting
+            // point, which can't break a knife-edge balance.
             const nudgeAngle = Math.random() * Math.PI * 2;
             melon.Move({
                 angularVelocity: {
                     x: Math.cos(nudgeAngle) * SETTLE_NUDGE_ANGULAR_SPEED,
-                    y: 0,
-                    z: Math.sin(nudgeAngle) * SETTLE_NUDGE_ANGULAR_SPEED,
+                    y: Math.sin(nudgeAngle) * SETTLE_NUDGE_ANGULAR_SPEED,
+                    z: 0,
                 },
             });
             kart.settled = true;
@@ -687,10 +692,20 @@ function GetJumpChargeFraction(kart) {
 /** @typedef {{ checkpoints: number, lapsToWin: number, startEntityName: string }} TrackConfig */
 /** @type {Record<number, TrackConfig> | null} */
 let trackConfigCache = null;
+// When no start triggers are found yet, the result isn't cached (see below),
+// and GetTrackConfig is called per kart every tick by the HUD — so without
+// this, a map with no tracks rescanned every trigger_multiple (and logged
+// about it) several times per tick. Retry at most once a second instead.
+const EMPTY_RESCAN_INTERVAL = 1; // seconds
+let lastEmptyScanTime = -Infinity;
 
 function GetTrackConfig() {
     if (trackConfigCache) {
         return trackConfigCache;
+    }
+    const now = Instance.GetGameTime();
+    if (now - lastEmptyScanTime < EMPTY_RESCAN_INTERVAL) {
+        return {};
     }
     /** @type {Record<number, TrackConfig>} */
     const config = {};
@@ -707,6 +722,7 @@ function GetTrackConfig() {
     }
     if (Object.keys(config).length === 0) {
         // Don't cache an empty result — entities may not have spawned yet.
+        lastEmptyScanTime = now;
         Debug("GetTrackConfig: no track_start_<id>_cp<N>_laps<M> triggers found yet");
         return config;
     }
@@ -998,8 +1014,8 @@ function GetSpawnOrigin(pawn) {
 
 /**
  * Spawns a fresh melon from the melon_template point_template at an explicit
- * position/angles — the shared primitive behind SpawnMelonFor below (which
- * works out where a *new* player's melon should appear) and kart-physics.js's
+ * position/angles — the shared primitive behind GetOrCreateKart below (at
+ * GetMelonSpawnTransform's spot for a *new* player's melon) and kart-physics.js's
  * post-break recovery (which respawns one at a kart's own checkpoint).
  * @param {{ x: number, y: number, z: number }} position @param {{ pitch: number, yaw: number, roll: number }} angles
  */
@@ -1022,8 +1038,15 @@ function SpawnMelonAt(position, angles) {
     return spawned[0];
 }
 
-/** @param {any} pawn */
-function SpawnMelonFor(pawn) {
+/**
+ * Where (and facing which way) a fresh melon for this player appears — also
+ * a new kart's initial respawn point, so a break before the first checkpoint
+ * lands it at the same lifted-up spot instead of hub_spawn's raw
+ * floor-level origin (see SPAWN_UP_OFFSET for why that would tunnel the
+ * melon through the floor).
+ * @param {any} pawn
+ */
+function GetMelonSpawnTransform(pawn) {
     const origin = GetSpawnOrigin(pawn);
     const yaw = GetSpawnFacingYaw(pawn);
     // Spawn a bit in front of the player, not exactly on top of them —
@@ -1038,8 +1061,9 @@ function SpawnMelonFor(pawn) {
         y: origin.y + Math.sin(rad) * SPAWN_FORWARD_OFFSET,
         z: origin.z + SPAWN_UP_OFFSET,
     };
-    return SpawnMelonAt(spawnPos, { pitch: 0, yaw, roll: 0 });
+    return { position: spawnPos, angles: { pitch: 0, yaw, roll: 0 } };
 }
+
 
 /** @param {any} pawn */
 function HidePawnModel(pawn) {
@@ -1076,7 +1100,9 @@ function GetOrCreateKart(pawn) {
     let kart = karts.get(slot);
     if (!kart || !kart.melon.IsValid()) {
         Debug(`GetOrCreateKart: slot ${slot} has no valid kart yet, spawning a new melon`);
-        const melon = SpawnMelonFor(pawn);
+        // Also reused as a new kart's initial respawn point below.
+        const spawnTransform = GetMelonSpawnTransform(pawn);
+        const melon = SpawnMelonAt(spawnTransform.position, spawnTransform.angles);
         if (!melon) {
             Debug(`GetOrCreateKart: slot ${slot} — melon spawn failed, no kart created`);
             return undefined;
@@ -1113,8 +1139,8 @@ function GetOrCreateKart(pawn) {
                 lastVelocity: undefined,
                 trackId: undefined,
                 checkpointIndex: 0,
-                checkpointPosition: GetSpawnOrigin(pawn),
-                checkpointAngles: { pitch: 0, yaw: GetSpawnFacingYaw(pawn), roll: 0 },
+                checkpointPosition: spawnTransform.position,
+                checkpointAngles: spawnTransform.angles,
                 lapsCompleted: 0,
                 inHub: false,
                 racing: false,
@@ -1330,7 +1356,13 @@ function ReturnAllToHub(returning) {
         kart.racing = false;
         kart.finished = false;
         kart.locked = false;
-        kart.inHub = true;
+        // kart.inHub (and the hub modal) is deliberately left to the
+        // hub_start_trigger's own hub_enter/hub_leave inputs: the teleport
+        // below lands inside it and fires hub_enter from there. Forcing it
+        // here left inHub stuck at true whenever the melon ended up outside
+        // the trigger volume — hub_leave never fires for a trigger that was
+        // never entered — and that kart then got pulled into the next heat
+        // from anywhere on the map.
         // Leaving the heat also leaves its track: without this the HUD kept
         // showing the old track's checkpoint/lap panel in the hub, and a
         // break or the user menu's respawn button would send the kart right
@@ -1368,7 +1400,6 @@ function ReturnAllToHub(returning) {
         // after a heat finishes normally in BREAK).
         GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", true);
         GetSpeedHud()?.SetHasClassForPlayer(slot, "break_label", "Hidden", true);
-        ShowHubModal(slot, kart, phase);
     });
 }
 
@@ -1403,12 +1434,12 @@ function UpdateRaceFlow(now) {
         if (remaining <= 0) {
             for (const kart of racers) {
                 kart.locked = false;
-                const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-                if (slot !== undefined) {
-                    hud?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", true);
-                }
             }
+            // The "GO!" just written above stays up for GO_DISPLAY_SECONDS —
+            // hiding it in this same tick meant it was never actually seen.
+            // RACING reuses phaseEndTime as the moment to hide it.
             phase = RacePhase.RACING;
+            phaseEndTime = now + GO_DISPLAY_SECONDS;
             Debug(`UpdateRaceFlow: countdown finished for track ${activeTrackId}, GO`);
         }
         return;
@@ -1416,6 +1447,15 @@ function UpdateRaceFlow(now) {
 
     if (phase === RacePhase.RACING) {
         const racers = CurrentRacers();
+        if (now >= phaseEndTime) {
+            for (const kart of racers) {
+                const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+                if (slot !== undefined) {
+                    hud?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", true);
+                }
+            }
+            phaseEndTime = Infinity; // hidden — don't re-hide every tick
+        }
         if (racers.length === 0) {
             // Same "everyone left" case as COUNTDOWN above, but mid-race:
             // without this, an empty heat sits in RACING forever since
@@ -1430,7 +1470,7 @@ function UpdateRaceFlow(now) {
         if (racers.every((kart) => kart.finished)) {
             phase = RacePhase.BREAK;
             phaseEndTime = now + BREAK_SECONDS;
-            const message = NextTrackId() !== undefined ? "Ziel!\nNächste Strecke in 10s…" : "Ziel!\nZurück zum Hub in 10s…";
+            const message = NextTrackId() !== undefined ? `Ziel!\nNächste Strecke in ${BREAK_SECONDS}s…` : `Ziel!\nZurück zum Hub in ${BREAK_SECONDS}s…`;
             for (const kart of racers) {
                 const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
                 if (slot === undefined) {
@@ -1894,6 +1934,13 @@ Instance.OnCustomHudClicked((event) => {
             // Already mid-respawn from a break — it's about to land at this
             // same checkpoint on its own, nothing for this click to do.
             Debug(`usermenu_respawn_button: slot ${slot} kart is already breaking/respawning, ignoring`);
+            return;
+        }
+        if (kart.locked) {
+            // Held on the start grid for the countdown, or parked after
+            // finishing — it isn't going anywhere that respawning would fix,
+            // and mid-countdown it'd just teleport a racer around the grid.
+            Debug(`usermenu_respawn_button: slot ${slot} kart is locked, ignoring`);
             return;
         }
         RespawnKartAtCheckpoint(kart);

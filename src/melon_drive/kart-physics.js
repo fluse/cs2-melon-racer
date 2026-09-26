@@ -96,12 +96,16 @@ export function UpdateKart(slot, kart, dt) {
             // The tick it *first* comes to rest — see SETTLE_NUDGE_ANGULAR_SPEED
             // for why a one-off random spin nudge belongs here rather than
             // just leaving it alone.
+            // Spin axis in the horizontal (x/y) plane, i.e. a tip over in a
+            // random direction — z is the vertical axis in Source, so any z
+            // component would just spin the melon in place on its resting
+            // point, which can't break a knife-edge balance.
             const nudgeAngle = Math.random() * Math.PI * 2;
             melon.Move({
                 angularVelocity: {
                     x: Math.cos(nudgeAngle) * SETTLE_NUDGE_ANGULAR_SPEED,
-                    y: 0,
-                    z: Math.sin(nudgeAngle) * SETTLE_NUDGE_ANGULAR_SPEED,
+                    y: Math.sin(nudgeAngle) * SETTLE_NUDGE_ANGULAR_SPEED,
+                    z: 0,
                 },
             });
             kart.settled = true;

@@ -44,8 +44,8 @@ export function GetSpawnOrigin(pawn) {
 
 /**
  * Spawns a fresh melon from the melon_template point_template at an explicit
- * position/angles — the shared primitive behind SpawnMelonFor below (which
- * works out where a *new* player's melon should appear) and kart-physics.js's
+ * position/angles — the shared primitive behind GetOrCreateKart below (at
+ * GetMelonSpawnTransform's spot for a *new* player's melon) and kart-physics.js's
  * post-break recovery (which respawns one at a kart's own checkpoint).
  * @param {{ x: number, y: number, z: number }} position @param {{ pitch: number, yaw: number, roll: number }} angles
  */
@@ -68,8 +68,15 @@ export function SpawnMelonAt(position, angles) {
     return spawned[0];
 }
 
-/** @param {any} pawn */
-export function SpawnMelonFor(pawn) {
+/**
+ * Where (and facing which way) a fresh melon for this player appears — also
+ * a new kart's initial respawn point, so a break before the first checkpoint
+ * lands it at the same lifted-up spot instead of hub_spawn's raw
+ * floor-level origin (see SPAWN_UP_OFFSET for why that would tunnel the
+ * melon through the floor).
+ * @param {any} pawn
+ */
+export function GetMelonSpawnTransform(pawn) {
     const origin = GetSpawnOrigin(pawn);
     const yaw = GetSpawnFacingYaw(pawn);
     // Spawn a bit in front of the player, not exactly on top of them —
@@ -84,8 +91,9 @@ export function SpawnMelonFor(pawn) {
         y: origin.y + Math.sin(rad) * SPAWN_FORWARD_OFFSET,
         z: origin.z + SPAWN_UP_OFFSET,
     };
-    return SpawnMelonAt(spawnPos, { pitch: 0, yaw, roll: 0 });
+    return { position: spawnPos, angles: { pitch: 0, yaw, roll: 0 } };
 }
+
 
 /** @param {any} pawn */
 function HidePawnModel(pawn) {
@@ -122,7 +130,9 @@ export function GetOrCreateKart(pawn) {
     let kart = karts.get(slot);
     if (!kart || !kart.melon.IsValid()) {
         Debug(`GetOrCreateKart: slot ${slot} has no valid kart yet, spawning a new melon`);
-        const melon = SpawnMelonFor(pawn);
+        // Also reused as a new kart's initial respawn point below.
+        const spawnTransform = GetMelonSpawnTransform(pawn);
+        const melon = SpawnMelonAt(spawnTransform.position, spawnTransform.angles);
         if (!melon) {
             Debug(`GetOrCreateKart: slot ${slot} — melon spawn failed, no kart created`);
             return undefined;
@@ -159,8 +169,8 @@ export function GetOrCreateKart(pawn) {
                 lastVelocity: undefined,
                 trackId: undefined,
                 checkpointIndex: 0,
-                checkpointPosition: GetSpawnOrigin(pawn),
-                checkpointAngles: { pitch: 0, yaw: GetSpawnFacingYaw(pawn), roll: 0 },
+                checkpointPosition: spawnTransform.position,
+                checkpointAngles: spawnTransform.angles,
                 lapsCompleted: 0,
                 inHub: false,
                 racing: false,

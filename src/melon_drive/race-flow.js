@@ -2,11 +2,12 @@ import { Instance } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { GetTrackConfig, GetTrackOrder } from "./track-config.js";
 import { karts } from "./kart-registry.js";
-import { ShowHubModal, HideHubModal, GetSpeedHud } from "./hud.js";
+import { HideHubModal, GetSpeedHud } from "./hud.js";
 import {
     RacePhase,
     COUNTDOWN_SECONDS,
     BREAK_SECONDS,
+    GO_DISPLAY_SECONDS,
     RACE_SPAWN_LATERAL_SPACING,
     HUB_TRIGGER_NAME,
     TELEPORT_UP_OFFSET,
@@ -197,7 +198,13 @@ export function ReturnAllToHub(returning) {
         kart.racing = false;
         kart.finished = false;
         kart.locked = false;
-        kart.inHub = true;
+        // kart.inHub (and the hub modal) is deliberately left to the
+        // hub_start_trigger's own hub_enter/hub_leave inputs: the teleport
+        // below lands inside it and fires hub_enter from there. Forcing it
+        // here left inHub stuck at true whenever the melon ended up outside
+        // the trigger volume — hub_leave never fires for a trigger that was
+        // never entered — and that kart then got pulled into the next heat
+        // from anywhere on the map.
         // Leaving the heat also leaves its track: without this the HUD kept
         // showing the old track's checkpoint/lap panel in the hub, and a
         // break or the user menu's respawn button would send the kart right
@@ -235,7 +242,6 @@ export function ReturnAllToHub(returning) {
         // after a heat finishes normally in BREAK).
         GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", true);
         GetSpeedHud()?.SetHasClassForPlayer(slot, "break_label", "Hidden", true);
-        ShowHubModal(slot, kart, phase);
     });
 }
 
@@ -270,12 +276,12 @@ export function UpdateRaceFlow(now) {
         if (remaining <= 0) {
             for (const kart of racers) {
                 kart.locked = false;
-                const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-                if (slot !== undefined) {
-                    hud?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", true);
-                }
             }
+            // The "GO!" just written above stays up for GO_DISPLAY_SECONDS —
+            // hiding it in this same tick meant it was never actually seen.
+            // RACING reuses phaseEndTime as the moment to hide it.
             phase = RacePhase.RACING;
+            phaseEndTime = now + GO_DISPLAY_SECONDS;
             Debug(`UpdateRaceFlow: countdown finished for track ${activeTrackId}, GO`);
         }
         return;
@@ -283,6 +289,15 @@ export function UpdateRaceFlow(now) {
 
     if (phase === RacePhase.RACING) {
         const racers = CurrentRacers();
+        if (now >= phaseEndTime) {
+            for (const kart of racers) {
+                const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+                if (slot !== undefined) {
+                    hud?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", true);
+                }
+            }
+            phaseEndTime = Infinity; // hidden — don't re-hide every tick
+        }
         if (racers.length === 0) {
             // Same "everyone left" case as COUNTDOWN above, but mid-race:
             // without this, an empty heat sits in RACING forever since
@@ -297,7 +312,7 @@ export function UpdateRaceFlow(now) {
         if (racers.every((kart) => kart.finished)) {
             phase = RacePhase.BREAK;
             phaseEndTime = now + BREAK_SECONDS;
-            const message = NextTrackId() !== undefined ? "Ziel!\nNächste Strecke in 10s…" : "Ziel!\nZurück zum Hub in 10s…";
+            const message = NextTrackId() !== undefined ? `Ziel!\nNächste Strecke in ${BREAK_SECONDS}s…` : `Ziel!\nZurück zum Hub in ${BREAK_SECONDS}s…`;
             for (const kart of racers) {
                 const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
                 if (slot === undefined) {

@@ -15,10 +15,20 @@ import { START_TRIGGER_NAME_PATTERN } from "./constants.js";
 /** @typedef {{ checkpoints: number, lapsToWin: number, startEntityName: string }} TrackConfig */
 /** @type {Record<number, TrackConfig> | null} */
 let trackConfigCache = null;
+// When no start triggers are found yet, the result isn't cached (see below),
+// and GetTrackConfig is called per kart every tick by the HUD — so without
+// this, a map with no tracks rescanned every trigger_multiple (and logged
+// about it) several times per tick. Retry at most once a second instead.
+const EMPTY_RESCAN_INTERVAL = 1; // seconds
+let lastEmptyScanTime = -Infinity;
 
 export function GetTrackConfig() {
     if (trackConfigCache) {
         return trackConfigCache;
+    }
+    const now = Instance.GetGameTime();
+    if (now - lastEmptyScanTime < EMPTY_RESCAN_INTERVAL) {
+        return {};
     }
     /** @type {Record<number, TrackConfig>} */
     const config = {};
@@ -35,6 +45,7 @@ export function GetTrackConfig() {
     }
     if (Object.keys(config).length === 0) {
         // Don't cache an empty result — entities may not have spawned yet.
+        lastEmptyScanTime = now;
         Debug("GetTrackConfig: no track_start_<id>_cp<N>_laps<M> triggers found yet");
         return config;
     }

@@ -180,6 +180,13 @@ Instance.OnCustomHudClicked((event) => {
             Debug(`usermenu_respawn_button: slot ${slot} kart is already breaking/respawning, ignoring`);
             return;
         }
+        if (kart.locked) {
+            // Held on the start grid for the countdown, or parked after
+            // finishing — it isn't going anywhere that respawning would fix,
+            // and mid-countdown it'd just teleport a racer around the grid.
+            Debug(`usermenu_respawn_button: slot ${slot} kart is locked, ignoring`);
+            return;
+        }
         RespawnKartAtCheckpoint(kart);
         SetUserMenuOpen(slot, kart, false);
     } else if (event.buttonId === "usermenu_hub_button") {

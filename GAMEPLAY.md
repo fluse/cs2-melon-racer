@@ -120,9 +120,15 @@ checkpoint — that's what picks a track (a racer can drive into whichever
 track's start they want). Checkpoints past `_1` only advance progress if the
 kart is already on that same track, so cutting across into a different
 track's later checkpoints doesn't skip anything — and, as before, progress
-only ever moves forward, never backward. Progress is tracked per kart (keyed
-by melon entity). The last-touched checkpoint's position/angles are also
-where a broken melon respawns (see above).
+only ever moves forward, never backward, and strictly one checkpoint at a
+time: touching checkpoint N only counts right after N-1, so a shortcut that
+skips checkpoints doesn't count toward the lap (a kart that misses one has
+to go back for it — keep checkpoint triggers thick enough that a fast melon
+can't tunnel through them). Progress is tracked per kart (keyed by melon
+entity). The last-touched checkpoint's position/angles are also where a
+broken melon respawns (see above). Returning to the hub (heat over, abort,
+or the user menu's hub button) clears the kart's track progress and moves
+its respawn point to the hub.
 
 Re-touching `_1` while already on that same track does **not** by itself
 restart/complete a lap — that's a separate `finish_<trackId>` input, see

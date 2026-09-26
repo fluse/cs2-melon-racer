@@ -121,6 +121,7 @@ export const COLOR_PRESETS = {
 };
 
 export const COUNTDOWN_SECONDS = 3;
+export const GO_DISPLAY_SECONDS = 1; // how long "GO!" stays on screen once the countdown ends
 export const BREAK_SECONDS = 10; // fixed by the original request
 // Spacing between racers teleported onto the same start line side-by-side,
 // so they don't spawn stacked on top of each other.
