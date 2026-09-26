@@ -124,15 +124,21 @@ export function BeginHeat(trackId) {
     const racers = CurrentRacers();
     racers.forEach((kart, i) => {
         const lateral = (i - (racers.length - 1) / 2) * RACE_SPAWN_LATERAL_SPACING;
-        kart.melon.Teleport({
-            position: {
-                x: origin.x + rightDir.x * lateral,
-                y: origin.y + rightDir.y * lateral,
-                z: origin.z + TELEPORT_UP_OFFSET,
-            },
-            angles,
-            velocity: { x: 0, y: 0, z: 0 },
-        });
+        // A melon destroyed mid-BREAK is still pending its respawn (see
+        // HandleMelonLost) — skip the teleport rather than throw on a dead
+        // entity; that respawn lands it at the checkpointPosition set below.
+        if (kart.melon.IsValid()) {
+            kart.melon.Teleport({
+                position: {
+                    x: origin.x + rightDir.x * lateral,
+                    y: origin.y + rightDir.y * lateral,
+                    z: origin.z + TELEPORT_UP_OFFSET,
+                },
+                angles,
+                velocity: { x: 0, y: 0, z: 0 },
+            });
+        }
+        kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
         kart.lastVelocity = undefined;
         kart.settled = false;
         // trackId is set directly instead of waiting for the physical
@@ -178,13 +184,28 @@ export function ReturnAllToHub(returning) {
         kart.finished = false;
         kart.locked = false;
         kart.inHub = true;
+        // Leaving the heat also leaves its track: without this the HUD kept
+        // showing the old track's checkpoint/lap panel in the hub, and a
+        // break or the user menu's respawn button would send the kart right
+        // back onto that track's last checkpoint.
+        kart.trackId = undefined;
+        kart.checkpointIndex = 0;
+        kart.lapsCompleted = 0;
         if (hubOrigin) {
-            kart.melon.Teleport({
-                position: { x: hubOrigin.x, y: hubOrigin.y, z: hubOrigin.z + TELEPORT_UP_OFFSET },
-                angles: hubAngles,
-                velocity: { x: 0, y: 0, z: 0 },
-            });
+            const hubPosition = { x: hubOrigin.x, y: hubOrigin.y, z: hubOrigin.z + TELEPORT_UP_OFFSET };
+            kart.checkpointPosition = hubPosition;
+            kart.checkpointAngles = hubAngles;
+            // Same dead-melon guard as BeginHeat — its pending respawn lands
+            // it at the hub checkpointPosition just set.
+            if (kart.melon.IsValid()) {
+                kart.melon.Teleport({
+                    position: hubPosition,
+                    angles: hubAngles,
+                    velocity: { x: 0, y: 0, z: 0 },
+                });
+            }
         }
+        kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
         kart.lastVelocity = undefined;
         kart.settled = false;
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();

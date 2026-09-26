@@ -79,7 +79,14 @@ export function Think() {
         }
     }
     EnsureModerator();
-    UpdateRaceFlow(now);
+    // Same reasoning as the per-kart try/catch above: a race-flow transition
+    // throwing (e.g. teleporting a kart whose melon just got destroyed) must
+    // never skip the SetNextThink below and freeze the gamemode for everyone.
+    try {
+        UpdateRaceFlow(now);
+    } catch (err) {
+        Debug(`Think: UpdateRaceFlow threw: ${err}`);
+    }
     // Re-think as soon as possible (every engine tick) rather than on a fixed
     // interval — WasInputJustPressed only reports a button edge for the
     // specific tick it happened on, so polling any slower than the engine's

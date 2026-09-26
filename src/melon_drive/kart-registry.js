@@ -8,6 +8,7 @@ import { Debug } from "./debug.js";
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
  *   breaking: boolean, paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean,
  *   cameraDistance: number, cameraHeight: number, settled: boolean,
+ *   teleportGen: number, // bumped by every race-flow teleport (BeginHeat/ReturnAllToHub) — see ScheduleRespawnAfterBreak
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
  * }} Kart
  */

@@ -263,52 +263,60 @@ export function SetKartPaintColor(kart, color) {
  * @param {number} slot @param {import("./kart-registry.js").Kart} kart
  */
 function ScheduleRespawnAfterBreak(slot, kart) {
+    // Which race-flow teleport this break happened after — see
+    // Kart.teleportGen. Compared against, rather than checking
+    // kart.racing/locked: those also describe perfectly ordinary states
+    // (free-roaming the hub, parked after finishing) in which a broken melon
+    // still needs to go back to its checkpoint.
+    const teleportGen = kart.teleportGen;
     Instance.Delay(BREAK_RESPAWN_DELAY).then(() => {
         kart.breaking = false;
         if (!kart.pawn.IsValid() || karts.get(slot) !== kart) {
             return; // player disconnected, or a fresh kart already replaced this one
         }
-        if (kart.locked || !kart.racing) {
-            // The race flow moved on while this kart was mid-break: either a
-            // fresh BeginHeat already re-locked it for the next track
-            // (kart.locked), or ReturnAllToHub pulled it out of the heat
-            // entirely — moderator abort, or this player's own "Return to
-            // hub" button (both clear kart.racing, not kart.locked, since
-            // they leave it free to drive around the hub). Either way
-            // that already-current teleport wins, don't stomp it a second
-            // later with our now-stale checkpointPosition — which, for the
-            // ReturnAllToHub case, would otherwise silently yank the player
-            // right back onto the track they just returned from. Just make
-            // sure it's visible again if our own hidden melon is still the
-            // one in play.
-            kart.health = MELON_MAX_HEALTH;
-            if (kart.melon.IsValid()) {
-                kart.melon.SetColor(kart.paintColor);
-            }
+        if (!kart.melon.IsValid()) {
+            // The melon wasn't just hidden by us — it's genuinely gone (the
+            // engine's own physics broke the prop_physics_multiplayer for
+            // real on a hard enough hit, see HandleMelonLost) — spawn a fresh
+            // one instead of teleporting an entity that no longer exists.
+            // Checked before the teleportGen case below, and regardless of
+            // racing/locked: otherwise a melon lost outside a heat would never
+            // come back, and Think would re-run HandleMelonLost on it forever.
+            // checkpointPosition is correct even if the race flow moved on
+            // meanwhile — BeginHeat/ReturnAllToHub set it to their own
+            // (skipped, since the melon was dead) teleport target.
+            RespawnDestroyedMelon(slot, kart);
             return;
         }
-        if (kart.melon.IsValid()) {
-            kart.melon.SetColor(kart.paintColor);
-            RespawnKartAtCheckpoint(kart);
-            return;
-        }
-        // The melon wasn't just hidden by us — it's genuinely gone (the
-        // engine's own physics broke the prop_physics_multiplayer for real
-        // on a hard enough hit, see HandleMelonLost) — spawn a fresh one at
-        // the checkpoint instead of teleporting an entity that no longer
-        // exists.
-        const melon = SpawnMelonAt(kart.checkpointPosition, kart.checkpointAngles);
-        if (!melon) {
-            Debug(`slot ${slot}: could not respawn a melon after it was destroyed, will keep retrying`);
-            return;
-        }
-        kart.melon = melon;
         kart.melon.SetColor(kart.paintColor);
-        kart.health = MELON_MAX_HEALTH;
-        kart.lastVelocity = undefined;
-        kart.settled = false;
-        ApplyCameraFollow(kart);
+        if (kart.teleportGen !== teleportGen) {
+            // The race flow moved this kart while it was mid-break (next
+            // heat's BeginHeat, or ReturnAllToHub via finish/moderator
+            // abort/the player's own "Return to hub" button). That
+            // already-current teleport wins — don't stomp it a second later
+            // with a now-stale checkpoint.
+            kart.health = MELON_MAX_HEALTH;
+            return;
+        }
+        RespawnKartAtCheckpoint(kart);
     });
+}
+
+/** @param {number} slot @param {import("./kart-registry.js").Kart} kart */
+function RespawnDestroyedMelon(slot, kart) {
+    const melon = SpawnMelonAt(kart.checkpointPosition, kart.checkpointAngles);
+    if (!melon) {
+        // kart.breaking is already cleared, so Think's invalid-melon check
+        // runs HandleMelonLost again next tick — that's the retry.
+        Debug(`slot ${slot}: could not respawn a melon after it was destroyed, will keep retrying`);
+        return;
+    }
+    kart.melon = melon;
+    kart.melon.SetColor(kart.paintColor);
+    kart.health = MELON_MAX_HEALTH;
+    kart.lastVelocity = undefined;
+    kart.settled = false;
+    ApplyCameraFollow(kart);
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed */
