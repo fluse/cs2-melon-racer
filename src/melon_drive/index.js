@@ -27,7 +27,7 @@ import { GetOrCreateKart, ParkPawn } from "./kart-spawn.js";
 import { RespawnKartAtCheckpoint, SetKartPaintColor } from "./kart-physics.js";
 import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen } from "./hud.js";
 import { SetCameraDistance, SetCameraHeight } from "./camera.js";
-import { phase, activeTrackId, phaseEndTime, TryStartRace, TryAbortRace, RestoreRaceFlowSnapshot } from "./race-flow.js";
+import { phase, activeTrackId, phaseEndTime, TryStartRace, TryAbortRace, ReturnAllToHub, RestoreRaceFlowSnapshot } from "./race-flow.js";
 import { RegisterCheckpointAndFinishInputs } from "./checkpoints.js";
 import { Think } from "./think.js";
 
@@ -179,6 +179,22 @@ Instance.OnCustomHudClicked((event) => {
         }
         RespawnKartAtCheckpoint(kart);
         SetUserMenuOpen(slot, kart, false);
+    } else if (event.buttonId === "usermenu_hub_button") {
+        const slot = event.player.GetPlayerSlot();
+        const kart = karts.get(slot);
+        if (!kart) {
+            return;
+        }
+        // Self-service pull-out: just this racer leaves the heat, everyone
+        // else keeps going — unlike hub_abort_button, which is moderator-only
+        // and ends it for the whole group. ReturnAllToHub already supports a
+        // single-kart list (it's the same path a disconnecting racer takes).
+        // Closed before ReturnAllToHub, not after — both toggle the same
+        // shared input-capture flag (see SetUserMenuOpen's note), and
+        // ReturnAllToHub's ShowHubModal needs to be the one left holding it
+        // since that's the modal left on screen.
+        SetUserMenuOpen(slot, kart, false);
+        ReturnAllToHub([kart]);
     } else if (event.buttonId.startsWith("usermenu_color_")) {
         const key = event.buttonId.slice("usermenu_color_".length);
         const preset = COLOR_PRESETS[key];

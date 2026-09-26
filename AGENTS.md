@@ -261,6 +261,3 @@ examples — read these instead of guessing signatures:
   change means loading the map in Hammer / launching CS2 in-game
   (`map melon_racer`), which only the user can do. Don't claim a gameplay
   change "works" without that manual check having happened.
-- This directory is not a git repository. Recommend initializing one before
-  the script logic grows, so changes to `.js` files can be diffed and
-  reverted.

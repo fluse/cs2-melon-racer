@@ -268,12 +268,19 @@ function ScheduleRespawnAfterBreak(slot, kart) {
         if (!kart.pawn.IsValid() || karts.get(slot) !== kart) {
             return; // player disconnected, or a fresh kart already replaced this one
         }
-        if (kart.locked) {
-            // The race flow moved on while this kart was mid-break (heat
-            // aborted, or a fresh BeginHeat/ReturnAllToHub already placed
-            // it) — that already-current teleport wins, don't stomp it with
-            // our now-stale checkpointPosition. Just make sure it's visible
-            // again if our own hidden melon is still the one in play.
+        if (kart.locked || !kart.racing) {
+            // The race flow moved on while this kart was mid-break: either a
+            // fresh BeginHeat already re-locked it for the next track
+            // (kart.locked), or ReturnAllToHub pulled it out of the heat
+            // entirely — moderator abort, or this player's own "Return to
+            // hub" button (both clear kart.racing, not kart.locked, since
+            // they leave it free to drive around the hub). Either way
+            // that already-current teleport wins, don't stomp it a second
+            // later with our now-stale checkpointPosition — which, for the
+            // ReturnAllToHub case, would otherwise silently yank the player
+            // right back onto the track they just returned from. Just make
+            // sure it's visible again if our own hidden melon is still the
+            // one in play.
             kart.health = MELON_MAX_HEALTH;
             if (kart.melon.IsValid()) {
                 kart.melon.SetColor(kart.paintColor);

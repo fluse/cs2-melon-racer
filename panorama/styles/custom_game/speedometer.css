@@ -8,7 +8,7 @@
 .CheckpointPanel {
     horizontal-align: center;
     vertical-align: top;
-    margin-top: 100px;
+    margin-top: 120px;
 
     flow-children: down;
 
@@ -437,6 +437,7 @@
     border-radius: 4px;
     padding: 10px 20px;
     font-size: 16px;
+    margin-top: 8px;
 
     background-color: #ffffff22;
     color: white;
@@ -445,6 +446,15 @@
     transition-duration: .1s;
     &:hover {
         background-color: #ffffff33;
+    }
+}
+
+/* Leaves the current heat, unlike the other action buttons — tinted red to
+   set it apart so it isn't clicked by accident. */
+.UserMenuActionButtonDanger {
+    background-color: #dd444422;
+    &:hover {
+        background-color: #dd444444;
     }
 }
 

@@ -94,6 +94,14 @@
 				<Label text="Respawn at last checkpoint" />
 			</Button>
 
+			<!-- Self-service, unlike hub_abort_button (moderator-only, ends the
+			     heat for everyone): pulls just this player out of the current
+			     heat and back to the hub, same as ReturnAllToHub handles for a
+			     disconnecting racer. -->
+			<Button id="usermenu_hub_button" class="UserMenuActionButton UserMenuActionButtonDanger">
+				<Label text="Return to hub" />
+			</Button>
+
 			<Label class="UserMenuSectionLabel" text="COLOR" />
 			<Panel class="UserMenuColorRow">
 				<Button id="usermenu_color_red" class="ColorSwatch ColorSwatchRed" />
