@@ -2,6 +2,7 @@ import { Instance, CSInputs, PointTemplate } from "cs_script/point_script";
 import { DEBUG, Debug } from "./debug.js";
 import { karts } from "./kart-registry.js";
 import { SpawnMelonAt } from "./kart-spawn.js";
+import { FacePlayerView } from "./spawn-points.js";
 import { ApplyCameraFollow, ApplyBreakCameraZoom } from "./camera.js";
 import { PruneBreakEffects, BreakPieceVelocity, RecenterOnto } from "./logic/break-sequence.js";
 import { TraceLine, TraceSphere } from "./trace.js";
@@ -671,12 +672,32 @@ export function RespawnKartAtCheckpoint(kart) {
         angles: kart.checkpointAngles,
         velocity: { x: 0, y: 0, z: 0 },
     });
+    FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
     kart.health = MELON_MAX_HEALTH;
     // Cleared, not measured against zero: this is our own intentional
     // velocity reset, not a physical impact to react to.
     kart.lastVelocity = undefined;
     kart.settled = false;
     kart.speedCap = undefined;
+    kart.pendingBounce = undefined;
+}
+
+/**
+ * Moves a kart's melon somewhere else mid-drive (a generic teleporter, see
+ * the melon_teleport input) without touching its health, respawn point or
+ * checkpoint progress. The tracking state that compares against last tick
+ * is cleared, so the jump in position/velocity isn't read as a hard impact
+ * (damage) or a wall hit. speedCap is kept, so a wall-bounce boost carried
+ * through the teleport isn't clamped away.
+ * @param {import("./kart-registry.js").Kart} kart @param {any} position @param {any} angles @param {{ x: number, y: number, z: number }} velocity
+ */
+export function TeleportKartTo(kart, position, angles, velocity) {
+    kart.melon.Teleport({ position, angles, velocity, angularVelocity: { x: 0, y: 0, z: 0 } });
+    FacePlayerView(kart.pawn, angles.yaw);
+    kart.lastVelocity = undefined;
+    kart.prevLastVelocity = undefined;
+    kart.prevOrigin = undefined;
+    kart.settled = false;
     kart.pendingBounce = undefined;
 }
 
@@ -757,6 +778,7 @@ function RespawnDestroyedMelon(slot, kart) {
         return;
     }
     kart.melon = melon;
+    FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
     kart.melon.SetColor(kart.paintColor);
     kart.health = MELON_MAX_HEALTH;
     kart.lastVelocity = undefined;

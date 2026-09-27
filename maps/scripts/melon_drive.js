@@ -263,6 +263,18 @@ const HUB_TRIGGER_NAME = "hub_start_trigger";
 // track_start_* in GetTrackConfig().
 const PAINT_TRIGGER_NAME_PATTERN = /^paint_trigger_(\d+)_(\d+)_(\d+)$/;
 
+// Generic teleporters, same name-carries-the-config convention: a
+// trigger_multiple named "teleport_to_<destination>" (filtered to
+// prop_physics) with OnStartTouch -> RunScriptInput "melon_teleport" sends
+// the touching melon to the entity named <destination> (e.g. an
+// info_target), facing that entity's yaw. One shared handler for every
+// teleporter — adding one is a pure Hammer edit. A teleport only moves the
+// melon; it never changes its respawn point / checkpoint progress.
+const TELEPORT_TRIGGER_NAME_PATTERN = /^teleport_to_(.+)$/;
+// true: keep the melon's horizontal speed, redirected along the
+// destination's facing; false: arrive standing still.
+const TELEPORT_KEEP_SPEED = true;
+
 // Color swatches offered by the user menu's color picker (see the
 // "usermenu_color_<key>" buttonId handling in index.js's OnCustomHudClicked)
 // — a fixed palette rather than a full picker since panorama's
@@ -342,7 +354,7 @@ const FOLLOW_OFFSET = { x: 0, y: 0, z: 20 };
 const CAMERA_LATERAL = 0;
 const CAMERA_DISTANCE_MIN = 50; // was 150 — players wanted it much closer
 const CAMERA_DISTANCE_MAX = 400;
-const CAMERA_DISTANCE_DEFAULT = 320;
+const CAMERA_DISTANCE_DEFAULT = CAMERA_DISTANCE_MIN; // closest setting feels best in play (was 320)
 // CustomHudLayout only supports Panel/Label/Image/Button — no native
 // slider/drag widget — so the user menu's "distance slider" is really a
 // clickable row of notches the player picks from, same trick as the jump
@@ -354,7 +366,7 @@ const CAMERA_DISTANCE_STEPS = 16; // must match the camdist_seg_* buttons in spe
 // view or a higher, more overview-ish one.
 const CAMERA_HEIGHT_MIN = 0; // was 20 — down to the melon's own FOLLOW_OFFSET height
 const CAMERA_HEIGHT_MAX = 160;
-const CAMERA_HEIGHT_DEFAULT = 80; // matches the old fixed CAMERA_HEIGHT
+const CAMERA_HEIGHT_DEFAULT = CAMERA_HEIGHT_MIN; // lowest setting feels best in play (was 80)
 const CAMERA_HEIGHT_STEPS = 16; // must match the camheight_seg_* buttons in speedometer.xml
 
 // Name of the custom_hud_layout entity (place one in Hammer pointing at
@@ -508,6 +520,144 @@ function FindKartByMelon(melon) {
         }
     }
     return undefined;
+}
+
+// Pure rules for generic teleporters — no cs_script import, so it's
+// unit-testable in Node (see test/teleport.test.mjs). index.js's
+// melon_teleport handler does the entity lookups and the actual teleport.
+
+/**
+ * The destination entity's name encoded in a teleport trigger's own name
+ * (teleport_to_<destination>), or undefined if the name doesn't follow that
+ * convention. Surrounding whitespace is ignored — Hammer keeps stray spaces.
+ * @param {string} triggerName
+ */
+function ParseTeleportTarget(triggerName) {
+    const match = TELEPORT_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
+    return match ? match[1] : undefined;
+}
+
+/**
+ * The player's view right after any teleport: turned to face `yaw` (the
+ * destination's facing), keeping how far up/down they were looking so the
+ * camera doesn't jerk vertically. Steering follows the view's yaw (see
+ * UpdateKart), so without this a teleported player kept driving in their
+ * old direction.
+ * @param {{ pitch: number }} currentEye @param {number} yaw
+ */
+function ViewAnglesFacing(currentEye, yaw) {
+    return { pitch: currentEye.pitch, yaw, roll: 0 };
+}
+
+/**
+ * The melon's velocity right after the teleport: its horizontal speed
+ * carried over but pointed along the destination's facing (so a teleporter
+ * keeps the race's flow instead of dead-stopping the melon), or zero with
+ * TELEPORT_KEEP_SPEED off. Vertical speed is always dropped — a melon
+ * teleported mid-fall would otherwise slam into the floor on arrival.
+ * @param {{ x: number, y: number, z: number }} velocity @param {number} destinationYaw degrees
+ */
+function TeleportExitVelocity(velocity, destinationYaw) {
+    if (!TELEPORT_KEEP_SPEED) {
+        return { x: 0, y: 0, z: 0 };
+    }
+    const speed = Math.hypot(velocity.x, velocity.y);
+    const rad = (destinationYaw * Math.PI) / 180;
+    return { x: Math.cos(rad) * speed, y: Math.sin(rad) * speed, z: 0 };
+}
+
+// The one place that turns a Hammer spawn entity into a melon position.
+// Every caller that puts a melon at the hub or the intro goes through here,
+// so they all agree on where exactly that is.
+
+/**
+ * @typedef {{ position: { x: number, y: number, z: number }, angles: { pitch: number, yaw: number, roll: number } }} SpawnPoint
+ */
+
+/**
+ * `origin` lifted by `upOffset` — a melon placed exactly at a floor-level
+ * entity's origin would start embedded in the floor and fall through it.
+ * @param {{ x: number, y: number, z: number }} origin @param {number} upOffset
+ */
+function Lifted(origin, upOffset) {
+    return { x: origin.x, y: origin.y, z: origin.z + upOffset };
+}
+
+/**
+ * Turns a player's view to face `yaw` — called after every teleport or
+ * spawn of their melon, so they look (and steer) the way the destination
+ * faces. Teleport with only angles sets a player pawn's eye angles and
+ * leaves its (parked) position alone.
+ * @param {any} pawn @param {number} yaw
+ */
+function FacePlayerView(pawn, yaw) {
+    if (!pawn?.IsValid()) {
+        return;
+    }
+    pawn.Teleport({ angles: ViewAnglesFacing(pawn.GetEyeAngles(), yaw) });
+}
+
+/** Level angles (no pitch/roll) facing `yaw` — a melon should never spawn tilted. @param {number} yaw */
+function LevelAngles(yaw) {
+    return { pitch: 0, yaw, roll: 0 };
+}
+
+/**
+ * Where a melon should appear for a spawn entity at `origin`: SPAWN_UP_OFFSET
+ * above the real floor under it, found by tracing down — so it doesn't
+ * matter whether the entity sits on, slightly in, or floating above the
+ * floor in Hammer. The trace starts a bit above the entity in case it's
+ * sunk into the floor. No floor found: just SPAWN_UP_OFFSET above the entity.
+ * @param {{ x: number, y: number, z: number }} origin
+ */
+function PositionAboveFloor(origin) {
+    const trace = TraceLine({
+        start: Lifted(origin, FLOOR_TRACE_UP),
+        end: Lifted(origin, -FLOOR_TRACE_DOWN),
+        ignorePlayers: true,
+    });
+    if (!trace.didHit || trace.startedInSolid) {
+        Debug(`PositionAboveFloor: no floor found below ${JSON.stringify(origin)}, spawning relative to the entity itself`);
+        return Lifted(origin, SPAWN_UP_OFFSET);
+    }
+    return Lifted(trace.end, SPAWN_UP_OFFSET);
+}
+
+/**
+ * Spawn point of the entity named `name`, facing the entity named
+ * `facingName` if given and placed, otherwise the entity's own yaw.
+ * @param {string} name @param {string} [facingName]
+ * @returns {SpawnPoint | undefined}
+ */
+function FindSpawnPoint(name, facingName) {
+    const entity = Instance.FindEntityByName(name);
+    if (!entity) {
+        return undefined;
+    }
+    const facing = (facingName && Instance.FindEntityByName(facingName)) || entity;
+    return {
+        position: PositionAboveFloor(entity.GetAbsOrigin()),
+        angles: LevelAngles(facing.GetAbsAngles().yaw),
+    };
+}
+
+/** Where karts go in the hub: the hub_spawn info_player_start, facing hub_spawn_facing. */
+function GetHubSpawnPoint() {
+    const spawn = FindSpawnPoint(HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME);
+    if (!spawn) {
+        Debug(`GetHubSpawnPoint: no "${HUB_SPAWN_NAME}" in the map — nowhere to put melons`);
+    }
+    return spawn;
+}
+
+/** Where a player's very first melon appears: the intro_spawn tutorial spot, or the hub if there's none. */
+function GetIntroSpawnPoint() {
+    const spawn = FindSpawnPoint(INTRO_SPAWN_NAME);
+    if (!spawn) {
+        Debug(`GetIntroSpawnPoint: no "${INTRO_SPAWN_NAME}" in the map, using the hub spawn`);
+        return GetHubSpawnPoint();
+    }
+    return spawn;
 }
 
 // Pure rules for the melon-break sequence — no cs_script import, so it's
@@ -1371,12 +1521,32 @@ function RespawnKartAtCheckpoint(kart) {
         angles: kart.checkpointAngles,
         velocity: { x: 0, y: 0, z: 0 },
     });
+    FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
     kart.health = MELON_MAX_HEALTH;
     // Cleared, not measured against zero: this is our own intentional
     // velocity reset, not a physical impact to react to.
     kart.lastVelocity = undefined;
     kart.settled = false;
     kart.speedCap = undefined;
+    kart.pendingBounce = undefined;
+}
+
+/**
+ * Moves a kart's melon somewhere else mid-drive (a generic teleporter, see
+ * the melon_teleport input) without touching its health, respawn point or
+ * checkpoint progress. The tracking state that compares against last tick
+ * is cleared, so the jump in position/velocity isn't read as a hard impact
+ * (damage) or a wall hit. speedCap is kept, so a wall-bounce boost carried
+ * through the teleport isn't clamped away.
+ * @param {import("./kart-registry.js").Kart} kart @param {any} position @param {any} angles @param {{ x: number, y: number, z: number }} velocity
+ */
+function TeleportKartTo(kart, position, angles, velocity) {
+    kart.melon.Teleport({ position, angles, velocity, angularVelocity: { x: 0, y: 0, z: 0 } });
+    FacePlayerView(kart.pawn, angles.yaw);
+    kart.lastVelocity = undefined;
+    kart.prevLastVelocity = undefined;
+    kart.prevOrigin = undefined;
+    kart.settled = false;
     kart.pendingBounce = undefined;
 }
 
@@ -1457,6 +1627,7 @@ function RespawnDestroyedMelon(slot, kart) {
         return;
     }
     kart.melon = melon;
+    FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
     kart.melon.SetColor(kart.paintColor);
     kart.health = MELON_MAX_HEALTH;
     kart.lastVelocity = undefined;
@@ -2039,6 +2210,7 @@ function CreateKart(pawn, slot, spawnPoint) {
     if (!melon) {
         return undefined;
     }
+    FacePlayerView(pawn, spawnPoint.angles.yaw);
     const kart = NewKartRecord(pawn, melon, spawnPoint);
     karts.set(slot, kart);
     if (moderatorSlot === undefined) {
@@ -2079,86 +2251,6 @@ function SetUpPlayerKart(pawn, newKartSpawnPoint) {
     UpdateCameraDistanceHud(kart);
     UpdateCameraHeightHud(kart);
     return kart;
-}
-
-// The one place that turns a Hammer spawn entity into a melon position.
-// Every caller that puts a melon at the hub or the intro goes through here,
-// so they all agree on where exactly that is.
-
-/**
- * @typedef {{ position: { x: number, y: number, z: number }, angles: { pitch: number, yaw: number, roll: number } }} SpawnPoint
- */
-
-/**
- * `origin` lifted by `upOffset` — a melon placed exactly at a floor-level
- * entity's origin would start embedded in the floor and fall through it.
- * @param {{ x: number, y: number, z: number }} origin @param {number} upOffset
- */
-function Lifted(origin, upOffset) {
-    return { x: origin.x, y: origin.y, z: origin.z + upOffset };
-}
-
-/** Level angles (no pitch/roll) facing `yaw` — a melon should never spawn tilted. @param {number} yaw */
-function LevelAngles(yaw) {
-    return { pitch: 0, yaw, roll: 0 };
-}
-
-/**
- * Where a melon should appear for a spawn entity at `origin`: SPAWN_UP_OFFSET
- * above the real floor under it, found by tracing down — so it doesn't
- * matter whether the entity sits on, slightly in, or floating above the
- * floor in Hammer. The trace starts a bit above the entity in case it's
- * sunk into the floor. No floor found: just SPAWN_UP_OFFSET above the entity.
- * @param {{ x: number, y: number, z: number }} origin
- */
-function PositionAboveFloor(origin) {
-    const trace = TraceLine({
-        start: Lifted(origin, FLOOR_TRACE_UP),
-        end: Lifted(origin, -FLOOR_TRACE_DOWN),
-        ignorePlayers: true,
-    });
-    if (!trace.didHit || trace.startedInSolid) {
-        Debug(`PositionAboveFloor: no floor found below ${JSON.stringify(origin)}, spawning relative to the entity itself`);
-        return Lifted(origin, SPAWN_UP_OFFSET);
-    }
-    return Lifted(trace.end, SPAWN_UP_OFFSET);
-}
-
-/**
- * Spawn point of the entity named `name`, facing the entity named
- * `facingName` if given and placed, otherwise the entity's own yaw.
- * @param {string} name @param {string} [facingName]
- * @returns {SpawnPoint | undefined}
- */
-function FindSpawnPoint(name, facingName) {
-    const entity = Instance.FindEntityByName(name);
-    if (!entity) {
-        return undefined;
-    }
-    const facing = (facingName && Instance.FindEntityByName(facingName)) || entity;
-    return {
-        position: PositionAboveFloor(entity.GetAbsOrigin()),
-        angles: LevelAngles(facing.GetAbsAngles().yaw),
-    };
-}
-
-/** Where karts go in the hub: the hub_spawn info_player_start, facing hub_spawn_facing. */
-function GetHubSpawnPoint() {
-    const spawn = FindSpawnPoint(HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME);
-    if (!spawn) {
-        Debug(`GetHubSpawnPoint: no "${HUB_SPAWN_NAME}" in the map — nowhere to put melons`);
-    }
-    return spawn;
-}
-
-/** Where a player's very first melon appears: the intro_spawn tutorial spot, or the hub if there's none. */
-function GetIntroSpawnPoint() {
-    const spawn = FindSpawnPoint(INTRO_SPAWN_NAME);
-    if (!spawn) {
-        Debug(`GetIntroSpawnPoint: no "${INTRO_SPAWN_NAME}" in the map, using the hub spawn`);
-        return GetHubSpawnPoint();
-    }
-    return spawn;
 }
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
@@ -2327,6 +2419,7 @@ function BeginHeat(trackId) {
         // is standing in the middle.
         kart.checkpointPosition = position;
         kart.checkpointAngles = angles;
+        FacePlayerView(kart.pawn, angles.yaw);
         SetFinishImageVisible(kart.pawn.GetPlayerController()?.GetPlayerSlot(), false);
     });
 
@@ -2358,8 +2451,28 @@ function FinishKart(kart) {
 
 /** @param {import("./kart-registry.js").Kart[]} returning */
 function ReturnAllToHub(returning) {
-    const hubSpawn = GetHubSpawnPoint();
-    Debug(`ReturnAllToHub: returning ${returning.length} kart(s) to ${hubSpawn ? JSON.stringify(hubSpawn.position) : "nowhere (no hub_spawn)"}`);
+    SendKartsOutOfRace(returning, GetHubSpawnPoint(), "hub");
+}
+
+/**
+ * The user menu's "Go to Tutorial": same as the hub button (leaves a
+ * running heat, respawn point moves along), just landing at intro_spawn —
+ * or the hub, if the map has no intro_spawn.
+ * @param {import("./kart-registry.js").Kart} kart
+ */
+function SendKartToTutorial(kart) {
+    SendKartsOutOfRace([kart], GetIntroSpawnPoint(), "tutorial");
+}
+
+/**
+ * Takes karts out of any heat and teleports them (lined up side by side)
+ * to `spawn`, which also becomes their respawn point.
+ * @param {import("./kart-registry.js").Kart[]} returning
+ * @param {import("./spawn-points.js").SpawnPoint | undefined} spawn where to put them
+ * @param {string} label for the debug log
+ */
+function SendKartsOutOfRace(returning, spawn, label) {
+    Debug(`SendKartsOutOfRace: sending ${returning.length} kart(s) to the ${label} at ${spawn ? JSON.stringify(spawn.position) : "nowhere (spawn entity missing)"}`);
     returning.forEach((kart, i) => {
         kart.racing = false;
         kart.finished = false;
@@ -2378,17 +2491,18 @@ function ReturnAllToHub(returning) {
         kart.trackId = undefined;
         kart.checkpointIndex = 0;
         kart.lapsCompleted = 0;
-        if (hubSpawn) {
-            const hubAngles = hubSpawn.angles;
-            const hubPosition = LineUpPosition(hubSpawn.position, hubAngles, i, returning.length);
-            kart.checkpointPosition = hubPosition;
-            kart.checkpointAngles = hubAngles;
+        if (spawn) {
+            const spawnAngles = spawn.angles;
+            const spawnPosition = LineUpPosition(spawn.position, spawnAngles, i, returning.length);
+            kart.checkpointPosition = spawnPosition;
+            kart.checkpointAngles = spawnAngles;
+            FacePlayerView(kart.pawn, spawnAngles.yaw);
             // Same dead-melon guard as BeginHeat — its pending respawn lands
-            // it at the hub checkpointPosition just set.
+            // it at the checkpointPosition just set.
             if (kart.melon.IsValid()) {
                 kart.melon.Teleport({
-                    position: hubPosition,
-                    angles: hubAngles,
+                    position: spawnPosition,
+                    angles: spawnAngles,
                     velocity: { x: 0, y: 0, z: 0 },
                 });
             }
@@ -3194,6 +3308,43 @@ Instance.OnScriptInput("melon_paint", ({ caller, activator }) => {
     Debug(`melon_paint: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} painted (${r}, ${g}, ${b})`);
 });
 
+// Generic teleporter — see TELEPORT_TRIGGER_NAME_PATTERN for the Hammer
+// convention: the destination comes from the touched trigger's own name
+// (teleport_to_<destination>), so every teleporter shares this handler.
+// Msg, not Debug, for wiring mistakes: a teleporter that silently does
+// nothing is hard to spot otherwise.
+Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
+    const kart = activator && FindKartByMelon(activator);
+    if (!kart || !caller) {
+        Debug("melon_teleport: activator wasn't a tracked melon, ignoring");
+        return;
+    }
+    if (kart.breaking || kart.locked) {
+        return; // broken (about to respawn) or parked by the race flow — leave it where it is
+    }
+    const triggerName = caller.GetEntityName();
+    const destinationName = ParseTeleportTarget(triggerName);
+    if (!destinationName) {
+        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" isn't named teleport_to_<destination>, ignoring`);
+        return;
+    }
+    const destination = Instance.FindEntityByName(destinationName);
+    if (!destination) {
+        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" points at "${destinationName}", but no entity has that name`);
+        return;
+    }
+    const yaw = destination.GetAbsAngles().yaw;
+    // Lifted like the race-flow teleports: a destination placed on (or
+    // sunk into) the floor would otherwise embed the melon in it.
+    TeleportKartTo(
+        kart,
+        Lifted(destination.GetAbsOrigin(), TELEPORT_UP_OFFSET),
+        LevelAngles(yaw),
+        TeleportExitVelocity(kart.melon.GetAbsVelocity(), yaw)
+    );
+    Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"`);
+});
+
 Instance.OnCustomHudClicked((event) => {
     if (event.layout !== GetSpeedHud()) {
         return;
@@ -3256,6 +3407,16 @@ Instance.OnCustomHudClicked((event) => {
         Debug(`usermenu_hub_button: slot ${slot} returning to hub (racing=${kart.racing}, phase=${phase})`);
         SetUserMenuOpen(slot, kart, false);
         ReturnAllToHub([kart]);
+    } else if (event.buttonId === "usermenu_tutorial_button") {
+        const slot = event.player.GetPlayerSlot();
+        const kart = karts.get(slot);
+        if (!kart) {
+            return;
+        }
+        // Same self-service pull-out as the hub button above, to intro_spawn.
+        Debug(`usermenu_tutorial_button: slot ${slot} going to the tutorial (racing=${kart.racing}, phase=${phase})`);
+        SetUserMenuOpen(slot, kart, false);
+        SendKartToTutorial(kart);
     } else if (event.buttonId.startsWith("usermenu_color_")) {
         const key = event.buttonId.slice("usermenu_color_".length);
         const preset = COLOR_PRESETS[key];

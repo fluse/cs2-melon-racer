@@ -440,6 +440,10 @@ long fall lands hard enough for the engine to destroy the melon on impact.
   first join again (the kart is dropped on disconnect).
 - Returning to the hub uses `hub_spawn` (required — there's no fallback),
   facing `hub_spawn_facing` if placed, else `hub_spawn`'s own angles.
+- The user menu's "Go to Tutorial" button sends that player back to
+  `intro_spawn` (or `hub_spawn` without one) the same way its "Return to
+  hub" button works: it leaves a running heat, clears track progress, and
+  makes that spot the kart's respawn point.
 - A later `OnPlayerReset` for a player who already has a kart never spawns
   or moves a melon — it only re-freezes the pawn and re-attaches the camera.
   A lost melon is brought back solely by the break/respawn logic, at the
@@ -467,6 +471,43 @@ paint trigger — it isn't reset on breaking, finishing a heat, or returning
 to the hub, only overwritten by touching another paint trigger. A freshly
 spawned melon (first join, or after a respawn where the old one was
 invalid) starts unpainted (the model's default color).
+
+## Teleporters (implemented)
+
+Generic, same name-carries-the-config convention as paint triggers — adding
+a teleporter is a pure Hammer edit, no script change:
+
+1. Place the destination: any named point entity (e.g. an `info_target`),
+   say `tp_dest_hub_back`. Its position is where the melon arrives (lifted
+   `TELEPORT_UP_OFFSET` so it drops onto the floor instead of into it), its
+   yaw is the direction it arrives facing.
+2. Place a `trigger_multiple` named `teleport_to_<destination>` — here
+   `teleport_to_tp_dest_hub_back` — filtered to `prop_physics` like the
+   other triggers.
+3. Its `OnStartTouch` fires `RunScriptInput` `melon_teleport` on the
+   `point_script` entity. That parameter is the same for every teleporter;
+   the destination comes from the trigger's name.
+
+Behavior (decided): a teleport **only moves** the melon — health, respawn
+point and checkpoint/lap progress stay as they were, so a teleporter can't
+skip or reset a track's checkpoints. With `TELEPORT_KEEP_SPEED` the melon
+keeps its horizontal speed, redirected along the destination's facing
+(vertical speed dropped, so a teleport mid-fall doesn't slam it into the
+floor); off, it arrives standing still. The player's **view is turned to
+the destination's facing** too (pitch kept) — steering follows the view, so
+otherwise they'd keep driving the old way. That holds for every teleport
+and spawn of a melon, not just teleporters: checkpoint respawns, heat
+start, hub/tutorial, the first spawn (`FacePlayerView` in
+`spawn-points.js`). Broken or race-locked melons
+(countdown, finished) ignore teleporters. Unlike Hammer's own
+`trigger_teleport`, this resets the per-tick tracking so the jump isn't
+read as a hard impact or wall hit.
+
+A trigger named wrong or pointing at a missing destination logs a
+`[melon_drive] melon_teleport: …` console message, and
+`test/map-io.test.mjs` fails on it in the .vmap. For sending a melon to the
+hub specifically, the existing `hub_teleport` input still works (it also
+takes the kart out of a running heat).
 
 ## Open design questions (not yet decided — ask before assuming)
 

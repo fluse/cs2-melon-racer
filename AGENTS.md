@@ -33,9 +33,10 @@ src/melon_drive/index.js, *.js           # melon_drive entry: split into one fil
                                           #   constants.js, debug.js, kart-registry.js, track-config.js,
                                           #   camera.js, hud.js, race-flow.js, spawn-points.js, kart-spawn.js, kart-physics.js,
                                           #   checkpoints.js, prediction.js, trace.js, think.js — index.js just wires them together
-src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, checkpoint progress, break sequence, camera steps) — no engine import, unit-tested
+src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, checkpoint progress, break sequence, camera steps, teleport) — no engine import, unit-tested
 test/*.test.mjs                          # node:test unit tests for src/*/logic/ (`npm test`), plus checks of the .vmap/.xml the script relies on
 test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities
+test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
 ```
 
@@ -271,7 +272,17 @@ examples — read these instead of guessing signatures:
   them, and add/adjust a test when changing a rule. Write assertions in
   terms of the constants (`WALL_BOUNCE_PEAK_MULTIPLIER`, ...) rather than
   their current values, so retuning `constants.js` doesn't break tests.
-- Beyond those unit tests there's no way to exercise the engine side here —
-  verifying a gameplay change means loading the map in Hammer / launching
-  CS2 in-game (`map melon_racer`), which only the user can do. Don't claim a
-  gameplay change "works" without that manual check having happened.
+- **Engine-side files can be tested against a fake engine** when a rule
+  spans them (e.g. `test/view-facing.test.mjs`: every teleport/spawn path
+  turns the player's view): `import "./helpers/register-cs-script.mjs"`
+  first, then load `src/` files with dynamic `await import(...)` —
+  `cs_script/point_script` resolves to `test/helpers/cs-script-mock.mjs`,
+  whose `world` holds fake entities (`Entity`, `CSPlayerPawn`,
+  `PointTemplate`) and records every `Instance.On*` registration in
+  `world.handlers`. It's a stub, not a simulation (traces never hit,
+  `Delay` resolves immediately) — prefer pure `logic/` tests, and extend
+  the mock only as far as a test needs.
+- Beyond that, verifying a gameplay change means loading the map in Hammer
+  / launching CS2 in-game (`map melon_racer`), which only the user can do.
+  Don't claim a gameplay change "works" without that manual check having
+  happened.

@@ -1,6 +1,7 @@
 import { Instance } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { TraceLine } from "./trace.js";
+import { ViewAnglesFacing } from "./logic/teleport.js";
 import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, FLOOR_TRACE_UP, FLOOR_TRACE_DOWN } from "./constants.js";
 
 // The one place that turns a Hammer spawn entity into a melon position.
@@ -18,6 +19,20 @@ import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSE
  */
 export function Lifted(origin, upOffset) {
     return { x: origin.x, y: origin.y, z: origin.z + upOffset };
+}
+
+/**
+ * Turns a player's view to face `yaw` — called after every teleport or
+ * spawn of their melon, so they look (and steer) the way the destination
+ * faces. Teleport with only angles sets a player pawn's eye angles and
+ * leaves its (parked) position alone.
+ * @param {any} pawn @param {number} yaw
+ */
+export function FacePlayerView(pawn, yaw) {
+    if (!pawn?.IsValid()) {
+        return;
+    }
+    pawn.Teleport({ angles: ViewAnglesFacing(pawn.GetEyeAngles(), yaw) });
 }
 
 /** Level angles (no pitch/roll) facing `yaw` — a melon should never spawn tilted. @param {number} yaw */

@@ -250,6 +250,18 @@ export const HUB_TRIGGER_NAME = "hub_start_trigger";
 // track_start_* in GetTrackConfig().
 export const PAINT_TRIGGER_NAME_PATTERN = /^paint_trigger_(\d+)_(\d+)_(\d+)$/;
 
+// Generic teleporters, same name-carries-the-config convention: a
+// trigger_multiple named "teleport_to_<destination>" (filtered to
+// prop_physics) with OnStartTouch -> RunScriptInput "melon_teleport" sends
+// the touching melon to the entity named <destination> (e.g. an
+// info_target), facing that entity's yaw. One shared handler for every
+// teleporter — adding one is a pure Hammer edit. A teleport only moves the
+// melon; it never changes its respawn point / checkpoint progress.
+export const TELEPORT_TRIGGER_NAME_PATTERN = /^teleport_to_(.+)$/;
+// true: keep the melon's horizontal speed, redirected along the
+// destination's facing; false: arrive standing still.
+export const TELEPORT_KEEP_SPEED = true;
+
 // Color swatches offered by the user menu's color picker (see the
 // "usermenu_color_<key>" buttonId handling in index.js's OnCustomHudClicked)
 // — a fixed palette rather than a full picker since panorama's
@@ -329,7 +341,7 @@ export const FOLLOW_OFFSET = { x: 0, y: 0, z: 20 };
 export const CAMERA_LATERAL = 0;
 export const CAMERA_DISTANCE_MIN = 50; // was 150 — players wanted it much closer
 export const CAMERA_DISTANCE_MAX = 400;
-export const CAMERA_DISTANCE_DEFAULT = 320;
+export const CAMERA_DISTANCE_DEFAULT = CAMERA_DISTANCE_MIN; // closest setting feels best in play (was 320)
 // CustomHudLayout only supports Panel/Label/Image/Button — no native
 // slider/drag widget — so the user menu's "distance slider" is really a
 // clickable row of notches the player picks from, same trick as the jump
@@ -341,7 +353,7 @@ export const CAMERA_DISTANCE_STEPS = 16; // must match the camdist_seg_* buttons
 // view or a higher, more overview-ish one.
 export const CAMERA_HEIGHT_MIN = 0; // was 20 — down to the melon's own FOLLOW_OFFSET height
 export const CAMERA_HEIGHT_MAX = 160;
-export const CAMERA_HEIGHT_DEFAULT = 80; // matches the old fixed CAMERA_HEIGHT
+export const CAMERA_HEIGHT_DEFAULT = CAMERA_HEIGHT_MIN; // lowest setting feels best in play (was 80)
 export const CAMERA_HEIGHT_STEPS = 16; // must match the camheight_seg_* buttons in speedometer.xml
 
 // Name of the custom_hud_layout entity (place one in Hammer pointing at

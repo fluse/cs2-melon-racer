@@ -21,14 +21,15 @@ import { Instance } from "cs_script/point_script";
 // think.js for the per-tick driver.
 
 import { Debug } from "./debug.js";
-import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, CAMERA_DISTANCE_STEPS, CAMERA_HEIGHT_STEPS, HUB_TRIGGER_NAME } from "./constants.js";
+import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, CAMERA_DISTANCE_STEPS, CAMERA_HEIGHT_STEPS, HUB_TRIGGER_NAME, TELEPORT_UP_OFFSET } from "./constants.js";
 import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, SetModeratorSlot, DropKart } from "./kart-registry.js";
 import { SetUpPlayerKart } from "./kart-spawn.js";
-import { GetIntroSpawnPoint } from "./spawn-points.js";
-import { RespawnKartAtCheckpoint, SetKartPaintColor } from "./kart-physics.js";
+import { GetIntroSpawnPoint, Lifted, LevelAngles } from "./spawn-points.js";
+import { ParseTeleportTarget, TeleportExitVelocity } from "./logic/teleport.js";
+import { RespawnKartAtCheckpoint, SetKartPaintColor, TeleportKartTo } from "./kart-physics.js";
 import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen } from "./hud.js";
 import { SetCameraDistance, SetCameraHeight } from "./camera.js";
-import { phase, activeTrackId, phaseEndTime, TryStartRace, TryAbortRace, ReturnAllToHub, RestoreRaceFlowSnapshot } from "./race-flow.js";
+import { phase, activeTrackId, phaseEndTime, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, RestoreRaceFlowSnapshot } from "./race-flow.js";
 import { RegisterCheckpointAndFinishInputs } from "./checkpoints.js";
 import { Think } from "./think.js";
 
@@ -155,6 +156,43 @@ Instance.OnScriptInput("melon_paint", ({ caller, activator }) => {
     Debug(`melon_paint: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} painted (${r}, ${g}, ${b})`);
 });
 
+// Generic teleporter — see TELEPORT_TRIGGER_NAME_PATTERN for the Hammer
+// convention: the destination comes from the touched trigger's own name
+// (teleport_to_<destination>), so every teleporter shares this handler.
+// Msg, not Debug, for wiring mistakes: a teleporter that silently does
+// nothing is hard to spot otherwise.
+Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
+    const kart = activator && FindKartByMelon(activator);
+    if (!kart || !caller) {
+        Debug("melon_teleport: activator wasn't a tracked melon, ignoring");
+        return;
+    }
+    if (kart.breaking || kart.locked) {
+        return; // broken (about to respawn) or parked by the race flow — leave it where it is
+    }
+    const triggerName = caller.GetEntityName();
+    const destinationName = ParseTeleportTarget(triggerName);
+    if (!destinationName) {
+        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" isn't named teleport_to_<destination>, ignoring`);
+        return;
+    }
+    const destination = Instance.FindEntityByName(destinationName);
+    if (!destination) {
+        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" points at "${destinationName}", but no entity has that name`);
+        return;
+    }
+    const yaw = destination.GetAbsAngles().yaw;
+    // Lifted like the race-flow teleports: a destination placed on (or
+    // sunk into) the floor would otherwise embed the melon in it.
+    TeleportKartTo(
+        kart,
+        Lifted(destination.GetAbsOrigin(), TELEPORT_UP_OFFSET),
+        LevelAngles(yaw),
+        TeleportExitVelocity(kart.melon.GetAbsVelocity(), yaw)
+    );
+    Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"`);
+});
+
 Instance.OnCustomHudClicked((event) => {
     if (event.layout !== GetSpeedHud()) {
         return;
@@ -217,6 +255,16 @@ Instance.OnCustomHudClicked((event) => {
         Debug(`usermenu_hub_button: slot ${slot} returning to hub (racing=${kart.racing}, phase=${phase})`);
         SetUserMenuOpen(slot, kart, false);
         ReturnAllToHub([kart]);
+    } else if (event.buttonId === "usermenu_tutorial_button") {
+        const slot = event.player.GetPlayerSlot();
+        const kart = karts.get(slot);
+        if (!kart) {
+            return;
+        }
+        // Same self-service pull-out as the hub button above, to intro_spawn.
+        Debug(`usermenu_tutorial_button: slot ${slot} going to the tutorial (racing=${kart.racing}, phase=${phase})`);
+        SetUserMenuOpen(slot, kart, false);
+        SendKartToTutorial(kart);
     } else if (event.buttonId.startsWith("usermenu_color_")) {
         const key = event.buttonId.slice("usermenu_color_".length);
         const preset = COLOR_PRESETS[key];

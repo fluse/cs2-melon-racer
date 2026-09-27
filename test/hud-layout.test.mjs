@@ -32,3 +32,12 @@ test("every image speedometer.xml shows exists in panorama/images", () => {
     const missing = srcs.filter((p) => !existsSync(fileURLToPath(new URL(`panorama/images/${p}`, root))));
     assert.deepEqual(missing, []);
 });
+
+test("every button in speedometer.xml has a click handler in the script", () => {
+    const buttonIds = [...layout.matchAll(/<Button\s+id="([^"]+)"/g)].map((m) => m[1]);
+    assert.ok(buttonIds.includes("usermenu_tutorial_button"), "sanity: the tutorial button is in the layout");
+    const exact = new Set([...source.matchAll(/buttonId === "([^"]+)"/g)].map((m) => m[1]));
+    const prefixes = [...source.matchAll(/buttonId\.startsWith\("([^"]+)"\)/g)].map((m) => m[1]);
+    const unhandled = buttonIds.filter((id) => !exact.has(id) && !prefixes.some((p) => id.startsWith(p)));
+    assert.deepEqual(unhandled, []);
+});

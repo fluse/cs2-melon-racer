@@ -2,6 +2,7 @@ import { Instance, PointTemplate, CSMoveType } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { karts, moderatorSlot, SetModeratorSlot } from "./kart-registry.js";
 import { ApplyCameraFollow, UpdateCameraDistanceHud, UpdateCameraHeightHud } from "./camera.js";
+import { FacePlayerView } from "./spawn-points.js";
 import {
     MELON_TEMPLATE_NAME,
     PAWN_PARK_HEIGHT,
@@ -111,6 +112,7 @@ function CreateKart(pawn, slot, spawnPoint) {
     if (!melon) {
         return undefined;
     }
+    FacePlayerView(pawn, spawnPoint.angles.yaw);
     const kart = NewKartRecord(pawn, melon, spawnPoint);
     karts.set(slot, kart);
     if (moderatorSlot === undefined) {

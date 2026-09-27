@@ -156,6 +156,12 @@
 				<Label text="Return to hub" />
 			</Button>
 
+			<!-- Same as the hub button (also leaves a running heat, hence the
+			     same red tint), but to intro_spawn — see SendKartToTutorial. -->
+			<Button id="usermenu_tutorial_button" class="UserMenuActionButton UserMenuActionButtonDanger">
+				<Label text="Go to Tutorial" />
+			</Button>
+
 			<Label class="UserMenuSectionLabel" text="COLOR" />
 			<Panel class="UserMenuColorRow">
 				<Button id="usermenu_color_red" class="ColorSwatch ColorSwatchRed" />

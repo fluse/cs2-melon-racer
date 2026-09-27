@@ -58,3 +58,11 @@ for (const s of sliders) {
         assert.deepEqual(ids.sort((a, b) => a - b), Array.from({ length: s.steps }, (_, i) => i));
     });
 }
+
+// Decided: new players start on the closest, lowest camera — it plays best.
+test("the default camera is the minimum distance and height (the first notch)", () => {
+    assert.equal(CAMERA_DISTANCE_DEFAULT, CAMERA_DISTANCE_MIN);
+    assert.equal(CAMERA_HEIGHT_DEFAULT, CAMERA_HEIGHT_MIN);
+    assert.equal(CameraDistanceStepFor(CAMERA_DISTANCE_DEFAULT), 0);
+    assert.equal(CameraHeightStepFor(CAMERA_HEIGHT_DEFAULT), 0);
+});

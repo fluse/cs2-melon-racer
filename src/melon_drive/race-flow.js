@@ -11,7 +11,7 @@ import {
     RACE_SPAWN_LATERAL_SPACING,
     TELEPORT_UP_OFFSET,
 } from "./constants.js";
-import { GetHubSpawnPoint, Lifted } from "./spawn-points.js";
+import { GetHubSpawnPoint, GetIntroSpawnPoint, Lifted, FacePlayerView } from "./spawn-points.js";
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
 // See GAMEPLAY.md's "Hub -> race -> next-track flow" for the full design.
@@ -179,6 +179,7 @@ export function BeginHeat(trackId) {
         // is standing in the middle.
         kart.checkpointPosition = position;
         kart.checkpointAngles = angles;
+        FacePlayerView(kart.pawn, angles.yaw);
         SetFinishImageVisible(kart.pawn.GetPlayerController()?.GetPlayerSlot(), false);
     });
 
@@ -210,8 +211,28 @@ export function FinishKart(kart) {
 
 /** @param {import("./kart-registry.js").Kart[]} returning */
 export function ReturnAllToHub(returning) {
-    const hubSpawn = GetHubSpawnPoint();
-    Debug(`ReturnAllToHub: returning ${returning.length} kart(s) to ${hubSpawn ? JSON.stringify(hubSpawn.position) : "nowhere (no hub_spawn)"}`);
+    SendKartsOutOfRace(returning, GetHubSpawnPoint(), "hub");
+}
+
+/**
+ * The user menu's "Go to Tutorial": same as the hub button (leaves a
+ * running heat, respawn point moves along), just landing at intro_spawn —
+ * or the hub, if the map has no intro_spawn.
+ * @param {import("./kart-registry.js").Kart} kart
+ */
+export function SendKartToTutorial(kart) {
+    SendKartsOutOfRace([kart], GetIntroSpawnPoint(), "tutorial");
+}
+
+/**
+ * Takes karts out of any heat and teleports them (lined up side by side)
+ * to `spawn`, which also becomes their respawn point.
+ * @param {import("./kart-registry.js").Kart[]} returning
+ * @param {import("./spawn-points.js").SpawnPoint | undefined} spawn where to put them
+ * @param {string} label for the debug log
+ */
+function SendKartsOutOfRace(returning, spawn, label) {
+    Debug(`SendKartsOutOfRace: sending ${returning.length} kart(s) to the ${label} at ${spawn ? JSON.stringify(spawn.position) : "nowhere (spawn entity missing)"}`);
     returning.forEach((kart, i) => {
         kart.racing = false;
         kart.finished = false;
@@ -230,17 +251,18 @@ export function ReturnAllToHub(returning) {
         kart.trackId = undefined;
         kart.checkpointIndex = 0;
         kart.lapsCompleted = 0;
-        if (hubSpawn) {
-            const hubAngles = hubSpawn.angles;
-            const hubPosition = LineUpPosition(hubSpawn.position, hubAngles, i, returning.length);
-            kart.checkpointPosition = hubPosition;
-            kart.checkpointAngles = hubAngles;
+        if (spawn) {
+            const spawnAngles = spawn.angles;
+            const spawnPosition = LineUpPosition(spawn.position, spawnAngles, i, returning.length);
+            kart.checkpointPosition = spawnPosition;
+            kart.checkpointAngles = spawnAngles;
+            FacePlayerView(kart.pawn, spawnAngles.yaw);
             // Same dead-melon guard as BeginHeat — its pending respawn lands
-            // it at the hub checkpointPosition just set.
+            // it at the checkpointPosition just set.
             if (kart.melon.IsValid()) {
                 kart.melon.Teleport({
-                    position: hubPosition,
-                    angles: hubAngles,
+                    position: spawnPosition,
+                    angles: spawnAngles,
                     velocity: { x: 0, y: 0, z: 0 },
                 });
             }
