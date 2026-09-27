@@ -181,7 +181,7 @@ in the world and logs the velocity angle next to the look angle. There's no glob
 - HUD: the speedometer gets `Boosted` while above `MAX_SPEED` and a short
   `PerfectBounce` flash after a bounce with angle closeness ≥
   `PERFECT_BOUNCE_ANGLE_FACTOR` (`speedometer.css`). Separately, a
-  `bounce_panel` below the crosshair shows for `BOUNCE_HUD_SECONDS` after
+  `bounce_panel` in the bottom-right HUD cluster, right above the speedometer (centered below the crosshair it covered the track), shows for `BOUNCE_HUD_SECONDS` after
   each bounce: a rating word by angle closeness (`BOUNCE_RATINGS`:
   PERFECT/GREAT/GOOD/MISS), the exact angle hit, a 0°–90° scale in 10°
   segments with the 45° target outlined and the hit segment lit, and a
@@ -348,7 +348,10 @@ Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
    checkpoints reached yet" — for the next lap); otherwise it's ignored (lap
    not actually run yet). Once
    `lapsCompleted >= lapsToWin`, that kart is marked `finished` (locked in
-   place, out of the way, so it doesn't keep re-triggering checkpoints) — it
+   place, out of the way, so it doesn't keep re-triggering checkpoints) and
+   that player immediately sees the big `word-finish.png` image
+   (`finish_image`) until the next heat or the hub, with the "next track /
+   back to hub in 10s" line under it once BREAK starts — it
    does **not** end the heat by itself; see next. Kept as a separate input
    from `checkpoint_<trackId>_1` (which only ever *picks* a track and never
    touches `lapsCompleted`) specifically so both can be wired as outputs on

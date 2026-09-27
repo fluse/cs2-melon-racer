@@ -179,6 +179,7 @@ export function BeginHeat(trackId) {
         // is standing in the middle.
         kart.checkpointPosition = position;
         kart.checkpointAngles = angles;
+        SetFinishImageVisible(kart.pawn.GetPlayerController()?.GetPlayerSlot(), false);
     });
 
     phase = RacePhase.COUNTDOWN;
@@ -186,11 +187,24 @@ export function BeginHeat(trackId) {
     Debug(`BeginHeat: track ${trackId}, ${racers.length} racer(s), countdown started`);
 }
 
+/**
+ * Shows or hides the big "FINISH" image (finish_image in speedometer.xml)
+ * for one player. @param {number | undefined} slot @param {boolean} visible
+ */
+function SetFinishImageVisible(slot, visible) {
+    if (slot !== undefined) {
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_image", "Hidden", !visible);
+    }
+}
+
 /** A kart reached lapsToWin — park it (still locked) until the whole heat ends. */
 /** @param {import("./kart-registry.js").Kart} kart */
 export function FinishKart(kart) {
     kart.finished = true;
     kart.locked = true;
+    // Shown the moment this racer crosses the line, not only once the whole
+    // heat is over — stays up through BREAK until the next heat/the hub.
+    SetFinishImageVisible(kart.pawn.GetPlayerController()?.GetPlayerSlot(), true);
     Debug(`FinishKart: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} finished track ${activeTrackId}`);
 }
 
@@ -245,6 +259,7 @@ export function ReturnAllToHub(returning) {
         // after a heat finishes normally in BREAK).
         GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
         GetSpeedHud()?.SetHasClassForPlayer(slot, "break_label", "Hidden", true);
+        SetFinishImageVisible(slot, false);
     });
 }
 
@@ -317,7 +332,8 @@ export function UpdateRaceFlow(now) {
         if (racers.every((kart) => kart.finished)) {
             phase = RacePhase.BREAK;
             phaseEndTime = now + BREAK_SECONDS;
-            const message = NextTrackId() !== undefined ? `Ziel!\nNächste Strecke in ${BREAK_SECONDS}s…` : `Ziel!\nZurück zum Hub in ${BREAK_SECONDS}s…`;
+            // "Ziel!" itself is the finish_image FinishKart already shows; this is just the line under it.
+            const message = NextTrackId() !== undefined ? `Nächste Strecke in ${BREAK_SECONDS}s…` : `Zurück zum Hub in ${BREAK_SECONDS}s…`;
             for (const kart of racers) {
                 const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
                 if (slot === undefined) {

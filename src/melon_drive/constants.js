@@ -10,9 +10,9 @@ export const MELON_TEMPLATE_NAME = "melon_template";
 // (sent_melon_base/init.lua ENT:Think + gamemode/shared.lua DefXSpeed):
 // forward is the strongest push, reverse is half that, strafe is weaker
 // still — keeping FORWARD_ACCEL as our existing tuned baseline.
-export const FORWARD_ACCEL = 900; // units/sec^2 while holding forward
-export const REVERSE_ACCEL = 450; // 0.5x forward, matches original's Reverse/Forward ratio
-export const STRAFE_ACCEL = 360; // 0.4x forward, matches original's Strafe/Forward ratio
+export const FORWARD_ACCEL = 600; // units/sec^2 while holding forward (was 900 — lowered for a heavier, slower build-up: ~1.1s instead of ~0.7s to MAX_SPEED)
+export const REVERSE_ACCEL = FORWARD_ACCEL * 0.5; // 0.5x forward, matches original's Reverse/Forward ratio
+export const STRAFE_ACCEL = FORWARD_ACCEL * 0.4; // 0.4x forward, matches original's Strafe/Forward ratio
 export const MAX_SPEED = 650; // units/sec, horizontal speed cap
 export const COAST_FRICTION = 120; // units/sec^2 horizontal slowdown with no input — low, so the melon keeps rolling on its own momentum instead of grinding to a stop
 export const JUMP_SPEED = 400; // units/sec upward impulse

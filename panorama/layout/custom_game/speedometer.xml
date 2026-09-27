@@ -48,16 +48,23 @@
 			<Image class="CountdownImage CountdownGo" src="file://{images}/custom_game/word-go.png" />
 		</Panel>
 
-		<!-- Break banner between heats ("Finish!" + next-track countdown). -->
+		<!-- Shown to a racer the moment they finish (see FinishKart), until
+		     the next heat or the hub. -->
+		<Image id="finish_image" class="FinishImage Hidden" src="file://{images}/custom_game/word-finish.png" />
+
+		<!-- Line under the finish image between heats ("Nächste Strecke in 10s…"). -->
 		<Label id="break_label" class="BreakLabel Hidden" text="{s:break}" />
 
 		<!-- Wall-bounce feedback, shown briefly after each bounce (see
-		     UpdateBounceHud): rating word + exact angle, a 0°..90° scale in
-		     10° segments with the 45° target outlined and the hit segment
-		     lit, and a jump-timing bar. Rating* class on the panel colors it. -->
+		     UpdateBounceHud), in the bottom-right cluster right above the
+		     speedometer: rating word + exact angle, a 0°..90° scale in 10°
+		     segments with the 45° target outlined and the hit segment lit,
+		     and a jump-timing bar. Rating* class on the panel colors it. -->
 		<Panel id="bounce_panel" class="BouncePanel Hidden">
-			<Label class="BounceRating" text="{s:bounce_rating}" />
-			<Label class="BounceAngle" text="{s:bounce_angle}°" />
+			<Panel class="BounceHeader">
+				<Label class="BounceRating" text="{s:bounce_rating}" />
+				<Label class="BounceAngle" text="{s:bounce_angle}°" />
+			</Panel>
 			<Panel class="BounceAngleScale">
 				<Label class="BounceScaleEdge" text="0°" />
 				<Panel id="bounce_angle_seg_0" class="BounceAngleSegment" />
