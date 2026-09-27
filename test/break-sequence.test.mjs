@@ -2,7 +2,7 @@
 // effects stay), asserted in terms of the constants, not their values.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BreakCameraZoomFraction, BreakCameraOffset, PruneBreakEffects, BreakPieceVelocity } from "../src/melon_drive/logic/break-sequence.js";
+import { BreakCameraZoomFraction, BreakCameraOffset, PruneBreakEffects, BreakPieceVelocity, RecenterOnto } from "../src/melon_drive/logic/break-sequence.js";
 import {
     BREAK_CAMERA_ZOOM_SECONDS,
     BREAK_CAMERA_EXTRA_DISTANCE,
@@ -80,4 +80,19 @@ test("a break piece spawned right at the center still gets launched, along the f
     const v = BreakPieceVelocity(center, center, Math.PI / 2);
     assert.ok(Math.abs(v.x) < 1e-9 && Math.abs(v.y - BREAK_PIECE_SPEED) < 1e-9);
     assert.ok(Number.isFinite(v.x) && Number.isFinite(v.y));
+});
+
+// Regression: ForceSpawn keeps each entity's Hammer offset from its
+// template, so break effects/pieces placed next to the template appeared
+// ~200 units away from the crash site.
+test("break pieces are centered on the crash site, keeping their layout", () => {
+    const hammer = [{ x: 509, y: -240, z: 8 }, { x: 505, y: -239, z: 7 }, { x: 507, y: -246, z: 3 }];
+    const crash = { x: -1000, y: 2000, z: 64 };
+    const placed = RecenterOnto(hammer, crash);
+    const centroid = placed.reduce((c, p) => ({ x: c.x + p.x / 3, y: c.y + p.y / 3, z: c.z + p.z / 3 }), { x: 0, y: 0, z: 0 });
+    for (const axis of ["x", "y", "z"]) {
+        assert.ok(Math.abs(centroid[axis] - crash[axis]) < 1e-9, `centroid ${axis}`);
+        assert.ok(Math.abs(placed[1][axis] - placed[0][axis] - (hammer[1][axis] - hammer[0][axis])) < 1e-9, `layout ${axis}`);
+    }
+    assert.deepEqual(RecenterOnto([], crash), []);
 });

@@ -98,25 +98,23 @@ The spawned effects are left lying at the crash site for
 
 The chunks particle (`break_watermelon_chunks.vpcf`) is only small sprite
 flecks that fade within moments, so it can't provide chunks that lie on the
-ground. Those come from a third template, `melon_break_pieces_template`: the
-melon model's own break pieces as real physics props. On a break they're
-spawned at the crash site (randomly turned), tinted in the melon's paint
-color, flung outward (`BREAK_PIECE_SPEED`/`_UP_SPEED`/`_SPIN`), and removed
-only after `BREAK_EFFECT_LIFETIME`. Hammer setup:
+ground. **Decided: there are only these two break templates, no others.**
+Lying chunks therefore come from physics props placed *inside* one of them:
+any `prop_physics` either template spawns is treated as a break piece —
+tinted in the melon's paint color, flung outward from the crash site
+(`BREAK_PIECE_SPEED`/`_UP_SPEED`/`_SPIN`), and removed only after
+`BREAK_EFFECT_LIFETIME`. To get them, add to `melon_break_chunks_template`
+(`Template02`…) up to 9 `prop_physics` with the melon model's own break
+pieces, `models/cs_italy/italy_food_melon/italy_food_melon/piece.vmdl`,
+`piece1.vmdl` … `piece8.vmdl`, arranged close together in roughly a
+melon's shape. Where the templates and their entities sit in Hammer doesn't
+matter: `ForceSpawn` would keep each entity's offset from its template, so
+script moves particle systems exactly onto the crash site and centers the
+pieces' group on it (keeping their layout relative to each other). If lying pieces get in the karts' way, mark them as debris.
 
-- Place 9 `prop_physics` entities, one each with model
-  `models/cs_italy/italy_food_melon/italy_food_melon/piece.vmdl`, `piece1.vmdl`
-  … `piece8.vmdl`, arranged close together around one point in roughly a
-  melon's shape. Give each its own name (e.g. `melon_break_piece_0` … `_8`).
-  If lying pieces get in the karts' way, mark them as debris
-  (Debris collision group / "Debris" spawnflag).
-- Place a `point_template` named `melon_break_pieces_template` at the
-  center of that melon shape, with `Template01`…`Template09` set to those
-  nine names. Where the pieces sit relative to the template's origin is
-  where they appear around the crash site.
-
-`test/map-templates.test.mjs` checks the .vmap to make sure all these
-templates exist and are wired up (the `npm test` failure names whatever's
+`test/map-templates.test.mjs` checks the .vmap to make sure both
+templates exist and are wired up, and that no other `melon_break_*`
+template creeps in (the `npm test` failure names whatever's
 missing). There's no break sound yet.
 
 Tune via `IMPACT_DAMAGE_THRESHOLD` (units/sec of sudden velocity change
@@ -305,7 +303,11 @@ Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
    kart is in it, that player sees a modal ("Jetzt starten" button) on the
    HUD — or, if a heat is already running for other players, a "race in
    progress" message instead of the button. Clicking the button only starts
-   a heat if the phase is still `HUB`.
+   a heat if the phase is still `HUB`. `hub_enter`/`hub_leave` are accepted
+   **only from `hub_start_trigger` itself** (checked by caller name, and in
+   the .vmap by `test/map-io.test.mjs`): any other trigger that should just
+   get melons to the hub — e.g. the intro's exit — fires `hub_teleport`
+   instead, which sends the touching melon to `hub_spawn` without the modal.
 2. Clicking start: **every kart currently standing in the hub trigger**
    (not every connected player) is pulled into the heat — the ones outside
    it stay in the hub. This matches the original request ("all players who

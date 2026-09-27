@@ -33,8 +33,9 @@ src/melon_drive/index.js, *.js           # melon_drive entry: split into one fil
                                           #   constants.js, debug.js, kart-registry.js, track-config.js,
                                           #   camera.js, hud.js, race-flow.js, spawn-points.js, kart-spawn.js, kart-physics.js,
                                           #   checkpoints.js, prediction.js, trace.js, think.js — index.js just wires them together
-src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, checkpoint progress) — no engine import, unit-tested
-test/*.test.mjs                          # node:test unit tests for src/*/logic/ (`npm test`)
+src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, checkpoint progress, break sequence, camera steps) — no engine import, unit-tested
+test/*.test.mjs                          # node:test unit tests for src/*/logic/ (`npm test`), plus checks of the .vmap/.xml the script relies on
+test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
 ```
 

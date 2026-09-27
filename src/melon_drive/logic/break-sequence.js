@@ -12,6 +12,27 @@ import {
 } from "../constants.js";
 
 /**
+ * Moves a group of points so their centroid lands on `target`, keeping
+ * their layout relative to each other. ForceSpawn keeps each templated
+ * entity's Hammer offset from its point_template — break pieces placed
+ * next to (not on) the template would otherwise appear that far away from
+ * the crash site, possibly inside a wall.
+ * @param {Array<{ x: number, y: number, z: number }>} points @param {{ x: number, y: number, z: number }} target
+ */
+export function RecenterOnto(points, target) {
+    if (points.length === 0) {
+        return [];
+    }
+    const c = { x: 0, y: 0, z: 0 };
+    for (const p of points) {
+        c.x += p.x / points.length;
+        c.y += p.y / points.length;
+        c.z += p.z / points.length;
+    }
+    return points.map((p) => ({ x: p.x - c.x + target.x, y: p.y - c.y + target.y, z: p.z - c.z + target.z }));
+}
+
+/**
  * Launch velocity for one break piece: away from the crash site (the
  * direction from `center` to where the piece spawned, flattened so the
  * pieces spread along the ground), plus an upward pop. A piece that spawned

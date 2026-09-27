@@ -21,7 +21,7 @@ import { Instance } from "cs_script/point_script";
 // think.js for the per-tick driver.
 
 import { Debug } from "./debug.js";
-import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, CAMERA_DISTANCE_STEPS, CAMERA_HEIGHT_STEPS } from "./constants.js";
+import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, CAMERA_DISTANCE_STEPS, CAMERA_HEIGHT_STEPS, HUB_TRIGGER_NAME } from "./constants.js";
 import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, SetModeratorSlot, DropKart } from "./kart-registry.js";
 import { SetUpPlayerKart } from "./kart-spawn.js";
 import { GetIntroSpawnPoint } from "./spawn-points.js";
@@ -84,10 +84,22 @@ RegisterCheckpointAndFinishInputs();
 // kart is inside it, that player sees the "Jetzt starten" modal (or a
 // "race in progress" message if a heat is already running) — see
 // GAMEPLAY.md's "Hub -> race -> next-track flow".
-Instance.OnScriptInput("hub_enter", ({ activator }) => {
+Instance.OnScriptInput("hub_enter", ({ caller, activator }) => {
     const kart = activator && FindKartByMelon(activator);
     if (!kart) {
         Debug("hub_enter: activator wasn't a tracked melon, ignoring");
+        return;
+    }
+    // Only the hub's own start area may open the start modal. A trigger
+    // elsewhere wired to hub_enter by mistake (the intro's pass-through to
+    // the hub was — that should be hub_teleport) showed "start race" to
+    // players just driving through, and without a matching hub_leave it
+    // never closed again. test/map-io.test.mjs catches this in the .vmap.
+    // trim(): Hammer happily keeps a stray trailing space in a name (the map's
+    // hub trigger had one), which would otherwise reject the real trigger.
+    const callerName = caller?.GetEntityName().trim();
+    if (callerName !== HUB_TRIGGER_NAME) {
+        Instance.Msg(`[melon_drive] hub_enter fired by "${callerName ?? "?"}", not "${HUB_TRIGGER_NAME}" — ignoring. To send melons to the hub, use RunScriptInput hub_teleport instead.`);
         return;
     }
     kart.inHub = true;

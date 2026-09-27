@@ -178,6 +178,12 @@
 				<Button id="camdist_seg_7" class="DistanceSegment" />
 				<Button id="camdist_seg_8" class="DistanceSegment" />
 				<Button id="camdist_seg_9" class="DistanceSegment" />
+				<Button id="camdist_seg_10" class="DistanceSegment" />
+				<Button id="camdist_seg_11" class="DistanceSegment" />
+				<Button id="camdist_seg_12" class="DistanceSegment" />
+				<Button id="camdist_seg_13" class="DistanceSegment" />
+				<Button id="camdist_seg_14" class="DistanceSegment" />
+				<Button id="camdist_seg_15" class="DistanceSegment" />
 			</Panel>
 
 			<!-- Same clickable-notches trick as CAMERA DISTANCE above, for how
@@ -195,6 +201,12 @@
 				<Button id="camheight_seg_7" class="DistanceSegment" />
 				<Button id="camheight_seg_8" class="DistanceSegment" />
 				<Button id="camheight_seg_9" class="DistanceSegment" />
+				<Button id="camheight_seg_10" class="DistanceSegment" />
+				<Button id="camheight_seg_11" class="DistanceSegment" />
+				<Button id="camheight_seg_12" class="DistanceSegment" />
+				<Button id="camheight_seg_13" class="DistanceSegment" />
+				<Button id="camheight_seg_14" class="DistanceSegment" />
+				<Button id="camheight_seg_15" class="DistanceSegment" />
 			</Panel>
 		</Panel>
 	</Panel>

@@ -91,3 +91,36 @@ export function ReadVmapEntities(path) {
         .filter((e) => e.type === "EditGameClassProps" && typeof e.attrs.classname === "string")
         .map((e) => e.attrs);
 }
+
+/**
+ * Every entity's Hammer I/O connections (its Outputs tab), e.g. a trigger's
+ * OnStartTouch -> melon_drive_script RunScriptInput "hub_enter".
+ * @param {string} path
+ * @returns {Array<{ classname: string, targetname: string, origin: number[] | undefined, output: string, target: string, input: string, param: string }>}
+ */
+export function ReadVmapConnections(path) {
+    const elements = ReadDmxElements(path);
+    const result = [];
+    for (const e of elements) {
+        if (e.type !== "CMapEntity") {
+            continue;
+        }
+        const props = elements[e.attrs.entity_properties?.elem]?.attrs ?? {};
+        for (const ref of e.attrs.connectionsData ?? []) {
+            const c = elements[ref.elem]?.attrs;
+            if (!c) {
+                continue;
+            }
+            result.push({
+                classname: props.classname,
+                targetname: props.targetname ?? "",
+                origin: e.attrs.origin,
+                output: c.outputName,
+                target: c.targetName,
+                input: c.inputName,
+                param: c.overrideParam ?? "",
+            });
+        }
+    }
+    return result;
+}

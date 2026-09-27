@@ -221,14 +221,12 @@ const BREAK_PARTICLE_TEMPLATE_NAME = "melon_break_template";
 // Second, separate break effect layered on top of the one above — e.g. flying
 // melon chunks, as opposed to the main burst. Same point_template convention.
 const BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME = "melon_break_chunks_template";
-// The actual chunks lying on the ground. The chunks particle above is only
-// small sprite flecks that fade within moments, so real pieces come from a
-// third point_template holding prop_physics entities with the melon model's
-// own break pieces (models/cs_italy/italy_food_melon/italy_food_melon/
-// piece.vmdl .. piece8.vmdl), arranged around the template's origin in
-// roughly a melon's shape. They're flung outward from the crash site and
-// stay there as ordinary physics props for BREAK_EFFECT_LIFETIME.
-const BREAK_PIECES_TEMPLATE_NAME = "melon_break_pieces_template";
+// Any prop_physics the two break templates above spawn (e.g. the melon
+// model's own break pieces, models/cs_italy/italy_food_melon/
+// italy_food_melon/piece.vmdl .. piece8.vmdl, added to the chunks template)
+// is treated as a break piece: flung outward from the crash site, tinted in
+// the melon's color, and left lying there for BREAK_EFFECT_LIFETIME. The
+// chunks particle alone is only sprite flecks that fade within moments.
 const BREAK_PIECE_SPEED = 220; // units/sec outward from the crash site
 const BREAK_PIECE_UP_SPEED = 180; // units/sec extra upward pop
 const BREAK_PIECE_SPIN = 600; // max degrees/sec of random tumble per axis
@@ -342,22 +340,22 @@ const PAWN_PARK_HEIGHT = 3000;
 // GetCameraOffsetFor in camera.js, and the user menu's camera controls).
 const FOLLOW_OFFSET = { x: 0, y: 0, z: 20 };
 const CAMERA_LATERAL = 0;
-const CAMERA_DISTANCE_MIN = 150;
+const CAMERA_DISTANCE_MIN = 50; // was 150 — players wanted it much closer
 const CAMERA_DISTANCE_MAX = 400;
 const CAMERA_DISTANCE_DEFAULT = 320;
 // CustomHudLayout only supports Panel/Label/Image/Button — no native
 // slider/drag widget — so the user menu's "distance slider" is really a
 // clickable row of notches the player picks from, same trick as the jump
 // recharge bar (JUMP_BAR_SEGMENTS) below. This is how many notches it has.
-const CAMERA_DISTANCE_STEPS = 10;
+const CAMERA_DISTANCE_STEPS = 16; // must match the camdist_seg_* buttons in speedometer.xml (test/camera-steps.test.mjs checks)
 
 // Same notch-slider trick as CAMERA_DISTANCE_* above, for how high above the
 // melon the chase camera sits — lets players pick a low, close-to-the-ground
 // view or a higher, more overview-ish one.
-const CAMERA_HEIGHT_MIN = 20;
+const CAMERA_HEIGHT_MIN = 0; // was 20 — down to the melon's own FOLLOW_OFFSET height
 const CAMERA_HEIGHT_MAX = 160;
 const CAMERA_HEIGHT_DEFAULT = 80; // matches the old fixed CAMERA_HEIGHT
-const CAMERA_HEIGHT_STEPS = 10;
+const CAMERA_HEIGHT_STEPS = 16; // must match the camheight_seg_* buttons in speedometer.xml
 
 // Name of the custom_hud_layout entity (place one in Hammer pointing at
 // panorama/layout/custom_game/speedometer.vxml) that shows the speedometer.
@@ -515,6 +513,27 @@ function FindKartByMelon(melon) {
 // Pure rules for the melon-break sequence — no cs_script import, so it's
 // unit-testable in Node (see test/break-sequence.test.mjs). kart-physics.js
 // and camera.js apply the results (camera config, entity removal).
+
+/**
+ * Moves a group of points so their centroid lands on `target`, keeping
+ * their layout relative to each other. ForceSpawn keeps each templated
+ * entity's Hammer offset from its point_template — break pieces placed
+ * next to (not on) the template would otherwise appear that far away from
+ * the crash site, possibly inside a wall.
+ * @param {Array<{ x: number, y: number, z: number }>} points @param {{ x: number, y: number, z: number }} target
+ */
+function RecenterOnto(points, target) {
+    if (points.length === 0) {
+        return [];
+    }
+    const c = { x: 0, y: 0, z: 0 };
+    for (const p of points) {
+        c.x += p.x / points.length;
+        c.y += p.y / points.length;
+        c.z += p.z / points.length;
+    }
+    return points.map((p) => ({ x: p.x - c.x + target.x, y: p.y - c.y + target.y, z: p.z - c.z + target.z }));
+}
 
 /**
  * Launch velocity for one break piece: away from the crash site (the
@@ -1257,6 +1276,7 @@ function SpawnParticleTemplate(templateName, position, angles) {
         Instance.Msg(`[melon_drive] SpawnParticleTemplate: ForceSpawn of "${templateName}" returned nothing — check its Template01.. entries in Hammer`);
         return [];
     }
+    PlaceAtCrashSite(spawned, position);
     for (const entity of spawned) {
         // "Start Active" alone doesn't reliably play a particle system spawned
         // later from a point_template — start it explicitly.
@@ -1269,17 +1289,40 @@ function SpawnParticleTemplate(templateName, position, angles) {
 }
 
 /**
- * Spawns the melon's real break pieces (see BREAK_PIECES_TEMPLATE_NAME) at
- * the crash site and flings them outward. Randomly turned around the
- * vertical axis so every break scatters differently.
- * @param {any} position @param {{ r: number, g: number, b: number, a: number }} color
- * @returns {any[]} the spawned pieces
+ * ForceSpawn keeps each templated entity's Hammer offset from its
+ * point_template (same as melon_template, see SpawnMelonAt) — in the map
+ * the break particles sit ~200 units next to their templates, so they
+ * played that far away from the crash site, somewhere different on every
+ * break (the offset is rotated by the impact direction). Put particle
+ * systems exactly on the crash site, and center the pieces' group on it,
+ * keeping their layout relative to each other.
+ * @param {any[]} entities @param {any} position
  */
-function SpawnBreakPieces(position, color) {
-    const angles = { pitch: 0, yaw: Math.random() * 360, roll: 0 };
-    const pieces = SpawnParticleTemplate(BREAK_PIECES_TEMPLATE_NAME, position, angles);
-    for (const piece of pieces) {
-        // Same tint as the melon was painted, so the chunks match it.
+function PlaceAtCrashSite(entities, position) {
+    const pieces = entities.filter((e) => e.GetClassName().startsWith("prop_physics"));
+    const placed = RecenterOnto(pieces.map((p) => p.GetAbsOrigin()), position);
+    pieces.forEach((piece, i) => piece.Teleport({ position: placed[i] }));
+    for (const entity of entities) {
+        if (!entity.GetClassName().startsWith("prop_physics")) {
+            entity.Teleport({ position });
+        }
+    }
+}
+
+/**
+ * Flings any physics props a break template spawned (e.g. the melon model's
+ * own break pieces, models/cs_italy/italy_food_melon/italy_food_melon/
+ * piece*.vmdl, added to melon_break_chunks_template in Hammer) outward from
+ * the crash site, tinted in the melon's paint color. They then lie there as
+ * ordinary physics props until BREAK_EFFECT_LIFETIME removes them — unlike
+ * the chunks particle, which is only sprite flecks that fade within moments.
+ * @param {any[]} entities @param {any} position @param {{ r: number, g: number, b: number, a: number }} color
+ */
+function LaunchBreakPieces(entities, position, color) {
+    for (const piece of entities) {
+        if (!piece.GetClassName().startsWith("prop_physics")) {
+            continue;
+        }
         piece.SetColor(color);
         const spin = () => (Math.random() * 2 - 1) * BREAK_PIECE_SPIN;
         piece.Teleport({
@@ -1287,15 +1330,13 @@ function SpawnBreakPieces(position, color) {
             angularVelocity: { x: spin(), y: spin(), z: spin() },
         });
     }
-    return pieces;
 }
 
 /**
- * Spawns all break effects at the crash site — the main burst, the chunks
- * particle layered on top of it, and the real pieces that stay lying on the
- * ground. Independent of each other (any can be missing from Hammer without
- * the others failing).
- * @param {any} position @param {any} angles @param {{ r: number, g: number, b: number, a: number }} color the melon's paint, for the pieces
+ * Spawns both break effects at the crash site — the main burst plus the
+ * chunks template layered on top of it. Independent of each other (either
+ * can be missing from Hammer without the other failing).
+ * @param {any} position @param {any} angles @param {{ r: number, g: number, b: number, a: number }} color the melon's paint, for any pieces
  * @returns {boolean} whether at least one of them actually spawned — see
  * BreakMelon's fallback tint for why callers need to know this, not just
  * fire-and-forget.
@@ -1304,8 +1345,8 @@ function SpawnBreakParticles(position, angles, color) {
     const entities = [
         ...SpawnParticleTemplate(BREAK_PARTICLE_TEMPLATE_NAME, position, angles),
         ...SpawnParticleTemplate(BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, position, angles),
-        ...SpawnBreakPieces(position, color),
     ];
+    LaunchBreakPieces(entities, position, color);
     if (entities.length === 0) {
         return false;
     }
@@ -1772,23 +1813,47 @@ function UpdateUserMenu(slot, kart) {
     }
 }
 
+// Pure step <-> value math for the user menu's camera "sliders" (rows of
+// clickable notches, see camera.js / speedometer.xml) — no cs_script
+// import, so it's unit-testable in Node (see test/camera-steps.test.mjs).
+
+/** @param {number} value @param {number} min @param {number} max @param {number} steps */
+function StepFor(value, min, max, steps) {
+    const fraction = (value - min) / (max - min);
+    return Math.max(0, Math.min(steps - 1, Math.round(fraction * (steps - 1))));
+}
+
+/** @param {number} step @param {number} min @param {number} max @param {number} steps */
+function ValueForStep(step, min, max, steps) {
+    const fraction = steps > 1 ? step / (steps - 1) : 0;
+    return min + fraction * (max - min);
+}
+
+/** @param {number} distance */
+function CameraDistanceStepFor(distance) {
+    return StepFor(distance, CAMERA_DISTANCE_MIN, CAMERA_DISTANCE_MAX, CAMERA_DISTANCE_STEPS);
+}
+
+/** @param {number} step */
+function CameraDistanceForStep(step) {
+    return ValueForStep(step, CAMERA_DISTANCE_MIN, CAMERA_DISTANCE_MAX, CAMERA_DISTANCE_STEPS);
+}
+
+/** @param {number} height */
+function CameraHeightStepFor(height) {
+    return StepFor(height, CAMERA_HEIGHT_MIN, CAMERA_HEIGHT_MAX, CAMERA_HEIGHT_STEPS);
+}
+
+/** @param {number} step */
+function CameraHeightForStep(step) {
+    return ValueForStep(step, CAMERA_HEIGHT_MIN, CAMERA_HEIGHT_MAX, CAMERA_HEIGHT_STEPS);
+}
+
 // "Slider" for the third-person camera distance — really a clickable row of
 // notches (camdist_seg_0 .. camdist_seg_{CAMERA_DISTANCE_STEPS-1} buttons in
 // speedometer.xml, handled in OnCustomHudClicked), since CustomHudLayout has
 // no native drag/slider widget. Filled the same way the jump bar is, up to
 // the step the current cameraDistance falls on.
-/** @param {number} distance */
-function CameraDistanceStepFor(distance) {
-    const fraction = (distance - CAMERA_DISTANCE_MIN) / (CAMERA_DISTANCE_MAX - CAMERA_DISTANCE_MIN);
-    return Math.round(fraction * (CAMERA_DISTANCE_STEPS - 1));
-}
-
-/** @param {number} step */
-function CameraDistanceForStep(step) {
-    const fraction = CAMERA_DISTANCE_STEPS > 1 ? step / (CAMERA_DISTANCE_STEPS - 1) : 0;
-    return CAMERA_DISTANCE_MIN + fraction * (CAMERA_DISTANCE_MAX - CAMERA_DISTANCE_MIN);
-}
-
 /** @param {import("./kart-registry.js").Kart} kart */
 function UpdateCameraDistanceHud(kart) {
     const hud = GetSpeedHud();
@@ -1813,18 +1878,6 @@ function SetCameraDistance(kart, step) {
 // camheight_seg_{CAMERA_HEIGHT_STEPS-1} in speedometer.xml), for how high
 // above the melon the chase camera sits — lets a player pull it down close
 // to the ground or push it up for more of an overview.
-/** @param {number} height */
-function CameraHeightStepFor(height) {
-    const fraction = (height - CAMERA_HEIGHT_MIN) / (CAMERA_HEIGHT_MAX - CAMERA_HEIGHT_MIN);
-    return Math.round(fraction * (CAMERA_HEIGHT_STEPS - 1));
-}
-
-/** @param {number} step */
-function CameraHeightForStep(step) {
-    const fraction = CAMERA_HEIGHT_STEPS > 1 ? step / (CAMERA_HEIGHT_STEPS - 1) : 0;
-    return CAMERA_HEIGHT_MIN + fraction * (CAMERA_HEIGHT_MAX - CAMERA_HEIGHT_MIN);
-}
-
 /** @param {import("./kart-registry.js").Kart} kart */
 function UpdateCameraHeightHud(kart) {
     const hud = GetSpeedHud();
@@ -3054,10 +3107,22 @@ RegisterCheckpointAndFinishInputs();
 // kart is inside it, that player sees the "Jetzt starten" modal (or a
 // "race in progress" message if a heat is already running) — see
 // GAMEPLAY.md's "Hub -> race -> next-track flow".
-Instance.OnScriptInput("hub_enter", ({ activator }) => {
+Instance.OnScriptInput("hub_enter", ({ caller, activator }) => {
     const kart = activator && FindKartByMelon(activator);
     if (!kart) {
         Debug("hub_enter: activator wasn't a tracked melon, ignoring");
+        return;
+    }
+    // Only the hub's own start area may open the start modal. A trigger
+    // elsewhere wired to hub_enter by mistake (the intro's pass-through to
+    // the hub was — that should be hub_teleport) showed "start race" to
+    // players just driving through, and without a matching hub_leave it
+    // never closed again. test/map-io.test.mjs catches this in the .vmap.
+    // trim(): Hammer happily keeps a stray trailing space in a name (the map's
+    // hub trigger had one), which would otherwise reject the real trigger.
+    const callerName = caller?.GetEntityName().trim();
+    if (callerName !== HUB_TRIGGER_NAME) {
+        Instance.Msg(`[melon_drive] hub_enter fired by "${callerName ?? "?"}", not "${HUB_TRIGGER_NAME}" — ignoring. To send melons to the hub, use RunScriptInput hub_teleport instead.`);
         return;
     }
     kart.inHub = true;

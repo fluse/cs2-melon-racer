@@ -3,7 +3,7 @@ import { DEBUG, Debug } from "./debug.js";
 import { karts } from "./kart-registry.js";
 import { SpawnMelonAt } from "./kart-spawn.js";
 import { ApplyCameraFollow, ApplyBreakCameraZoom } from "./camera.js";
-import { PruneBreakEffects, BreakPieceVelocity } from "./logic/break-sequence.js";
+import { PruneBreakEffects, BreakPieceVelocity, RecenterOnto } from "./logic/break-sequence.js";
 import { TraceLine, TraceSphere } from "./trace.js";
 import { JumpTimingFactor, JumpMultiplier, PickIncomingVelocity, ReflectOffWall, WallBounceDamage, IsWallContact } from "./logic/wall-bounce.js";
 import {
@@ -26,7 +26,6 @@ import {
     BREAK_EFFECT_LIFETIME,
     BREAK_PARTICLE_TEMPLATE_NAME,
     BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME,
-    BREAK_PIECES_TEMPLATE_NAME,
     BREAK_PIECE_SPIN,
     MELON_REST_SPEED,
     SETTLE_NUDGE_ANGULAR_SPEED,
@@ -577,6 +576,7 @@ function SpawnParticleTemplate(templateName, position, angles) {
         Instance.Msg(`[melon_drive] SpawnParticleTemplate: ForceSpawn of "${templateName}" returned nothing — check its Template01.. entries in Hammer`);
         return [];
     }
+    PlaceAtCrashSite(spawned, position);
     for (const entity of spawned) {
         // "Start Active" alone doesn't reliably play a particle system spawned
         // later from a point_template — start it explicitly.
@@ -589,17 +589,40 @@ function SpawnParticleTemplate(templateName, position, angles) {
 }
 
 /**
- * Spawns the melon's real break pieces (see BREAK_PIECES_TEMPLATE_NAME) at
- * the crash site and flings them outward. Randomly turned around the
- * vertical axis so every break scatters differently.
- * @param {any} position @param {{ r: number, g: number, b: number, a: number }} color
- * @returns {any[]} the spawned pieces
+ * ForceSpawn keeps each templated entity's Hammer offset from its
+ * point_template (same as melon_template, see SpawnMelonAt) — in the map
+ * the break particles sit ~200 units next to their templates, so they
+ * played that far away from the crash site, somewhere different on every
+ * break (the offset is rotated by the impact direction). Put particle
+ * systems exactly on the crash site, and center the pieces' group on it,
+ * keeping their layout relative to each other.
+ * @param {any[]} entities @param {any} position
  */
-function SpawnBreakPieces(position, color) {
-    const angles = { pitch: 0, yaw: Math.random() * 360, roll: 0 };
-    const pieces = SpawnParticleTemplate(BREAK_PIECES_TEMPLATE_NAME, position, angles);
-    for (const piece of pieces) {
-        // Same tint as the melon was painted, so the chunks match it.
+function PlaceAtCrashSite(entities, position) {
+    const pieces = entities.filter((e) => e.GetClassName().startsWith("prop_physics"));
+    const placed = RecenterOnto(pieces.map((p) => p.GetAbsOrigin()), position);
+    pieces.forEach((piece, i) => piece.Teleport({ position: placed[i] }));
+    for (const entity of entities) {
+        if (!entity.GetClassName().startsWith("prop_physics")) {
+            entity.Teleport({ position });
+        }
+    }
+}
+
+/**
+ * Flings any physics props a break template spawned (e.g. the melon model's
+ * own break pieces, models/cs_italy/italy_food_melon/italy_food_melon/
+ * piece*.vmdl, added to melon_break_chunks_template in Hammer) outward from
+ * the crash site, tinted in the melon's paint color. They then lie there as
+ * ordinary physics props until BREAK_EFFECT_LIFETIME removes them — unlike
+ * the chunks particle, which is only sprite flecks that fade within moments.
+ * @param {any[]} entities @param {any} position @param {{ r: number, g: number, b: number, a: number }} color
+ */
+function LaunchBreakPieces(entities, position, color) {
+    for (const piece of entities) {
+        if (!piece.GetClassName().startsWith("prop_physics")) {
+            continue;
+        }
         piece.SetColor(color);
         const spin = () => (Math.random() * 2 - 1) * BREAK_PIECE_SPIN;
         piece.Teleport({
@@ -607,15 +630,13 @@ function SpawnBreakPieces(position, color) {
             angularVelocity: { x: spin(), y: spin(), z: spin() },
         });
     }
-    return pieces;
 }
 
 /**
- * Spawns all break effects at the crash site — the main burst, the chunks
- * particle layered on top of it, and the real pieces that stay lying on the
- * ground. Independent of each other (any can be missing from Hammer without
- * the others failing).
- * @param {any} position @param {any} angles @param {{ r: number, g: number, b: number, a: number }} color the melon's paint, for the pieces
+ * Spawns both break effects at the crash site — the main burst plus the
+ * chunks template layered on top of it. Independent of each other (either
+ * can be missing from Hammer without the other failing).
+ * @param {any} position @param {any} angles @param {{ r: number, g: number, b: number, a: number }} color the melon's paint, for any pieces
  * @returns {boolean} whether at least one of them actually spawned — see
  * BreakMelon's fallback tint for why callers need to know this, not just
  * fire-and-forget.
@@ -624,8 +645,8 @@ function SpawnBreakParticles(position, angles, color) {
     const entities = [
         ...SpawnParticleTemplate(BREAK_PARTICLE_TEMPLATE_NAME, position, angles),
         ...SpawnParticleTemplate(BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, position, angles),
-        ...SpawnBreakPieces(position, color),
     ];
+    LaunchBreakPieces(entities, position, color);
     if (entities.length === 0) {
         return false;
     }

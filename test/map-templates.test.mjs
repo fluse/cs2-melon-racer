@@ -11,7 +11,6 @@ import {
     MELON_TEMPLATE_NAME,
     BREAK_PARTICLE_TEMPLATE_NAME,
     BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME,
-    BREAK_PIECES_TEMPLATE_NAME,
 } from "../src/melon_drive/constants.js";
 
 const entities = ReadVmapEntities(fileURLToPath(new URL("../maps/melon_racer.vmap", import.meta.url)));
@@ -57,17 +56,22 @@ for (const name of [BREAK_PARTICLE_TEMPLATE_NAME, BREAK_CHUNKS_PARTICLE_TEMPLATE
     });
 }
 
-// Regression: the chunks particle is only sprite flecks that fade within
-// moments — the chunks lying on the ground are these real pieces. Without
-// this template in the map a break shows no chunks at all.
-test(`"${BREAK_PIECES_TEMPLATE_NAME}" spawns the melon's break-piece physics props`, () => {
-    const pieces = TemplateTargets(BREAK_PIECES_TEMPLATE_NAME);
-    for (const piece of pieces) {
-        assert.match(String(piece.classname), /^prop_physics/, `"${piece.targetname}" must be a prop_physics`);
-        assert.match(piece.model, /\.vmdl$/, `"${piece.targetname}" has no model`);
-    }
-    assert.ok(
-        pieces.some((p) => /italy_food_melon\/piece\d*\.vmdl$/.test(p.model)),
-        "expected at least one of the melon's own break pieces (models/cs_italy/italy_food_melon/italy_food_melon/piece*.vmdl)"
-    );
+// Decided: exactly these two break templates, no others — extra chunks go
+// into one of them as prop_physics (see GAMEPLAY.md, "Melon health & breaking").
+test("there are no break templates besides the two the script spawns", () => {
+    const breakTemplates = entities
+        .filter((e) => e.classname === "point_template" && String(e.targetname ?? "").startsWith("melon_break"))
+        .map((e) => e.targetname)
+        .sort();
+    assert.deepEqual(breakTemplates, [BREAK_PARTICLE_TEMPLATE_NAME, BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME].sort());
+});
+
+// Found in the map: "hub_start_trigger " with a trailing space. The script
+// looks entities up (and checks triggers) by exact name, so a stray space
+// silently breaks the lookup.
+test("no entity name has leading or trailing whitespace", () => {
+    const bad = entities
+        .filter((e) => typeof e.targetname === "string" && e.targetname !== e.targetname.trim())
+        .map((e) => `${e.classname} ${JSON.stringify(e.targetname)}`);
+    assert.deepEqual(bad, []);
 });

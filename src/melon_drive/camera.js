@@ -2,13 +2,10 @@ import { CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { GetSpeedHud } from "./hud.js";
 import { BreakCameraOffset } from "./logic/break-sequence.js";
+import { CameraDistanceStepFor, CameraDistanceForStep, CameraHeightStepFor, CameraHeightForStep } from "./logic/camera-steps.js";
 import {
     CAMERA_LATERAL,
-    CAMERA_DISTANCE_MIN,
-    CAMERA_DISTANCE_MAX,
     CAMERA_DISTANCE_STEPS,
-    CAMERA_HEIGHT_MIN,
-    CAMERA_HEIGHT_MAX,
     CAMERA_HEIGHT_STEPS,
     FOLLOW_OFFSET,
 } from "./constants.js";
@@ -18,18 +15,6 @@ import {
 // speedometer.xml, handled in OnCustomHudClicked), since CustomHudLayout has
 // no native drag/slider widget. Filled the same way the jump bar is, up to
 // the step the current cameraDistance falls on.
-/** @param {number} distance */
-export function CameraDistanceStepFor(distance) {
-    const fraction = (distance - CAMERA_DISTANCE_MIN) / (CAMERA_DISTANCE_MAX - CAMERA_DISTANCE_MIN);
-    return Math.round(fraction * (CAMERA_DISTANCE_STEPS - 1));
-}
-
-/** @param {number} step */
-export function CameraDistanceForStep(step) {
-    const fraction = CAMERA_DISTANCE_STEPS > 1 ? step / (CAMERA_DISTANCE_STEPS - 1) : 0;
-    return CAMERA_DISTANCE_MIN + fraction * (CAMERA_DISTANCE_MAX - CAMERA_DISTANCE_MIN);
-}
-
 /** @param {import("./kart-registry.js").Kart} kart */
 export function UpdateCameraDistanceHud(kart) {
     const hud = GetSpeedHud();
@@ -54,18 +39,6 @@ export function SetCameraDistance(kart, step) {
 // camheight_seg_{CAMERA_HEIGHT_STEPS-1} in speedometer.xml), for how high
 // above the melon the chase camera sits — lets a player pull it down close
 // to the ground or push it up for more of an overview.
-/** @param {number} height */
-export function CameraHeightStepFor(height) {
-    const fraction = (height - CAMERA_HEIGHT_MIN) / (CAMERA_HEIGHT_MAX - CAMERA_HEIGHT_MIN);
-    return Math.round(fraction * (CAMERA_HEIGHT_STEPS - 1));
-}
-
-/** @param {number} step */
-export function CameraHeightForStep(step) {
-    const fraction = CAMERA_HEIGHT_STEPS > 1 ? step / (CAMERA_HEIGHT_STEPS - 1) : 0;
-    return CAMERA_HEIGHT_MIN + fraction * (CAMERA_HEIGHT_MAX - CAMERA_HEIGHT_MIN);
-}
-
 /** @param {import("./kart-registry.js").Kart} kart */
 export function UpdateCameraHeightHud(kart) {
     const hud = GetSpeedHud();

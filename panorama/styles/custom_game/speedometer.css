@@ -671,9 +671,9 @@
 }
 
 .DistanceSegment {
-    width: 24px;
+    width: 15px; /* 16 notches have to fit in the 360px user menu */
     height: 16px;
-    margin-left: 3px;
+    margin-left: 2px;
     background-color: #ffffff33;
     border-radius: 3px;
 

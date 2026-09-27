@@ -208,14 +208,12 @@ export const BREAK_PARTICLE_TEMPLATE_NAME = "melon_break_template";
 // Second, separate break effect layered on top of the one above — e.g. flying
 // melon chunks, as opposed to the main burst. Same point_template convention.
 export const BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME = "melon_break_chunks_template";
-// The actual chunks lying on the ground. The chunks particle above is only
-// small sprite flecks that fade within moments, so real pieces come from a
-// third point_template holding prop_physics entities with the melon model's
-// own break pieces (models/cs_italy/italy_food_melon/italy_food_melon/
-// piece.vmdl .. piece8.vmdl), arranged around the template's origin in
-// roughly a melon's shape. They're flung outward from the crash site and
-// stay there as ordinary physics props for BREAK_EFFECT_LIFETIME.
-export const BREAK_PIECES_TEMPLATE_NAME = "melon_break_pieces_template";
+// Any prop_physics the two break templates above spawn (e.g. the melon
+// model's own break pieces, models/cs_italy/italy_food_melon/
+// italy_food_melon/piece.vmdl .. piece8.vmdl, added to the chunks template)
+// is treated as a break piece: flung outward from the crash site, tinted in
+// the melon's color, and left lying there for BREAK_EFFECT_LIFETIME. The
+// chunks particle alone is only sprite flecks that fade within moments.
 export const BREAK_PIECE_SPEED = 220; // units/sec outward from the crash site
 export const BREAK_PIECE_UP_SPEED = 180; // units/sec extra upward pop
 export const BREAK_PIECE_SPIN = 600; // max degrees/sec of random tumble per axis
@@ -329,22 +327,22 @@ export const PAWN_PARK_HEIGHT = 3000;
 // GetCameraOffsetFor in camera.js, and the user menu's camera controls).
 export const FOLLOW_OFFSET = { x: 0, y: 0, z: 20 };
 export const CAMERA_LATERAL = 0;
-export const CAMERA_DISTANCE_MIN = 150;
+export const CAMERA_DISTANCE_MIN = 50; // was 150 — players wanted it much closer
 export const CAMERA_DISTANCE_MAX = 400;
 export const CAMERA_DISTANCE_DEFAULT = 320;
 // CustomHudLayout only supports Panel/Label/Image/Button — no native
 // slider/drag widget — so the user menu's "distance slider" is really a
 // clickable row of notches the player picks from, same trick as the jump
 // recharge bar (JUMP_BAR_SEGMENTS) below. This is how many notches it has.
-export const CAMERA_DISTANCE_STEPS = 10;
+export const CAMERA_DISTANCE_STEPS = 16; // must match the camdist_seg_* buttons in speedometer.xml (test/camera-steps.test.mjs checks)
 
 // Same notch-slider trick as CAMERA_DISTANCE_* above, for how high above the
 // melon the chase camera sits — lets players pick a low, close-to-the-ground
 // view or a higher, more overview-ish one.
-export const CAMERA_HEIGHT_MIN = 20;
+export const CAMERA_HEIGHT_MIN = 0; // was 20 — down to the melon's own FOLLOW_OFFSET height
 export const CAMERA_HEIGHT_MAX = 160;
 export const CAMERA_HEIGHT_DEFAULT = 80; // matches the old fixed CAMERA_HEIGHT
-export const CAMERA_HEIGHT_STEPS = 10;
+export const CAMERA_HEIGHT_STEPS = 16; // must match the camheight_seg_* buttons in speedometer.xml
 
 // Name of the custom_hud_layout entity (place one in Hammer pointing at
 // panorama/layout/custom_game/speedometer.vxml) that shows the speedometer.
