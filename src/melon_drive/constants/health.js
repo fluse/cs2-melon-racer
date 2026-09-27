@@ -6,7 +6,7 @@
 // our own steering only ever change velocity gradually. That gap's
 // magnitude is the "impact speed" damage is based on:
 //   damage = (impactSpeed - IMPACT_DAMAGE_THRESHOLD) * IMPACT_DAMAGE_SCALE
-// e.g. a 700 u/s impact = (700 - 450) * 0.2 = 50 of MELON_MAX_HEALTH's 80.
+// e.g. a 700 u/s impact = (700 - 450) * 0.2 = 50 of MELON_MAX_HEALTH's 70.
 
 // The melon's health pool (kart.health), refilled on every respawn at a
 // checkpoint (after a break or via the user menu). Shared by landing/crash damage here and wall-hit damage
@@ -16,7 +16,7 @@
 //   crashes matter less, wall bounces that cost health can be chained longer.
 // Lower: fewer hits until it breaks — punishing; at or below one typical
 //   hard landing's damage (~50 above), a single bad jump breaks it.
-export const MELON_MAX_HEALTH = 80;
+export const MELON_MAX_HEALTH = 70; // was 80 — every hit now takes ~14% more of the pool
 // The melon entity's *engine* health (not kart.health above) — set this high
 // on every spawn so the engine's own physics damage never destroys the prop,
 // regardless of its Hammer health/damage settings. See MakeUnbreakableByEngine.

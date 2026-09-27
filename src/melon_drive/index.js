@@ -25,7 +25,7 @@ import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, CAMERA_DISTANCE_STEPS, CAMER
 import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, SetModeratorSlot, DropKart } from "./kart-registry.js";
 import { SetUpPlayerKart, ForgetIntroLogo } from "./kart-spawn.js";
 import { Lifted, LevelAngles } from "./spawn-points.js";
-import { ParseTeleportTarget, TeleportExitVelocity } from "./logic/teleport.js";
+import { ParseTeleportTrigger, TeleportExitVelocity } from "./logic/teleport.js";
 import { HealZoneRate } from "./logic/health.js";
 import { RespawnKartAtCheckpoint, SetKartPaintColor, TeleportKartTo, IsJumpDebugOn, SetJumpDebug } from "./physics/index.js";
 import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen, UpdateJumpDebugHud } from "./hud.js";
@@ -174,11 +174,12 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
         return; // broken (about to respawn) or parked by the race flow — leave it where it is
     }
     const triggerName = caller.GetEntityName();
-    const destinationName = ParseTeleportTarget(triggerName);
-    if (!destinationName) {
-        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" isn't named teleport_to_<destination>, ignoring`);
+    const parsed = ParseTeleportTrigger(triggerName);
+    if (!parsed) {
+        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" isn't named teleport_[stop_|keep_]to_<destination>, ignoring`);
         return;
     }
+    const destinationName = parsed.destination;
     const destination = Instance.FindEntityByName(destinationName);
     if (!destination) {
         Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" points at "${destinationName}", but no entity has that name`);
@@ -191,7 +192,7 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
         kart,
         Lifted(destination.GetAbsOrigin(), TELEPORT_UP_OFFSET),
         LevelAngles(yaw),
-        TeleportExitVelocity(kart.melon.GetAbsVelocity(), yaw)
+        TeleportExitVelocity(kart.melon.GetAbsVelocity(), yaw, parsed.keepSpeed)
     );
     Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"`);
 });

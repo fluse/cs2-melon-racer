@@ -584,10 +584,15 @@ a teleporter is a pure Hammer edit, no script change:
 3. Its `OnStartTouch` fires `RunScriptInput` `melon_teleport` on the
    `point_script` entity. That parameter is the same for every teleporter;
    the destination comes from the trigger's name.
+4. Optional, per teleporter: name it `teleport_stop_to_<destination>` to
+   make the melon arrive standing still, or `teleport_keep_to_<destination>`
+   to make it keep its speed; plain `teleport_to_` uses the
+   `TELEPORT_KEEP_SPEED` default.
 
 Behavior (decided): a teleport **only moves** the melon — health, respawn
 point and checkpoint/lap progress stay as they were, so a teleporter can't
-skip or reset a track's checkpoints. With `TELEPORT_KEEP_SPEED` the melon
+skip or reset a track's checkpoints. Keeping speed (`keep`, or the
+`TELEPORT_KEEP_SPEED` default), the melon
 keeps its horizontal speed, redirected along the destination's facing
 (vertical speed dropped, so a teleport mid-fall doesn't slam it into the
 floor); off, it arrives standing still. The player's **view is turned to

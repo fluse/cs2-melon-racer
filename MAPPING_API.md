@@ -49,7 +49,8 @@ These apply to everything below unless a section says otherwise.
 6. **Keep triggers thick.** Melons can go well above `MAX_SPEED` after wall
    bounces; a thin trigger can be tunneled through in one tick.
 7. **Prefixes are reserved.** Don't give unrelated entities names starting
-   with `track_start_`, `checkpoint_`, `paint_trigger_`, `teleport_to_`, `heal_zone_`,
+   with `track_start_`, `checkpoint_`, `paint_trigger_`, `teleport_to_`, `teleport_stop_to_`,
+   `teleport_keep_to_`, `heal_zone_`,
    `melon_break` or `hub_` — the script or tests may pick them up.
 
 ## 2. Required core entities
@@ -94,7 +95,7 @@ follows the general conventions in section 1.
 | `hub_leave` | `hub_start_trigger`, **`OnEndTouch`** | — | Hides the hub modal. |
 | `hub_teleport` | any trigger | — | Sends the melon to `hub_spawn`, takes it out of a running heat, resets its track progress. |
 | `melon_paint` | `paint_trigger_<r>_<g>_<b>` | name (color) | Paints the melon. See 4.4. |
-| `melon_teleport` | `teleport_to_<destination>` | name (destination) | Teleports the melon. See 4.5. |
+| `melon_teleport` | `teleport_[stop_\|keep_]to_<destination>` | name (mode, destination) | Teleports the melon. See 4.5. |
 | `heal_enter` | any heal trigger | name (optional rate) | Melon starts healing over time. See 4.6. |
 | `heal_leave` | the same heal trigger, **`OnEndTouch`** | — | Stops healing from that trigger. |
 
@@ -183,15 +184,20 @@ output: OnStartTouch → melon_drive_script → RunScriptInput → melon_paint
 
 ```
 destination: any named point entity, e.g. info_target "tp_dest_hub_back"
-trigger:     teleport_to_<destination>   e.g. teleport_to_tp_dest_hub_back
+trigger:     teleport_to_<destination>        e.g. teleport_to_tp_dest_hub_back
+             teleport_stop_to_<destination>   arrives standing still
+             teleport_keep_to_<destination>   keeps its speed
 output:      OnStartTouch → melon_drive_script → RunScriptInput → melon_teleport
 ```
 
-- Pattern `^teleport_to_(.+)$`; everything after `teleport_to_` is the
-  destination's exact name.
+- Pattern `^teleport_(?:(stop|keep)_)?to_(.+)$`; everything after `to_` is
+  the destination's exact name.
 - The melon arrives at the destination's origin (+ `TELEPORT_UP_OFFSET`),
-  facing its yaw; the player's view is turned with it. With
-  `TELEPORT_KEEP_SPEED` it keeps its horizontal speed along the new facing.
+  facing its yaw; the player's view is turned with it. Speed, per
+  teleporter: `teleport_stop_to_…` arrives standing still,
+  `teleport_keep_to_…` keeps its horizontal speed along the new facing, plain
+  `teleport_to_…` does whatever `TELEPORT_KEEP_SPEED` says (currently: keeps
+  it). Vertical speed is always dropped.
 - Only moves the melon: health, respawn point and checkpoint/lap progress
   stay as they were — a teleporter can't skip checkpoints.
 - Ignored for broken melons and melons locked by the race flow (countdown,
@@ -209,7 +215,7 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → heal_enter
 - While the melon is inside, it regains health every tick, up to full.
   Rate: parsed from a name matching `^heal_zone_(\d+(?:\.\d+)?)$`
   (health per second, decimals allowed), any other name uses
-  `HEAL_ZONE_RATE` (10/s; full health is `MELON_MAX_HEALTH` = 80).
+  `HEAL_ZONE_RATE` (10/s; full health is `MELON_MAX_HEALTH` = 70).
 - Both outputs are required — without `heal_leave` the melon keeps healing
   after leaving (until its next teleport/respawn).
 - Overlapping zones don't stack; the fastest one counts. Damage still
@@ -236,7 +242,7 @@ Script inputs are pre-registered up to these limits; raise them in
 - a `RunScriptInput` parameter the script doesn't register (typos),
 - `hub_enter`/`hub_leave` fired by anything but `hub_start_trigger`, or
   either of them missing there,
-- a `melon_teleport` from a trigger not named `teleport_to_<destination>`,
+- a `melon_teleport` from a trigger not named `teleport_[stop_|keep_]to_<destination>`,
   a destination that doesn't exist, or a `teleport_to_*` trigger without the
   output,
 - a trigger feeding the script without "Physics Objects" ticked,

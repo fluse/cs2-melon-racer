@@ -19,7 +19,7 @@ function Debug(text) {
 // (sent_melon_base/init.lua ENT:Think + gamemode/shared.lua DefXSpeed):
 // forward is the strongest push, reverse is half that, strafe is weaker
 // still — keeping FORWARD_ACCEL as our existing tuned baseline.
-const FORWARD_ACCEL = 400; // units/sec^2 while holding forward (was 900, then 500 — lowered for a heavier, slower build-up: ~1.6s to MAX_SPEED)
+const FORWARD_ACCEL = 450; // units/sec^2 while holding forward (was 900, then 500, then 400 — a heavier, slower build-up: ~1.45s to MAX_SPEED)
 const REVERSE_ACCEL = FORWARD_ACCEL * 0.5; // 0.5x forward, matches original's Reverse/Forward ratio
 const STRAFE_ACCEL = FORWARD_ACCEL * 0.4; // 0.4x forward, matches original's Strafe/Forward ratio
 const MAX_SPEED = 650; // units/sec, horizontal speed cap
@@ -124,7 +124,7 @@ const WALL_JUMP_SAME_WALL_DOT = 0.7; // normals closer than this (dot product, ~
 // our own steering only ever change velocity gradually. That gap's
 // magnitude is the "impact speed" damage is based on:
 //   damage = (impactSpeed - IMPACT_DAMAGE_THRESHOLD) * IMPACT_DAMAGE_SCALE
-// e.g. a 700 u/s impact = (700 - 450) * 0.2 = 50 of MELON_MAX_HEALTH's 80.
+// e.g. a 700 u/s impact = (700 - 450) * 0.2 = 50 of MELON_MAX_HEALTH's 70.
 
 // The melon's health pool (kart.health), refilled on every respawn at a
 // checkpoint (after a break or via the user menu). Shared by landing/crash damage here and wall-hit damage
@@ -134,7 +134,7 @@ const WALL_JUMP_SAME_WALL_DOT = 0.7; // normals closer than this (dot product, ~
 //   crashes matter less, wall bounces that cost health can be chained longer.
 // Lower: fewer hits until it breaks — punishing; at or below one typical
 //   hard landing's damage (~50 above), a single bad jump breaks it.
-const MELON_MAX_HEALTH = 80;
+const MELON_MAX_HEALTH = 70; // was 80 — every hit now takes ~14% more of the pool
 // The melon entity's *engine* health (not kart.health above) — set this high
 // on every spawn so the engine's own physics damage never destroys the prop,
 // regardless of its Hammer health/damage settings. See MakeUnbreakableByEngine.
@@ -477,9 +477,14 @@ const COLOR_PRESETS = {
 // info_target), facing that entity's yaw. One shared handler for every
 // teleporter — adding one is a pure Hammer edit. A teleport only moves the
 // melon; it never changes its respawn point / checkpoint progress.
-const TELEPORT_TRIGGER_NAME_PATTERN = /^teleport_to_(.+)$/;
-// true: keep the melon's horizontal speed, redirected along the
-// destination's facing; false: arrive standing still.
+// Optional mode between "teleport_" and "to_", per teleporter:
+//   teleport_stop_to_<destination> — arrives standing still
+//   teleport_keep_to_<destination> — keeps its speed
+//   teleport_to_<destination>      — TELEPORT_KEEP_SPEED decides
+const TELEPORT_TRIGGER_NAME_PATTERN = /^teleport_(?:(stop|keep)_)?to_(.+)$/;
+// Default for teleport_to_<destination> without a mode. true: keep the
+// melon's horizontal speed, redirected along the destination's facing;
+// false: arrive standing still.
 const TELEPORT_KEEP_SPEED = true;
 
 // Race-flow teleports (heat start, checkpoint respawns) target a trigger_multiple's
@@ -1863,14 +1868,30 @@ function ApplyBreakCameraZoom(kart, elapsed) {
 // melon_teleport handler does the entity lookups and the actual teleport.
 
 /**
- * The destination entity's name encoded in a teleport trigger's own name
- * (teleport_to_<destination>), or undefined if the name doesn't follow that
- * convention. Surrounding whitespace is ignored — Hammer keeps stray spaces.
+ * What a teleport trigger's own name encodes (teleport_[stop_|keep_]to_<destination>):
+ * the destination entity's name and whether the melon keeps its speed
+ * (stop/keep, else TELEPORT_KEEP_SPEED) — or undefined if the name doesn't
+ * follow that convention. Surrounding whitespace is ignored — Hammer keeps
+ * stray spaces.
+ * @param {string} triggerName
+ * @returns {{ destination: string, keepSpeed: boolean } | undefined}
+ */
+function ParseTeleportTrigger(triggerName) {
+    const match = TELEPORT_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
+    if (!match) {
+        return undefined;
+    }
+    const keepSpeed = match[1] === "stop" ? false : match[1] === "keep" ? true : TELEPORT_KEEP_SPEED;
+    return { destination: match[2], keepSpeed };
+}
+
+/**
+ * Just the destination entity's name from a teleport trigger's name (see
+ * ParseTeleportTrigger), or undefined.
  * @param {string} triggerName
  */
 function ParseTeleportTarget(triggerName) {
-    const match = TELEPORT_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
-    return match ? match[1] : undefined;
+    return ParseTeleportTrigger(triggerName)?.destination;
 }
 
 /**
@@ -1889,12 +1910,14 @@ function ViewAnglesFacing(currentEye, yaw) {
  * The melon's velocity right after the teleport: its horizontal speed
  * carried over but pointed along the destination's facing (so a teleporter
  * keeps the race's flow instead of dead-stopping the melon), or zero with
- * TELEPORT_KEEP_SPEED off. Vertical speed is always dropped — a melon
- * teleported mid-fall would otherwise slam into the floor on arrival.
+ * keepSpeed off (the trigger's stop/keep mode, default TELEPORT_KEEP_SPEED).
+ * Vertical speed is always dropped — a melon teleported mid-fall would
+ * otherwise slam into the floor on arrival.
  * @param {{ x: number, y: number, z: number }} velocity @param {number} destinationYaw degrees
+ * @param {boolean} [keepSpeed]
  */
-function TeleportExitVelocity(velocity, destinationYaw) {
-    if (!TELEPORT_KEEP_SPEED) {
+function TeleportExitVelocity(velocity, destinationYaw, keepSpeed = TELEPORT_KEEP_SPEED) {
+    if (!keepSpeed) {
         return { x: 0, y: 0, z: 0 };
     }
     const speed = Math.hypot(velocity.x, velocity.y);
@@ -4294,11 +4317,12 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
         return; // broken (about to respawn) or parked by the race flow — leave it where it is
     }
     const triggerName = caller.GetEntityName();
-    const destinationName = ParseTeleportTarget(triggerName);
-    if (!destinationName) {
-        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" isn't named teleport_to_<destination>, ignoring`);
+    const parsed = ParseTeleportTrigger(triggerName);
+    if (!parsed) {
+        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" isn't named teleport_[stop_|keep_]to_<destination>, ignoring`);
         return;
     }
+    const destinationName = parsed.destination;
     const destination = Instance.FindEntityByName(destinationName);
     if (!destination) {
         Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" points at "${destinationName}", but no entity has that name`);
@@ -4311,7 +4335,7 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
         kart,
         Lifted(destination.GetAbsOrigin(), TELEPORT_UP_OFFSET),
         LevelAngles(yaw),
-        TeleportExitVelocity(kart.melon.GetAbsVelocity(), yaw)
+        TeleportExitVelocity(kart.melon.GetAbsVelocity(), yaw, parsed.keepSpeed)
     );
     Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"`);
 });

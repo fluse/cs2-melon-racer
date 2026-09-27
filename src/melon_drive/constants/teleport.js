@@ -7,9 +7,14 @@
 // info_target), facing that entity's yaw. One shared handler for every
 // teleporter — adding one is a pure Hammer edit. A teleport only moves the
 // melon; it never changes its respawn point / checkpoint progress.
-export const TELEPORT_TRIGGER_NAME_PATTERN = /^teleport_to_(.+)$/;
-// true: keep the melon's horizontal speed, redirected along the
-// destination's facing; false: arrive standing still.
+// Optional mode between "teleport_" and "to_", per teleporter:
+//   teleport_stop_to_<destination> — arrives standing still
+//   teleport_keep_to_<destination> — keeps its speed
+//   teleport_to_<destination>      — TELEPORT_KEEP_SPEED decides
+export const TELEPORT_TRIGGER_NAME_PATTERN = /^teleport_(?:(stop|keep)_)?to_(.+)$/;
+// Default for teleport_to_<destination> without a mode. true: keep the
+// melon's horizontal speed, redirected along the destination's facing;
+// false: arrive standing still.
 export const TELEPORT_KEEP_SPEED = true;
 
 // Race-flow teleports (heat start, checkpoint respawns) target a trigger_multiple's

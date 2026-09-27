@@ -4,7 +4,7 @@
 // (sent_melon_base/init.lua ENT:Think + gamemode/shared.lua DefXSpeed):
 // forward is the strongest push, reverse is half that, strafe is weaker
 // still — keeping FORWARD_ACCEL as our existing tuned baseline.
-export const FORWARD_ACCEL = 400; // units/sec^2 while holding forward (was 900, then 500 — lowered for a heavier, slower build-up: ~1.6s to MAX_SPEED)
+export const FORWARD_ACCEL = 450; // units/sec^2 while holding forward (was 900, then 500, then 400 — a heavier, slower build-up: ~1.45s to MAX_SPEED)
 export const REVERSE_ACCEL = FORWARD_ACCEL * 0.5; // 0.5x forward, matches original's Reverse/Forward ratio
 export const STRAFE_ACCEL = FORWARD_ACCEL * 0.4; // 0.4x forward, matches original's Strafe/Forward ratio
 export const MAX_SPEED = 650; // units/sec, horizontal speed cap

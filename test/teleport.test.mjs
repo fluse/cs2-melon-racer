@@ -1,7 +1,7 @@
 // Rules of the generic teleporters (see TELEPORT_TRIGGER_NAME_PATTERN).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ParseTeleportTarget, TeleportExitVelocity, ViewAnglesFacing } from "../src/melon_drive/logic/teleport.js";
+import { ParseTeleportTarget, ParseTeleportTrigger, TeleportExitVelocity, ViewAnglesFacing } from "../src/melon_drive/logic/teleport.js";
 import { TELEPORT_KEEP_SPEED } from "../src/melon_drive/constants/index.js";
 
 test("the destination is read from the trigger's own name", () => {
@@ -17,6 +17,23 @@ test("names that don't follow teleport_to_<destination> are rejected", () => {
     for (const name of ["", "teleport_to_", "teleport_dest", "hub_start_trigger", "my_teleport_to_dest"]) {
         assert.equal(ParseTeleportTarget(name), undefined, JSON.stringify(name));
     }
+});
+
+test("the trigger name picks per teleporter whether the melon keeps its speed", () => {
+    assert.deepEqual(ParseTeleportTrigger("teleport_stop_to_tp_dest_hub_back"), { destination: "tp_dest_hub_back", keepSpeed: false });
+    assert.deepEqual(ParseTeleportTrigger("teleport_keep_to_tp_dest_hub_back"), { destination: "tp_dest_hub_back", keepSpeed: true });
+    assert.deepEqual(ParseTeleportTrigger("teleport_to_tp_dest_hub_back"), { destination: "tp_dest_hub_back", keepSpeed: TELEPORT_KEEP_SPEED });
+    // A destination whose own name looks like a mode stays the destination.
+    assert.deepEqual(ParseTeleportTrigger("teleport_to_stop_to_x"), { destination: "stop_to_x", keepSpeed: TELEPORT_KEEP_SPEED });
+    for (const name of ["teleport_stop_to_", "teleport_fast_to_dest", "teleport_stop_dest"]) {
+        assert.equal(ParseTeleportTrigger(name), undefined, JSON.stringify(name));
+    }
+});
+
+test("keepSpeed off arrives standing still, on keeps the horizontal speed", () => {
+    assert.deepEqual(TeleportExitVelocity({ x: 300, y: 400, z: -900 }, 90, false), { x: 0, y: 0, z: 0 });
+    const kept = TeleportExitVelocity({ x: 300, y: 400, z: -900 }, 0, true);
+    assert.ok(Math.abs(kept.x - 500) < 1e-9 && Math.abs(kept.y) < 1e-9 && kept.z === 0);
 });
 
 test("exit velocity points along the destination's facing and never keeps falling speed", () => {

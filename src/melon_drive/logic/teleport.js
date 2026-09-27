@@ -4,14 +4,30 @@
 import { TELEPORT_TRIGGER_NAME_PATTERN, TELEPORT_KEEP_SPEED } from "../constants/index.js";
 
 /**
- * The destination entity's name encoded in a teleport trigger's own name
- * (teleport_to_<destination>), or undefined if the name doesn't follow that
- * convention. Surrounding whitespace is ignored — Hammer keeps stray spaces.
+ * What a teleport trigger's own name encodes (teleport_[stop_|keep_]to_<destination>):
+ * the destination entity's name and whether the melon keeps its speed
+ * (stop/keep, else TELEPORT_KEEP_SPEED) — or undefined if the name doesn't
+ * follow that convention. Surrounding whitespace is ignored — Hammer keeps
+ * stray spaces.
+ * @param {string} triggerName
+ * @returns {{ destination: string, keepSpeed: boolean } | undefined}
+ */
+export function ParseTeleportTrigger(triggerName) {
+    const match = TELEPORT_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
+    if (!match) {
+        return undefined;
+    }
+    const keepSpeed = match[1] === "stop" ? false : match[1] === "keep" ? true : TELEPORT_KEEP_SPEED;
+    return { destination: match[2], keepSpeed };
+}
+
+/**
+ * Just the destination entity's name from a teleport trigger's name (see
+ * ParseTeleportTrigger), or undefined.
  * @param {string} triggerName
  */
 export function ParseTeleportTarget(triggerName) {
-    const match = TELEPORT_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
-    return match ? match[1] : undefined;
+    return ParseTeleportTrigger(triggerName)?.destination;
 }
 
 /**
@@ -30,12 +46,14 @@ export function ViewAnglesFacing(currentEye, yaw) {
  * The melon's velocity right after the teleport: its horizontal speed
  * carried over but pointed along the destination's facing (so a teleporter
  * keeps the race's flow instead of dead-stopping the melon), or zero with
- * TELEPORT_KEEP_SPEED off. Vertical speed is always dropped — a melon
- * teleported mid-fall would otherwise slam into the floor on arrival.
+ * keepSpeed off (the trigger's stop/keep mode, default TELEPORT_KEEP_SPEED).
+ * Vertical speed is always dropped — a melon teleported mid-fall would
+ * otherwise slam into the floor on arrival.
  * @param {{ x: number, y: number, z: number }} velocity @param {number} destinationYaw degrees
+ * @param {boolean} [keepSpeed]
  */
-export function TeleportExitVelocity(velocity, destinationYaw) {
-    if (!TELEPORT_KEEP_SPEED) {
+export function TeleportExitVelocity(velocity, destinationYaw, keepSpeed = TELEPORT_KEEP_SPEED) {
+    if (!keepSpeed) {
         return { x: 0, y: 0, z: 0 };
     }
     const speed = Math.hypot(velocity.x, velocity.y);
