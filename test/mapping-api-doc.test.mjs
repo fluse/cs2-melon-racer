@@ -1,11 +1,11 @@
 // Keeps MAPPING_API.md in step with the script: every entity name the
-// script looks up (constants.js's *_NAME exports) and every script input it
+// script looks up (the *_NAME exports in constants/) and every script input it
 // registers must be documented there, so a new Hammer-side convention can't
 // be added without the mapping reference hearing about it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import * as constants from "../src/melon_drive/constants.js";
+import * as constants from "../src/melon_drive/constants/index.js";
 
 const doc = readFileSync(new URL("../MAPPING_API.md", import.meta.url), "utf8");
 

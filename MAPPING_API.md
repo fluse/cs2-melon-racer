@@ -9,7 +9,7 @@ this file, the script doesn't know about it.
   [TRACK_CREATION.md](TRACK_CREATION.md).
 - For *why* things behave the way they do, see [GAMEPLAY.md](GAMEPLAY.md).
 - All names below are defined in
-  [src/melon_drive/constants.js](src/melon_drive/constants.js);
+  [src/melon_drive/constants/](src/melon_drive/constants/) (mostly `spawn.js`, `race.js`, `paint.js`, `teleport.js`);
   `test/mapping-api-doc.test.mjs` fails if one is missing from this file.
 
 ## 1. General conventions
@@ -206,7 +206,7 @@ output:      OnStartTouch → melon_drive_script → RunScriptInput → melon_te
 | `SPAWN_UP_OFFSET` | 40 | units above the floor under `hub_spawn` / `intro_spawn` — keep spawn entities near the floor, a long drop can break the melon |
 
 Script inputs are pre-registered up to these limits; raise them in
-`constants.js` (and rebuild) if a map needs more.
+`constants/race.js` (and rebuild) if a map needs more.
 
 ## 6. Checking your map
 

@@ -9,7 +9,7 @@ import {
     BREAK_EFFECT_MAX_ACTIVE,
     BREAK_PIECE_SPEED,
     BREAK_PIECE_UP_SPEED,
-} from "../constants.js";
+} from "../constants/index.js";
 
 /**
  * Moves a group of points so their centroid lands on `target`, keeping

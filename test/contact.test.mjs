@@ -17,7 +17,7 @@ import {
     WALL_TOUCH_MIN_STOP_SPEED,
     GROUND_LIFTOFF_TIME,
     WALL_CONTACT_MIN_STOP,
-} from "../src/melon_drive/constants.js";
+} from "../src/melon_drive/constants/index.js";
 
 const DT = 1 / 64;
 

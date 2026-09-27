@@ -1,6 +1,6 @@
 import { Instance } from "cs_script/point_script";
 import { Debug } from "./debug.js";
-import { START_TRIGGER_NAME_PATTERN } from "./constants.js";
+import { START_TRIGGER_NAME_PATTERN } from "./constants/index.js";
 
 // Per-track checkpoint/lap config comes straight from Hammer instead of a
 // hand-maintained lookup: each track has one trigger_multiple named

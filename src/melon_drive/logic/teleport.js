@@ -1,7 +1,7 @@
 // Pure rules for generic teleporters — no cs_script import, so it's
 // unit-testable in Node (see test/teleport.test.mjs). index.js's
 // melon_teleport handler does the entity lookups and the actual teleport.
-import { TELEPORT_TRIGGER_NAME_PATTERN, TELEPORT_KEEP_SPEED } from "../constants.js";
+import { TELEPORT_TRIGGER_NAME_PATTERN, TELEPORT_KEEP_SPEED } from "../constants/index.js";
 
 /**
  * The destination entity's name encoded in a teleport trigger's own name

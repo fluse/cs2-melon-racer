@@ -6,7 +6,7 @@ import {
     HEALTH_BAR_SEGMENTS,
     HEALTH_LOW_FRACTION,
     HEALTH_CRITICAL_FRACTION,
-} from "../src/melon_drive/constants.js";
+} from "../src/melon_drive/constants/index.js";
 
 test("full health fills every segment", () => {
     assert.equal(HealthBarState(MELON_MAX_HEALTH).filledSegments, HEALTH_BAR_SEGMENTS);

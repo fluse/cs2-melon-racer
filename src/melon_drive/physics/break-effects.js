@@ -4,7 +4,7 @@
 import { Instance, PointTemplate } from "cs_script/point_script";
 import { Debug } from "../debug.js";
 import { PruneBreakEffects, BreakPieceVelocity, RecenterOnto } from "../logic/break-sequence.js";
-import { BREAK_EFFECT_LIFETIME, BREAK_PARTICLE_TEMPLATE_NAME, BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, BREAK_PIECE_SPIN } from "../constants.js";
+import { BREAK_EFFECT_LIFETIME, BREAK_PARTICLE_TEMPLATE_NAME, BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, BREAK_PIECE_SPIN } from "../constants/index.js";
 
 /**
  * Converts a direction vector into the pitch/yaw/roll a particle template

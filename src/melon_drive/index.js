@@ -13,7 +13,7 @@ import { Instance } from "cs_script/point_script";
 // doesn't need to be anywhere near it for the view to work.
 //
 // This file only wires cs_script's entity-lifecycle/input callbacks to the
-// logic in the sibling modules below — see constants.js for tunables,
+// logic in the sibling modules below — see constants/ for tunables,
 // kart-registry.js for the kart/moderator bookkeeping, race-flow.js for the
 // hub/countdown/racing/break state machine, kart-spawn.js / physics/ for
 // melon spawning and per-tick movement, jumping, damage and breaking, hud.js/camera.js for the
@@ -21,7 +21,7 @@ import { Instance } from "cs_script/point_script";
 // think.js for the per-tick driver.
 
 import { Debug } from "./debug.js";
-import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, CAMERA_DISTANCE_STEPS, CAMERA_HEIGHT_STEPS, HUB_TRIGGER_NAME, TELEPORT_UP_OFFSET } from "./constants.js";
+import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, CAMERA_DISTANCE_STEPS, CAMERA_HEIGHT_STEPS, HUB_TRIGGER_NAME, TELEPORT_UP_OFFSET } from "./constants/index.js";
 import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, SetModeratorSlot, DropKart } from "./kart-registry.js";
 import { SetUpPlayerKart, ForgetIntroLogo } from "./kart-spawn.js";
 import { Lifted, LevelAngles } from "./spawn-points.js";

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ParseTeleportTarget, TeleportExitVelocity, ViewAnglesFacing } from "../src/melon_drive/logic/teleport.js";
-import { TELEPORT_KEEP_SPEED } from "../src/melon_drive/constants.js";
+import { TELEPORT_KEEP_SPEED } from "../src/melon_drive/constants/index.js";
 
 test("the destination is read from the trigger's own name", () => {
     assert.equal(ParseTeleportTarget("teleport_to_tp_dest_hub_back"), "tp_dest_hub_back");

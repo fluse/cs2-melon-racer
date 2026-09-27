@@ -6,7 +6,7 @@ import { CameraDistanceForStep, CameraHeightForStep } from "./logic/camera-steps
 import {
     CAMERA_LATERAL,
     FOLLOW_OFFSET,
-} from "./constants.js";
+} from "./constants/index.js";
 
 // The preset buttons' labels and "Selected" mark: UpdateCameraPresetHud in
 // hud.js (which also runs every time the user menu opens).

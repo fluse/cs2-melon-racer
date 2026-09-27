@@ -1,7 +1,7 @@
 // Moving a kart's melon on purpose: checkpoint respawn, generic teleports,
 // and its paint color (kept across breaks).
 import { FacePlayerView } from "../spawn-points.js";
-import { MELON_MAX_HEALTH } from "../constants.js";
+import { MELON_MAX_HEALTH } from "../constants/index.js";
 
 /**
  * Teleports a kart's melon back to its last checkpoint and resets it to a

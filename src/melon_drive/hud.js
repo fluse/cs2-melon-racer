@@ -24,7 +24,7 @@ import {
     CAMERA_DISTANCE_STEPS,
     CAMERA_HEIGHT_STEPS,
     RacePhase,
-} from "./constants.js";
+} from "./constants/index.js";
 
 /** @type {any} */
 let speedHud = null;

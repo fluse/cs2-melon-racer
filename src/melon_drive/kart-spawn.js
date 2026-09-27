@@ -12,7 +12,7 @@ import {
     CAMERA_DISTANCE_DEFAULT,
     CAMERA_HEIGHT_DEFAULT,
     INTRO_LOGO_SECONDS,
-} from "./constants.js";
+} from "./constants/index.js";
 
 // Spawn flow, in one sentence: a player without a kart gets a new one at the
 // spawn point the caller picks (the intro on join); a player who already has

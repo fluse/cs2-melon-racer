@@ -18,7 +18,7 @@ import {
     WALL_BOUNCE_COOLDOWN,
     WALL_BOUNCE_PERFECT_JUMP_WINDOW,
     BOOST_DECAY,
-} from "../constants.js";
+} from "../constants/index.js";
 import { ApplyJump } from "./jump.js";
 import { UpdateGrounded, UpdateWallContact } from "./contact.js";
 import { DrawJumpDebug } from "./jump-debug.js";

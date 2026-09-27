@@ -11,7 +11,7 @@ import {
     WALL_PROBE_DIRECTIONS,
     WALL_CONTACT_DISTANCE,
     WALL_NORMAL_MAX_Z,
-} from "../constants.js";
+} from "../constants/index.js";
 
 /**
  * Refreshes kart.lastGroundedTime if the melon is on the ground right now —

@@ -10,7 +10,7 @@ const { karts } = await import("../src/melon_drive/kart-registry.js");
 const { SetUpPlayerKart } = await import("../src/melon_drive/kart-spawn.js");
 const { GetIntroSpawnPoint } = await import("../src/melon_drive/spawn-points.js");
 const { UpdateKart } = await import("../src/melon_drive/physics/index.js");
-const C = await import("../src/melon_drive/constants.js");
+const C = await import("../src/melon_drive/constants/index.js");
 
 const DT = 1 / 64;
 const FLOOR_Z = 0;

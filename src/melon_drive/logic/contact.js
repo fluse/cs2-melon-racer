@@ -1,7 +1,7 @@
 // Pure ground/wall contact and wall-jump rules — no cs_script import, so
 // it's unit-testable in Node (see test/contact.test.mjs). physics/contact.js and physics/jump.js
 // runs the traces and feeds the results in here. See the JUMP_SPEED /
-// WALL_PROBE_DIRECTIONS comments in constants.js for the design.
+// WALL_PROBE_DIRECTIONS comments in constants/jump.js for the design.
 import {
     GRAVITY,
     FREE_FALL_FRACTION,
@@ -17,7 +17,7 @@ import {
     WALL_TOUCH_MIN_STOP_SPEED,
     GROUND_LIFTOFF_TIME,
     WALL_CONTACT_MIN_STOP,
-} from "../constants.js";
+} from "../constants/index.js";
 
 /**
  * The melon's vertical acceleration over the last tick: the vertical

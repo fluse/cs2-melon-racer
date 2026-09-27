@@ -1,6 +1,6 @@
 // Health loss from hard impacts (landings, crashes) — see IMPACT_DAMAGE_*.
 import { Debug } from "../debug.js";
-import { IMPACT_DAMAGE_THRESHOLD, IMPACT_DAMAGE_SCALE, MELON_MAX_HEALTH } from "../constants.js";
+import { IMPACT_DAMAGE_THRESHOLD, IMPACT_DAMAGE_SCALE, MELON_MAX_HEALTH } from "../constants/index.js";
 
 /** @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} impactSpeed */
 export function ApplyImpactDamage(slot, kart, impactSpeed) {

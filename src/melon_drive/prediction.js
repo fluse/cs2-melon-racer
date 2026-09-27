@@ -14,9 +14,9 @@ import {
     PREDICTION_MIN_SPEED,
     PREDICTION_NEUTRAL_COLOR,
     WALL_NORMAL_MAX_Z,
-} from "./constants.js";
+} from "./constants/index.js";
 
-// Wall-bounce prediction line — see PREDICTION_* in constants.js for the
+// Wall-bounce prediction line — see PREDICTION_* in constants/prediction.js for the
 // design. Recomputed every tick from the melon's actual velocity (the same
 // direction the bounce itself measures its angle from), and its angle
 // rating comes from the same WallAngleFactor/GetBounceRating the bounce

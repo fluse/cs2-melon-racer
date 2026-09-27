@@ -12,7 +12,7 @@ import {
     BREAK_EFFECT_MAX_ACTIVE,
     BREAK_PIECE_SPEED,
     BREAK_PIECE_UP_SPEED,
-} from "../src/melon_drive/constants.js";
+} from "../src/melon_drive/constants/index.js";
 
 const base = { x: -320, y: 0, z: 80 };
 

@@ -1,6 +1,6 @@
 import { Instance, CSInputs } from "cs_script/point_script";
 import { DEBUG, Debug } from "./debug.js";
-import { HEARTBEAT_INTERVAL } from "./constants.js";
+import { HEARTBEAT_INTERVAL } from "./constants/index.js";
 import { karts, EnsureModerator, DropKart } from "./kart-registry.js";
 import { SetUpPlayerKart, EnsurePlayerKarts, HoldPawn } from "./kart-spawn.js";
 import { GetHubSpawnPoint } from "./spawn-points.js";

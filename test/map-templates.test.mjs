@@ -12,7 +12,7 @@ import {
     BREAK_PARTICLE_TEMPLATE_NAME,
     BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME,
     PERFECT_SPARK_PARTICLE_NAME,
-} from "../src/melon_drive/constants.js";
+} from "../src/melon_drive/constants/index.js";
 
 const entities = ReadVmapEntities(fileURLToPath(new URL("../maps/melon_racer.vmap", import.meta.url)));
 

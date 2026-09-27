@@ -14,7 +14,7 @@ import {
     BOUNCE_RATINGS,
     WALL_CONTACT_DISTANCE,
     WALL_CONTACT_MIN_STOP,
-} from "../constants.js";
+} from "../constants/index.js";
 
 /**
  * Whether a wall the traces found is really the thing the melon just hit:
@@ -99,7 +99,7 @@ export function PickIncomingVelocity(last, prev, n) {
 /**
  * Reflects a horizontal velocity off a wall and scales it by the angle's
  * rating (BOUNCE_RATINGS[].speedMultiplier) and the jump timing (see
- * WALL_BOUNCE_* in constants.js).
+ * WALL_BOUNCE_* in constants/wall-bounce.js).
  * @param {{ x: number, y: number }} v incoming velocity
  * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal
  * @param {number} jumpFactor 0..1, see JumpTimingFactor

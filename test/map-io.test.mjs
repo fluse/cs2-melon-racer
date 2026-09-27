@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { ReadVmapConnections, ReadVmapEntities } from "./helpers/vmap.mjs";
 import { ParseTeleportTarget } from "../src/melon_drive/logic/teleport.js";
-import { HUB_TRIGGER_NAME } from "../src/melon_drive/constants.js";
+import { HUB_TRIGGER_NAME } from "../src/melon_drive/constants/index.js";
 
 const vmapPath = fileURLToPath(new URL("../maps/melon_racer.vmap", import.meta.url));
 const connections = ReadVmapConnections(vmapPath);

@@ -1,0 +1,23 @@
+// Teleporters and the lift applied to every trigger/destination teleport target.
+
+// Generic teleporters, same name-carries-the-config convention: a
+// trigger_multiple named "teleport_to_<destination>" (filtered to
+// prop_physics) with OnStartTouch -> RunScriptInput "melon_teleport" sends
+// the touching melon to the entity named <destination> (e.g. an
+// info_target), facing that entity's yaw. One shared handler for every
+// teleporter — adding one is a pure Hammer edit. A teleport only moves the
+// melon; it never changes its respawn point / checkpoint progress.
+export const TELEPORT_TRIGGER_NAME_PATTERN = /^teleport_to_(.+)$/;
+// true: keep the melon's horizontal speed, redirected along the
+// destination's facing; false: arrive standing still.
+export const TELEPORT_KEEP_SPEED = true;
+
+// Race-flow teleports (heat start, checkpoint respawns) target a trigger_multiple's
+// raw GetAbsOrigin() — Hammer mappers commonly sink a trigger's brush a bit
+// into the floor so a fast-moving physics prop reliably touches it instead
+// of tunneling past a paper-thin volume. Teleporting the melon to that exact
+// height would embed it in solid ground; VPhysics can't resolve that
+// overlap upward and the melon tunnels down through the floor instead. Lift
+// the target up by this much so the melon always drops onto the floor from
+// just above it, same trick as SPAWN_UP_OFFSET (spawn.js).
+export const TELEPORT_UP_OFFSET = 40;

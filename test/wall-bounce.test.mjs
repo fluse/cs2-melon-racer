@@ -1,6 +1,6 @@
 // These assert the *rules* of the wall bounce (45° is best, a perfect jump
 // helps, a perfect bounce is free, ...) in terms of the constants, not
-// their current values — so retuning constants.js doesn't break them, but
+// their current values — so retuning constants/ doesn't break them, but
 // changing how the math works does.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -23,7 +23,7 @@ import {
     WALL_BOUNCE_PERFECT_JUMP_MULTIPLIER,
     WALL_IMPACT_DAMAGE_THRESHOLD,
     BOUNCE_RATINGS,
-} from "../src/melon_drive/constants.js";
+} from "../src/melon_drive/constants/index.js";
 
 const EPS = 1e-9;
 /** @param {number} a @param {number} b */

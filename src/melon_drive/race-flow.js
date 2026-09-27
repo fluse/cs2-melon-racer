@@ -10,7 +10,7 @@ import {
     GO_DISPLAY_SECONDS,
     RACE_SPAWN_LATERAL_SPACING,
     TELEPORT_UP_OFFSET,
-} from "./constants.js";
+} from "./constants/index.js";
 import { GetHubSpawnPoint, GetIntroSpawnPoint, Lifted, FacePlayerView } from "./spawn-points.js";
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------

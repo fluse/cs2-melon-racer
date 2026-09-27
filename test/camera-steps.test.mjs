@@ -20,7 +20,7 @@ import {
     CAMERA_HEIGHT_MAX,
     CAMERA_HEIGHT_DEFAULT,
     CAMERA_HEIGHT_STEPS,
-} from "../src/melon_drive/constants.js";
+} from "../src/melon_drive/constants/index.js";
 
 const layout = readFileSync(new URL("../panorama/layout/custom_game/speedometer.xml", import.meta.url), "utf8");
 

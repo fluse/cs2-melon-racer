@@ -13,7 +13,7 @@ const { SetUpPlayerKart } = await import("../src/melon_drive/kart-spawn.js");
 const { GetIntroSpawnPoint } = await import("../src/melon_drive/spawn-points.js");
 const { RespawnKartAtCheckpoint, TeleportKartTo, BreakMelon, HandleMelonLost } = await import("../src/melon_drive/physics/index.js");
 const { ReturnAllToHub, SendKartToTutorial, BeginHeat } = await import("../src/melon_drive/race-flow.js");
-const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME } = await import("../src/melon_drive/constants.js");
+const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME } = await import("../src/melon_drive/constants/index.js");
 
 const INTRO_YAW = 30;
 const HUB_YAW = 200;

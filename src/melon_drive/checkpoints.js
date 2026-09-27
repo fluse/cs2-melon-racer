@@ -4,7 +4,7 @@ import { FindKartByMelon } from "./kart-registry.js";
 import { activeTrackId, FinishKart } from "./race-flow.js";
 import { GetTrackConfig } from "./track-config.js";
 import { ApplyCheckpointTouch, ApplyLapCompletion } from "./logic/checkpoint-progress.js";
-import { MAX_TRACKS, MAX_CHECKPOINTS_PER_TRACK, TELEPORT_UP_OFFSET } from "./constants.js";
+import { MAX_TRACKS, MAX_CHECKPOINTS_PER_TRACK, TELEPORT_UP_OFFSET } from "./constants/index.js";
 import { Lifted } from "./spawn-points.js";
 
 // Checkpoints: place a trigger_multiple per checkpoint, filtered to the

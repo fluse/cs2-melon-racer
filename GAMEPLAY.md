@@ -335,7 +335,7 @@ Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
    `countdown_panel`: one image per step, `number-3/2/1.png` and `word-go.png`
    in `panorama/images/custom_game/`, switched via `Show3`/`Show2`/`Show1`/
    `ShowGo` classes) counts down for the racers only. `COUNTDOWN_SECONDS`
-   in `constants.js` controls the length — there are only images for 3..1,
+   in `constants/race.js` controls the length — there are only images for 3..1,
    so a longer countdown shows nothing until 3.
 4. **RACING** — normal driving, existing checkpoint/lap logic, plus a
    dedicated `finish_<trackId>` script input (registered for every

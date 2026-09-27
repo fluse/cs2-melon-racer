@@ -22,7 +22,7 @@ import {
     WALL_BOUNCE_DEBUG_LINE_LENGTH,
     BOUNCE_RATINGS,
     PERFECT_SPARK_PARTICLE_NAME,
-} from "../constants.js";
+} from "../constants/index.js";
 import { DamageKart } from "./damage.js";
 import { BreakMelon } from "./breaking.js";
 
@@ -158,7 +158,7 @@ function DebugDrawBounce(kart, n, incoming, outgoing, angle) {
 
 /**
  * Reflects the melon's pre-impact horizontal velocity off a wall and scales
- * it by how well the hit was angled (see WALL_BOUNCE_* in constants.js).
+ * it by how well the hit was angled (see WALL_BOUNCE_* in constants/wall-bounce.js).
  * Vertical velocity is left to physics — a bounce never launches upward.
  * @param {import("../kart-registry.js").Kart} kart @param {{ x: number, y: number, method: string, hitPoint?: any }} n @param {number} now
  * @returns {{ velocity: { x: number, y: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number } | null}

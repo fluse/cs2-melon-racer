@@ -80,7 +80,7 @@ melon_racer/
     ├── gamemode/index.js                       # cvars, teams, disables combat damage
     └── melon_drive/                            # the core game mode, split by concern:
         ├── index.js          # wiring: registers Instance.On*/OnScriptInput handlers
-        ├── constants.js      # every tunable value (speeds, accel, health, timings, ...)
+        ├── constants/        # every tunable value (speeds, accel, health, timings, ...), one file per system
         ├── kart-registry.js  # per-player kart state (the `karts` map)
         ├── kart-spawn.js     # spawning/parking melons and player pawns
         ├── physics/          # melon physics, one file per concern (import via physics/index.js):
@@ -136,7 +136,7 @@ For the full `cs_script` API reference (available `Instance` calls, entity class
 Some common ways to build on this repo, and where to start:
 
 - **Add a new track** — pure Hammer work, no script changes. Follow [TRACK_CREATION.md](TRACK_CREATION.md) step by step.
-- **Tune physics/feel** (acceleration, top speed, jump height, impact-damage sensitivity, camera offsets, timings) — all tunables live at the top of `src/melon_drive/constants.js`. Change a value, rebuild, and hot-reload in tools mode to feel the difference immediately.
+- **Tune physics/feel** (acceleration, top speed, jump height, impact-damage sensitivity, camera offsets, timings) — all tunables live in `src/melon_drive/constants/`, one file per system (`driving.js`, `jump.js`, `camera.js`, …). Change a value, rebuild, and hot-reload in tools mode to feel the difference immediately.
 - **Add HUD elements or menus** — edit `panorama/layout/custom_game/speedometer.xml` and the matching `speedometer.css`, then wire the new elements from `src/melon_drive/hud.js`. Note CS2's custom HUD layouts only support `<Panel>`, `<Label>`, `<Image>`, and `<Button>` — no native sliders/inputs and no inline scripting.
 - **Add gameplay mechanics** (boost pads, new trigger types, new melon behaviors) — follow the existing pattern: a Hammer trigger fires `RunScriptInput` on `melon_drive`, handled by a new (or extended) module under `src/melon_drive/`, registered from `index.js`.
 - **Add sound** — `soundevents/soundevents_addon.vsndevts` currently only contains Valve's stock example ambience events; there's no melon-specific audio yet (e.g. a break sound, engine/roll sound, countdown beep) — a good, self-contained first contribution.

@@ -34,12 +34,14 @@ sounds/*.wav                             # ambience: birds, interior, vent
 src/tsconfig.json                        # editor tooling config for src/**/*.js (references ../maps/scripts/point_script.d.ts)
 src/gamemode/index.js                    # gamemode entry: a single small file
 src/melon_drive/index.js, *.js           # melon_drive entry: split into one file per concern —
-                                          #   constants.js, debug.js, kart-registry.js, track-config.js,
+                                          #   debug.js, kart-registry.js, track-config.js,
                                           #   camera.js, hud.js, race-flow.js, spawn-points.js, kart-spawn.js,
                                           #   checkpoints.js, prediction.js, trace.js, think.js — index.js just wires them together
 src/melon_drive/physics/*.js             # melon physics, one file per concern: drive.js (UpdateKart, the per-tick order),
                                           #   jump.js, contact.js (floor/wall probes), wall-bounce.js, damage.js, breaking.js,
                                           #   break-effects.js, teleport.js, jump-debug.js (the user-menu jump debug view) — others import from physics/index.js
+src/melon_drive/constants/*.js           # every tunable/Hammer name, one file per system (driving, jump, health, wall-bounce, prediction,
+                                          #   breaking, race, paint, teleport, spawn, camera, hud, debug) — import from constants/index.js
 src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, checkpoint progress, break sequence, camera steps, teleport, ground/wall contact) — no engine import, unit-tested
 test/*.test.mjs                          # node:test unit tests for src/*/logic/ (`npm test`), plus checks of the .vmap/.xml the script relies on
 test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities
@@ -282,14 +284,14 @@ examples — read these instead of guessing signatures:
 - **Pure logic goes in `src/<entry>/logic/`, with tests.** Game rules that
   are just math/state transitions (no traces, entities, HUD calls) live in
   `logic/*.js` files that must **not** import `cs_script/point_script` (or
-  any sibling that does — only `constants.js` and other `logic/` files), so
+  any sibling that does — only `constants/` and other `logic/` files), so
   Node can load them. The engine-side files call into them and handle the
   side effects (e.g. `checkpoints.js` logs/`FinishKart`s based on the result
   string `ApplyCheckpointTouch` returns). Each has a `test/<name>.test.mjs`
   using the built-in `node:test` runner — run `npm test` after touching
   them, and add/adjust a test when changing a rule. Write assertions in
   terms of the constants (`WALL_BOUNCE_OPTIMAL_ANGLE`, ...) rather than
-  their current values, so retuning `constants.js` doesn't break tests.
+  their current values, so retuning `constants/` doesn't break tests.
 - **Engine-side files can be tested against a fake engine** when a rule
   spans them (e.g. `test/view-facing.test.mjs`: every teleport/spawn path
   turns the player's view): `import "./helpers/register-cs-script.mjs"`

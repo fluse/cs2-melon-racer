@@ -2,7 +2,7 @@ import { Instance } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { TraceLine } from "./trace.js";
 import { ViewAnglesFacing } from "./logic/teleport.js";
-import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, FLOOR_TRACE_UP, FLOOR_TRACE_DOWN } from "./constants.js";
+import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, FLOOR_TRACE_UP, FLOOR_TRACE_DOWN } from "./constants/index.js";
 
 // The one place that turns a Hammer spawn entity into a melon position.
 // Every caller that puts a melon at the hub or the intro goes through here,

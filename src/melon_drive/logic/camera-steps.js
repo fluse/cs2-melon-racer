@@ -8,7 +8,7 @@ import {
     CAMERA_HEIGHT_MIN,
     CAMERA_HEIGHT_MAX,
     CAMERA_HEIGHT_STEPS,
-} from "../constants.js";
+} from "../constants/index.js";
 
 /** @param {number} value @param {number} min @param {number} max @param {number} steps */
 function StepFor(value, min, max, steps) {

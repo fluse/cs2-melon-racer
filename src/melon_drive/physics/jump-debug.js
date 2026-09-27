@@ -6,7 +6,7 @@
 // Record*/Log*/Draw* functions here, so none of this lives in the gameplay
 // code itself. Debug draws only show in dev environments (tools mode).
 import { Instance } from "cs_script/point_script";
-import { WALL_CONTACT_DISTANCE, WALL_JUMP_WINDOW } from "../constants.js";
+import { WALL_CONTACT_DISTANCE, WALL_JUMP_WINDOW } from "../constants/index.js";
 
 /**
  * What this tick's probes saw. Rebuilt every tick (while the view is on)

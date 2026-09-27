@@ -1,6 +1,6 @@
 // Pure health-bar math — no cs_script import, so it's unit-testable in
 // Node (see test/health.test.mjs). hud.js turns the result into HUD classes.
-import { HEALTH_BAR_SEGMENTS, HEALTH_LOW_FRACTION, HEALTH_CRITICAL_FRACTION, MELON_MAX_HEALTH } from "../constants.js";
+import { HEALTH_BAR_SEGMENTS, HEALTH_LOW_FRACTION, HEALTH_CRITICAL_FRACTION, MELON_MAX_HEALTH } from "../constants/index.js";
 
 /**
  * What the segmented health bar should show for a given health value.

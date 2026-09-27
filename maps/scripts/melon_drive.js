@@ -13,13 +13,7 @@ function Debug(text) {
     }
 }
 
-// All tunable numbers and static/Hammer-naming-convention data for
-// melon_drive live here, grouped by the system they configure. Actual
-// mutable runtime state (kart registry, race phase, caches) lives with the
-// module that owns it instead — see kart-registry.js, race-flow.js,
-// track-config.js.
-
-const MELON_TEMPLATE_NAME = "melon_template";
+// Driving: acceleration, speed cap, friction, and how a melon settles at rest.
 
 // Force ratios ported from the original melonracer GMod gamemode
 // (sent_melon_base/init.lua ENT:Think + gamemode/shared.lua DefXSpeed):
@@ -30,6 +24,29 @@ const REVERSE_ACCEL = FORWARD_ACCEL * 0.5; // 0.5x forward, matches original's R
 const STRAFE_ACCEL = FORWARD_ACCEL * 0.4; // 0.4x forward, matches original's Strafe/Forward ratio
 const MAX_SPEED = 650; // units/sec, horizontal speed cap
 const COAST_FRICTION = 120; // units/sec^2 horizontal slowdown with no input — low, so the melon keeps rolling on its own momentum instead of grinding to a stop
+
+// Below this horizontal AND vertical speed, with no steering/jump input,
+// the melon counts as fully settled — UpdateKart stops re-pinning its
+// velocity/spin to zero every tick and lets vphysics run it completely
+// freely, so its own weight and (irregular) resting shape can tip or slide
+// it exactly as real physics dictates instead of gluing it to whatever spot
+// it stopped at.
+const MELON_REST_SPEED = 2; // units/sec
+
+// The instant a melon crosses into "fully settled" (see MELON_REST_SPEED
+// above), vphysics owns its orientation completely — but a perfectly
+// balanced landing (e.g. resting dead upright on end) is a knife-edge
+// equilibrium that a deterministic physics sim has no numerical noise to
+// break on its own, so it would otherwise freeze there forever instead of
+// tipping onto a stable side. UpdateKart gives it one small, random-direction
+// spin nudge the moment it settles to break that tie; real vphysics then
+// decides — from the melon's actual collision shape and whatever surface
+// it's resting on — whether that nudge grows into a proper topple or just
+// gets damped straight back to rest.
+const SETTLE_NUDGE_ANGULAR_SPEED = 40; // deg/sec, one-off pitch/roll kick on settling
+
+// Jumping: ground jump, wall jump, and the ground contact they rely on (see logic/contact.js).
+
 const JUMP_SPEED = 370; // units/sec upward impulse
 // The ground jump needs real ground contact (see logic/contact.js), and a
 // new one since the last jump — no cooldown: touching down is what resets
@@ -87,38 +104,52 @@ const WALL_JUMP_UP_SPEED = 240; // units/sec upward — well below the ground ju
 const WALL_JUMP_PUSH_SPEED = 160; // units/sec at least away from the wall (more if already moving away faster) (was 250)
 const WALL_JUMP_SAME_WALL_DOT = 0.7; // normals closer than this (dot product, ~45°) count as the same wall
 
-// Below this horizontal AND vertical speed, with no steering/jump input,
-// the melon counts as fully settled — UpdateKart stops re-pinning its
-// velocity/spin to zero every tick and lets vphysics run it completely
-// freely, so its own weight and (irregular) resting shape can tip or slide
-// it exactly as real physics dictates instead of gluing it to whatever spot
-// it stopped at.
-const MELON_REST_SPEED = 2; // units/sec
-
-// The instant a melon crosses into "fully settled" (see MELON_REST_SPEED
-// above), vphysics owns its orientation completely — but a perfectly
-// balanced landing (e.g. resting dead upright on end) is a knife-edge
-// equilibrium that a deterministic physics sim has no numerical noise to
-// break on its own, so it would otherwise freeze there forever instead of
-// tipping onto a stable side. UpdateKart gives it one small, random-direction
-// spin nudge the moment it settles to break that tie; real vphysics then
-// decides — from the melon's actual collision shape and whatever surface
-// it's resting on — whether that nudge grows into a proper topple or just
-// gets damped straight back to rest.
-const SETTLE_NUDGE_ANGULAR_SPEED = 40; // deg/sec, one-off pitch/roll kick on settling
+// Melon health and impact damage from landings/crashes (wall hits have their own rules in wall-bounce.js).
 
 // Impact damage: every tick we compare the velocity we commanded last tick
 // against the melon's actual velocity now. A big gap means physics forcibly
 // overrode our command — a wall crash or a hard landing — since gravity and
 // our own steering only ever change velocity gradually. That gap's
-// magnitude is the "impact speed" damage is based on.
+// magnitude is the "impact speed" damage is based on:
+//   damage = (impactSpeed - IMPACT_DAMAGE_THRESHOLD) * IMPACT_DAMAGE_SCALE
+// e.g. a 700 u/s impact = (700 - 450) * 0.2 = 50 of MELON_MAX_HEALTH's 80.
+
+// The melon's health pool (kart.health), refilled on every respawn at a
+// checkpoint (after a break or via the user menu). Shared by landing/crash damage here and wall-hit damage
+// (WALL_IMPACT_DAMAGE_* / WALL_BOUNCE_DAMAGE_PER_SPEED in wall-bounce.js).
+// The HUD bar shows it as a fraction, so changing it doesn't change the bar.
+// Higher: more or harder hits before the melon breaks — more forgiving,
+//   crashes matter less, wall bounces that cost health can be chained longer.
+// Lower: fewer hits until it breaks — punishing; at or below one typical
+//   hard landing's damage (~50 above), a single bad jump breaks it.
 const MELON_MAX_HEALTH = 80;
 // The melon entity's *engine* health (not kart.health above) — set this high
 // on every spawn so the engine's own physics damage never destroys the prop,
 // regardless of its Hammer health/damage settings. See MakeUnbreakableByEngine.
+// Not a gameplay knob: only has to stay far above anything the engine's
+// physics damage could deal.
+// Higher: no effect.
+// Lower: the engine may destroy the melon prop itself on a hard hit, outside
+//   our break/respawn logic — the kart loses its melon instead of breaking
+//   and respawning properly.
 const MELON_ENGINE_HEALTH = 1000000;
-const IMPACT_DAMAGE_THRESHOLD = 450; // units/sec of sudden velocity change before it starts to hurt
-const IMPACT_DAMAGE_SCALE = 0.2; // health lost per unit/sec beyond the threshold
+// units/sec of sudden velocity change before it starts to hurt — also the
+// gate for whether a landing/crash deals damage at all.
+// Higher: more impacts are free — normal jumps and small bumps never hurt,
+//   only really hard falls/crashes do; every damaging hit also deals less
+//   (the threshold is subtracted first).
+// Lower: even ordinary landings and light bumps cost health; set too low,
+//   physics noise from rolling over uneven ground chips health away.
+const IMPACT_DAMAGE_THRESHOLD = 450;
+// health lost per unit/sec beyond the threshold — how steeply damage grows
+// once an impact is over it.
+// Higher: impacts just above the threshold already hurt a lot; hard crashes
+//   break the melon in one hit.
+// Lower: damage grows slowly — even big crashes only nibble at health,
+//   breaking needs many hard hits.
+const IMPACT_DAMAGE_SCALE = 0.2;
+
+// Wall bounce: contact rules, speed-for-health trade, ratings, bounce HUD and the PERFECT spark.
 
 // Wall bounce: an impact against a wall (any world/brush surface whose
 // normal is mostly horizontal — see WALL_NORMAL_MAX_Z) reflects the melon's
@@ -132,7 +163,7 @@ const IMPACT_DAMAGE_SCALE = 0.2; // health lost per unit/sec beyond the threshol
 // WALL_BOUNCE_PERFECT_JUMP_WINDOW of the hit (before or after) multiplies the
 // result once more — fully for the exact same tick, fading out towards the
 // window's edges. Floors/landings never bounce — they keep using the
-// plain IMPACT_DAMAGE_* rules above.
+// plain IMPACT_DAMAGE_* rules (health.js).
 const WALL_BOUNCE_MIN_IMPACT = 200; // units/sec of sudden velocity change before a wall hit counts as a bounce at all
 const WALL_NORMAL_MAX_Z = 0.5; // |normal.z| above this is a floor/ceiling/steep ramp, not a wall
 const WALL_BOUNCE_TRACE_DISTANCE = 160; // ray length from last tick's position along the incoming direction — must reach the wall even at grazing angles (grows with 1/cos(angle))
@@ -217,6 +248,8 @@ const BOUNCE_RATINGS = [
     { minAngleFactor: 0, label: "MISS", speedMultiplier: 0.3, cssClass: "RatingMiss", color: { r: 255, g: 102, b: 102, a: 255 } },
 ];
 
+// Wall-bounce prediction line (see prediction.js).
+
 // Wall-bounce prediction line, drawn in front of the melon (see
 // prediction.js): a dotted line along its current direction of travel up to
 // the next wall, then on along the direction it would bounce off in —
@@ -243,40 +276,75 @@ const PREDICTION_START_OFFSET = 36; // first dot this far ahead of the melon's c
 const PREDICTION_MIN_SPEED = 80; // units/sec — below this there's no meaningful direction, line hidden
 const PREDICTION_NEUTRAL_COLOR = { r: 255, g: 255, b: 255, a: 160 }; // no wall in range
 
+// Breaking: what happens at the crash site and the respawn delay.
+
 // When a melon breaks it doesn't respawn instantly — it shreds apart at the
 // crash site (hidden immediately, with the break particle standing in for
 // the melon itself) for BREAK_RESPAWN_DELAY seconds before reappearing at the
 // last checkpoint. Gives the player a beat to register that it broke instead
-// of it just snapping to the checkpoint.
-const BREAK_RESPAWN_DELAY = 3; // seconds
+// of it just snapping to the checkpoint. Seconds.
+// Higher: a break costs more race time and the player watches the burst
+//   longer — harsher penalty, can feel like waiting.
+// Lower: quicker back on track, a milder penalty; too low and the burst and
+//   camera pull-back (BREAK_CAMERA_ZOOM_SECONDS) are cut off before they're
+//   seen — it just snaps to the checkpoint.
+const BREAK_RESPAWN_DELAY = 3;
 // While broken, the chase camera pulls back from the crash site so the
 // player actually sees the melon burst (see BreakCameraOffset in
 // logic/break-sequence.js): it eases out by this much extra distance/height
 // over BREAK_CAMERA_ZOOM_SECONDS, holds there, and snaps back to the
 // player's normal offset when the melon respawns BREAK_RESPAWN_DELAY later.
+// Seconds the pull-back takes.
+// Higher: slower, smoother zoom-out; at or above BREAK_RESPAWN_DELAY it never
+//   reaches its full distance before the respawn.
+// Lower: a faster, more abrupt jerk back; 0 = jumps straight out.
 const BREAK_CAMERA_ZOOM_SECONDS = 0.8;
-const BREAK_CAMERA_EXTRA_DISTANCE = 260; // units further back
-const BREAK_CAMERA_EXTRA_HEIGHT = 160; // units further up
+// Units the camera ends up further back than the player's normal distance.
+// Higher: wider view of the burst and the flying pieces, the melon looks small.
+// Lower: stays close — the burst fills the screen, pieces fly out of view;
+//   0 = no pull-back (only BREAK_CAMERA_EXTRA_HEIGHT).
+const BREAK_CAMERA_EXTRA_DISTANCE = 260;
+// Units the camera ends up higher than the player's normal height.
+// Higher: looks down onto the crash site from above, pieces on the ground
+//   are easier to see; in low rooms the camera may end up in the ceiling.
+// Lower: flatter view from the side; 0 = no rise (only
+//   BREAK_CAMERA_EXTRA_DISTANCE).
+const BREAK_CAMERA_EXTRA_HEIGHT = 160;
 // How long a break's spawned effect entities (both templates below) are
 // kept before being removed — long, so the chunks stay lying at the crash
 // site. Removing the info_particle_system ends its particles, so this is an
 // upper bound: the .vpcf's own particle lifetime can still end them sooner.
-const BREAK_EFFECT_LIFETIME = 180; // seconds
+// Seconds.
+// Higher: pieces stay lying around longer as traces of past crashes — more
+//   entities alive at once (still capped by BREAK_EFFECT_MAX_ACTIVE).
+// Lower: the crash site is cleaned up sooner; below the particle's own
+//   lifetime it also cuts the burst itself short.
+const BREAK_EFFECT_LIFETIME = 180;
 // Cap on how many breaks' effects exist at once, so a long session doesn't
 // pile up entities — the oldest break's effects go first.
+// Higher: more crash sites stay visible with many players/breaks — more
+//   entities and physics pieces, costs performance and entity slots.
+// Lower: fewer entities; with many breaks old pieces vanish long before
+//   BREAK_EFFECT_LIFETIME, possibly while someone's still looking at them.
 const BREAK_EFFECT_MAX_ACTIVE = 24;
 // Fallback look while broken when no break particle actually spawned (see
 // SpawnBreakParticles/BreakMelon) — a dark, dead-looking husk visibly marking
 // the crash site instead of the melon just vanishing for BREAK_RESPAWN_DELAY
-// seconds with nothing to look at.
+// seconds with nothing to look at. Only used when the break templates are
+// missing or spawn nothing.
+// Brighter (r/g/b up): the husk looks less "dead", closer to a normal melon.
+// Darker (r/g/b down): more clearly broken; a < 255 makes it see-through,
+//   0 hides it completely (the melon just vanishes).
 const BREAK_TINT_FALLBACK = { r: 40, g: 40, b: 40, a: 255 };
 // Name of a point_template placed in Hammer holding the break effect (e.g. an
 // info_particle_system with "Start Active" set so it plays as soon as it's
 // spawned, no input needed) — same ForceSpawn-from-a-template convention as
-// MELON_TEMPLATE_NAME.
+// MELON_TEMPLATE_NAME. Not a tuning value: must match the entity's name in
+// Hammer (renaming means renaming it there too, and in MAPPING_API.md).
 const BREAK_PARTICLE_TEMPLATE_NAME = "melon_break_template";
 // Second, separate break effect layered on top of the one above — e.g. flying
-// melon chunks, as opposed to the main burst. Same point_template convention.
+// melon chunks, as opposed to the main burst. Same point_template convention,
+// same "must match Hammer" rule.
 const BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME = "melon_break_chunks_template";
 // Any prop_physics the two break templates above spawn (e.g. the melon
 // model's own break pieces, models/cs_italy/italy_food_melon/
@@ -284,9 +352,23 @@ const BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME = "melon_break_chunks_template";
 // is treated as a break piece: flung outward from the crash site, tinted in
 // the melon's color, and left lying there for BREAK_EFFECT_LIFETIME. The
 // chunks particle alone is only sprite flecks that fade within moments.
-const BREAK_PIECE_SPEED = 220; // units/sec outward from the crash site
-const BREAK_PIECE_UP_SPEED = 180; // units/sec extra upward pop
-const BREAK_PIECE_SPIN = 600; // max degrees/sec of random tumble per axis
+// Units/sec each piece flies outward (along the ground) from the crash site.
+// Higher: a more violent burst, pieces scatter wide — they can end up far
+//   off, across the track (in karts' way) or out of view.
+// Lower: pieces drop in a tight heap where the melon broke; 0 = straight up
+//   only (BREAK_PIECE_UP_SPEED).
+const BREAK_PIECE_SPEED = 220;
+// Units/sec extra upward pop per piece.
+// Higher: pieces fly high and stay in the air longer before landing; too
+//   high and they hit ceilings indoors.
+// Lower: pieces skid along the ground instead of flying; 0 = no pop.
+const BREAK_PIECE_UP_SPEED = 180;
+// Max degrees/sec of random tumble per axis.
+// Higher: pieces spin wildly through the air, a more chaotic burst.
+// Lower: pieces fly calmer, keeping their orientation; 0 = no spin at all.
+const BREAK_PIECE_SPIN = 600;
+
+// Tracks, checkpoints and the hub -> race -> next-track flow.
 
 // The map has multiple separate tracks, so a checkpoint's script input
 // parameter names both which track it belongs to and its position along
@@ -310,6 +392,21 @@ const RacePhase = /** @type {const} */ ({
 
 const HUB_TRIGGER_NAME = "hub_start_trigger";
 
+const COUNTDOWN_SECONDS = 3;
+const GO_DISPLAY_SECONDS = 1; // how long "GO!" stays on screen once the countdown ends
+const BREAK_SECONDS = 10; // fixed by the original request
+// Spacing between racers teleported onto the same start line side-by-side,
+// so they don't spawn stacked on top of each other.
+const RACE_SPAWN_LATERAL_SPACING = 120;
+
+// Track start/finish trigger naming convention:
+// "track_start_<trackId>_cp<checkpointCount>_laps<lapsToWin>" (e.g.
+// "track_start_1_cp8_laps3"). See GetTrackConfig() in track-config.js for
+// how this is parsed, cached, and used as each track's start position.
+const START_TRIGGER_NAME_PATTERN = /^track_start_(\d+)_cp(\d+)_laps(\d+)$/;
+
+// Melon painting: paint triggers and the user menu's color swatches.
+
 // Paint triggers: place a trigger_multiple anywhere (hub is the intended
 // use, but nothing restricts it there) named "paint_trigger_<r>_<g>_<b>"
 // (e.g. "paint_trigger_255_0_0" for red), filtered to prop_physics like the
@@ -319,18 +416,6 @@ const HUB_TRIGGER_NAME = "hub_start_trigger";
 // paint trigger's color is a pure Hammer edit, same convention as
 // track_start_* in GetTrackConfig().
 const PAINT_TRIGGER_NAME_PATTERN = /^paint_trigger_(\d+)_(\d+)_(\d+)$/;
-
-// Generic teleporters, same name-carries-the-config convention: a
-// trigger_multiple named "teleport_to_<destination>" (filtered to
-// prop_physics) with OnStartTouch -> RunScriptInput "melon_teleport" sends
-// the touching melon to the entity named <destination> (e.g. an
-// info_target), facing that entity's yaw. One shared handler for every
-// teleporter — adding one is a pure Hammer edit. A teleport only moves the
-// melon; it never changes its respawn point / checkpoint progress.
-const TELEPORT_TRIGGER_NAME_PATTERN = /^teleport_to_(.+)$/;
-// true: keep the melon's horizontal speed, redirected along the
-// destination's facing; false: arrive standing still.
-const TELEPORT_KEEP_SPEED = true;
 
 // Color swatches offered by the user menu's color picker (see the
 // "usermenu_color_<key>" buttonId handling in index.js's OnCustomHudClicked)
@@ -349,22 +434,37 @@ const COLOR_PRESETS = {
     black: { r: 40, g: 40, b: 40, a: 255 },
 };
 
+// Teleporters and the lift applied to every trigger/destination teleport target.
+
+// Generic teleporters, same name-carries-the-config convention: a
+// trigger_multiple named "teleport_to_<destination>" (filtered to
+// prop_physics) with OnStartTouch -> RunScriptInput "melon_teleport" sends
+// the touching melon to the entity named <destination> (e.g. an
+// info_target), facing that entity's yaw. One shared handler for every
+// teleporter — adding one is a pure Hammer edit. A teleport only moves the
+// melon; it never changes its respawn point / checkpoint progress.
+const TELEPORT_TRIGGER_NAME_PATTERN = /^teleport_to_(.+)$/;
+// true: keep the melon's horizontal speed, redirected along the
+// destination's facing; false: arrive standing still.
+const TELEPORT_KEEP_SPEED = true;
+
+// Race-flow teleports (heat start, checkpoint respawns) target a trigger_multiple's
+// raw GetAbsOrigin() — Hammer mappers commonly sink a trigger's brush a bit
+// into the floor so a fast-moving physics prop reliably touches it instead
+// of tunneling past a paper-thin volume. Teleporting the melon to that exact
+// height would embed it in solid ground; VPhysics can't resolve that
+// overlap upward and the melon tunnels down through the floor instead. Lift
+// the target up by this much so the melon always drops onto the floor from
+// just above it, same trick as SPAWN_UP_OFFSET (spawn.js).
+const TELEPORT_UP_OFFSET = 40;
+
+// Spawning: the melon template, spawn entities, intro logo, and the frozen pawn.
+
+const MELON_TEMPLATE_NAME = "melon_template";
+
 // How long the Melon Racer logo (intro_logo in speedometer.xml) shows after
 // a player picks a team, before their melon spawns at the intro.
 const INTRO_LOGO_SECONDS = 5;
-
-const COUNTDOWN_SECONDS = 3;
-const GO_DISPLAY_SECONDS = 1; // how long "GO!" stays on screen once the countdown ends
-const BREAK_SECONDS = 10; // fixed by the original request
-// Spacing between racers teleported onto the same start line side-by-side,
-// so they don't spawn stacked on top of each other.
-const RACE_SPAWN_LATERAL_SPACING = 120;
-
-// Track start/finish trigger naming convention:
-// "track_start_<trackId>_cp<checkpointCount>_laps<lapsToWin>" (e.g.
-// "track_start_1_cp8_laps3"). See GetTrackConfig() in track-config.js for
-// how this is parsed, cached, and used as each track's start position.
-const START_TRIGGER_NAME_PATTERN = /^track_start_(\d+)_cp(\d+)_laps(\d+)$/;
 
 // How far above the floor under a spawn entity (hub_spawn, intro_spawn) the
 // melon's origin appears — straight above it, no sideways offset (see
@@ -389,20 +489,12 @@ const HUB_SPAWN_NAME = "hub_spawn";
 const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
 const INTRO_SPAWN_NAME = "intro_spawn";
 
-// Race-flow teleports (heat start, checkpoint respawns) target a trigger_multiple's
-// raw GetAbsOrigin() — Hammer mappers commonly sink a trigger's brush a bit
-// into the floor so a fast-moving physics prop reliably touches it instead
-// of tunneling past a paper-thin volume. Teleporting the melon to that exact
-// height would embed it in solid ground; VPhysics can't resolve that
-// overlap upward and the melon tunnels down through the floor instead. Lift
-// the target up by this much so the melon always drops onto the floor from
-// just above it, same trick as SPAWN_UP_OFFSET above.
-const TELEPORT_UP_OFFSET = 40;
-
 // The frozen pawn (CSMoveType.NOCLIP: non-solid, but WASD still flies it)
 // stays where it spawned — see HoldPawn in kart-spawn.js. It's only put back
 // once it has drifted further than this, not every tick.
 const PAWN_DRIFT_TOLERANCE = 16;
+
+// Chase camera offsets and the user menu's distance/height presets.
 
 // Offsets for CameraFollowConfig — behind and above the melon. cameraOffset
 // is rotated by the player's eye angles: x is forward (negative = behind),
@@ -426,6 +518,8 @@ const CAMERA_HEIGHT_MAX = 160;
 const CAMERA_HEIGHT_DEFAULT = CAMERA_HEIGHT_MIN; // lowest setting feels best in play (was 80)
 const CAMERA_HEIGHT_STEPS = 3; // must match the camheight_seg_* buttons in speedometer.xml
 
+// HUD entity and the speedometer/jump/health bars in speedometer.xml.
+
 // Name of the custom_hud_layout entity (place one in Hammer pointing at
 // panorama/layout/custom_game/speedometer.vxml) that shows the speedometer.
 const SPEED_HUD_ENTITY_NAME = "speed_hud";
@@ -445,8 +539,16 @@ const HEALTH_BAR_SEGMENTS = 20;
 const HEALTH_LOW_FRACTION = 0.6;
 const HEALTH_CRITICAL_FRACTION = 0.3;
 
+// Debug output timing.
+
 // Think's debug heartbeat log interval — see think.js.
 const HEARTBEAT_INTERVAL = 1; // seconds
+
+// All tunable numbers and static/Hammer-naming-convention data for
+// melon_drive, one file per system they configure. Import from here, not
+// from the single files. Actual mutable runtime state (kart registry, race
+// phase, caches) lives with the module that owns it instead — see
+// kart-registry.js, race-flow.js, track-config.js.
 
 // Every kart's prediction-line dot entities (see prediction.js). They sit
 // right on the melon's line of travel, so a trace along it — the prediction
@@ -589,7 +691,7 @@ function FindKartByMelon(melon) {
 // Pure ground/wall contact and wall-jump rules — no cs_script import, so
 // it's unit-testable in Node (see test/contact.test.mjs). physics/contact.js and physics/jump.js
 // runs the traces and feeds the results in here. See the JUMP_SPEED /
-// WALL_PROBE_DIRECTIONS comments in constants.js for the design.
+// WALL_PROBE_DIRECTIONS comments in constants/jump.js for the design.
 
 /**
  * The melon's vertical acceleration over the last tick: the vertical
@@ -808,7 +910,7 @@ function PickIncomingVelocity(last, prev, n) {
 /**
  * Reflects a horizontal velocity off a wall and scales it by the angle's
  * rating (BOUNCE_RATINGS[].speedMultiplier) and the jump timing (see
- * WALL_BOUNCE_* in constants.js).
+ * WALL_BOUNCE_* in constants/wall-bounce.js).
  * @param {{ x: number, y: number }} v incoming velocity
  * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal
  * @param {number} jumpFactor 0..1, see JumpTimingFactor
@@ -2674,7 +2776,7 @@ function DebugDrawBounce(kart, n, incoming, outgoing, angle) {
 
 /**
  * Reflects the melon's pre-impact horizontal velocity off a wall and scales
- * it by how well the hit was angled (see WALL_BOUNCE_* in constants.js).
+ * it by how well the hit was angled (see WALL_BOUNCE_* in constants/wall-bounce.js).
  * Vertical velocity is left to physics — a bounce never launches upward.
  * @param {import("../kart-registry.js").Kart} kart @param {{ x: number, y: number, method: string, hitPoint?: any }} n @param {number} now
  * @returns {{ velocity: { x: number, y: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number } | null}
@@ -3581,7 +3683,7 @@ function RegisterCheckpointAndFinishInputs() {
     }
 }
 
-// Wall-bounce prediction line — see PREDICTION_* in constants.js for the
+// Wall-bounce prediction line — see PREDICTION_* in constants/prediction.js for the
 // design. Recomputed every tick from the melon's actual velocity (the same
 // direction the bounce itself measures its angle from), and its angle
 // rating comes from the same WallAngleFactor/GetBounceRating the bounce

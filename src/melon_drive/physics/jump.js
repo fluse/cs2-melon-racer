@@ -5,7 +5,7 @@
 import { Debug } from "../debug.js";
 import { CanGroundJump, CanWallJump, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter } from "../logic/contact.js";
 import { JumpTimingFactor, JumpMultiplier } from "../logic/wall-bounce.js";
-import { JUMP_SPEED, MAX_SPEED, WALL_TIMING_SPAM_LOCKOUT } from "../constants.js";
+import { JUMP_SPEED, MAX_SPEED, WALL_TIMING_SPAM_LOCKOUT } from "../constants/index.js";
 import { LogJumpPress } from "./jump-debug.js";
 
 /**

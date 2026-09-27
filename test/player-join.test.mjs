@@ -10,7 +10,7 @@ import { world, Entity, CSPlayerPawn, PointTemplate, CustomCameraMode } from "./
 const { karts } = await import("../src/melon_drive/kart-registry.js");
 const { SetUpPlayerKart, EnsurePlayerKarts, HoldPawn } = await import("../src/melon_drive/kart-spawn.js");
 const { GetIntroSpawnPoint } = await import("../src/melon_drive/spawn-points.js");
-const { MELON_TEMPLATE_NAME, INTRO_SPAWN_NAME, PAWN_DRIFT_TOLERANCE, INTRO_LOGO_SECONDS, SPEED_HUD_ENTITY_NAME } = await import("../src/melon_drive/constants.js");
+const { MELON_TEMPLATE_NAME, INTRO_SPAWN_NAME, PAWN_DRIFT_TOLERANCE, INTRO_LOGO_SECONDS, SPEED_HUD_ENTITY_NAME } = await import("../src/melon_drive/constants/index.js");
 
 const INTRO = { x: -2000, y: -900, z: 24 };
 const PLAYER_SPAWN = { x: 5000, y: 5000, z: 0 };
