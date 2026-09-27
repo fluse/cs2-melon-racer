@@ -19,7 +19,7 @@ function Debug(text) {
 // (sent_melon_base/init.lua ENT:Think + gamemode/shared.lua DefXSpeed):
 // forward is the strongest push, reverse is half that, strafe is weaker
 // still — keeping FORWARD_ACCEL as our existing tuned baseline.
-const FORWARD_ACCEL = 500; // units/sec^2 while holding forward (was 900 — lowered for a heavier, slower build-up: ~1.1s instead of ~0.7s to MAX_SPEED)
+const FORWARD_ACCEL = 400; // units/sec^2 while holding forward (was 900, then 500 — lowered for a heavier, slower build-up: ~1.6s to MAX_SPEED)
 const REVERSE_ACCEL = FORWARD_ACCEL * 0.5; // 0.5x forward, matches original's Reverse/Forward ratio
 const STRAFE_ACCEL = FORWARD_ACCEL * 0.4; // 0.4x forward, matches original's Strafe/Forward ratio
 const MAX_SPEED = 650; // units/sec, horizontal speed cap
@@ -44,6 +44,18 @@ const MELON_REST_SPEED = 2; // units/sec
 // it's resting on — whether that nudge grows into a proper topple or just
 // gets damped straight back to rest.
 const SETTLE_NUDGE_ANGULAR_SPEED = 40; // deg/sec, one-off pitch/roll kick on settling
+
+// Steering grip: while holding forward on the ground, the melon's horizontal
+// velocity is turned towards the look direction by up to STEER_GRIP_RATE
+// degrees per second, keeping its speed — so it goes where the camera points
+// instead of only being pushed that way by FORWARD_ACCEL (which at MAX_SPEED
+// turned it slowly, like a hovercraft). Only for velocity that is at most
+// STEER_GRIP_MAX_ANGLE off the look direction: looking back or far to the
+// side is braking/turning around via plain acceleration, not a snap U-turn.
+// No grip in the air, so a wall bounce's outgoing angle isn't bent right away.
+// Higher STEER_GRIP_RATE: more direct, less drift. 0 = off (old behavior).
+const STEER_GRIP_RATE = 180; // degrees/sec
+const STEER_GRIP_MAX_ANGLE = 100; // degrees
 
 // Jumping: ground jump, wall jump, and the ground contact they rely on (see logic/contact.js).
 
@@ -149,6 +161,21 @@ const IMPACT_DAMAGE_THRESHOLD = 450;
 //   breaking needs many hard hits.
 const IMPACT_DAMAGE_SCALE = 0.2;
 
+// Heal zones: a trigger_multiple (filtered to prop_physics like the other
+// triggers) with OnStartTouch -> RunScriptInput "heal_enter" and OnEndTouch
+// -> RunScriptInput "heal_leave" heals the melon over time while it's
+// inside. Health per second, used for a zone whose name doesn't set its own
+// rate (see HEAL_ZONE_NAME_PATTERN).
+// Higher: a quick stop in the zone refills the melon — heal zones become
+//   pit stops you barely slow down for.
+// Lower: healing takes a long stay; driving through only helps a little.
+const HEAL_ZONE_RATE = 10;
+// Optional per-zone rate: a heal trigger named "heal_zone_<rate>" (e.g.
+// "heal_zone_25") heals <rate> health per second instead of HEAL_ZONE_RATE.
+// Any other name uses HEAL_ZONE_RATE. Overlapping zones don't stack — the
+// fastest one counts.
+const HEAL_ZONE_NAME_PATTERN = /^heal_zone_(\d+(?:\.\d+)?)$/;
+
 // Wall bounce: contact rules, speed-for-health trade, ratings, bounce HUD and the PERFECT spark.
 
 // Wall bounce: an impact against a wall (any world/brush surface whose
@@ -185,11 +212,6 @@ const WALL_TOUCH_MIN_STOP_SPEED = 60; // units/sec of speed into the wall that m
 const WALL_CONTACT_MIN_STOP = 0.5; // fraction of the into-the-wall speed the impact must have taken away — a landing or friction leaves it almost untouched, a real wall stops it
 const WALL_BOUNCE_TRACE_RADIUS = 8; // backup sphere sweep from the current position, for posts/edges the ray slips past
 const WALL_BOUNCE_SPHERE_TRACE_DISTANCE = 48;
-// DEBUG only (debug.js): world lines drawn per bounce — wall normal green,
-// incoming red, outgoing blue, look direction yellow — plus a log line with
-// the velocity-based vs. look-based angle.
-const WALL_BOUNCE_DEBUG_SECONDS = 4;
-const WALL_BOUNCE_DEBUG_LINE_LENGTH = 96;
 const WALL_BOUNCE_OPTIMAL_ANGLE = 45; // degrees from the wall normal where the bounce is strongest
 const WALL_BOUNCE_ANGLE_FALLOFF = 45; // degrees away from optimal at which the bonus has faded out completely
 const WALL_BOUNCE_PERFECT_JUMP_WINDOW = 0.12; // seconds, before or after the hit
@@ -209,8 +231,8 @@ const WALL_BOUNCE_COOLDOWN = 0.2; // seconds — stops one wall contact from bou
 // affects speed, not damage. Anything rated PERFECT (BOUNCE_RATINGS[0]) costs
 // no health at all; one with no angle bonus pays full price. Charged once the jump window has
 // closed (a late jump can still add speed), not on impact itself.
-const WALL_IMPACT_DAMAGE_THRESHOLD = 450;
-const WALL_IMPACT_DAMAGE_SCALE = 0.2;
+const WALL_IMPACT_DAMAGE_THRESHOLD = 200; // units/sec — same as WALL_BOUNCE_MIN_IMPACT, so any bounce that isn't PERFECT costs health from its first unit/sec
+const WALL_IMPACT_DAMAGE_SCALE = 0.3; // health lost per unit/sec beyond the threshold (before the angle reduction)
 const WALL_BOUNCE_DAMAGE_PER_SPEED = 0.05; // health lost per unit/sec gained by a bounce
 // A bounce may lift the melon above MAX_SPEED — deliberately with no upper
 // limit, chained bounces stack. The raised cap then decays back towards
@@ -223,8 +245,9 @@ const PERFECT_BOUNCE_FLASH_SECONDS = 0.4;
 const PERFECT_BOUNCE_ANGLE_FACTOR = 0.8;
 // point_template placed in Hammer holding the spark's info_particle_system:
 // spawned at the melon on every wall bounce the HUD rates PERFECT
-// (BOUNCE_RATINGS[0]) — a fresh copy per hit, so perfect hits by several
-// karts at once each get their own spark. Must match the name in Hammer.
+// (BOUNCE_RATINGS[0]) — two fresh copies per hit, one left at the wall and
+// one parented to the melon so its player sees it too, and perfect hits by
+// several karts at once each get their own. Must match the name in Hammer.
 const PERFECT_SPARK_TEMPLATE_NAME = "perfect_hit_particle_template";
 // Seconds a spawned spark is kept before it's removed. Removing the
 // info_particle_system ends its particles, so this is an upper bound.
@@ -249,8 +272,11 @@ const BOUNCE_JUMP_SEGMENTS = 5;
 // rating does to the melon's speed (before jump timing). cssClass colors the panel; color is the same
 // accent for the in-world prediction line (see prediction.js) — keep the two
 // in sync with speedometer.css's .Rating* rules.
+// PERFECT counts within this many degrees either side of
+// WALL_BOUNCE_OPTIMAL_ANGLE (was 4.5°, i.e. minAngleFactor 0.9).
+const PERFECT_BOUNCE_TOLERANCE = 6.5; // degrees
 const BOUNCE_RATINGS = [
-    { minAngleFactor: 0.9, label: "PERFECT", speedMultiplier: 1.35, cssClass: "RatingPerfect", color: { r: 255, g: 224, b: 102, a: 255 } },
+    { minAngleFactor: 1 - PERFECT_BOUNCE_TOLERANCE / WALL_BOUNCE_ANGLE_FALLOFF, label: "PERFECT", speedMultiplier: 1.35, cssClass: "RatingPerfect", color: { r: 255, g: 224, b: 102, a: 255 } },
     { minAngleFactor: 0.7, label: "GOOD", speedMultiplier: 1.1, cssClass: "RatingGood", color: { r: 102, g: 221, b: 102, a: 255 } },
     { minAngleFactor: 0.4, label: "BAD", speedMultiplier: 0.5, cssClass: "RatingBad", color: { r: 102, g: 170, b: 255, a: 255 } },
     { minAngleFactor: 0, label: "MISS", speedMultiplier: 0.3, cssClass: "RatingMiss", color: { r: 255, g: 102, b: 102, a: 255 } },
@@ -624,6 +650,7 @@ function TraceSphere(config) {
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   predictionDots?: any[], // this kart's prediction-line dot entities, see prediction.js
  *   pendingBounce?: { time: number, impactSpeed: number, impactDir: { x: number, y: number, z: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number }, // damage not yet charged — waits out the jump window, see SettleWallBounceDamage
+ *   healZones?: Map<any, number>, // heal triggers the melon is inside -> their rate (health/s), see physics/heal.js
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
  * }} Kart
  */
@@ -1294,6 +1321,28 @@ function HealthBarState(health) {
         low: fraction <= HEALTH_LOW_FRACTION,
         critical: fraction <= HEALTH_CRITICAL_FRACTION,
     };
+}
+
+/**
+ * Health after healing for dt seconds at rate health/second, never above
+ * MELON_MAX_HEALTH (and never lowering a value that's already above it).
+ * @param {number} health @param {number} rate @param {number} dt
+ */
+function HealedHealth(health, rate, dt) {
+    if (health >= MELON_MAX_HEALTH) {
+        return health;
+    }
+    return Math.min(MELON_MAX_HEALTH, health + Math.max(0, rate) * Math.max(0, dt));
+}
+
+/**
+ * Heal rate (health/second) of a heal trigger: parsed from a
+ * "heal_zone_<rate>" name, else HEAL_ZONE_RATE.
+ * @param {string} triggerName
+ */
+function HealZoneRate(triggerName) {
+    const match = HEAL_ZONE_NAME_PATTERN.exec(triggerName.trim());
+    return match ? Number(match[1]) : HEAL_ZONE_RATE;
 }
 
 // Pure step <-> value math for the user menu's camera presets (a row of
@@ -2196,6 +2245,34 @@ function IsOnPlayingTeam(pawn) {
     return team === 2 || team === 3;
 }
 
+// Steering grip (see STEER_GRIP_* in constants/driving.js): turning the
+// melon's velocity towards where the player looks. Pure math, no engine.
+
+/**
+ * Turns horizontal velocity `v` towards unit direction `dir` by at most
+ * `maxTurn` degrees, keeping its length. Unchanged if it's standing still or
+ * more than `maxAngle` degrees away from `dir`.
+ * @param {{ x: number, y: number }} v @param {{ x: number, y: number }} dir
+ * @param {number} maxTurn @param {number} maxAngle
+ * @returns {{ x: number, y: number }}
+ */
+function SteerTowards(v, dir, maxTurn, maxAngle) {
+    const speed = Math.hypot(v.x, v.y);
+    if (speed === 0 || maxTurn <= 0) {
+        return { x: v.x, y: v.y };
+    }
+    const current = Math.atan2(v.y, v.x);
+    const target = Math.atan2(dir.y, dir.x);
+    // Signed difference in -PI..PI.
+    const diff = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+    if (Math.abs(diff) > (maxAngle * Math.PI) / 180) {
+        return { x: v.x, y: v.y };
+    }
+    const limit = (maxTurn * Math.PI) / 180;
+    const angle = current + Math.max(-limit, Math.min(limit, diff));
+    return { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed };
+}
+
 // Engine side of ground/wall contact: the floor and wall probes (line
 // traces — see UpdateGrounded for why not TraceSphere). The rules are in
 // ../logic/contact.js; what the probes saw goes to jump-debug.js for the
@@ -2451,6 +2528,40 @@ function SpawnBreakParticles(position, angles, color) {
     return true;
 }
 
+// Heal zones: while a melon is inside one or more heal triggers (heal_enter /
+// heal_leave, see HEAL_ZONE_RATE), its health refills over time.
+
+/**
+ * Heals the melon for this tick at the fastest rate of the zones it's in.
+ * Zone entities that no longer exist are dropped.
+ * @param {import("../kart-registry.js").Kart} kart @param {number} dt
+ */
+function ApplyHealing(kart, dt) {
+    if (!kart.healZones || kart.healZones.size === 0) {
+        return;
+    }
+    let rate = 0;
+    for (const [zone, zoneRate] of kart.healZones) {
+        if (!zone.IsValid()) {
+            kart.healZones.delete(zone);
+            continue;
+        }
+        rate = Math.max(rate, zoneRate);
+    }
+    kart.health = HealedHealth(kart.health, rate, dt);
+}
+
+/**
+ * Forgets every heal zone the melon was in — for teleports/respawns, where
+ * the zone's OnEndTouch may never reach us (the melon left it by teleport,
+ * or it's a brand new melon entity). If the melon lands inside a zone, the
+ * zone's next OnStartTouch adds it back.
+ * @param {import("../kart-registry.js").Kart} kart
+ */
+function LeaveHealZones(kart) {
+    kart.healZones?.clear();
+}
+
 // Moving a kart's melon on purpose: checkpoint respawn, generic teleports,
 // and its paint color (kept across breaks).
 
@@ -2476,6 +2587,7 @@ function RespawnKartAtCheckpoint(kart) {
     kart.settled = false;
     kart.speedCap = undefined;
     kart.pendingBounce = undefined;
+    LeaveHealZones(kart);
 }
 
 /**
@@ -2496,6 +2608,7 @@ function TeleportKartTo(kart, position, angles, velocity) {
     kart.prevOrigin = undefined;
     kart.settled = false;
     kart.pendingBounce = undefined;
+    LeaveHealZones(kart);
 }
 
 /**
@@ -2585,6 +2698,7 @@ function RespawnDestroyedMelon(slot, kart) {
     kart.settled = false;
     kart.speedCap = undefined;
     kart.pendingBounce = undefined;
+    LeaveHealZones(kart); // a new melon entity — the old one's zones never send heal_leave
     ApplyCameraFollow(kart);
 }
 
@@ -2648,7 +2762,7 @@ function HandleMelonLost(slot, kart) {
 }
 
 // Engine side of the wall bounce: finding the wall's normal on impact
-// (traces + IsWallContact), computing the bounce, DEBUG drawing, and
+// (traces + IsWallContact), computing the bounce, DEBUG logging, and
 // charging its damage once the jump-timing window closes. The math is in
 // ../logic/wall-bounce.js.
 
@@ -2742,38 +2856,18 @@ function DetectWallNormal(kart, impactDelta) {
 }
 
 /**
- * DEBUG only: draws the bounce in the world for a few seconds — wall normal
- * (green), measured incoming direction (red), outgoing direction (blue),
- * and where the player was *looking* (yellow) — and logs the velocity-based
- * angle next to the look-based one, so a "that felt like 45°" mismatch can
- * be told apart from a measuring bug.
+ * DEBUG only: logs the velocity-based bounce angle next to the look-based
+ * one, so a "that felt like 45°" mismatch can be told apart from a
+ * measuring bug.
  * @param {import("../kart-registry.js").Kart} kart
- * @param {{ x: number, y: number, method: string, hitPoint?: any }} n
- * @param {{ x: number, y: number }} incoming @param {{ x: number, y: number }} outgoing @param {number} angle
+ * @param {{ x: number, y: number, method: string }} n @param {number} angle
  */
-function DebugDrawBounce(kart, n, incoming, outgoing, angle) {
+function DebugLogBounce(kart, n, angle) {
     if (!DEBUG) {
         return;
     }
-    const origin = kart.melon.GetAbsOrigin();
-    const at = n.hitPoint ?? origin;
-    const len = WALL_BOUNCE_DEBUG_LINE_LENGTH;
-    const duration = WALL_BOUNCE_DEBUG_SECONDS;
-    /** @param {{ x: number, y: number }} d */
-    const unit = (d) => {
-        const l = Math.hypot(d.x, d.y) || 1;
-        return { x: d.x / l, y: d.y / l };
-    };
-    const inDir = unit(incoming);
-    const outDir = unit(outgoing);
     const yaw = (kart.pawn.GetEyeAngles().yaw * Math.PI) / 180;
     const lookDir = { x: Math.cos(yaw), y: Math.sin(yaw) };
-
-    Instance.DebugLine({ start: at, end: { x: at.x + n.x * len, y: at.y + n.y * len, z: at.z }, duration, color: { r: 0, g: 255, b: 0 } });
-    Instance.DebugLine({ start: { x: at.x - inDir.x * len, y: at.y - inDir.y * len, z: at.z }, end: at, duration, color: { r: 255, g: 60, b: 60 } });
-    Instance.DebugLine({ start: at, end: { x: at.x + outDir.x * len, y: at.y + outDir.y * len, z: at.z }, duration, color: { r: 80, g: 140, b: 255 } });
-    Instance.DebugLine({ start: origin, end: { x: origin.x + lookDir.x * len, y: origin.y + lookDir.y * len, z: origin.z }, duration, color: { r: 255, g: 224, b: 102 } });
-
     const lookInto = -(lookDir.x * n.x + lookDir.y * n.y);
     const lookAngle = lookInto > 0 ? (Math.acos(Math.min(1, lookInto)) * 180) / Math.PI : NaN;
     Debug(
@@ -2799,7 +2893,7 @@ function ComputeWallBounce(kart, n, now) {
     if (!bounce) {
         return null;
     }
-    DebugDrawBounce(kart, n, v, bounce.velocity, bounce.angle);
+    DebugLogBounce(kart, n, bounce.angle);
     if (GetBounceRating(bounce.angleFactor) === BOUNCE_RATINGS[0]) {
         PlayPerfectSpark(kart);
     }
@@ -2807,9 +2901,12 @@ function ComputeWallBounce(kart, n, now) {
 }
 
 /**
- * Spawns a fresh copy of the perfect_hit_particle_template at the melon and
- * starts it, removed again after PERFECT_SPARK_LIFETIME — one copy per hit,
- * so several karts' perfect hits at the same moment each show their own.
+ * Spawns two fresh copies of the perfect_hit_particle_template and starts
+ * them, removed again after PERFECT_SPARK_LIFETIME: one left at the hit spot
+ * on the wall, and one parented to the melon so it rides along — the melon
+ * is off the wall so fast that the player would otherwise never see the
+ * spark behind them. Fresh copies per hit, so several karts' perfect hits
+ * at the same moment each show their own.
  * @param {import("../kart-registry.js").Kart} kart
  */
 function PlayPerfectSpark(kart) {
@@ -2819,18 +2916,27 @@ function PlayPerfectSpark(kart) {
         return;
     }
     const position = kart.melon.GetAbsOrigin();
-    const spawned = template.ForceSpawn(position) ?? [];
-    for (const entity of spawned) {
-        // ForceSpawn keeps the entity's Hammer offset from its template — put
-        // it exactly on the melon, and start it explicitly (see
-        // SpawnParticleTemplate in break-effects.js for why).
-        entity.Teleport({ position });
-        if (entity.GetClassName() === "info_particle_system") {
-            Instance.EntFireAtTarget({ target: entity, input: "Start" });
+    /** @type {import("cs_script/point_script").Entity[]} */
+    const spawned = [];
+    for (const followMelon of [false, true]) {
+        const copy = template.ForceSpawn(position) ?? [];
+        for (const entity of copy) {
+            // ForceSpawn keeps the entity's Hammer offset from its template — put
+            // it exactly on the melon, and start it explicitly (see
+            // SpawnParticleTemplate in break-effects.js for why).
+            entity.Teleport({ position });
+            if (followMelon) {
+                entity.SetParent(kart.melon);
+            }
+            if (entity.GetClassName() === "info_particle_system") {
+                Instance.EntFireAtTarget({ target: entity, input: "Start" });
+            }
         }
+        spawned.push(...copy);
     }
     Instance.Delay(PERFECT_SPARK_LIFETIME).then(() => {
         for (const entity of spawned) {
+            // The melon's copy goes with the melon if that's removed first.
             if (entity.IsValid()) {
                 entity.Remove();
             }
@@ -2906,6 +3012,9 @@ function UpdateKart(slot, kart, dt) {
     }
 
     const now = Instance.GetGameTime();
+    // Heal zones (heal_enter/heal_leave) — before this tick's damage, so a
+    // hit inside a zone still breaks the melon if it's big enough.
+    ApplyHealing(kart, dt);
     // A wall bounce's jump-timing window has closed — its quality is final,
     // so charge (or waive) its damage now.
     if (kart.pendingBounce && now - kart.pendingBounce.time > WALL_BOUNCE_PERFECT_JUMP_WINDOW) {
@@ -3043,6 +3152,15 @@ function UpdateKart(slot, kart, dt) {
     // still steer out of the bounce the same tick.
     let vx = bounceVelocity ? bounceVelocity.x : currentVelocity.x;
     let vy = bounceVelocity ? bounceVelocity.y : currentVelocity.y;
+
+    // Steering grip (STEER_GRIP_*): on the ground, holding forward turns the
+    // velocity itself towards the look direction. Not on a bounce tick — the
+    // reflected velocity is the bounce's result and stays as computed.
+    if (forwardInput > 0 && grounded && !bounceVelocity) {
+        const steered = SteerTowards({ x: vx, y: vy }, forwardDir, STEER_GRIP_RATE * dt, STEER_GRIP_MAX_ANGLE);
+        vx = steered.x;
+        vy = steered.y;
+    }
 
     if (forwardInput !== 0 || strafeInput !== 0) {
         const forwardAccel = forwardInput > 0 ? FORWARD_ACCEL : REVERSE_ACCEL;
@@ -3242,6 +3360,7 @@ function BeginHeat(trackId) {
         kart.settled = false;
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
         kart.pendingBounce = undefined;
+        LeaveHealZones(kart);
         // trackId is set directly instead of waiting for the physical
         // checkpoint_<trackId>_1 trigger touch to report it, so the
         // checkpoint/lap panel is already visible ("0/N", lap "1/M") the
@@ -3354,6 +3473,7 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.settled = false;
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
         kart.pendingBounce = undefined;
+        LeaveHealZones(kart);
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot === undefined) {
             return;
@@ -4194,6 +4314,30 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
         TeleportExitVelocity(kart.melon.GetAbsVelocity(), yaw)
     );
     Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"`);
+});
+
+// Heal zones — see HEAL_ZONE_RATE for the Hammer convention: OnStartTouch ->
+// "heal_enter", OnEndTouch -> "heal_leave". The trigger itself (caller) is
+// remembered, so overlapping zones and their leaves are tracked separately;
+// its name may set the rate (heal_zone_<rate>). Healing happens per tick in
+// ApplyHealing (physics/heal.js).
+Instance.OnScriptInput("heal_enter", ({ caller, activator }) => {
+    const kart = activator && FindKartByMelon(activator);
+    if (!kart || !caller) {
+        Debug("heal_enter: activator wasn't a tracked melon, ignoring");
+        return;
+    }
+    const rate = HealZoneRate(caller.GetEntityName());
+    (kart.healZones ??= new Map()).set(caller, rate);
+    Debug(`heal_enter: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} in "${caller.GetEntityName()}" (${rate}/s)`);
+});
+
+Instance.OnScriptInput("heal_leave", ({ caller, activator }) => {
+    const kart = activator && FindKartByMelon(activator);
+    if (!kart || !caller) {
+        return;
+    }
+    kart.healZones?.delete(caller);
 });
 
 Instance.OnCustomHudClicked((event) => {
