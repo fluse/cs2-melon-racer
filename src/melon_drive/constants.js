@@ -175,6 +175,10 @@ export const BOOST_DECAY = 150; // units/sec^2
 // with at least this angle factor — i.e. one that cost little or no health.
 export const PERFECT_BOUNCE_FLASH_SECONDS = 0.4;
 export const PERFECT_BOUNCE_ANGLE_FACTOR = 0.8;
+// info_particle_system placed in Hammer that's moved onto the melon and
+// (re)started on every wall bounce the HUD rates PERFECT (BOUNCE_RATINGS[0]).
+// One shared entity: two perfect hits at the same moment show only the later.
+export const PERFECT_SPARK_PARTICLE_NAME = "particle_perfect_spark";
 // Bounce feedback panel (bounce_panel in speedometer.xml, see
 // UpdateBounceHud): shown for this long after each wall bounce.
 export const BOUNCE_HUD_SECONDS = 1.5;

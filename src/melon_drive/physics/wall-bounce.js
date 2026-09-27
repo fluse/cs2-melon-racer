@@ -11,6 +11,7 @@ import {
     ReflectOffWall,
     WallBounceDamage,
     IsWallContact,
+    GetBounceRating,
 } from "../logic/wall-bounce.js";
 import {
     WALL_NORMAL_MAX_Z,
@@ -19,6 +20,8 @@ import {
     WALL_BOUNCE_SPHERE_TRACE_DISTANCE,
     WALL_BOUNCE_DEBUG_SECONDS,
     WALL_BOUNCE_DEBUG_LINE_LENGTH,
+    BOUNCE_RATINGS,
+    PERFECT_SPARK_PARTICLE_NAME,
 } from "../constants.js";
 import { DamageKart } from "./damage.js";
 import { BreakMelon } from "./breaking.js";
@@ -171,7 +174,27 @@ export function ComputeWallBounce(kart, n, now) {
         return null;
     }
     DebugDrawBounce(kart, n, v, bounce.velocity, bounce.angle);
+    if (GetBounceRating(bounce.angleFactor) === BOUNCE_RATINGS[0]) {
+        PlayPerfectSpark(kart);
+    }
     return { ...bounce, jumpFactor };
+}
+
+/**
+ * Plays the particle_perfect_spark info_particle_system at the melon: moved
+ * there, then stopped and started again so a second perfect hit while the
+ * first is still playing restarts it.
+ * @param {import("../kart-registry.js").Kart} kart
+ */
+function PlayPerfectSpark(kart) {
+    const spark = Instance.FindEntityByName(PERFECT_SPARK_PARTICLE_NAME);
+    if (!spark) {
+        Debug(`PlayPerfectSpark: no entity named "${PERFECT_SPARK_PARTICLE_NAME}" in the map`);
+        return;
+    }
+    spark.Teleport({ position: kart.melon.GetAbsOrigin() });
+    Instance.EntFireAtTarget({ target: spark, input: "Stop" });
+    Instance.EntFireAtTarget({ target: spark, input: "Start" });
 }
 
 /**

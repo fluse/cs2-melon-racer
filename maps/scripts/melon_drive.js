@@ -190,6 +190,10 @@ const BOOST_DECAY = 150; // units/sec^2
 // with at least this angle factor — i.e. one that cost little or no health.
 const PERFECT_BOUNCE_FLASH_SECONDS = 0.4;
 const PERFECT_BOUNCE_ANGLE_FACTOR = 0.8;
+// info_particle_system placed in Hammer that's moved onto the melon and
+// (re)started on every wall bounce the HUD rates PERFECT (BOUNCE_RATINGS[0]).
+// One shared entity: two perfect hits at the same moment show only the later.
+const PERFECT_SPARK_PARTICLE_NAME = "particle_perfect_spark";
 // Bounce feedback panel (bounce_panel in speedometer.xml, see
 // UpdateBounceHud): shown for this long after each wall bounce.
 const BOUNCE_HUD_SECONDS = 1.5;
@@ -2686,7 +2690,27 @@ function ComputeWallBounce(kart, n, now) {
         return null;
     }
     DebugDrawBounce(kart, n, v, bounce.velocity, bounce.angle);
+    if (GetBounceRating(bounce.angleFactor) === BOUNCE_RATINGS[0]) {
+        PlayPerfectSpark(kart);
+    }
     return { ...bounce, jumpFactor };
+}
+
+/**
+ * Plays the particle_perfect_spark info_particle_system at the melon: moved
+ * there, then stopped and started again so a second perfect hit while the
+ * first is still playing restarts it.
+ * @param {import("../kart-registry.js").Kart} kart
+ */
+function PlayPerfectSpark(kart) {
+    const spark = Instance.FindEntityByName(PERFECT_SPARK_PARTICLE_NAME);
+    if (!spark) {
+        Debug(`PlayPerfectSpark: no entity named "${PERFECT_SPARK_PARTICLE_NAME}" in the map`);
+        return;
+    }
+    spark.Teleport({ position: kart.melon.GetAbsOrigin() });
+    Instance.EntFireAtTarget({ target: spark, input: "Stop" });
+    Instance.EntFireAtTarget({ target: spark, input: "Start" });
 }
 
 /**

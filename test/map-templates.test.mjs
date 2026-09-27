@@ -11,6 +11,7 @@ import {
     MELON_TEMPLATE_NAME,
     BREAK_PARTICLE_TEMPLATE_NAME,
     BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME,
+    PERFECT_SPARK_PARTICLE_NAME,
 } from "../src/melon_drive/constants.js";
 
 const entities = ReadVmapEntities(fileURLToPath(new URL("../maps/melon_racer.vmap", import.meta.url)));
@@ -74,4 +75,13 @@ test("no entity name has leading or trailing whitespace", () => {
         .filter((e) => typeof e.targetname === "string" && e.targetname !== e.targetname.trim())
         .map((e) => `${e.classname} ${JSON.stringify(e.targetname)}`);
     assert.deepEqual(bad, []);
+});
+
+// Moved onto the melon and started on every PERFECT wall bounce (see
+// PlayPerfectSpark in physics/wall-bounce.js) — a plain entity, not a template.
+test(`"${PERFECT_SPARK_PARTICLE_NAME}" is one info_particle_system with an effect`, () => {
+    const matches = ByName(PERFECT_SPARK_PARTICLE_NAME);
+    assert.equal(matches.length, 1, `expected exactly one entity named "${PERFECT_SPARK_PARTICLE_NAME}", found ${matches.length}`);
+    assert.equal(matches[0].classname, "info_particle_system");
+    assert.ok(matches[0].effect_name, "no particle effect set");
 });

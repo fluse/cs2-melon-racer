@@ -188,6 +188,12 @@ in the world and logs the velocity angle next to the look angle. There's no glob
   segments with the 45° target outlined and the hit segment lit, and a
   jump-timing bar (which still fills in if the jump comes just *after* the
   hit).
+- **Perfect spark:** every bounce rated PERFECT (`BOUNCE_RATINGS[0]`, same
+  as the HUD) moves the map's single `info_particle_system` named
+  `particle_perfect_spark` (`PERFECT_SPARK_PARTICLE_NAME`) onto the melon
+  and restarts it (`Stop` + `Start`). One shared entity, so two perfect hits
+  at the same moment show only the later one; `test/map-templates.test.mjs`
+  checks it exists in the .vmap.
 - **Prediction line** (`prediction.js`, `PREDICTION_*`): a dotted line in
   front of the melon along its current direction of travel up to the next
   wall, then on along the direction it would bounce off in, colored by the
