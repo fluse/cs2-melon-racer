@@ -1,7 +1,7 @@
 // Minimal in-process fake of the engine's "cs_script/point_script" module —
 // just enough for the engine-side files in src/ to load and for tests to
 // drive specific functions with fake entities. Not a simulation: traces
-// never hit anything, Delay() resolves on the next microtask, and every
+// hit nothing unless a test sets world.traceLine/traceSphere, Delay() resolves on the next microtask, and every
 // Instance.OnXxx/SetXxx registration is only recorded (see `world.handlers`).
 //
 // Tests set up the world through `world` (exported below): add entities
@@ -54,6 +54,10 @@ export class CSPlayerPawn extends Entity {
         super({ className: "player" });
         this.slot = slot;
         this.eyeAngles = clone(eyeAngles);
+        /** @type {Set<string>} buttons held (CSInputs names, e.g. "FORWARD") */
+        this.pressed = new Set();
+        /** @type {Set<string>} buttons pressed this tick (e.g. "JUMP") */
+        this.justPressed = new Set();
         this.camera = { mode: 0, config: undefined, SetMode(m) { this.mode = m; }, GetMode() { return this.mode; }, SetFollowConfig(c) { this.config = c; } };
     }
     Teleport(values = {}) {
@@ -63,8 +67,8 @@ export class CSPlayerPawn extends Entity {
     GetEyeAngles() { return clone(this.eyeAngles); }
     GetPlayerController() { return { GetPlayerSlot: () => this.slot }; }
     GetCustomCamera() { return this.camera; }
-    IsInputPressed() { return false; }
-    WasInputJustPressed() { return false; }
+    IsInputPressed(button) { return this.pressed.has(button); }
+    WasInputJustPressed(button) { return this.justPressed.has(button); }
 }
 
 export class PointTemplate extends Entity {
@@ -91,9 +95,12 @@ export const world = {
     handlers: {},
     /** @type {string[]} */
     messages: [],
+    /** Optional overrides for what traces hit: (config) => TraceResult. Default: nothing is ever hit. */
+    traceLine: undefined,
+    traceSphere: undefined,
     /** @template {Entity} T @param {T} e @returns {T} */
     add(e) { this.entities.push(e); return e; },
-    reset() { this.time = 0; this.entities = []; this.messages = []; },
+    reset() { this.time = 0; this.entities = []; this.messages = []; this.traceLine = undefined; this.traceSphere = undefined; },
 };
 
 const noHit = (config) => ({ didHit: false, startedInSolid: false, end: clone(config.end), normal: { x: 0, y: 0, z: 1 }, fraction: 1 });
@@ -105,8 +112,8 @@ const instanceMethods = {
     FindEntitiesByName: (name) => world.entities.filter((e) => e.valid && e.name === name),
     FindEntityByClass: (cls) => world.entities.find((e) => e.valid && e.className === cls),
     FindEntitiesByClass: (cls) => world.entities.filter((e) => e.valid && e.className === cls),
-    TraceLine: noHit,
-    TraceSphere: noHit,
+    TraceLine: (c) => (world.traceLine ?? noHit)(c),
+    TraceSphere: (c) => (world.traceSphere ?? noHit)(c),
     TraceBox: noHit,
     Delay: () => Promise.resolve(),
     EntFireAtTarget: () => {},

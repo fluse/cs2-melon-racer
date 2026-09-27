@@ -408,7 +408,7 @@ is now just a backup rather than the only thing preventing contact. There's
 no separate turn control —
 steering direction is wherever the player is looking (mouse): W/S
 accelerate/brake along that look direction, A/D strafe left/right relative
-to it, Space jumps (only while grounded). A third-person
+to it, Space jumps (only with real ground contact, or off a wall in the air — see "Jumping" below). A third-person
 `CustomPlayerCamera` in `FOLLOW_POSITION` mode chase-cams behind the melon
 directly, so it doesn't need the pawn nearby to work.
 
@@ -423,6 +423,42 @@ Tuning constants (accel, max speed, friction, jump speed, spawn offset,
 camera offsets) live at the top of `melon_drive.js` — iterate them in-game
 via hot reload
 rather than guessing.
+
+## Jumping (implemented)
+
+- **Ground jump** needs real ground contact plus the recharged
+  `JUMP_COOLDOWN`. Contact is measured from physics, not guessed from the
+  distance to the floor: each tick the vertical velocity the script
+  commanded is compared with what physics left of it. Falling freely,
+  gravity takes the full `GRAVITY` (800 u/s²) off; anything holding the
+  melon up cancels a clear part of that (`IsSupported`,
+  `FREE_FALL_FRACTION`). A short trace down confirms the support is
+  floor-like (`GROUND_NORMAL_MIN_Z`), not a wall or an edge — a line trace,
+  not `TraceSphere` (a sphere probe from the melon's center found no floor
+  in-engine at all, which broke jumping). So a melon a
+  few units up in the air is "in the air", whatever its (egg) shape.
+  `GROUND_COYOTE_TIME` (0.08 s) only bridges the tiny hops a rolling melon
+  makes. (Before: a 48-unit ray down from the center counted as ground,
+  plus 0.15 s grace — a melon well into a jump could jump again.)
+- **Wall jump**: in the air, touching a wall and pressing jump pushes the
+  melon off the wall (`WALL_JUMP_PUSH_SPEED`, more if it's already moving
+  away faster — e.g. right after a wall bounce) and up
+  (`WALL_JUMP_UP_SPEED`), keeping its speed along the wall. "Touching" =
+  a line trace in any of `WALL_PROBE_DIRECTIONS` horizontal directions
+  finds a steep, non-prop surface within `WALL_CONTACT_DISTANCE`, or a wall
+  bounce just happened (the melon leaves the wall the moment it bounces);
+  either stays jumpable for `WALL_JUMP_WINDOW`. Independent of the ground
+  jump's cooldown, `WALL_JUMP_COOLDOWN` between two wall jumps, and one
+  wall can't be climbed forever: the next wall jump needs ground contact
+  first or a different wall (`WALL_JUMP_SAME_WALL_DOT`) — bouncing between
+  two facing walls chains. The same press still counts as wall-bounce
+  jump timing.
+- With `DEBUG` on, the contact state is on screen every tick
+  (`GROUND` / `AIR` / `AIR + WALL`, whether it's supported, the measured
+  vertical acceleration, what the floor trace saw), and the touched wall's normal is drawn as an
+  orange line — for checking the detection while driving.
+- Tests: `test/contact.test.mjs` (rules) and `test/jump.test.mjs` (the real
+  `UpdateKart` against the fake engine).
 
 ## Spawn points (implemented)
 

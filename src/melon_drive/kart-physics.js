@@ -4,6 +4,7 @@ import { karts } from "./kart-registry.js";
 import { SpawnMelonAt } from "./kart-spawn.js";
 import { FacePlayerView } from "./spawn-points.js";
 import { ApplyCameraFollow, ApplyBreakCameraZoom } from "./camera.js";
+import { VerticalAccel, IsSupported, IsGrounded, CanWallJump, WallJumpVelocity } from "./logic/contact.js";
 import { PruneBreakEffects, BreakPieceVelocity, RecenterOnto } from "./logic/break-sequence.js";
 import { TraceLine, TraceSphere } from "./trace.js";
 import { JumpTimingFactor, JumpMultiplier, PickIncomingVelocity, ReflectOffWall, WallBounceDamage, IsWallContact } from "./logic/wall-bounce.js";
@@ -16,9 +17,9 @@ import {
     JUMP_SPEED,
     JUMP_COOLDOWN,
     GROUND_CHECK_DISTANCE,
-    GROUND_NORMAL_MIN_Z,
     GROUND_COYOTE_TIME,
-    LANDING_MIN_IMPACT_Z,
+    WALL_PROBE_DIRECTIONS,
+    WALL_CONTACT_DISTANCE,
     IMPACT_DAMAGE_THRESHOLD,
     IMPACT_DAMAGE_SCALE,
     MELON_MAX_HEALTH,
@@ -87,6 +88,15 @@ export function UpdateKart(slot, kart, dt) {
     }
     const origin = melon.GetAbsOrigin();
     const currentVelocity = melon.GetAbsVelocity();
+    // Ground contact from physics (see IsSupported): the vertical velocity we
+    // commanded last tick vs. what it is now. No command to compare against
+    // (first tick after a teleport/respawn, or coming out of rest): a melon
+    // that was lying still is on something, anything else counts as not.
+    const verticalAccel = kart.lastVelocity ? VerticalAccel(kart.lastVelocity.z, currentVelocity.z, dt) : undefined;
+    const supported = verticalAccel !== undefined ? IsSupported(verticalAccel) : kart.settled;
+    const grounded = UpdateGrounded(kart, origin, now, supported);
+    const wallNormalNow = grounded ? undefined : UpdateWallContact(kart, origin, now);
+    DebugDrawContact(slot, kart, grounded, supported, verticalAccel, wallNormalNow);
     /** @type {{ x: number, y: number } | undefined} */
     let bounceVelocity = undefined;
     if (kart.lastVelocity) {
@@ -96,11 +106,8 @@ export function UpdateKart(slot, kart, dt) {
             z: currentVelocity.z - kart.lastVelocity.z,
         };
         const impactSpeed = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
-        // Was falling, and something below just stopped it — a landing,
-        // counts as ground contact for the jump check below.
-        if (kart.lastVelocity.z < 0 && impactDelta.z > LANDING_MIN_IMPACT_Z) {
-            kart.lastGroundedTime = now;
-        }
+        // (A landing needs no special case here any more: the floor stopping
+        // the fall is exactly the support IsSupported measures above.)
         // Right after a bounce the same wall contact often keeps shoving the
         // melon for another tick or two — that's still the bounce (already
         // charged via pendingBounce), not a new crash to take damage from.
@@ -118,6 +125,9 @@ export function UpdateKart(slot, kart, dt) {
                 return;
             }
             bounceVelocity = bounce.velocity;
+            // The melon leaves the wall right away after bouncing, so the
+            // probes won't see it next tick — this is its wall contact.
+            kart.lastWallContact = { time: now, normal: { x: wallNormal.x, y: wallNormal.y } };
             kart.nextBounceTime = now + WALL_BOUNCE_COOLDOWN;
             kart.lastBounceTime = now;
             // Read by UpdateBounceHud for the angle/timing feedback panel.
@@ -222,13 +232,11 @@ export function UpdateKart(slot, kart, dt) {
         }
     }
 
-    // Jump: straight-up force, only with ground contact (tolerant — see
-    // UpdateGrounded/GROUND_COYOTE_TIME) and at most once per JUMP_COOLDOWN
-    // seconds via kart.nextJumpTime.
-    // Only jumps that actually fire count towards wall-bounce timing, so the
-    // cooldown also keeps jump-spamming along a wall from being "perfect".
+    // Jump: straight-up force, only with real ground contact (see
+    // UpdateGrounded / IsSupported) and at most once per JUMP_COOLDOWN
+    // seconds via kart.nextJumpTime. In the air at a wall, a wall jump
+    // instead (see the end of this block).
     let vz = currentVelocity.z;
-    const grounded = UpdateGrounded(kart, origin, now);
     if (jumpPressed) {
         const ready = now >= kart.nextJumpTime;
         const timingPress = RegisterWallTimingPress(kart, now);
@@ -262,6 +270,23 @@ export function UpdateKart(slot, kart, dt) {
                     kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, after);
                 }
             }
+        }
+        // Wall jump — in the air, at (or just off) a wall: push away from
+        // it and up. After the bounce-timing upgrade above, so that one's
+        // extra speed isn't lost; WallJumpVelocity keeps whichever push away
+        // from the wall is stronger.
+        const wallContact = kart.lastWallContact;
+        if (
+            wallContact &&
+            CanWallJump({ now, grounded, wallContact, lastWallJump: kart.lastWallJump, lastGroundedTime: kart.lastGroundedTime })
+        ) {
+            const jump = WallJumpVelocity({ x: vx, y: vy }, wallContact.normal);
+            vx = jump.x;
+            vy = jump.y;
+            vz = jump.z;
+            kart.lastWallJump = { time: now, normal: wallContact.normal };
+            kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, Math.hypot(vx, vy));
+            Debug(`wall jump: slot ${slot}, off wall normal (${wallContact.normal.x.toFixed(2)}, ${wallContact.normal.y.toFixed(2)})`);
         }
     }
 
@@ -314,23 +339,108 @@ function RegisterWallTimingPress(kart, now) {
 }
 
 /**
- * Refreshes kart.lastGroundedTime if there's floor within
- * GROUND_CHECK_DISTANCE below the melon, and reports whether it has had
- * ground contact (this trace, or a landing detected in UpdateKart) within the
- * last GROUND_COYOTE_TIME seconds.
- * @param {import("./kart-registry.js").Kart} kart @param {any} origin @param {number} now
+ * Refreshes kart.lastGroundedTime if the melon is on the ground right now —
+ * held up (`supported`, measured from physics in UpdateKart) by a floor-like
+ * surface a trace finds underneath — and reports whether it had ground
+ * contact within the last GROUND_COYOTE_TIME seconds.
+ * Line traces only, not TraceSphere: a sphere started at the melon's center
+ * apparently counts as starting inside it in-engine — with sphere probes no
+ * floor was ever found and jumping stopped working entirely.
+ * @param {import("./kart-registry.js").Kart} kart @param {any} origin @param {number} now @param {boolean} supported
  */
-function UpdateGrounded(kart, origin, now) {
+function UpdateGrounded(kart, origin, now, supported) {
     const trace = TraceLine({
         start: origin,
         end: { x: origin.x, y: origin.y, z: origin.z - GROUND_CHECK_DISTANCE },
         ignoreEntity: [kart.melon, kart.pawn],
         ignorePlayers: true,
     });
-    if (trace.didHit && !trace.startedInSolid && trace.normal.z >= GROUND_NORMAL_MIN_Z) {
+    const floorNormalZ = trace.didHit && !trace.startedInSolid ? trace.normal.z : undefined;
+    // For the DEBUG overlay: what the floor trace saw.
+    kart.floorProbe = trace.startedInSolid ? "started in solid" : trace.didHit ? `hit, normal z ${trace.normal.z.toFixed(2)}` : "nothing";
+    if (IsGrounded(supported, floorNormalZ)) {
         kart.lastGroundedTime = now;
     }
     return kart.lastGroundedTime !== undefined && now - kart.lastGroundedTime <= GROUND_COYOTE_TIME;
+}
+
+/**
+ * In the air: looks for a wall right next to the melon — a line trace in
+ * each of WALL_PROBE_DIRECTIONS horizontal directions (long enough that the
+ * gaps between directions don't miss a wall), the steep, non-prop hit whose
+ * plane is nearest and within WALL_CONTACT_DISTANCE of the melon's center
+ * wins — and records it as kart.lastWallContact (the wall jump's normal).
+ * @param {import("./kart-registry.js").Kart} kart @param {any} origin @param {number} now
+ * @returns {{ x: number, y: number } | undefined} the touched wall's normal, if any
+ */
+function UpdateWallContact(kart, origin, now) {
+    let best = undefined;
+    let bestGap = Infinity;
+    // A wall between two probe directions is hit at up to 1/cos(half the
+    // angle between them) times its real distance.
+    const reach = WALL_CONTACT_DISTANCE / Math.cos(Math.PI / WALL_PROBE_DIRECTIONS);
+    for (let i = 0; i < WALL_PROBE_DIRECTIONS; i++) {
+        const a = (i / WALL_PROBE_DIRECTIONS) * Math.PI * 2;
+        const trace = TraceLine({
+            start: origin,
+            end: {
+                x: origin.x + Math.cos(a) * reach,
+                y: origin.y + Math.sin(a) * reach,
+                z: origin.z,
+            },
+            ignoreEntity: [kart.melon, kart.pawn],
+            ignorePlayers: true,
+        });
+        if (!trace.didHit || trace.startedInSolid || Math.abs(trace.normal.z) >= WALL_NORMAL_MAX_Z) {
+            continue;
+        }
+        const hit = trace.hitEntity;
+        if (hit && !hit.IsWorld() && hit.GetClassName().startsWith("prop_physics")) {
+            continue; // other melons, break pieces — not a wall to jump off
+        }
+        const h = Math.hypot(trace.normal.x, trace.normal.y);
+        const n = { x: trace.normal.x / h, y: trace.normal.y / h };
+        const gap = (origin.x - trace.end.x) * n.x + (origin.y - trace.end.y) * n.y; // center to wall plane
+        if (gap <= WALL_CONTACT_DISTANCE && gap < bestGap) {
+            best = n;
+            bestGap = gap;
+        }
+    }
+    if (best) {
+        kart.lastWallContact = { time: now, normal: best };
+    }
+    return best;
+}
+
+/**
+ * DEBUG only: the contact state on screen every tick (GROUND / AIR, WALL,
+ * the measured vertical acceleration) plus the touched wall's normal in the
+ * world — to check the detection while driving before relying on it.
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart @param {boolean} grounded @param {boolean} supported
+ * @param {number | undefined} verticalAccel @param {{ x: number, y: number } | undefined} wallNormal
+ */
+function DebugDrawContact(slot, kart, grounded, supported, verticalAccel, wallNormal) {
+    if (!DEBUG) {
+        return;
+    }
+    const accel = verticalAccel === undefined ? "—" : `${verticalAccel.toFixed(0)} u/s²`;
+    const text = `slot ${slot}: ${grounded ? "GROUND" : "AIR"}${wallNormal ? " + WALL" : ""}  (supported=${supported}, az=${accel}, floor trace: ${kart.floorProbe ?? "—"})`;
+    Instance.DebugScreenText({
+        text,
+        x: 20,
+        y: 200 + slot * 16,
+        duration: 0,
+        color: grounded ? { r: 90, g: 220, b: 90 } : wallNormal ? { r: 255, g: 180, b: 60 } : { r: 255, g: 255, b: 255 },
+    });
+    if (wallNormal) {
+        const o = kart.melon.GetAbsOrigin();
+        Instance.DebugLine({
+            start: o,
+            end: { x: o.x + wallNormal.x * 64, y: o.y + wallNormal.y * 64, z: o.z },
+            duration: 0,
+            color: { r: 255, g: 180, b: 60 },
+        });
+    }
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart @param {number} impactSpeed */
@@ -673,6 +783,7 @@ export function RespawnKartAtCheckpoint(kart) {
         velocity: { x: 0, y: 0, z: 0 },
     });
     FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
+    kart.lastWallContact = undefined; // that wall is somewhere else now
     kart.health = MELON_MAX_HEALTH;
     // Cleared, not measured against zero: this is our own intentional
     // velocity reset, not a physical impact to react to.
@@ -694,6 +805,7 @@ export function RespawnKartAtCheckpoint(kart) {
 export function TeleportKartTo(kart, position, angles, velocity) {
     kart.melon.Teleport({ position, angles, velocity, angularVelocity: { x: 0, y: 0, z: 0 } });
     FacePlayerView(kart.pawn, angles.yaw);
+    kart.lastWallContact = undefined; // that wall is somewhere else now
     kart.lastVelocity = undefined;
     kart.prevLastVelocity = undefined;
     kart.prevOrigin = undefined;

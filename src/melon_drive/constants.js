@@ -16,20 +16,41 @@ export const STRAFE_ACCEL = FORWARD_ACCEL * 0.4; // 0.4x forward, matches origin
 export const MAX_SPEED = 650; // units/sec, horizontal speed cap
 export const COAST_FRICTION = 120; // units/sec^2 horizontal slowdown with no input — low, so the melon keeps rolling on its own momentum instead of grinding to a stop
 export const JUMP_SPEED = 400; // units/sec upward impulse
-// Jump needs both: the JUMP_COOLDOWN recharged (HUD recharge bar), and the
-// melon having touched ground within the last GROUND_COYOTE_TIME seconds —
-// without the ground part, jumping again every cooldown gains net height
-// each cycle, so a player could hover in the air forever. A strict "on the
-// ground this exact tick" check was unreliable (the melon wobbles/bounces
-// while rolling), hence the tolerant version: a generous downward trace
-// (GROUND_CHECK_DISTANCE from the melon's origin) *or* a detected landing
-// impact counts as ground contact, and that contact stays valid for a short
-// grace period.
+// Jump needs both: the JUMP_COOLDOWN recharged (HUD recharge bar), and real
+// ground contact (see logic/contact.js) — without the ground part, jumping
+// again every cooldown gains net height each cycle, so a player could hover
+// in the air forever.
+//
+// Ground contact is measured, not guessed from distance: each tick the
+// vertical velocity we commanded is compared with what physics made of it.
+// In the air gravity pulls it down by the full GRAVITY; anything holding
+// the melon up (the floor, a slope) cancels part of that. So "supported" =
+// the vertical acceleration was clearly less than free fall — independent
+// of the melon's (non-round) shape, and a melon hovering just above the
+// floor is correctly "in the air". A short line trace down then confirms
+// what's holding it up is floor-like (GROUND_NORMAL_MIN_Z), not a wall or
+// an edge. GROUND_COYOTE_TIME only bridges the tiny hops a rolling,
+// egg-shaped melon makes — keep it short.
 export const JUMP_COOLDOWN = 0.9; // seconds
-export const GROUND_CHECK_DISTANCE = 48; // units straight down from the melon's origin — melon radius plus wobble margin; raise if jumps get refused while visibly rolling on the ground
+export const GRAVITY = 800; // units/sec^2 — CS2's sv_gravity, what vphysics pulls the melon down with
+export const FREE_FALL_FRACTION = 0.8; // vertical accel at or below -FREE_FALL_FRACTION * GRAVITY counts as falling freely (not supported); lower = stricter
+export const GROUND_CHECK_DISTANCE = 48; // units down from the melon's center the floor-confirming trace reaches — melon radius plus margin
 export const GROUND_NORMAL_MIN_Z = 0.5; // surface must be at least this floor-like (not a wall) to count as ground
-export const GROUND_COYOTE_TIME = 0.15; // seconds a ground contact stays valid after losing it
-export const LANDING_MIN_IMPACT_Z = 100; // units/sec of sudden upward velocity change while falling that counts as having landed
+export const GROUND_COYOTE_TIME = 0.08; // seconds a ground contact stays valid after losing it — only bridges rolling hops
+
+// Wall jump: in the air, touching a wall (a line trace in any of
+// WALL_PROBE_DIRECTIONS horizontal directions finds a steep surface within
+// WALL_CONTACT_DISTANCE, or a wall impact just happened) and pressing jump
+// pushes the melon off that wall and up. Independent of the ground jump's
+// cooldown. Can't climb one wall forever: after a wall jump, the next one
+// needs ground contact first or a different wall (normal differing by more
+// than WALL_JUMP_SAME_WALL_DOT) — bouncing between two facing walls chains.
+export const WALL_PROBE_DIRECTIONS = 8;
+export const WALL_JUMP_WINDOW = 0.2; // seconds a wall contact stays jumpable — the melon usually bounces off the wall the moment it hits it
+export const WALL_JUMP_COOLDOWN = 0.3; // seconds between two wall jumps
+export const WALL_JUMP_UP_SPEED = 380; // units/sec upward
+export const WALL_JUMP_PUSH_SPEED = 250; // units/sec at least away from the wall (more if already moving away faster)
+export const WALL_JUMP_SAME_WALL_DOT = 0.7; // normals closer than this (dot product, ~45°) count as the same wall
 
 // Below this horizontal AND vertical speed, with no steering/jump input,
 // the melon counts as fully settled — UpdateKart stops re-pinning its
