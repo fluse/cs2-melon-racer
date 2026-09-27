@@ -1,6 +1,7 @@
 import { CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { GetSpeedHud } from "./hud.js";
+import { BreakCameraOffset } from "./logic/break-sequence.js";
 import {
     CAMERA_LATERAL,
     CAMERA_DISTANCE_MIN,
@@ -109,4 +110,19 @@ export function ApplyCameraFollow(kart) {
         clipCameraOffset: true, // pull the camera in instead of letting it clip through walls
     });
     Debug(`ApplyCameraFollow: mode=${camera.GetMode()} distance=${kart.cameraDistance} for slot=${kart.pawn.GetPlayerController()?.GetPlayerSlot()}`);
+}
+
+/**
+ * Pulls the chase camera back from a broken melon (still frozen, hidden, at
+ * the crash site) so the burst is visible — called every tick while
+ * kart.breaking; ApplyCameraFollow restores the normal offset on respawn.
+ * @param {import("./kart-registry.js").Kart} kart @param {number} elapsed seconds since the break
+ */
+export function ApplyBreakCameraZoom(kart, elapsed) {
+    kart.pawn.GetCustomCamera().SetFollowConfig({
+        followEntity: kart.melon,
+        followOffset: FOLLOW_OFFSET,
+        cameraOffset: BreakCameraOffset(GetCameraOffsetFor(kart), elapsed),
+        clipCameraOffset: true,
+    });
 }

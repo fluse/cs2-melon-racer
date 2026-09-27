@@ -2,9 +2,10 @@ import { Instance, CSInputs, PointTemplate } from "cs_script/point_script";
 import { DEBUG, Debug } from "./debug.js";
 import { karts } from "./kart-registry.js";
 import { SpawnMelonAt } from "./kart-spawn.js";
-import { ApplyCameraFollow } from "./camera.js";
+import { ApplyCameraFollow, ApplyBreakCameraZoom } from "./camera.js";
+import { PruneBreakEffects, BreakPieceVelocity } from "./logic/break-sequence.js";
 import { TraceLine, TraceSphere } from "./trace.js";
-import { JumpTimingFactor, JumpMultiplier, PickIncomingVelocity, ReflectOffWall, WallBounceDamage } from "./logic/wall-bounce.js";
+import { JumpTimingFactor, JumpMultiplier, PickIncomingVelocity, ReflectOffWall, WallBounceDamage, IsWallContact } from "./logic/wall-bounce.js";
 import {
     FORWARD_ACCEL,
     REVERSE_ACCEL,
@@ -22,8 +23,11 @@ import {
     MELON_MAX_HEALTH,
     BREAK_RESPAWN_DELAY,
     BREAK_TINT_FALLBACK,
+    BREAK_EFFECT_LIFETIME,
     BREAK_PARTICLE_TEMPLATE_NAME,
     BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME,
+    BREAK_PIECES_TEMPLATE_NAME,
+    BREAK_PIECE_SPIN,
     MELON_REST_SPEED,
     SETTLE_NUDGE_ANGULAR_SPEED,
     WALL_BOUNCE_MIN_IMPACT,
@@ -67,6 +71,9 @@ export function UpdateKart(slot, kart, dt) {
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.pendingBounce = undefined;
+        // Pull the chase camera back from the crash site so the burst is
+        // actually visible; restored by ScheduleRespawnAfterBreak.
+        ApplyBreakCameraZoom(kart, Instance.GetGameTime() - (kart.breakTime ?? Instance.GetGameTime()));
         return;
     }
 
@@ -365,8 +372,12 @@ function DetectWallNormal(kart, impactDelta) {
     // along the travel direction grows with 1/cos(angle).
     // 2nd: a sphere sweep from the current position (catches thin posts or
     // edges the center ray slips past).
-    // Last resort: the impact direction itself — skewed by wall friction and
-    // the melon's spin, so only used when neither trace finds anything.
+    // Neither finds a wall -> no bounce. (There used to be a last resort
+    // that took the impact direction itself as the normal, but with no wall
+    // found that bounced the melon off thin air.)
+    // Whatever they find must then pass IsWallContact: the ray reaches far
+    // ahead, and in a small room it finds some wall on nearly every hard
+    // landing or bump, even though the melon isn't touching it.
     const from = kart.prevOrigin ?? kart.melon.GetAbsOrigin();
     const ray = TraceLine({
         start: from,
@@ -398,31 +409,29 @@ function DetectWallNormal(kart, impactDelta) {
         method = "sphere";
     }
 
-    let nx, ny, nz;
-    /** @type {any} */
-    let hitPoint = undefined;
-    if (trace) {
-        const hit = trace.hitEntity;
-        if (hit && !hit.IsWorld() && hit.GetClassName().startsWith("prop_physics")) {
-            return null;
-        }
-        ({ x: nx, y: ny, z: nz } = trace.normal);
-        hitPoint = trace.end;
-    } else {
-        method = "impact-fallback";
-        const len = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
-        if (len < 1) {
-            return null;
-        }
-        nx = impactDelta.x / len;
-        ny = impactDelta.y / len;
-        nz = impactDelta.z / len;
+    if (!trace) {
+        return null;
     }
+    const hit = trace.hitEntity;
+    if (hit && !hit.IsWorld() && hit.GetClassName().startsWith("prop_physics")) {
+        return null;
+    }
+    const { x: nx, y: ny, z: nz } = trace.normal;
     if (Math.abs(nz) > WALL_NORMAL_MAX_Z) {
         return null;
     }
     const h = Math.hypot(nx, ny);
-    return h > 0 ? { x: nx / h, y: ny / h, method, hitPoint } : null;
+    if (h <= 0) {
+        return null;
+    }
+    const n = { x: nx / h, y: ny / h };
+    const hitPoint = trace.end;
+    const incoming = PickIncomingVelocity(v, kart.prevLastVelocity, n);
+    if (!IsWallContact(kart.melon.GetAbsOrigin(), hitPoint, n, incoming, kart.melon.GetAbsVelocity())) {
+        Debug(`wall bounce rejected: wall found via ${method} isn't actually being touched (impact ${Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z).toFixed(0)} u/s)`);
+        return null;
+    }
+    return { ...n, method, hitPoint };
 }
 
 /**
@@ -527,38 +536,105 @@ function DirectionToAngles(dir, length) {
     return { pitch, yaw, roll: 0 };
 }
 
-/**
- * Spawns a single named point_template's particle effect, if it's actually
- * placed in Hammer. @param {string} templateName @param {any} position @param {any} angles
- * @returns {boolean} whether it actually spawned
- */
-function SpawnParticleTemplate(templateName, position, angles) {
-    const template = Instance.FindEntityByName(templateName);
-    if (!template) {
-        Debug(`SpawnParticleTemplate: no entity named "${templateName}" found — add a point_template in Hammer with a "Start Active" particle system to see break effects`);
-        return false;
+// Every break's spawned effect entities, kept so they can stay at the crash
+// site for a long time (BREAK_EFFECT_LIFETIME) and still get cleaned up —
+// see PruneBreakEffects.
+/** @type {Array<{ spawnTime: number, entities: any[] }>} */
+let breakEffects = [];
+
+/** Removes break effects that are too old, or too many. */
+function CleanUpBreakEffects() {
+    const { expired, kept } = PruneBreakEffects(breakEffects, Instance.GetGameTime());
+    breakEffects = kept;
+    for (const effect of expired) {
+        for (const entity of effect.entities) {
+            if (entity.IsValid()) {
+                entity.Remove();
+            }
+        }
     }
-    if (!(template instanceof PointTemplate)) {
-        Debug(`SpawnParticleTemplate: entity "${templateName}" exists but is a ${template.GetClassName()}, not a point_template`);
-        return false;
-    }
-    template.ForceSpawn(position, angles);
-    return true;
 }
 
 /**
- * Spawns both break effects at the crash site — the main burst plus a
- * separate melon-chunks template layered on top of it. Independent of each
- * other (either can be missing from Hammer without the other failing).
- * @param {any} position @param {any} angles
+ * Spawns a single named point_template's particle effect, if it's actually
+ * placed in Hammer. @param {string} templateName @param {any} position @param {any} angles
+ * @returns {any[]} the spawned entities (empty if nothing spawned)
+ */
+function SpawnParticleTemplate(templateName, position, angles) {
+    const template = Instance.FindEntityByName(templateName);
+    // Msg, not Debug: a missing/broken break template must be visible in the
+    // console even with DEBUG off — silently spawning nothing is the bug.
+    if (!template) {
+        Instance.Msg(`[melon_drive] SpawnParticleTemplate: no entity named "${templateName}" found — add a point_template in Hammer with a particle system to see break effects`);
+        return [];
+    }
+    if (!(template instanceof PointTemplate)) {
+        Instance.Msg(`[melon_drive] SpawnParticleTemplate: entity "${templateName}" exists but is a ${template.GetClassName()}, not a point_template`);
+        return [];
+    }
+    const spawned = template.ForceSpawn(position, angles) ?? [];
+    if (spawned.length === 0) {
+        Instance.Msg(`[melon_drive] SpawnParticleTemplate: ForceSpawn of "${templateName}" returned nothing — check its Template01.. entries in Hammer`);
+        return [];
+    }
+    for (const entity of spawned) {
+        // "Start Active" alone doesn't reliably play a particle system spawned
+        // later from a point_template — start it explicitly.
+        if (entity.GetClassName() === "info_particle_system") {
+            Instance.EntFireAtTarget({ target: entity, input: "Start" });
+        }
+    }
+    Debug(`SpawnParticleTemplate: "${templateName}" spawned ${spawned.map((e) => e.GetClassName()).join(", ")} at ${JSON.stringify(position)}`);
+    return spawned;
+}
+
+/**
+ * Spawns the melon's real break pieces (see BREAK_PIECES_TEMPLATE_NAME) at
+ * the crash site and flings them outward. Randomly turned around the
+ * vertical axis so every break scatters differently.
+ * @param {any} position @param {{ r: number, g: number, b: number, a: number }} color
+ * @returns {any[]} the spawned pieces
+ */
+function SpawnBreakPieces(position, color) {
+    const angles = { pitch: 0, yaw: Math.random() * 360, roll: 0 };
+    const pieces = SpawnParticleTemplate(BREAK_PIECES_TEMPLATE_NAME, position, angles);
+    for (const piece of pieces) {
+        // Same tint as the melon was painted, so the chunks match it.
+        piece.SetColor(color);
+        const spin = () => (Math.random() * 2 - 1) * BREAK_PIECE_SPIN;
+        piece.Teleport({
+            velocity: BreakPieceVelocity(position, piece.GetAbsOrigin(), Math.random() * Math.PI * 2),
+            angularVelocity: { x: spin(), y: spin(), z: spin() },
+        });
+    }
+    return pieces;
+}
+
+/**
+ * Spawns all break effects at the crash site — the main burst, the chunks
+ * particle layered on top of it, and the real pieces that stay lying on the
+ * ground. Independent of each other (any can be missing from Hammer without
+ * the others failing).
+ * @param {any} position @param {any} angles @param {{ r: number, g: number, b: number, a: number }} color the melon's paint, for the pieces
  * @returns {boolean} whether at least one of them actually spawned — see
  * BreakMelon's fallback tint for why callers need to know this, not just
  * fire-and-forget.
  */
-function SpawnBreakParticles(position, angles) {
-    const spawnedMain = SpawnParticleTemplate(BREAK_PARTICLE_TEMPLATE_NAME, position, angles);
-    const spawnedChunks = SpawnParticleTemplate(BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, position, angles);
-    return spawnedMain || spawnedChunks;
+function SpawnBreakParticles(position, angles, color) {
+    const entities = [
+        ...SpawnParticleTemplate(BREAK_PARTICLE_TEMPLATE_NAME, position, angles),
+        ...SpawnParticleTemplate(BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, position, angles),
+        ...SpawnBreakPieces(position, color),
+    ];
+    if (entities.length === 0) {
+        return false;
+    }
+    // Deliberately not removed on respawn — the chunks should keep lying at
+    // the crash site long after the melon is back on the track.
+    breakEffects.push({ spawnTime: Instance.GetGameTime(), entities });
+    CleanUpBreakEffects();
+    Instance.Delay(BREAK_EFFECT_LIFETIME).then(CleanUpBreakEffects);
+    return true;
 }
 
 /**
@@ -615,6 +691,7 @@ function ScheduleRespawnAfterBreak(slot, kart) {
     const teleportGen = kart.teleportGen;
     Instance.Delay(BREAK_RESPAWN_DELAY).then(() => {
         kart.breaking = false;
+        kart.breakTime = undefined;
         if (!kart.pawn.IsValid() || karts.get(slot) !== kart) {
             return; // player disconnected, or a fresh kart already replaced this one
         }
@@ -633,6 +710,9 @@ function ScheduleRespawnAfterBreak(slot, kart) {
             return;
         }
         kart.melon.SetColor(kart.paintColor);
+        // Back from the pulled-out break camera (ApplyBreakCameraZoom) to the
+        // player's normal chase offset.
+        ApplyCameraFollow(kart);
         if (kart.teleportGen !== teleportGen) {
             // The race flow moved this kart while it was mid-break (next
             // heat's BeginHeat, or ReturnAllToHub via finish/moderator
@@ -671,6 +751,7 @@ export function BreakMelon(slot, kart, impactDir, impactSpeed) {
         return; // already broken and counting down to its respawn
     }
     kart.breaking = true;
+    kart.breakTime = Instance.GetGameTime();
     const breakPosition = kart.melon.GetAbsOrigin();
     // Oriented along the velocity change the impact caused, not the melon's
     // own orientation — while rolling, that's an essentially random tumble
@@ -691,7 +772,7 @@ export function BreakMelon(slot, kart, impactDir, impactSpeed) {
     // the crash site to see while it waits out the respawn delay.
     // kart.paintColor itself is untouched either way, restored in
     // ScheduleRespawnAfterBreak.
-    const particlesSpawned = SpawnBreakParticles(breakPosition, breakAngles);
+    const particlesSpawned = SpawnBreakParticles(breakPosition, breakAngles, kart.paintColor);
     kart.melon.SetColor(particlesSpawned ? { r: 255, g: 255, b: 255, a: 0 } : BREAK_TINT_FALLBACK);
 
     ScheduleRespawnAfterBreak(slot, kart);
@@ -719,7 +800,7 @@ export function HandleMelonLost(slot, kart) {
     const breakPosition = kart.lastKnownPosition ?? kart.checkpointPosition;
     const breakAngles = kart.lastKnownAngles ?? kart.checkpointAngles;
     Debug(`slot ${slot}: melon was destroyed at ${JSON.stringify(breakPosition)} — respawning at checkpoint ${kart.checkpointIndex} in ${BREAK_RESPAWN_DELAY}s`);
-    SpawnBreakParticles(breakPosition, breakAngles);
+    SpawnBreakParticles(breakPosition, breakAngles, kart.paintColor);
     ScheduleRespawnAfterBreak(slot, kart);
 }
 

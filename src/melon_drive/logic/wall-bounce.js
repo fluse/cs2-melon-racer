@@ -14,7 +14,35 @@ import {
     WALL_IMPACT_DAMAGE_SCALE,
     WALL_BOUNCE_DAMAGE_PER_SPEED,
     BOUNCE_RATINGS,
+    WALL_CONTACT_DISTANCE,
+    WALL_CONTACT_MIN_STOP,
 } from "../constants.js";
+
+/**
+ * Whether a wall the traces found is really the thing the melon just hit:
+ * it must be close enough to be touching (within WALL_CONTACT_DISTANCE of
+ * the melon's center), and the impact must have actually stopped most of
+ * the melon's speed into that wall (WALL_CONTACT_MIN_STOP). Without this, a
+ * landing or ceiling bump in a small room bounced the melon off whichever
+ * wall happened to lie ahead within trace range.
+ * @param {{ x: number, y: number }} origin the melon's center now
+ * @param {{ x: number, y: number }} hitPoint where the trace hit the wall
+ * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal
+ * @param {{ x: number, y: number }} incoming commanded velocity before the impact
+ * @param {{ x: number, y: number }} current the melon's actual velocity now
+ */
+export function IsWallContact(origin, hitPoint, n, incoming, current) {
+    const gap = (origin.x - hitPoint.x) * n.x + (origin.y - hitPoint.y) * n.y;
+    if (gap > WALL_CONTACT_DISTANCE) {
+        return false;
+    }
+    const intoBefore = -(incoming.x * n.x + incoming.y * n.y);
+    if (intoBefore <= 0) {
+        return false; // wasn't heading into this wall at all
+    }
+    const intoAfter = -(current.x * n.x + current.y * n.y);
+    return (intoBefore - intoAfter) / intoBefore >= WALL_CONTACT_MIN_STOP;
+}
 
 /**
  * 0..1 — how close a wall hit's angle (degrees from the wall normal, 0 =

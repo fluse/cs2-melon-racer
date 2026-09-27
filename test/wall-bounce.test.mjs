@@ -12,9 +12,12 @@ import {
     PickIncomingVelocity,
     ReflectOffWall,
     WallBounceDamage,
+    IsWallContact,
 } from "../src/melon_drive/logic/wall-bounce.js";
 import {
     WALL_BOUNCE_OPTIMAL_ANGLE,
+    WALL_CONTACT_DISTANCE,
+    WALL_CONTACT_MIN_STOP,
     WALL_BOUNCE_ANGLE_FALLOFF,
     WALL_BOUNCE_BASE_RESTITUTION,
     WALL_BOUNCE_PEAK_MULTIPLIER,
@@ -136,4 +139,41 @@ test("damage: everything rated as the best rating (PERFECT) is free", () => {
 
 test("damage: a soft hit that gained no speed costs nothing", () => {
     near(WallBounceDamage(WALL_IMPACT_DAMAGE_THRESHOLD - 1, 0, 0), 0);
+});
+
+// --- IsWallContact: only a wall the melon actually touches bounces it ---
+// Wall along the y axis at x = 0, facing +x; the melon approaches from +x.
+const wallNormal = { x: 1, y: 0 };
+const wallHit = { x: 0, y: 0 };
+const into45 = { x: -Math.SQRT1_2 * 800, y: Math.SQRT1_2 * 800 };
+
+test("contact: a melon touching the wall that stopped its into-wall speed counts", () => {
+    const origin = { x: WALL_CONTACT_DISTANCE / 2, y: 0 };
+    const stopped = { x: 0, y: into45.y }; // normal part gone, tangential kept
+    assert.equal(IsWallContact(origin, wallHit, wallNormal, into45, stopped), true);
+});
+
+// Regression: in a small room the ray found a wall far ahead on every hard
+// landing, and the melon bounced off it in mid-air.
+test("contact: a wall further away than WALL_CONTACT_DISTANCE never counts", () => {
+    const origin = { x: WALL_CONTACT_DISTANCE + 50, y: 0 };
+    const stopped = { x: 0, y: into45.y };
+    assert.equal(IsWallContact(origin, wallHit, wallNormal, into45, stopped), false);
+});
+
+test("contact: a landing next to a wall (horizontal speed untouched) doesn't count", () => {
+    const origin = { x: WALL_CONTACT_DISTANCE / 2, y: 0 };
+    assert.equal(IsWallContact(origin, wallHit, wallNormal, into45, { ...into45 }), false);
+});
+
+test("contact: friction that took off less than WALL_CONTACT_MIN_STOP doesn't count", () => {
+    const origin = { x: WALL_CONTACT_DISTANCE / 2, y: 0 };
+    const slowed = { x: into45.x * (1 - WALL_CONTACT_MIN_STOP * 0.5), y: into45.y };
+    assert.equal(IsWallContact(origin, wallHit, wallNormal, into45, slowed), false);
+});
+
+test("contact: a melon moving away from the wall doesn't count", () => {
+    const origin = { x: WALL_CONTACT_DISTANCE / 2, y: 0 };
+    const away = { x: 400, y: 0 };
+    assert.equal(IsWallContact(origin, wallHit, wallNormal, away, { x: 0, y: 0 }), false);
 });

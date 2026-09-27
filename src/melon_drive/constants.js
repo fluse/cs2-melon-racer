@@ -79,6 +79,12 @@ export const IMPACT_DAMAGE_SCALE = 0.2; // health lost per unit/sec beyond the t
 export const WALL_BOUNCE_MIN_IMPACT = 200; // units/sec of sudden velocity change before a wall hit counts as a bounce at all
 export const WALL_NORMAL_MAX_Z = 0.5; // |normal.z| above this is a floor/ceiling/steep ramp, not a wall
 export const WALL_BOUNCE_TRACE_DISTANCE = 160; // ray length from last tick's position along the incoming direction — must reach the wall even at grazing angles (grows with 1/cos(angle))
+// A wall the traces find only counts if the melon is actually touching it
+// (see IsWallContact in logic/wall-bounce.js) — the trace reaches far ahead,
+// so in a small room it finds *some* wall on almost every hard landing or
+// bump, which used to bounce the melon off a wall it never touched.
+export const WALL_CONTACT_DISTANCE = 56; // max units from the melon's center to the wall plane — melon radius (see GROUND_CHECK_DISTANCE) plus margin for the tick physics already pushed it back
+export const WALL_CONTACT_MIN_STOP = 0.5; // fraction of the into-the-wall speed the impact must have taken away — a landing or friction leaves it almost untouched, a real wall stops it
 export const WALL_BOUNCE_TRACE_RADIUS = 8; // backup sphere sweep from the current position, for posts/edges the ray slips past
 export const WALL_BOUNCE_SPHERE_TRACE_DISTANCE = 48;
 // DEBUG only (debug.js): world lines drawn per bounce — wall normal green,
@@ -172,7 +178,23 @@ export const PREDICTION_NEUTRAL_COLOR = { r: 255, g: 255, b: 255, a: 160 }; // n
 // the melon itself) for BREAK_RESPAWN_DELAY seconds before reappearing at the
 // last checkpoint. Gives the player a beat to register that it broke instead
 // of it just snapping to the checkpoint.
-export const BREAK_RESPAWN_DELAY = 1; // seconds
+export const BREAK_RESPAWN_DELAY = 3; // seconds
+// While broken, the chase camera pulls back from the crash site so the
+// player actually sees the melon burst (see BreakCameraOffset in
+// logic/break-sequence.js): it eases out by this much extra distance/height
+// over BREAK_CAMERA_ZOOM_SECONDS, holds there, and snaps back to the
+// player's normal offset when the melon respawns BREAK_RESPAWN_DELAY later.
+export const BREAK_CAMERA_ZOOM_SECONDS = 0.8;
+export const BREAK_CAMERA_EXTRA_DISTANCE = 260; // units further back
+export const BREAK_CAMERA_EXTRA_HEIGHT = 160; // units further up
+// How long a break's spawned effect entities (both templates below) are
+// kept before being removed — long, so the chunks stay lying at the crash
+// site. Removing the info_particle_system ends its particles, so this is an
+// upper bound: the .vpcf's own particle lifetime can still end them sooner.
+export const BREAK_EFFECT_LIFETIME = 180; // seconds
+// Cap on how many breaks' effects exist at once, so a long session doesn't
+// pile up entities — the oldest break's effects go first.
+export const BREAK_EFFECT_MAX_ACTIVE = 24;
 // Fallback look while broken when no break particle actually spawned (see
 // SpawnBreakParticles/BreakMelon) — a dark, dead-looking husk visibly marking
 // the crash site instead of the melon just vanishing for BREAK_RESPAWN_DELAY
@@ -186,6 +208,17 @@ export const BREAK_PARTICLE_TEMPLATE_NAME = "melon_break_template";
 // Second, separate break effect layered on top of the one above — e.g. flying
 // melon chunks, as opposed to the main burst. Same point_template convention.
 export const BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME = "melon_break_chunks_template";
+// The actual chunks lying on the ground. The chunks particle above is only
+// small sprite flecks that fade within moments, so real pieces come from a
+// third point_template holding prop_physics entities with the melon model's
+// own break pieces (models/cs_italy/italy_food_melon/italy_food_melon/
+// piece.vmdl .. piece8.vmdl), arranged around the template's origin in
+// roughly a melon's shape. They're flung outward from the crash site and
+// stay there as ordinary physics props for BREAK_EFFECT_LIFETIME.
+export const BREAK_PIECES_TEMPLATE_NAME = "melon_break_pieces_template";
+export const BREAK_PIECE_SPEED = 220; // units/sec outward from the crash site
+export const BREAK_PIECE_UP_SPEED = 180; // units/sec extra upward pop
+export const BREAK_PIECE_SPIN = 600; // max degrees/sec of random tumble per axis
 
 // The map has multiple separate tracks, so a checkpoint's script input
 // parameter names both which track it belongs to and its position along

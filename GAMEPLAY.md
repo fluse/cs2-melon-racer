@@ -87,8 +87,37 @@ health the melon "breaks": it's teleported back to the position/angles of
 the last checkpoint it reached (or the player's spawn point, if none yet),
 velocity zeroed, health reset to full. The melon entity itself isn't
 destroyed/recreated (keeps the camera's `followEntity` and other references
-valid) — there's no visual/audio "it broke" cue yet, just the reset; that'd
-be a good follow-up (glow flash, a break sound, briefly hiding the model).
+valid). Before that reset, the break plays out at the crash site: the melon
+is hidden and frozen there, the `melon_break_template` and
+`melon_break_chunks_template` point_templates are spawned (their
+`info_particle_system`s get an explicit `Start` input), and the chase camera
+eases back (`BREAK_CAMERA_*`) so the burst is visible. After
+`BREAK_RESPAWN_DELAY` the camera snaps back to normal and the melon respawns.
+The spawned effects are left lying at the crash site for
+`BREAK_EFFECT_LIFETIME` (at most `BREAK_EFFECT_MAX_ACTIVE` breaks at once).
+
+The chunks particle (`break_watermelon_chunks.vpcf`) is only small sprite
+flecks that fade within moments, so it can't provide chunks that lie on the
+ground. Those come from a third template, `melon_break_pieces_template`: the
+melon model's own break pieces as real physics props. On a break they're
+spawned at the crash site (randomly turned), tinted in the melon's paint
+color, flung outward (`BREAK_PIECE_SPEED`/`_UP_SPEED`/`_SPIN`), and removed
+only after `BREAK_EFFECT_LIFETIME`. Hammer setup:
+
+- Place 9 `prop_physics` entities, one each with model
+  `models/cs_italy/italy_food_melon/italy_food_melon/piece.vmdl`, `piece1.vmdl`
+  … `piece8.vmdl`, arranged close together around one point in roughly a
+  melon's shape. Give each its own name (e.g. `melon_break_piece_0` … `_8`).
+  If lying pieces get in the karts' way, mark them as debris
+  (Debris collision group / "Debris" spawnflag).
+- Place a `point_template` named `melon_break_pieces_template` at the
+  center of that melon shape, with `Template01`…`Template09` set to those
+  nine names. Where the pieces sit relative to the template's origin is
+  where they appear around the crash site.
+
+`test/map-templates.test.mjs` checks the .vmap to make sure all these
+templates exist and are wired up (the `npm test` failure names whatever's
+missing). There's no break sound yet.
 
 Tune via `IMPACT_DAMAGE_THRESHOLD` (units/sec of sudden velocity change
 before damage starts) and `IMPACT_DAMAGE_SCALE` (health lost per unit/sec
@@ -102,9 +131,13 @@ physics props like melons don't either) bounces the melon back instead of
 just stopping it: the melon's *pre-impact* horizontal velocity is reflected
 off the wall's normal and scaled by a multiplier. The normal comes from a
 `TraceLine` cast from the melon's *previous-tick* position along its
-incoming direction (then a short `TraceSphere` from the current position,
-then — last resort, skewed by wall friction/spin — the impact's own
-direction). Since a collision often spans two ticks, the incoming velocity
+incoming direction (then a short `TraceSphere` from the current position;
+if neither finds a wall, there's no bounce). A found wall only counts if the
+melon is really touching it (`IsWallContact`): its center is within
+`WALL_CONTACT_DISTANCE` of the wall plane, and the impact took away at least
+`WALL_CONTACT_MIN_STOP` of its speed into that wall. Otherwise a hard
+landing or bump in a small room bounced the melon off whatever wall lay
+ahead within trace range, seemingly off thin air. Since a collision often spans two ticks, the incoming velocity
 is whichever of the last two commanded velocities still heads more squarely
 into the wall. With `DEBUG` on (`debug.js`), every bounce draws the wall
 normal (green), incoming (red), outgoing (blue) and look direction (yellow)

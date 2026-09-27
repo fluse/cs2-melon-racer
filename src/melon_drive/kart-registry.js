@@ -7,7 +7,8 @@ import { predictionDotSet } from "./trace.js";
  *   health: number, lastVelocity: { x: number, y: number, z: number } | undefined,
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
- *   breaking: boolean, paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
+ *   breaking: boolean, breakTime?: number, // game time BreakMelon ran, for the break camera zoom
+ *   paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
  *   cameraDistance: number, cameraHeight: number, settled: boolean,
  *   teleportGen: number, // bumped by every race-flow teleport (BeginHeat/ReturnAllToHub) — see ScheduleRespawnAfterBreak
  *   speedCap?: number, // current horizontal speed limit; above MAX_SPEED only while a wall-bounce boost decays — unset means MAX_SPEED
