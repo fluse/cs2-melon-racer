@@ -558,7 +558,7 @@
    logo and close button are drawn after it (later children on top). See
    SetUserMenuOpen for the Hidden toggle. */
 .UserMenu {
-    width: 470px;
+    width: 560px; /* the logo's width — the card itself is narrower */
     horizontal-align: center;
     vertical-align: center;
 
@@ -572,30 +572,34 @@
 }
 
 .UserMenuCard {
-    width: 100%;
-    margin-top: 50px;
+    width: 470px;
+    horizontal-align: center;
+    margin-top: 92px;
     flow-children: down;
 
-    padding: 54px 12px 12px 12px;
+    padding: 70px 12px 12px 12px;
     background-color: #1c261ceb;
     border: 2px solid #7fd13b;
     border-radius: 10px;
     box-shadow: #7fd13b66 0px 0px 14px 2px;
 }
 
-/* 846x295 source, scaled to keep its aspect. */
+/* 846x295 source, scaled to keep its aspect. The lettering only fills about
+   84% of the image's width, so at 560px it's as wide as the 470px card; the
+   card starts at about the lettering's vertical middle. */
 .UserMenuLogo {
     horizontal-align: center;
     vertical-align: top;
-    width: 290px;
-    height: 101px;
+    width: 560px;
+    height: 195px;
 }
 
 .UserMenuCloseButton {
     horizontal-align: right;
     vertical-align: top;
-    margin-top: 58px;
-    margin-right: 10px;
+    /* Right under the lettering's right end, inside the card's corner. */
+    margin-top: 136px;
+    margin-right: 55px; /* (560 - 470) / 2 + 10 */
     width: 24px;
     height: 24px;
 
