@@ -34,11 +34,6 @@ export const WALL_TOUCH_MIN_STOP_SPEED = 60; // units/sec of speed into the wall
 export const WALL_CONTACT_MIN_STOP = 0.5; // fraction of the into-the-wall speed the impact must have taken away — a landing or friction leaves it almost untouched, a real wall stops it
 export const WALL_BOUNCE_TRACE_RADIUS = 8; // backup sphere sweep from the current position, for posts/edges the ray slips past
 export const WALL_BOUNCE_SPHERE_TRACE_DISTANCE = 48;
-// DEBUG only (debug.js): world lines drawn per bounce — wall normal green,
-// incoming red, outgoing blue, look direction yellow — plus a log line with
-// the velocity-based vs. look-based angle.
-export const WALL_BOUNCE_DEBUG_SECONDS = 4;
-export const WALL_BOUNCE_DEBUG_LINE_LENGTH = 96;
 export const WALL_BOUNCE_OPTIMAL_ANGLE = 45; // degrees from the wall normal where the bounce is strongest
 export const WALL_BOUNCE_ANGLE_FALLOFF = 45; // degrees away from optimal at which the bonus has faded out completely
 export const WALL_BOUNCE_PERFECT_JUMP_WINDOW = 0.12; // seconds, before or after the hit
@@ -58,8 +53,8 @@ export const WALL_BOUNCE_COOLDOWN = 0.2; // seconds — stops one wall contact f
 // affects speed, not damage. Anything rated PERFECT (BOUNCE_RATINGS[0]) costs
 // no health at all; one with no angle bonus pays full price. Charged once the jump window has
 // closed (a late jump can still add speed), not on impact itself.
-export const WALL_IMPACT_DAMAGE_THRESHOLD = 450;
-export const WALL_IMPACT_DAMAGE_SCALE = 0.2;
+export const WALL_IMPACT_DAMAGE_THRESHOLD = 200; // units/sec — same as WALL_BOUNCE_MIN_IMPACT, so any bounce that isn't PERFECT costs health from its first unit/sec
+export const WALL_IMPACT_DAMAGE_SCALE = 0.3; // health lost per unit/sec beyond the threshold (before the angle reduction)
 export const WALL_BOUNCE_DAMAGE_PER_SPEED = 0.05; // health lost per unit/sec gained by a bounce
 // A bounce may lift the melon above MAX_SPEED — deliberately with no upper
 // limit, chained bounces stack. The raised cap then decays back towards
@@ -72,8 +67,9 @@ export const PERFECT_BOUNCE_FLASH_SECONDS = 0.4;
 export const PERFECT_BOUNCE_ANGLE_FACTOR = 0.8;
 // point_template placed in Hammer holding the spark's info_particle_system:
 // spawned at the melon on every wall bounce the HUD rates PERFECT
-// (BOUNCE_RATINGS[0]) — a fresh copy per hit, so perfect hits by several
-// karts at once each get their own spark. Must match the name in Hammer.
+// (BOUNCE_RATINGS[0]) — two fresh copies per hit, one left at the wall and
+// one parented to the melon so its player sees it too, and perfect hits by
+// several karts at once each get their own. Must match the name in Hammer.
 export const PERFECT_SPARK_TEMPLATE_NAME = "perfect_hit_particle_template";
 // Seconds a spawned spark is kept before it's removed. Removing the
 // info_particle_system ends its particles, so this is an upper bound.
@@ -98,8 +94,11 @@ export const BOUNCE_JUMP_SEGMENTS = 5;
 // rating does to the melon's speed (before jump timing). cssClass colors the panel; color is the same
 // accent for the in-world prediction line (see prediction.js) — keep the two
 // in sync with speedometer.css's .Rating* rules.
+// PERFECT counts within this many degrees either side of
+// WALL_BOUNCE_OPTIMAL_ANGLE (was 4.5°, i.e. minAngleFactor 0.9).
+export const PERFECT_BOUNCE_TOLERANCE = 6.5; // degrees
 export const BOUNCE_RATINGS = [
-    { minAngleFactor: 0.9, label: "PERFECT", speedMultiplier: 1.35, cssClass: "RatingPerfect", color: { r: 255, g: 224, b: 102, a: 255 } },
+    { minAngleFactor: 1 - PERFECT_BOUNCE_TOLERANCE / WALL_BOUNCE_ANGLE_FALLOFF, label: "PERFECT", speedMultiplier: 1.35, cssClass: "RatingPerfect", color: { r: 255, g: 224, b: 102, a: 255 } },
     { minAngleFactor: 0.7, label: "GOOD", speedMultiplier: 1.1, cssClass: "RatingGood", color: { r: 102, g: 221, b: 102, a: 255 } },
     { minAngleFactor: 0.4, label: "BAD", speedMultiplier: 0.5, cssClass: "RatingBad", color: { r: 102, g: 170, b: 255, a: 255 } },
     { minAngleFactor: 0, label: "MISS", speedMultiplier: 0.3, cssClass: "RatingMiss", color: { r: 255, g: 102, b: 102, a: 255 } },

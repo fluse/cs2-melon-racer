@@ -16,6 +16,7 @@ import {
 } from "../src/melon_drive/logic/wall-bounce.js";
 import {
     WALL_BOUNCE_OPTIMAL_ANGLE,
+    PERFECT_BOUNCE_TOLERANCE,
     WALL_CONTACT_DISTANCE,
     WALL_CONTACT_MIN_STOP,
     WALL_BOUNCE_ANGLE_FALLOFF,
@@ -182,4 +183,11 @@ test("contact: a melon moving away from the wall doesn't count", () => {
     const origin = { x: WALL_CONTACT_DISTANCE / 2, y: 0 };
     const away = { x: 400, y: 0 };
     assert.equal(IsWallContact(origin, wallHit, wallNormal, away, { x: 0, y: 0 }), false);
+});
+
+test("rating: PERFECT holds exactly within PERFECT_BOUNCE_TOLERANCE of the optimal angle", () => {
+    const edge = WALL_BOUNCE_OPTIMAL_ANGLE + PERFECT_BOUNCE_TOLERANCE;
+    assert.equal(GetBounceRating(WallAngleFactor(edge - 0.01)), BOUNCE_RATINGS[0]);
+    assert.equal(GetBounceRating(WallAngleFactor(WALL_BOUNCE_OPTIMAL_ANGLE - PERFECT_BOUNCE_TOLERANCE + 0.01)), BOUNCE_RATINGS[0]);
+    assert.notEqual(GetBounceRating(WallAngleFactor(edge + 0.01)), BOUNCE_RATINGS[0]);
 });

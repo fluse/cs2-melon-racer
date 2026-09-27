@@ -1,5 +1,5 @@
 // Engine side of the wall bounce: finding the wall's normal on impact
-// (traces + IsWallContact), computing the bounce, DEBUG drawing, and
+// (traces + IsWallContact), computing the bounce, DEBUG logging, and
 // charging its damage once the jump-timing window closes. The math is in
 // ../logic/wall-bounce.js.
 import { Instance, PointTemplate } from "cs_script/point_script";
@@ -18,8 +18,6 @@ import {
     WALL_BOUNCE_TRACE_RADIUS,
     WALL_BOUNCE_TRACE_DISTANCE,
     WALL_BOUNCE_SPHERE_TRACE_DISTANCE,
-    WALL_BOUNCE_DEBUG_SECONDS,
-    WALL_BOUNCE_DEBUG_LINE_LENGTH,
     BOUNCE_RATINGS,
     PERFECT_SPARK_TEMPLATE_NAME,
     PERFECT_SPARK_LIFETIME,
@@ -117,38 +115,18 @@ export function DetectWallNormal(kart, impactDelta) {
 }
 
 /**
- * DEBUG only: draws the bounce in the world for a few seconds — wall normal
- * (green), measured incoming direction (red), outgoing direction (blue),
- * and where the player was *looking* (yellow) — and logs the velocity-based
- * angle next to the look-based one, so a "that felt like 45°" mismatch can
- * be told apart from a measuring bug.
+ * DEBUG only: logs the velocity-based bounce angle next to the look-based
+ * one, so a "that felt like 45°" mismatch can be told apart from a
+ * measuring bug.
  * @param {import("../kart-registry.js").Kart} kart
- * @param {{ x: number, y: number, method: string, hitPoint?: any }} n
- * @param {{ x: number, y: number }} incoming @param {{ x: number, y: number }} outgoing @param {number} angle
+ * @param {{ x: number, y: number, method: string }} n @param {number} angle
  */
-function DebugDrawBounce(kart, n, incoming, outgoing, angle) {
+function DebugLogBounce(kart, n, angle) {
     if (!DEBUG) {
         return;
     }
-    const origin = kart.melon.GetAbsOrigin();
-    const at = n.hitPoint ?? origin;
-    const len = WALL_BOUNCE_DEBUG_LINE_LENGTH;
-    const duration = WALL_BOUNCE_DEBUG_SECONDS;
-    /** @param {{ x: number, y: number }} d */
-    const unit = (d) => {
-        const l = Math.hypot(d.x, d.y) || 1;
-        return { x: d.x / l, y: d.y / l };
-    };
-    const inDir = unit(incoming);
-    const outDir = unit(outgoing);
     const yaw = (kart.pawn.GetEyeAngles().yaw * Math.PI) / 180;
     const lookDir = { x: Math.cos(yaw), y: Math.sin(yaw) };
-
-    Instance.DebugLine({ start: at, end: { x: at.x + n.x * len, y: at.y + n.y * len, z: at.z }, duration, color: { r: 0, g: 255, b: 0 } });
-    Instance.DebugLine({ start: { x: at.x - inDir.x * len, y: at.y - inDir.y * len, z: at.z }, end: at, duration, color: { r: 255, g: 60, b: 60 } });
-    Instance.DebugLine({ start: at, end: { x: at.x + outDir.x * len, y: at.y + outDir.y * len, z: at.z }, duration, color: { r: 80, g: 140, b: 255 } });
-    Instance.DebugLine({ start: origin, end: { x: origin.x + lookDir.x * len, y: origin.y + lookDir.y * len, z: origin.z }, duration, color: { r: 255, g: 224, b: 102 } });
-
     const lookInto = -(lookDir.x * n.x + lookDir.y * n.y);
     const lookAngle = lookInto > 0 ? (Math.acos(Math.min(1, lookInto)) * 180) / Math.PI : NaN;
     Debug(
@@ -174,7 +152,7 @@ export function ComputeWallBounce(kart, n, now) {
     if (!bounce) {
         return null;
     }
-    DebugDrawBounce(kart, n, v, bounce.velocity, bounce.angle);
+    DebugLogBounce(kart, n, bounce.angle);
     if (GetBounceRating(bounce.angleFactor) === BOUNCE_RATINGS[0]) {
         PlayPerfectSpark(kart);
     }
@@ -182,9 +160,12 @@ export function ComputeWallBounce(kart, n, now) {
 }
 
 /**
- * Spawns a fresh copy of the perfect_hit_particle_template at the melon and
- * starts it, removed again after PERFECT_SPARK_LIFETIME — one copy per hit,
- * so several karts' perfect hits at the same moment each show their own.
+ * Spawns two fresh copies of the perfect_hit_particle_template and starts
+ * them, removed again after PERFECT_SPARK_LIFETIME: one left at the hit spot
+ * on the wall, and one parented to the melon so it rides along — the melon
+ * is off the wall so fast that the player would otherwise never see the
+ * spark behind them. Fresh copies per hit, so several karts' perfect hits
+ * at the same moment each show their own.
  * @param {import("../kart-registry.js").Kart} kart
  */
 function PlayPerfectSpark(kart) {
@@ -194,18 +175,27 @@ function PlayPerfectSpark(kart) {
         return;
     }
     const position = kart.melon.GetAbsOrigin();
-    const spawned = template.ForceSpawn(position) ?? [];
-    for (const entity of spawned) {
-        // ForceSpawn keeps the entity's Hammer offset from its template — put
-        // it exactly on the melon, and start it explicitly (see
-        // SpawnParticleTemplate in break-effects.js for why).
-        entity.Teleport({ position });
-        if (entity.GetClassName() === "info_particle_system") {
-            Instance.EntFireAtTarget({ target: entity, input: "Start" });
+    /** @type {import("cs_script/point_script").Entity[]} */
+    const spawned = [];
+    for (const followMelon of [false, true]) {
+        const copy = template.ForceSpawn(position) ?? [];
+        for (const entity of copy) {
+            // ForceSpawn keeps the entity's Hammer offset from its template — put
+            // it exactly on the melon, and start it explicitly (see
+            // SpawnParticleTemplate in break-effects.js for why).
+            entity.Teleport({ position });
+            if (followMelon) {
+                entity.SetParent(kart.melon);
+            }
+            if (entity.GetClassName() === "info_particle_system") {
+                Instance.EntFireAtTarget({ target: entity, input: "Start" });
+            }
         }
+        spawned.push(...copy);
     }
     Instance.Delay(PERFECT_SPARK_LIFETIME).then(() => {
         for (const entity of spawned) {
+            // The melon's copy goes with the melon if that's removed first.
             if (entity.IsValid()) {
                 entity.Remove();
             }

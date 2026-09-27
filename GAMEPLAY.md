@@ -137,14 +137,14 @@ melon is really touching it (`IsWallContact`): its center is within
 landing or bump in a small room bounced the melon off whatever wall lay
 ahead within trace range, seemingly off thin air. Since a collision often spans two ticks, the incoming velocity
 is whichever of the last two commanded velocities still heads more squarely
-into the wall. With `DEBUG` on (`debug.js`), every bounce draws the wall
-normal (green), incoming (red), outgoing (blue) and look direction (yellow)
-in the world and logs the velocity angle next to the look angle. There's no global "on/off per wall" — all walls do it.
+into the wall. With `DEBUG` on (`debug.js`), every bounce logs the velocity
+angle next to the look angle (nothing is drawn in the world). There's no global "on/off per wall" — all walls do it.
 
 - **Angle is the skill part.** Angle closeness is 1 at exactly
   `WALL_BOUNCE_OPTIMAL_ANGLE` (45° from the wall normal) and falls off
   linearly to 0 `WALL_BOUNCE_ANGLE_FALLOFF` degrees away from it; it picks
-  the rating (`BOUNCE_RATINGS`), and each rating has a fixed speed
+  the rating (`BOUNCE_RATINGS`; PERFECT within ±`PERFECT_BOUNCE_TOLERANCE`,
+  6.5°, of 45°), and each rating has a fixed speed
   multiplier (`speedMultiplier`, decided): PERFECT ×1.35, GOOD ×1.1,
   BAD ×0.5, MISS ×0.3 — so only PERFECT and GOOD come out faster than they
   went in, BAD and MISS cost speed.
@@ -189,10 +189,12 @@ in the world and logs the velocity angle next to the look angle. There's no glob
   jump-timing bar (which still fills in if the jump comes just *after* the
   hit).
 - **Perfect spark:** every bounce rated PERFECT (`BOUNCE_RATINGS[0]`, same
-  as the HUD) spawns a fresh copy of the `point_template` named
+  as the HUD) spawns two fresh copies of the `point_template` named
   `perfect_hit_particle_template` (`PERFECT_SPARK_TEMPLATE_NAME`, holding an
-  `info_particle_system`) at the melon, starts it, and removes it after
-  `PERFECT_SPARK_LIFETIME`. One copy per hit, so several karts' perfect hits
+  `info_particle_system`) at the melon, starts them, and removes them after
+  `PERFECT_SPARK_LIFETIME`: one stays at the hit spot on the wall, the other
+  is parented to the melon and rides along — the melon leaves the wall too
+  fast for its player to see the first one. Fresh copies per hit, so several karts' perfect hits
   at the same moment each show their own spark; `test/map-templates.test.mjs`
   checks the template exists in the .vmap and points at a particle system.
 - **Prediction line** (`prediction.js`, `PREDICTION_*`): a dotted line in
