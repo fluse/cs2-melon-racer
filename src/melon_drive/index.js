@@ -26,6 +26,7 @@ import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, Se
 import { SetUpPlayerKart, ForgetIntroLogo } from "./kart-spawn.js";
 import { Lifted, LevelAngles } from "./spawn-points.js";
 import { ParseTeleportTarget, TeleportExitVelocity } from "./logic/teleport.js";
+import { HealZoneRate } from "./logic/health.js";
 import { RespawnKartAtCheckpoint, SetKartPaintColor, TeleportKartTo, IsJumpDebugOn, SetJumpDebug } from "./physics/index.js";
 import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen, UpdateJumpDebugHud } from "./hud.js";
 import { SetCameraDistance, SetCameraHeight } from "./camera.js";
@@ -193,6 +194,30 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
         TeleportExitVelocity(kart.melon.GetAbsVelocity(), yaw)
     );
     Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"`);
+});
+
+// Heal zones — see HEAL_ZONE_RATE for the Hammer convention: OnStartTouch ->
+// "heal_enter", OnEndTouch -> "heal_leave". The trigger itself (caller) is
+// remembered, so overlapping zones and their leaves are tracked separately;
+// its name may set the rate (heal_zone_<rate>). Healing happens per tick in
+// ApplyHealing (physics/heal.js).
+Instance.OnScriptInput("heal_enter", ({ caller, activator }) => {
+    const kart = activator && FindKartByMelon(activator);
+    if (!kart || !caller) {
+        Debug("heal_enter: activator wasn't a tracked melon, ignoring");
+        return;
+    }
+    const rate = HealZoneRate(caller.GetEntityName());
+    (kart.healZones ??= new Map()).set(caller, rate);
+    Debug(`heal_enter: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} in "${caller.GetEntityName()}" (${rate}/s)`);
+});
+
+Instance.OnScriptInput("heal_leave", ({ caller, activator }) => {
+    const kart = activator && FindKartByMelon(activator);
+    if (!kart || !caller) {
+        return;
+    }
+    kart.healZones?.delete(caller);
 });
 
 Instance.OnCustomHudClicked((event) => {

@@ -601,6 +601,21 @@ A trigger named wrong or pointing at a missing destination logs a
 hub specifically, the existing `hub_teleport` input still works (it also
 takes the kart out of a running heat).
 
+## Heal zones (implemented)
+
+Areas where the melon regains health over time: a `trigger_multiple`
+(filtered to `prop_physics`) whose `OnStartTouch` fires `RunScriptInput`
+`heal_enter` and whose `OnEndTouch` fires `heal_leave`. While inside, the
+melon heals every tick at `HEAL_ZONE_RATE` health/second (`constants/health.js`),
+or at the rate in the trigger's name if it's called `heal_zone_<rate>`
+(e.g. `heal_zone_25`) — pure Hammer edit, same name-carries-the-config
+convention as paint triggers. Capped at `MELON_MAX_HEALTH`; damage still
+applies inside, and overlapping zones don't stack (the fastest counts).
+Broken or race-locked melons don't heal. Teleports/respawns drop the melon
+out of all zones (the trigger's `OnEndTouch` isn't guaranteed to reach the
+script after a teleport, and a respawned new melon entity never gets one),
+so a zone it lands in re-adds it on its next touch.
+
 ## Open design questions (not yet decided — ask before assuming)
 
 - **Respawn-on-death vs. never-die**: given out-of-bounds already teleports

@@ -49,7 +49,7 @@ These apply to everything below unless a section says otherwise.
 6. **Keep triggers thick.** Melons can go well above `MAX_SPEED` after wall
    bounces; a thin trigger can be tunneled through in one tick.
 7. **Prefixes are reserved.** Don't give unrelated entities names starting
-   with `track_start_`, `checkpoint_`, `paint_trigger_`, `teleport_to_`,
+   with `track_start_`, `checkpoint_`, `paint_trigger_`, `teleport_to_`, `heal_zone_`,
    `melon_break` or `hub_` — the script or tests may pick them up.
 
 ## 2. Required core entities
@@ -95,6 +95,8 @@ follows the general conventions in section 1.
 | `hub_teleport` | any trigger | — | Sends the melon to `hub_spawn`, takes it out of a running heat, resets its track progress. |
 | `melon_paint` | `paint_trigger_<r>_<g>_<b>` | name (color) | Paints the melon. See 4.4. |
 | `melon_teleport` | `teleport_to_<destination>` | name (destination) | Teleports the melon. See 4.5. |
+| `heal_enter` | any heal trigger | name (optional rate) | Melon starts healing over time. See 4.6. |
+| `heal_leave` | the same heal trigger, **`OnEndTouch`** | — | Stops healing from that trigger. |
 
 Anything else is ignored by the script, and `npm test` fails on it.
 
@@ -195,6 +197,25 @@ output:      OnStartTouch → melon_drive_script → RunScriptInput → melon_te
 - Ignored for broken melons and melons locked by the race flow (countdown,
   finished).
 - Prefix destination names with `tp_dest_` by convention.
+
+### 4.6 Heal zones
+
+```
+name:    anything, or heal_zone_<rate>   e.g. heal_zone_25 (25 health/s)
+outputs: OnStartTouch → melon_drive_script → RunScriptInput → heal_enter
+         OnEndTouch   → melon_drive_script → RunScriptInput → heal_leave
+```
+
+- While the melon is inside, it regains health every tick, up to full.
+  Rate: parsed from a name matching `^heal_zone_(\d+(?:\.\d+)?)$`
+  (health per second, decimals allowed), any other name uses
+  `HEAL_ZONE_RATE` (10/s; full health is `MELON_MAX_HEALTH` = 80).
+- Both outputs are required — without `heal_leave` the melon keeps healing
+  after leaving (until its next teleport/respawn).
+- Overlapping zones don't stack; the fastest one counts. Damage still
+  applies inside a zone.
+- Teleports and respawns drop the melon out of every zone; a zone it lands
+  in picks it up again on its next `OnStartTouch`.
 
 ## 5. Limits
 

@@ -42,3 +42,18 @@ export const IMPACT_DAMAGE_THRESHOLD = 450;
 // Lower: damage grows slowly — even big crashes only nibble at health,
 //   breaking needs many hard hits.
 export const IMPACT_DAMAGE_SCALE = 0.2;
+
+// Heal zones: a trigger_multiple (filtered to prop_physics like the other
+// triggers) with OnStartTouch -> RunScriptInput "heal_enter" and OnEndTouch
+// -> RunScriptInput "heal_leave" heals the melon over time while it's
+// inside. Health per second, used for a zone whose name doesn't set its own
+// rate (see HEAL_ZONE_NAME_PATTERN).
+// Higher: a quick stop in the zone refills the melon — heal zones become
+//   pit stops you barely slow down for.
+// Lower: healing takes a long stay; driving through only helps a little.
+export const HEAL_ZONE_RATE = 10;
+// Optional per-zone rate: a heal trigger named "heal_zone_<rate>" (e.g.
+// "heal_zone_25") heals <rate> health per second instead of HEAL_ZONE_RATE.
+// Any other name uses HEAL_ZONE_RATE. Overlapping zones don't stack — the
+// fastest one counts.
+export const HEAL_ZONE_NAME_PATTERN = /^heal_zone_(\d+(?:\.\d+)?)$/;

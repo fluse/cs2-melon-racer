@@ -9,6 +9,7 @@ import { ApplyCameraFollow } from "../camera.js";
 import { MELON_MAX_HEALTH, BREAK_RESPAWN_DELAY, BREAK_TINT_FALLBACK } from "../constants/index.js";
 import { DirectionToAngles, SpawnBreakParticles } from "./break-effects.js";
 import { RespawnKartAtCheckpoint } from "./teleport.js";
+import { LeaveHealZones } from "./heal.js";
 
 /**
  * Common tail end of every break, whether it was caught by our own
@@ -80,6 +81,7 @@ function RespawnDestroyedMelon(slot, kart) {
     kart.settled = false;
     kart.speedCap = undefined;
     kart.pendingBounce = undefined;
+    LeaveHealZones(kart); // a new melon entity — the old one's zones never send heal_leave
     ApplyCameraFollow(kart);
 }
 

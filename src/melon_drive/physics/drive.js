@@ -25,6 +25,7 @@ import { DrawJumpDebug } from "./jump-debug.js";
 import { ApplyImpactDamage } from "./damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage } from "./wall-bounce.js";
 import { BreakMelon } from "./breaking.js";
+import { ApplyHealing } from "./heal.js";
 
 /** @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} dt */
 export function UpdateKart(slot, kart, dt) {
@@ -61,6 +62,9 @@ export function UpdateKart(slot, kart, dt) {
     }
 
     const now = Instance.GetGameTime();
+    // Heal zones (heal_enter/heal_leave) — before this tick's damage, so a
+    // hit inside a zone still breaks the melon if it's big enough.
+    ApplyHealing(kart, dt);
     // A wall bounce's jump-timing window has closed — its quality is final,
     // so charge (or waive) its damage now.
     if (kart.pendingBounce && now - kart.pendingBounce.time > WALL_BOUNCE_PERFECT_JUMP_WINDOW) {

@@ -18,6 +18,8 @@ const SCRIPT_INPUTS = [
     "hub_teleport",
     "melon_paint",
     "melon_teleport",
+    "heal_enter",
+    "heal_leave",
 ];
 
 test("every entity name the script looks up is in MAPPING_API.md", () => {
