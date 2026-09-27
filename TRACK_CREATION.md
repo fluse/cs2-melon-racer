@@ -6,7 +6,9 @@ script changes are needed to add, remove, or resize a track. For the
 *design* reasoning behind this system (why it works this way), see
 [GAMEPLAY.md](GAMEPLAY.md)'s "Hub → race → next-track flow" and "Multiple
 tracks & checkpoints" sections. All script inputs below are handled in
-[maps/scripts/melon_drive.js](maps/scripts/melon_drive.js).
+[maps/scripts/melon_drive.js](maps/scripts/melon_drive.js). For every other
+entity the map uses (hub, spawns, paint triggers, teleporters, effects) and
+the general conventions, see [MAPPING_API.md](MAPPING_API.md).
 
 ## The core idea
 

@@ -14,7 +14,11 @@ logic, open design questions — lives in [GAMEPLAY.md](GAMEPLAY.md) (imported
 above, so it's always loaded together with this file). Put gameplay-design
 changes there, not here. For the Hammer-side steps to build a new track
 (entity names, triggers, I/O wiring) rather than the design rationale, see
-[TRACK_CREATION.md](TRACK_CREATION.md).
+[TRACK_CREATION.md](TRACK_CREATION.md). The full map↔script contract —
+every entity name, name pattern and `RunScriptInput` parameter the script
+knows — is [MAPPING_API.md](MAPPING_API.md): when you add, rename or remove
+one in `src/`, update it there too (`test/mapping-api-doc.test.mjs` checks
+the `*_NAME`/`*_NAME_PATTERN` constants and script inputs are listed).
 
 Current addon contents:
 

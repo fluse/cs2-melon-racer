@@ -16,6 +16,7 @@ This document is the entry point for anyone who wants to **run, understand, or e
 | [AGENTS.md](AGENTS.md) | The CS2 `cs_script` engine API, the build pipeline, and hard editing rules for this addon |
 | [GAMEPLAY.md](GAMEPLAY.md) | Game design: concept, race-heat flow, checkpoint/lap logic, moderator powers, melon health, open design questions |
 | [TRACK_CREATION.md](TRACK_CREATION.md) | Step-by-step Hammer guide for adding a new track — no script changes required |
+| [MAPPING_API.md](MAPPING_API.md) | Mapping reference: every entity name, name pattern and script input the map can use, plus the conventions they follow |
 
 ## How the game mode works
 
@@ -57,7 +58,8 @@ There is no automated test suite or CLI compiler for this addon (Workshop Tools 
 
 ```
 melon_racer/
-├── AGENTS.md, GAMEPLAY.md, TRACK_CREATION.md   # detailed docs, see table above
+├── AGENTS.md, GAMEPLAY.md, TRACK_CREATION.md,  # detailed docs, see table above
+│   MAPPING_API.md
 ├── build.mjs, package.json                     # Rollup build: src/ -> maps/scripts/
 ├── cfg/melon_racer.cfg                         # server cvars for this map
 ├── maps/
@@ -123,7 +125,7 @@ src/melon_drive/*.js          (source of truth — edit these)
 panorama/.../speedometer.xml + .css   (custom_hud_layout — speedometer, menus, banners)
 ```
 
-- **Hammer → script**: trigger volumes fire `RunScriptInput` with a specific parameter string. Track layout itself is config-free — a track's checkpoint count, lap count, and spawn point are parsed straight out of a trigger's *name* (`track_start_<id>_cp<N>_laps<M>`) and its transform, and checkpoints/finish lines follow the same naming convention (`checkpoint_<id>_<index>`, `finish_<id>`). See [TRACK_CREATION.md](TRACK_CREATION.md) for the exact entity/output wiring.
+- **Hammer → script**: trigger volumes fire `RunScriptInput` with a specific parameter string. Track layout itself is config-free — a track's checkpoint count, lap count, and spawn point are parsed straight out of a trigger's *name* (`track_start_<id>_cp<N>_laps<M>`) and its transform, and checkpoints/finish lines follow the same naming convention (`checkpoint_<id>_<index>`, `finish_<id>`). See [TRACK_CREATION.md](TRACK_CREATION.md) for the exact entity/output wiring and [MAPPING_API.md](MAPPING_API.md) for the complete list of names and inputs.
 - **Build step**: Hammer's own JS compiler doesn't resolve local `import`s, so `build.mjs` (Rollup) flattens each `src/<entry>/` tree into the single file its `point_script` entity actually points at. **Always edit under `src/`, never the generated files in `maps/scripts/`** — they're overwritten on the next build and carry an `AUTO-GENERATED` banner.
 - **Script → HUD**: the custom HUD (`speed_hud` entity) is driven entirely from script via `SetDialogVariableStringForPlayer`, `SetHasClassForPlayer`, and click callbacks — the XML/CSS only define static layout and styling, with no logic of their own.
 
