@@ -341,7 +341,7 @@
     horizontal-align: right;
     vertical-align: bottom;
     margin-right: 40px;
-    margin-bottom: 196px; /* #speed_panel's margin-bottom + its height + a gap */
+    margin-bottom: 196px; /* #speed_panel's margin-bottom, its height and a gap */
     flow-children: down;
 
     padding: 6px 10px;
@@ -551,20 +551,16 @@
     }
 }
 
-/* General user menu (USE to toggle) — same modal look/pattern as .HubModal,
-   kept separate since the two aren't shown for the same reason and can grow
-   independently (see melon_drive.js's SetUserMenuOpen). */
+/* General user menu (USE to toggle) — a green-framed card with the Melon
+   Racer logo sitting on its top edge. #user_menu itself is just an
+   unstyled wrapper (no flow-children), so the card, the logo and the close
+   button can overlap: the card starts UserMenuLogo's half-height down, the
+   logo and close button are drawn after it (later children on top). See
+   SetUserMenuOpen for the Hidden toggle. */
 .UserMenu {
-    width: 360px;
+    width: 470px;
     horizontal-align: center;
     vertical-align: center;
-
-    flow-children: down;
-
-    padding: 24px;
-    background-color: #000000ee;
-    border: 1px solid #ffe066;
-    border-radius: 8px;
 
     transition-property: opacity;
     transition-duration: .15s;
@@ -575,12 +571,31 @@
     }
 }
 
+.UserMenuCard {
+    width: 100%;
+    margin-top: 50px;
+    flow-children: down;
+
+    padding: 54px 12px 12px 12px;
+    background-color: #1c261ceb;
+    border: 2px solid #7fd13b;
+    border-radius: 10px;
+    box-shadow: #7fd13b66 0px 0px 14px 2px;
+}
+
+/* 846x295 source, scaled to keep its aspect. */
+.UserMenuLogo {
+    horizontal-align: center;
+    vertical-align: top;
+    width: 290px;
+    height: 101px;
+}
+
 .UserMenuCloseButton {
     horizontal-align: right;
     vertical-align: top;
-    margin-top: -12px;
-    margin-right: -12px;
-    padding-left: 3px;
+    margin-top: 58px;
+    margin-right: 10px;
     width: 24px;
     height: 24px;
 
@@ -602,72 +617,131 @@
     vertical-align: center;
 }
 
-.UserMenuTitle {
-    font-size: 24px;
-    font-weight: bold;
-    color: white;
-    horizontal-align: center;
-    margin-bottom: 16px;
-}
-
-.UserMenuActionButton {
-    horizontal-align: center;
-    border-radius: 4px;
-    padding: 10px 20px;
-    font-size: 16px;
+/* One card per section: icon and title row, then its controls. */
+.UserMenuSection {
+    width: 100%;
+    flow-children: down;
     margin-top: 8px;
+    padding: 8px 10px 10px 10px;
 
-    background-color: #ffffff22;
-    color: white;
+    background-color: #00000066;
+    border: 1px solid #ffffff1a;
+    border-radius: 6px;
 
-    transition-property: background-color;
-    transition-duration: .1s;
-    &:hover {
-        background-color: #ffffff33;
+    &:first-child {
+        margin-top: 0px;
     }
 }
 
-/* Leaves the current heat, unlike the other action buttons — tinted red to
-   set it apart so it isn't clicked by accident. */
-.UserMenuActionButtonDanger {
-    background-color: #dd444422;
-    &:hover {
-        background-color: #dd444444;
-    }
+.UserMenuSectionHeader {
+    flow-children: right;
+    margin-bottom: 6px;
 }
 
-/* A settings toggle that's currently on (e.g. the jump debug button). */
-.UserMenuActionButton.ToggleOn {
-    background-color: #44dd4455;
-    &:hover {
-        background-color: #44dd4477;
-    }
+/* A second header inside the same section (CAMERA HEIGHT under DISTANCE). */
+.UserMenuSectionHeaderSpaced {
+    margin-top: 10px;
+}
+
+.UserMenuSectionIcon {
+    width: 16px;
+    height: 16px;
+    vertical-align: center;
+    margin-right: 7px;
+    opacity: 0.85;
 }
 
 .UserMenuSectionLabel {
-    font-size: 12px;
+    font-size: 14px;
+    font-weight: bold;
     letter-spacing: 1px;
-    color: #ffffff88;
+    color: #ffffffdd;
+    vertical-align: center;
+}
+
+.UserMenuButtonRow {
+    width: 100%;
+    flow-children: right;
+}
+
+.UserMenuActionButton {
+    height: 40px;
+    border-radius: 5px;
+    border: 1px solid #ffffff40;
+
+    background-color: #ffffff22;
+    transition-property: brightness, background-color;
+    transition-duration: .1s;
+    &:hover {
+        brightness: 1.25;
+    }
+}
+
+.UserMenuButtonHalf {
+    width: fill-parent-flow(1.0);
+    margin-left: 8px;
+    &:first-child {
+        margin-left: 0px;
+    }
+}
+
+.UserMenuButtonFull {
+    width: 100%;
+}
+
+.UserMenuButtonGreen {
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #55a83d ), to( #2f7124 ) );
+}
+
+/* Leaves the current heat — red so it isn't clicked by accident. */
+.UserMenuButtonRed {
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #b23a36 ), to( #74201e ) );
+}
+
+.UserMenuButtonBlue {
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #4f8ae0 ), to( #2b5bb0 ) );
+}
+
+/* Icon and text, centered in the button. */
+.UserMenuButtonContent {
+    flow-children: right;
     horizontal-align: center;
-    margin-top: 20px;
-    margin-bottom: 10px;
+    vertical-align: center;
+    max-width: 100%;
+    padding: 0px 8px;
+}
+
+.UserMenuButtonIcon {
+    width: 20px;
+    height: 20px;
+    vertical-align: center;
+    margin-right: 8px;
+}
+
+.UserMenuButtonLabel {
+    font-size: 15px;
+    font-weight: bold;
+    color: white;
+    vertical-align: center;
+    text-align: center;
+    max-width: 150px;
 }
 
 .UserMenuColorRow {
+    width: 100%;
     flow-children: right;
-    horizontal-align: center;
 }
 
 /* Plain flat swatches, not tied to melon_paint's r/g/b-in-the-name trigger
-   convention — usermenu_color_<key> in melon_drive.js's COLOR_PRESETS is the
+   convention — usermenu_color_<key> in COLOR_PRESETS (constants.js) is the
    source of truth for the actual applied color, these just need to look
    like it. Keep new swatches' class colors in sync with COLOR_PRESETS. */
 .ColorSwatch {
-    width: 32px;
-    height: 32px;
-    margin-left: 8px;
-    border-radius: 16px;
-    border: 2px solid #ffffff55;
+    width: fill-parent-flow(1.0);
+    height: 30px;
+    margin-left: 6px;
+    border-radius: 4px;
+    border: 2px solid #ffffff33;
 
     transition-property: border-color;
     transition-duration: .1s;
@@ -677,7 +751,7 @@
     }
 
     &:hover {
-        border-color: #ffffffcc;
+        border-color: #ffffffdd;
     }
 }
 
@@ -690,27 +764,23 @@
 .ColorSwatchWhite { background-color: #ffffff; }
 .ColorSwatchBlack { background-color: #282828; }
 
-/* Camera distance "slider" — a row of clickable notch buttons, same visual
-   language as .JumpBar/.JumpSegment above (filled left-to-right up to the
-   current step, driven from melon_drive.js's UpdateCameraDistanceHud). */
-.DistanceSlider {
-    horizontal-align: center;
+/* Camera distance/height presets: one button per step, the current one
+   "Selected" (driven from camera.js's UpdateCameraDistanceHud/
+   UpdateCameraHeightHud, which also set each button's {s:label}). */
+.CameraPresetRow {
+    width: 100%;
     flow-children: right;
-
-    padding: 6px;
-    background-color: #000000aa;
-    border: 2px solid #ffffff55;
-    border-radius: 6px;
 }
 
-.DistanceSegment {
-    width: 15px; /* 16 notches have to fit in the 360px user menu */
-    height: 16px;
-    margin-left: 2px;
-    background-color: #ffffff33;
-    border-radius: 3px;
+.CameraPresetButton {
+    width: fill-parent-flow(1.0);
+    height: 28px;
+    margin-left: 10px;
+    border-radius: 4px;
+    border: 1px solid #ffffff40;
+    background-color: #00000066;
 
-    transition-property: background-color;
+    transition-property: background-color, border-color;
     transition-duration: .1s;
 
     &:first-child {
@@ -718,10 +788,73 @@
     }
 
     &:hover {
-        background-color: #ffffff55;
+        background-color: #ffffff1a;
     }
 
-    &.Filled {
-        background-color: #ffe066;
+    &.Selected {
+        background-color: #ffffff30;
+        border-color: #ffffffcc;
     }
+}
+
+.CameraPresetLabel {
+    font-size: 14px;
+    font-weight: bold;
+    color: #ffffffdd;
+    horizontal-align: center;
+    vertical-align: center;
+}
+
+/* Full-width outlined settings toggle (jump debug). */
+.UserMenuOutlineButton {
+    width: 100%;
+    height: 30px;
+    border-radius: 4px;
+    border: 1px solid #ffffff66;
+    background-color: #00000066;
+
+    transition-property: background-color;
+    transition-duration: .1s;
+    &:hover {
+        background-color: #ffffff1a;
+    }
+
+    &.ToggleOn {
+        background-color: #44dd4455;
+        border-color: #7fd13b;
+    }
+}
+
+.UserMenuOutlineLabel {
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: white;
+    horizontal-align: center;
+    vertical-align: center;
+}
+
+/* Melon Racer logo after picking a team, before the melon spawns — full
+   screen, so the frozen first-person view behind it doesn't show. Fades out
+   as the melon appears. */
+.IntroLogo {
+    width: 100%;
+    height: 100%;
+    background-color: #000000ee;
+
+    transition-property: opacity;
+    transition-duration: .5s;
+    opacity: 1;
+
+    &.Hidden {
+        opacity: 0;
+    }
+}
+
+/* Native size 846x295. */
+.IntroLogoImage {
+    horizontal-align: center;
+    vertical-align: center;
+    width: 846px;
+    height: 295px;
 }

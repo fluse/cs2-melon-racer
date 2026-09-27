@@ -395,9 +395,9 @@ instead of after the last track's `BREAK`.
 
 Free-look: each player automatically gets their own `prop_physics` melon
 (spawned per-player from a `point_template` named `melon_template` — see
-`maps/scripts/melon_drive.js`) on every `OnPlayerReset` — and, as a
-safety net, `EnsurePlayerKarts` (every tick) gives any alive player on T or
-CT without a kart one at the intro, moves a kart over to a player's new
+`maps/scripts/melon_drive.js`): `EnsurePlayerKarts` (every tick) gives any
+alive player on T or CT without a kart one at the intro, after the logo
+(see "Spawn points"), moves a kart over to a player's new
 pawn, and re-attaches a chase camera the engine reset (joining a team used
 to leave the player looking through their frozen body instead). T and CT
 are both fine for racing; only unassigned players/spectators are put on CT.
@@ -512,6 +512,11 @@ sideways offset, and exactly there — the `melon_template`'s own offset is
 corrected by a teleport right after `ForceSpawn`). Keep that drop short: a
 long fall lands hard enough for the engine to destroy the melon on impact.
 
+- Picking a team first shows the Melon Racer logo
+  (`logo_melon_racer.png`, `intro_logo` in `speedometer.xml`, full screen
+  over a dark backdrop) for `INTRO_LOGO_SECONDS`, the player's own body
+  already frozen and hidden behind it; only then does the melon spawn
+  (`ShowIntroLogoThenSpawn` in `kart-spawn.js`). Reconnecting shows it again.
 - A player's very first melon (first join, i.e. no kart entry yet) appears
   at the `info_player_start` named `intro_spawn` — the tutorial area —
   facing that entity's own angles. It's also that new kart's respawn point

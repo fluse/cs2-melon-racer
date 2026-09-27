@@ -1,5 +1,5 @@
-// Pure step <-> value math for the user menu's camera "sliders" (rows of
-// clickable notches, see camera.js / speedometer.xml) — no cs_script
+// Pure step <-> value math for the user menu's camera presets (a row of
+// buttons, one per step, see camera.js / speedometer.xml) — no cs_script
 // import, so it's unit-testable in Node (see test/camera-steps.test.mjs).
 import {
     CAMERA_DISTANCE_MIN,
@@ -40,4 +40,11 @@ export function CameraHeightStepFor(height) {
 /** @param {number} step */
 export function CameraHeightForStep(step) {
     return ValueForStep(step, CAMERA_HEIGHT_MIN, CAMERA_HEIGHT_MAX, CAMERA_HEIGHT_STEPS);
+}
+
+const METERS_PER_UNIT = 0.0254; // Source units are inches
+
+/** A camera preset's button label, e.g. "2.5m". @param {number} units */
+export function FormatMeters(units) {
+    return `${(units * METERS_PER_UNIT).toFixed(1)}m`;
 }

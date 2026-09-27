@@ -135,100 +135,127 @@
 
 		<!-- Press USE to toggle: a general-purpose settings/actions menu, not
 		     tied to any single map trigger (see UpdateUserMenu/SetUserMenuOpen
-		     and the "usermenu_*" buttonId handling in melon_drive.js). Add more
-		     rows/sections here for future options — each is just another
-		     labeled control, no restructuring needed. -->
+		     and the "usermenu_*" buttonId handling in index.js). One card per
+		     section (UserMenuSection: icon + title, then its controls); add a
+		     new option as another card. The logo is last in the wrapper so it
+		     draws over the card's top edge; icons come from
+		     tools/make-icons.mjs. -->
 		<Panel id="user_menu" class="UserMenu Hidden">
+			<Panel class="UserMenuCard">
+				<Panel class="UserMenuSection">
+					<Panel class="UserMenuSectionHeader">
+						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/navigation.png" />
+						<Label class="UserMenuSectionLabel" text="NAVIGATION" />
+					</Panel>
+					<Panel class="UserMenuButtonRow">
+						<Button id="usermenu_respawn_button" class="UserMenuActionButton UserMenuButtonGreen UserMenuButtonHalf">
+							<Panel class="UserMenuButtonContent">
+								<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/respawn.png" />
+								<Label class="UserMenuButtonLabel" text="Respawn at Checkpoint" />
+							</Panel>
+						</Button>
+						<Button id="usermenu_hub_button" class="UserMenuActionButton UserMenuButtonRed UserMenuButtonHalf">
+							<Panel class="UserMenuButtonContent">
+								<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/home.png" />
+								<Label class="UserMenuButtonLabel" text="Return to Hub" />
+							</Panel>
+						</Button>
+					</Panel>
+				</Panel>
+
+				<!-- Same as the hub button (also leaves a running heat), but to
+				     intro_spawn — see SendKartToTutorial. -->
+				<Panel class="UserMenuSection">
+					<Panel class="UserMenuSectionHeader">
+						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/tutorial-box.png" />
+						<Label class="UserMenuSectionLabel" text="GO TO TUTORIAL" />
+					</Panel>
+					<Button id="usermenu_tutorial_button" class="UserMenuActionButton UserMenuButtonBlue UserMenuButtonFull">
+						<Panel class="UserMenuButtonContent">
+							<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/tutorial.png" />
+							<Label class="UserMenuButtonLabel" text="Go to Tutorial" />
+						</Panel>
+					</Button>
+				</Panel>
+
+				<Panel class="UserMenuSection">
+					<Panel class="UserMenuSectionHeader">
+						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/palette.png" />
+						<Label class="UserMenuSectionLabel" text="COLOR (Melon Skin)" />
+					</Panel>
+					<Panel class="UserMenuColorRow">
+						<Button id="usermenu_color_red" class="ColorSwatch ColorSwatchRed" />
+						<Button id="usermenu_color_orange" class="ColorSwatch ColorSwatchOrange" />
+						<Button id="usermenu_color_yellow" class="ColorSwatch ColorSwatchYellow" />
+						<Button id="usermenu_color_green" class="ColorSwatch ColorSwatchGreen" />
+						<Button id="usermenu_color_blue" class="ColorSwatch ColorSwatchBlue" />
+						<Button id="usermenu_color_purple" class="ColorSwatch ColorSwatchPurple" />
+						<Button id="usermenu_color_white" class="ColorSwatch ColorSwatchWhite" />
+						<Button id="usermenu_color_black" class="ColorSwatch ColorSwatchBlack" />
+					</Panel>
+				</Panel>
+
+				<!-- Camera presets: one button per step (CAMERA_*_STEPS), the
+				     current one marked "Selected", labels ("{s:label}", in
+				     meters) set from script — see UpdateCameraDistanceHud. -->
+				<Panel class="UserMenuSection">
+					<Panel class="UserMenuSectionHeader">
+						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/camera.png" />
+						<Label class="UserMenuSectionLabel" text="CAMERA DISTANCE" />
+					</Panel>
+					<Panel id="camdist_slider" class="CameraPresetRow">
+						<Button id="camdist_seg_0" class="CameraPresetButton">
+							<Label class="CameraPresetLabel" text="[ {s:label} ]" />
+						</Button>
+						<Button id="camdist_seg_1" class="CameraPresetButton">
+							<Label class="CameraPresetLabel" text="[ {s:label} ]" />
+						</Button>
+						<Button id="camdist_seg_2" class="CameraPresetButton">
+							<Label class="CameraPresetLabel" text="[ {s:label} ]" />
+						</Button>
+					</Panel>
+					<Panel class="UserMenuSectionHeader UserMenuSectionHeaderSpaced">
+						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/height.png" />
+						<Label class="UserMenuSectionLabel" text="CAMERA HEIGHT" />
+					</Panel>
+					<Panel id="camheight_slider" class="CameraPresetRow">
+						<Button id="camheight_seg_0" class="CameraPresetButton">
+							<Label class="CameraPresetLabel" text="[ {s:label} ]" />
+						</Button>
+						<Button id="camheight_seg_1" class="CameraPresetButton">
+							<Label class="CameraPresetLabel" text="[ {s:label} ]" />
+						</Button>
+						<Button id="camheight_seg_2" class="CameraPresetButton">
+							<Label class="CameraPresetLabel" text="[ {s:label} ]" />
+						</Button>
+					</Panel>
+				</Panel>
+
+				<!-- Per-player debug view of how ground/wall contact and jump
+				     presses are judged (physics/jump-debug.js). Its drawing only
+				     shows in tools mode. -->
+				<Panel class="UserMenuSection">
+					<Panel class="UserMenuSectionHeader">
+						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/debug.png" />
+						<Label class="UserMenuSectionLabel" text="JUMP DEBUG" />
+					</Panel>
+					<Button id="usermenu_jumpdebug_button" class="UserMenuOutlineButton">
+						<Label class="UserMenuOutlineLabel" text="JUMP DEBUG: {s:jumpdebug_state}" />
+					</Button>
+				</Panel>
+			</Panel>
+
+			<Image class="UserMenuLogo" src="file://{images}/custom_game/logo_melon_racer.png" />
 			<Button id="usermenu_close_button" class="UserMenuCloseButton">
 				<Label class="UserMenuCloseIcon" text="✕" />
 			</Button>
-			<Label class="UserMenuTitle" text="Menu" />
+		</Panel>
 
-			<Button id="usermenu_respawn_button" class="UserMenuActionButton">
-				<Label text="Respawn at last checkpoint" />
-			</Button>
-
-			<!-- Self-service, unlike hub_abort_button (moderator-only, ends the
-			     heat for everyone): pulls just this player out of the current
-			     heat and back to the hub, same as ReturnAllToHub handles for a
-			     disconnecting racer. -->
-			<Button id="usermenu_hub_button" class="UserMenuActionButton UserMenuActionButtonDanger">
-				<Label text="Return to hub" />
-			</Button>
-
-			<!-- Same as the hub button (also leaves a running heat, hence the
-			     same red tint), but to intro_spawn — see SendKartToTutorial. -->
-			<Button id="usermenu_tutorial_button" class="UserMenuActionButton UserMenuActionButtonDanger">
-				<Label text="Go to Tutorial" />
-			</Button>
-
-			<Label class="UserMenuSectionLabel" text="COLOR" />
-			<Panel class="UserMenuColorRow">
-				<Button id="usermenu_color_red" class="ColorSwatch ColorSwatchRed" />
-				<Button id="usermenu_color_orange" class="ColorSwatch ColorSwatchOrange" />
-				<Button id="usermenu_color_yellow" class="ColorSwatch ColorSwatchYellow" />
-				<Button id="usermenu_color_green" class="ColorSwatch ColorSwatchGreen" />
-				<Button id="usermenu_color_blue" class="ColorSwatch ColorSwatchBlue" />
-				<Button id="usermenu_color_purple" class="ColorSwatch ColorSwatchPurple" />
-				<Button id="usermenu_color_white" class="ColorSwatch ColorSwatchWhite" />
-				<Button id="usermenu_color_black" class="ColorSwatch ColorSwatchBlack" />
-			</Panel>
-
-			<!-- "Slider" for third-person camera distance — CustomHudLayout has
-			     no native slider/drag widget (see melon_drive.js), so this is a
-			     row of clickable notches instead: click one to jump straight to
-			     that distance. Filled up to the current step via the "Filled"
-			     class, same convention as jump_bar's segments above. -->
-			<Label class="UserMenuSectionLabel" text="CAMERA DISTANCE" />
-			<Panel id="camdist_slider" class="DistanceSlider">
-				<Button id="camdist_seg_0" class="DistanceSegment" />
-				<Button id="camdist_seg_1" class="DistanceSegment" />
-				<Button id="camdist_seg_2" class="DistanceSegment" />
-				<Button id="camdist_seg_3" class="DistanceSegment" />
-				<Button id="camdist_seg_4" class="DistanceSegment" />
-				<Button id="camdist_seg_5" class="DistanceSegment" />
-				<Button id="camdist_seg_6" class="DistanceSegment" />
-				<Button id="camdist_seg_7" class="DistanceSegment" />
-				<Button id="camdist_seg_8" class="DistanceSegment" />
-				<Button id="camdist_seg_9" class="DistanceSegment" />
-				<Button id="camdist_seg_10" class="DistanceSegment" />
-				<Button id="camdist_seg_11" class="DistanceSegment" />
-				<Button id="camdist_seg_12" class="DistanceSegment" />
-				<Button id="camdist_seg_13" class="DistanceSegment" />
-				<Button id="camdist_seg_14" class="DistanceSegment" />
-				<Button id="camdist_seg_15" class="DistanceSegment" />
-			</Panel>
-
-			<!-- Same clickable-notches trick as CAMERA DISTANCE above, for how
-			     high above the melon the chase camera sits (close to the ground
-			     vs. a higher overview angle). -->
-			<Label class="UserMenuSectionLabel" text="CAMERA HEIGHT" />
-			<Panel id="camheight_slider" class="DistanceSlider">
-				<Button id="camheight_seg_0" class="DistanceSegment" />
-				<Button id="camheight_seg_1" class="DistanceSegment" />
-				<Button id="camheight_seg_2" class="DistanceSegment" />
-				<Button id="camheight_seg_3" class="DistanceSegment" />
-				<Button id="camheight_seg_4" class="DistanceSegment" />
-				<Button id="camheight_seg_5" class="DistanceSegment" />
-				<Button id="camheight_seg_6" class="DistanceSegment" />
-				<Button id="camheight_seg_7" class="DistanceSegment" />
-				<Button id="camheight_seg_8" class="DistanceSegment" />
-				<Button id="camheight_seg_9" class="DistanceSegment" />
-				<Button id="camheight_seg_10" class="DistanceSegment" />
-				<Button id="camheight_seg_11" class="DistanceSegment" />
-				<Button id="camheight_seg_12" class="DistanceSegment" />
-				<Button id="camheight_seg_13" class="DistanceSegment" />
-				<Button id="camheight_seg_14" class="DistanceSegment" />
-				<Button id="camheight_seg_15" class="DistanceSegment" />
-			</Panel>
-
-			<!-- Per-player debug view of how ground/wall contact and jump
-			     presses are judged (physics/jump-debug.js). Its drawing only
-			     shows in tools mode. -->
-			<Label class="UserMenuSectionLabel" text="DEBUG" />
-			<Button id="usermenu_jumpdebug_button" class="UserMenuActionButton">
-				<Label text="Jump debug: {s:jumpdebug_state}" />
-			</Button>
+		<!-- Melon Racer logo over a dark backdrop, shown for INTRO_LOGO_SECONDS
+		     once a player has picked a team, before their melon spawns (see
+		     ShowIntroLogoThenSpawn). Last, so it covers the rest of the HUD. -->
+		<Panel id="intro_logo" class="IntroLogo Hidden">
+			<Image class="IntroLogoImage" src="file://{images}/custom_game/logo_melon_racer.png" />
 		</Panel>
 	</Panel>
 </root>

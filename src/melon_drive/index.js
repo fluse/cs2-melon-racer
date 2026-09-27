@@ -23,8 +23,8 @@ import { Instance } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, CAMERA_DISTANCE_STEPS, CAMERA_HEIGHT_STEPS, HUB_TRIGGER_NAME, TELEPORT_UP_OFFSET } from "./constants.js";
 import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, SetModeratorSlot, DropKart } from "./kart-registry.js";
-import { SetUpPlayerKart } from "./kart-spawn.js";
-import { GetIntroSpawnPoint, Lifted, LevelAngles } from "./spawn-points.js";
+import { SetUpPlayerKart, ForgetIntroLogo } from "./kart-spawn.js";
+import { Lifted, LevelAngles } from "./spawn-points.js";
 import { ParseTeleportTarget, TeleportExitVelocity } from "./logic/teleport.js";
 import { RespawnKartAtCheckpoint, SetKartPaintColor, TeleportKartTo, IsJumpDebugOn, SetJumpDebug } from "./physics/index.js";
 import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen, UpdateJumpDebugHud } from "./hud.js";
@@ -58,14 +58,16 @@ Instance.OnScriptReload({
     },
 });
 
-// A player joining for the first time starts in the tutorial (intro_spawn);
-// any later reset keeps their existing kart where it is.
+// A reset keeps an existing kart where it is and just re-attaches it to the
+// pawn. A player without one gets it from EnsurePlayerKarts (think.js):
+// the logo first, then a melon in the tutorial (intro_spawn).
 Instance.OnPlayerReset(({ player }) => {
     Debug(`OnPlayerReset: slot=${player.GetPlayerController()?.GetPlayerSlot()}`);
-    SetUpPlayerKart(player, GetIntroSpawnPoint());
+    SetUpPlayerKart(player, undefined);
 });
 
 Instance.OnPlayerDisconnect(({ playerSlot }) => {
+    ForgetIntroLogo(playerSlot);
     const kart = karts.get(playerSlot);
     if (kart) {
         DropKart(playerSlot, kart);

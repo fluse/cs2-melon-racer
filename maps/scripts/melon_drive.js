@@ -345,6 +345,10 @@ const COLOR_PRESETS = {
     black: { r: 40, g: 40, b: 40, a: 255 },
 };
 
+// How long the Melon Racer logo (intro_logo in speedometer.xml) shows after
+// a player picks a team, before their melon spawns at the intro.
+const INTRO_LOGO_SECONDS = 5;
+
 const COUNTDOWN_SECONDS = 3;
 const GO_DISPLAY_SECONDS = 1; // how long "GO!" stays on screen once the countdown ends
 const BREAK_SECONDS = 10; // fixed by the original request
@@ -406,19 +410,17 @@ const CAMERA_LATERAL = 0;
 const CAMERA_DISTANCE_MIN = 50; // was 150 — players wanted it much closer
 const CAMERA_DISTANCE_MAX = 400;
 const CAMERA_DISTANCE_DEFAULT = CAMERA_DISTANCE_MIN; // closest setting feels best in play (was 320)
-// CustomHudLayout only supports Panel/Label/Image/Button — no native
-// slider/drag widget — so the user menu's "distance slider" is really a
-// clickable row of notches the player picks from, same trick as the jump
-// recharge bar (JUMP_BAR_SEGMENTS) below. This is how many notches it has.
-const CAMERA_DISTANCE_STEPS = 16; // must match the camdist_seg_* buttons in speedometer.xml (test/camera-steps.test.mjs checks)
+// The user menu offers the camera distance as a few preset buttons
+// (camdist_seg_* in speedometer.xml), evenly spread from MIN to MAX — this
+// is how many. Their labels (in meters) come from these values.
+const CAMERA_DISTANCE_STEPS = 3; // must match the camdist_seg_* buttons in speedometer.xml (test/camera-steps.test.mjs checks)
 
-// Same notch-slider trick as CAMERA_DISTANCE_* above, for how high above the
-// melon the chase camera sits — lets players pick a low, close-to-the-ground
-// view or a higher, more overview-ish one.
+// Same presets as CAMERA_DISTANCE_* above, for how high above the melon the
+// chase camera sits — a low, close-to-the-ground view or a higher overview.
 const CAMERA_HEIGHT_MIN = 0; // was 20 — down to the melon's own FOLLOW_OFFSET height
 const CAMERA_HEIGHT_MAX = 160;
 const CAMERA_HEIGHT_DEFAULT = CAMERA_HEIGHT_MIN; // lowest setting feels best in play (was 80)
-const CAMERA_HEIGHT_STEPS = 16; // must match the camheight_seg_* buttons in speedometer.xml
+const CAMERA_HEIGHT_STEPS = 3; // must match the camheight_seg_* buttons in speedometer.xml
 
 // Name of the custom_hud_layout entity (place one in Hammer pointing at
 // panorama/layout/custom_game/speedometer.vxml) that shows the speedometer.
@@ -1180,6 +1182,49 @@ function HealthBarState(health) {
     };
 }
 
+// Pure step <-> value math for the user menu's camera presets (a row of
+// buttons, one per step, see camera.js / speedometer.xml) — no cs_script
+// import, so it's unit-testable in Node (see test/camera-steps.test.mjs).
+
+/** @param {number} value @param {number} min @param {number} max @param {number} steps */
+function StepFor(value, min, max, steps) {
+    const fraction = (value - min) / (max - min);
+    return Math.max(0, Math.min(steps - 1, Math.round(fraction * (steps - 1))));
+}
+
+/** @param {number} step @param {number} min @param {number} max @param {number} steps */
+function ValueForStep(step, min, max, steps) {
+    const fraction = steps > 1 ? step / (steps - 1) : 0;
+    return min + fraction * (max - min);
+}
+
+/** @param {number} distance */
+function CameraDistanceStepFor(distance) {
+    return StepFor(distance, CAMERA_DISTANCE_MIN, CAMERA_DISTANCE_MAX, CAMERA_DISTANCE_STEPS);
+}
+
+/** @param {number} step */
+function CameraDistanceForStep(step) {
+    return ValueForStep(step, CAMERA_DISTANCE_MIN, CAMERA_DISTANCE_MAX, CAMERA_DISTANCE_STEPS);
+}
+
+/** @param {number} height */
+function CameraHeightStepFor(height) {
+    return StepFor(height, CAMERA_HEIGHT_MIN, CAMERA_HEIGHT_MAX, CAMERA_HEIGHT_STEPS);
+}
+
+/** @param {number} step */
+function CameraHeightForStep(step) {
+    return ValueForStep(step, CAMERA_HEIGHT_MIN, CAMERA_HEIGHT_MAX, CAMERA_HEIGHT_STEPS);
+}
+
+const METERS_PER_UNIT = 0.0254; // Source units are inches
+
+/** A camera preset's button label, e.g. "2.5m". @param {number} units */
+function FormatMeters(units) {
+    return `${(units * METERS_PER_UNIT).toFixed(1)}m`;
+}
+
 // Per-track checkpoint/lap config comes straight from Hammer instead of a
 // hand-maintained lookup: each track has one trigger_multiple named
 // "track_start_<trackId>_cp<checkpointCount>_laps<lapsToWin>" (e.g.
@@ -1428,7 +1473,10 @@ function SetUserMenuOpen(slot, kart, open) {
     }
     hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
     if (open) {
+        // Refreshed on every open: a layout or script reload in tools mode
+        // wipes what was set when the kart spawned.
         UpdateJumpDebugHud(slot, kart);
+        UpdateCameraPresetHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
 }
@@ -1445,6 +1493,32 @@ function UpdateJumpDebugHud(slot, kart) {
     const on = IsJumpDebugOn(kart);
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_jumpdebug_button", "jumpdebug_state", on ? "ON" : "OFF");
     hud.SetHasClassForPlayer(slot, "usermenu_jumpdebug_button", "ToggleOn", on);
+}
+
+/**
+ * The user menu's camera preset buttons (camdist_seg_* / camheight_seg_* in
+ * speedometer.xml, clicks handled in index.js): each labeled with its value
+ * in meters ({s:label}), the current one marked "Selected".
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+function UpdateCameraPresetHud(slot, kart) {
+    UpdatePresetButtons(slot, "camdist_seg_", CAMERA_DISTANCE_STEPS, CameraDistanceStepFor(kart.cameraDistance), CameraDistanceForStep);
+    UpdatePresetButtons(slot, "camheight_seg_", CAMERA_HEIGHT_STEPS, CameraHeightStepFor(kart.cameraHeight), CameraHeightForStep);
+}
+
+/**
+ * @param {number} slot @param {string} prefix @param {number} steps
+ * @param {number} selected @param {(step: number) => number} valueForStep
+ */
+function UpdatePresetButtons(slot, prefix, steps, selected, valueForStep) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    for (let i = 0; i < steps; i++) {
+        hud.SetDialogVariableStringForPlayer(slot, `${prefix}${i}`, "label", FormatMeters(valueForStep(i)));
+        hud.SetHasClassForPlayer(slot, `${prefix}${i}`, "Selected", i === selected);
+    }
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart */
@@ -1551,85 +1625,29 @@ function PruneBreakEffects(effects, now) {
     return { expired, kept };
 }
 
-// Pure step <-> value math for the user menu's camera "sliders" (rows of
-// clickable notches, see camera.js / speedometer.xml) — no cs_script
-// import, so it's unit-testable in Node (see test/camera-steps.test.mjs).
-
-/** @param {number} value @param {number} min @param {number} max @param {number} steps */
-function StepFor(value, min, max, steps) {
-    const fraction = (value - min) / (max - min);
-    return Math.max(0, Math.min(steps - 1, Math.round(fraction * (steps - 1))));
-}
-
-/** @param {number} step @param {number} min @param {number} max @param {number} steps */
-function ValueForStep(step, min, max, steps) {
-    const fraction = steps > 1 ? step / (steps - 1) : 0;
-    return min + fraction * (max - min);
-}
-
-/** @param {number} distance */
-function CameraDistanceStepFor(distance) {
-    return StepFor(distance, CAMERA_DISTANCE_MIN, CAMERA_DISTANCE_MAX, CAMERA_DISTANCE_STEPS);
-}
-
-/** @param {number} step */
-function CameraDistanceForStep(step) {
-    return ValueForStep(step, CAMERA_DISTANCE_MIN, CAMERA_DISTANCE_MAX, CAMERA_DISTANCE_STEPS);
-}
-
-/** @param {number} height */
-function CameraHeightStepFor(height) {
-    return StepFor(height, CAMERA_HEIGHT_MIN, CAMERA_HEIGHT_MAX, CAMERA_HEIGHT_STEPS);
-}
-
-/** @param {number} step */
-function CameraHeightForStep(step) {
-    return ValueForStep(step, CAMERA_HEIGHT_MIN, CAMERA_HEIGHT_MAX, CAMERA_HEIGHT_STEPS);
-}
-
-// "Slider" for the third-person camera distance — really a clickable row of
-// notches (camdist_seg_0 .. camdist_seg_{CAMERA_DISTANCE_STEPS-1} buttons in
-// speedometer.xml, handled in OnCustomHudClicked), since CustomHudLayout has
-// no native drag/slider widget. Filled the same way the jump bar is, up to
-// the step the current cameraDistance falls on.
+// The preset buttons' labels and "Selected" mark: UpdateCameraPresetHud in
+// hud.js (which also runs every time the user menu opens).
 /** @param {import("./kart-registry.js").Kart} kart */
 function UpdateCameraDistanceHud(kart) {
-    const hud = GetSpeedHud();
     const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-    if (!hud || slot === undefined) {
-        return;
-    }
-    const filledSegments = CameraDistanceStepFor(kart.cameraDistance) + 1;
-    for (let i = 0; i < CAMERA_DISTANCE_STEPS; i++) {
-        hud.SetHasClassForPlayer(slot, `camdist_seg_${i}`, "Filled", i < filledSegments);
+    if (slot !== undefined) {
+        UpdateCameraPresetHud(slot, kart);
     }
 }
 
-/** Applies a new camera distance (picked via the user menu's slider) immediately, without waiting for a respawn. @param {import("./kart-registry.js").Kart} kart @param {number} step */
+/** Applies a new camera distance (picked in the user menu) immediately, without waiting for a respawn. @param {import("./kart-registry.js").Kart} kart @param {number} step */
 function SetCameraDistance(kart, step) {
     kart.cameraDistance = CameraDistanceForStep(step);
     ApplyCameraFollow(kart);
     UpdateCameraDistanceHud(kart);
 }
 
-// Same notch-slider trick as the distance controls above (camheight_seg_0 ..
-// camheight_seg_{CAMERA_HEIGHT_STEPS-1} in speedometer.xml), for how high
-// above the melon the chase camera sits — lets a player pull it down close
-// to the ground or push it up for more of an overview.
 /** @param {import("./kart-registry.js").Kart} kart */
 function UpdateCameraHeightHud(kart) {
-    const hud = GetSpeedHud();
-    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-    if (!hud || slot === undefined) {
-        return;
-    }
-    const filledSegments = CameraHeightStepFor(kart.cameraHeight) + 1;
-    for (let i = 0; i < CAMERA_HEIGHT_STEPS; i++) {
-        hud.SetHasClassForPlayer(slot, `camheight_seg_${i}`, "Filled", i < filledSegments);
-    }
+    UpdateCameraDistanceHud(kart); // one update covers both rows
 }
 
-/** Applies a new camera height (picked via the user menu's slider) immediately, without waiting for a respawn. @param {import("./kart-registry.js").Kart} kart @param {number} step */
+/** Applies a new camera height (picked in the user menu) immediately, without waiting for a respawn. @param {import("./kart-registry.js").Kart} kart @param {number} step */
 function SetCameraHeight(kart, step) {
     kart.cameraHeight = CameraHeightForStep(step);
     ApplyCameraFollow(kart);
@@ -1819,9 +1837,15 @@ function GetIntroSpawnPoint() {
 // spawn point the caller picks (the intro on join); a player who already has
 // one keeps it as-is — a lost melon is brought back by the break/respawn
 // logic in physics/breaking.js, never here, so the two can't race each other.
-// OnPlayerReset is the usual trigger, but EnsurePlayerKarts (every tick)
-// also catches a player whose pawn got no melon or no chase camera from it —
-// e.g. the engine finishing a team-join spawn after that callback ran.
+// A new player's kart comes only from EnsurePlayerKarts (every tick): once
+// they've picked a team it shows the Melon Racer logo for
+// INTRO_LOGO_SECONDS, then spawns their melon at the intro. OnPlayerReset
+// only re-sets-up a player who already has a kart; EnsurePlayerKarts also
+// catches a pawn that lost its chase camera — e.g. the engine finishing a
+// team-join spawn after that callback ran.
+
+/** Game time each new player's intro logo ends, by slot — see EnsurePlayerKarts. @type {Map<number, number>} */
+const introLogoEnd = new Map();
 
 /**
  * Spawns a fresh melon from the melon_template point_template — shared by
@@ -1981,12 +2005,11 @@ function SetUpPlayerKart(pawn, newKartSpawnPoint) {
 
 /**
  * Every tick: makes sure each player standing on a team has a melon and is
- * looking through its chase camera. OnPlayerReset alone left a player who
- * had just picked a team stuck in their invisible, frozen body — the
- * engine's spawn could finish after that callback (or hand them a new pawn),
- * dropping the camera again. A player without a kart gets one at the intro,
- * like OnPlayerReset does; one whose pawn changed or whose camera got reset
- * is set up again on the pawn they have now.
+ * looking through its chase camera. A player without a kart first sees the
+ * Melon Racer logo (their own body frozen and hidden meanwhile), then gets a
+ * melon at the intro. One whose pawn changed or whose camera got reset is
+ * set up again on the pawn they have now — OnPlayerReset alone left a
+ * player who had just picked a team stuck in their invisible, frozen body.
  */
 function EnsurePlayerKarts() {
     for (const controller of Instance.GetAllPlayerControllers()) {
@@ -1997,17 +2020,59 @@ function EnsurePlayerKarts() {
         if (!pawn?.IsValid() || !pawn.IsAlive() || !IsOnPlayingTeam(pawn)) {
             continue; // spectating, picking a team, or dead (waiting to respawn)
         }
-        const kart = karts.get(controller.GetPlayerSlot());
+        const slot = controller.GetPlayerSlot();
+        const kart = karts.get(slot);
         if (!kart) {
-            Debug(`EnsurePlayerKarts: slot ${controller.GetPlayerSlot()} has a pawn but no kart, spawning one at the intro`);
-            SetUpPlayerKart(pawn, GetIntroSpawnPoint());
+            ShowIntroLogoThenSpawn(slot, pawn);
         } else if (kart.pawn !== pawn) {
-            Debug(`EnsurePlayerKarts: slot ${controller.GetPlayerSlot()} got a new pawn, moving the kart over`);
+            Debug(`EnsurePlayerKarts: slot ${slot} got a new pawn, moving the kart over`);
             SetUpPlayerKart(pawn, undefined);
         } else if (kart.melon.IsValid() && !kart.breaking && pawn.GetCustomCamera().GetMode() !== CustomCameraMode.FOLLOW_POSITION) {
-            Debug(`EnsurePlayerKarts: slot ${controller.GetPlayerSlot()} lost the chase camera, re-attaching`);
+            Debug(`EnsurePlayerKarts: slot ${slot} lost the chase camera, re-attaching`);
             SetUpPlayerKart(pawn, undefined);
         }
+    }
+}
+
+/**
+ * A new player's first INTRO_LOGO_SECONDS on a team: the logo, then their
+ * melon at the intro. Retried a second later if the melon can't spawn.
+ * @param {number} slot @param {any} pawn
+ */
+function ShowIntroLogoThenSpawn(slot, pawn) {
+    const now = Instance.GetGameTime();
+    const end = introLogoEnd.get(slot);
+    if (end === undefined) {
+        Debug(`EnsurePlayerKarts: slot ${slot} joined a team, showing the logo before spawning at the intro`);
+        FreezePawn(pawn);
+        SetIntroLogoVisible(slot, true);
+        introLogoEnd.set(slot, now + INTRO_LOGO_SECONDS);
+        return;
+    }
+    if (now < end) {
+        return;
+    }
+    if (SetUpPlayerKart(pawn, GetIntroSpawnPoint())) {
+        SetIntroLogoVisible(slot, false);
+        introLogoEnd.delete(slot);
+    } else {
+        introLogoEnd.set(slot, now + 1);
+    }
+}
+
+/** @param {number} slot @param {boolean} visible */
+function SetIntroLogoVisible(slot, visible) {
+    GetSpeedHud()?.SetHasClassForPlayer(slot, "intro_logo", "Hidden", !visible);
+}
+
+/**
+ * Forgets a disconnecting player's logo state and hides the logo, so a
+ * reconnect (a first join again) shows it from the start.
+ * @param {number} slot
+ */
+function ForgetIntroLogo(slot) {
+    if (introLogoEnd.delete(slot)) {
+        SetIntroLogoVisible(slot, false);
     }
 }
 
@@ -3845,14 +3910,16 @@ Instance.OnScriptReload({
     },
 });
 
-// A player joining for the first time starts in the tutorial (intro_spawn);
-// any later reset keeps their existing kart where it is.
+// A reset keeps an existing kart where it is and just re-attaches it to the
+// pawn. A player without one gets it from EnsurePlayerKarts (think.js):
+// the logo first, then a melon in the tutorial (intro_spawn).
 Instance.OnPlayerReset(({ player }) => {
     Debug(`OnPlayerReset: slot=${player.GetPlayerController()?.GetPlayerSlot()}`);
-    SetUpPlayerKart(player, GetIntroSpawnPoint());
+    SetUpPlayerKart(player, undefined);
 });
 
 Instance.OnPlayerDisconnect(({ playerSlot }) => {
+    ForgetIntroLogo(playerSlot);
     const kart = karts.get(playerSlot);
     if (kart) {
         DropKart(playerSlot, kart);

@@ -1,58 +1,36 @@
 import { CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "./debug.js";
-import { GetSpeedHud } from "./hud.js";
+import { UpdateCameraPresetHud } from "./hud.js";
 import { BreakCameraOffset } from "./logic/break-sequence.js";
-import { CameraDistanceStepFor, CameraDistanceForStep, CameraHeightStepFor, CameraHeightForStep } from "./logic/camera-steps.js";
+import { CameraDistanceForStep, CameraHeightForStep } from "./logic/camera-steps.js";
 import {
     CAMERA_LATERAL,
-    CAMERA_DISTANCE_STEPS,
-    CAMERA_HEIGHT_STEPS,
     FOLLOW_OFFSET,
 } from "./constants.js";
 
-// "Slider" for the third-person camera distance — really a clickable row of
-// notches (camdist_seg_0 .. camdist_seg_{CAMERA_DISTANCE_STEPS-1} buttons in
-// speedometer.xml, handled in OnCustomHudClicked), since CustomHudLayout has
-// no native drag/slider widget. Filled the same way the jump bar is, up to
-// the step the current cameraDistance falls on.
+// The preset buttons' labels and "Selected" mark: UpdateCameraPresetHud in
+// hud.js (which also runs every time the user menu opens).
 /** @param {import("./kart-registry.js").Kart} kart */
 export function UpdateCameraDistanceHud(kart) {
-    const hud = GetSpeedHud();
     const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-    if (!hud || slot === undefined) {
-        return;
-    }
-    const filledSegments = CameraDistanceStepFor(kart.cameraDistance) + 1;
-    for (let i = 0; i < CAMERA_DISTANCE_STEPS; i++) {
-        hud.SetHasClassForPlayer(slot, `camdist_seg_${i}`, "Filled", i < filledSegments);
+    if (slot !== undefined) {
+        UpdateCameraPresetHud(slot, kart);
     }
 }
 
-/** Applies a new camera distance (picked via the user menu's slider) immediately, without waiting for a respawn. @param {import("./kart-registry.js").Kart} kart @param {number} step */
+/** Applies a new camera distance (picked in the user menu) immediately, without waiting for a respawn. @param {import("./kart-registry.js").Kart} kart @param {number} step */
 export function SetCameraDistance(kart, step) {
     kart.cameraDistance = CameraDistanceForStep(step);
     ApplyCameraFollow(kart);
     UpdateCameraDistanceHud(kart);
 }
 
-// Same notch-slider trick as the distance controls above (camheight_seg_0 ..
-// camheight_seg_{CAMERA_HEIGHT_STEPS-1} in speedometer.xml), for how high
-// above the melon the chase camera sits — lets a player pull it down close
-// to the ground or push it up for more of an overview.
 /** @param {import("./kart-registry.js").Kart} kart */
 export function UpdateCameraHeightHud(kart) {
-    const hud = GetSpeedHud();
-    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-    if (!hud || slot === undefined) {
-        return;
-    }
-    const filledSegments = CameraHeightStepFor(kart.cameraHeight) + 1;
-    for (let i = 0; i < CAMERA_HEIGHT_STEPS; i++) {
-        hud.SetHasClassForPlayer(slot, `camheight_seg_${i}`, "Filled", i < filledSegments);
-    }
+    UpdateCameraDistanceHud(kart); // one update covers both rows
 }
 
-/** Applies a new camera height (picked via the user menu's slider) immediately, without waiting for a respawn. @param {import("./kart-registry.js").Kart} kart @param {number} step */
+/** Applies a new camera height (picked in the user menu) immediately, without waiting for a respawn. @param {import("./kart-registry.js").Kart} kart @param {number} step */
 export function SetCameraHeight(kart, step) {
     kart.cameraHeight = CameraHeightForStep(step);
     ApplyCameraFollow(kart);

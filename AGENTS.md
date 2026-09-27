@@ -41,6 +41,7 @@ test/*.test.mjs                          # node:test unit tests for src/*/logic/
 test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities
 test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
+tools/make-icons.mjs                     # generates panorama/images/custom_game/icons/*.png (user menu icons) — edit shapes there, re-run with node
 ```
 
 `src/<entry>/` is where gameplay code goes — one directory per `point_script`

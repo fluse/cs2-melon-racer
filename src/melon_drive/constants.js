@@ -330,6 +330,10 @@ export const COLOR_PRESETS = {
     black: { r: 40, g: 40, b: 40, a: 255 },
 };
 
+// How long the Melon Racer logo (intro_logo in speedometer.xml) shows after
+// a player picks a team, before their melon spawns at the intro.
+export const INTRO_LOGO_SECONDS = 5;
+
 export const COUNTDOWN_SECONDS = 3;
 export const GO_DISPLAY_SECONDS = 1; // how long "GO!" stays on screen once the countdown ends
 export const BREAK_SECONDS = 10; // fixed by the original request
@@ -391,19 +395,17 @@ export const CAMERA_LATERAL = 0;
 export const CAMERA_DISTANCE_MIN = 50; // was 150 — players wanted it much closer
 export const CAMERA_DISTANCE_MAX = 400;
 export const CAMERA_DISTANCE_DEFAULT = CAMERA_DISTANCE_MIN; // closest setting feels best in play (was 320)
-// CustomHudLayout only supports Panel/Label/Image/Button — no native
-// slider/drag widget — so the user menu's "distance slider" is really a
-// clickable row of notches the player picks from, same trick as the jump
-// recharge bar (JUMP_BAR_SEGMENTS) below. This is how many notches it has.
-export const CAMERA_DISTANCE_STEPS = 16; // must match the camdist_seg_* buttons in speedometer.xml (test/camera-steps.test.mjs checks)
+// The user menu offers the camera distance as a few preset buttons
+// (camdist_seg_* in speedometer.xml), evenly spread from MIN to MAX — this
+// is how many. Their labels (in meters) come from these values.
+export const CAMERA_DISTANCE_STEPS = 3; // must match the camdist_seg_* buttons in speedometer.xml (test/camera-steps.test.mjs checks)
 
-// Same notch-slider trick as CAMERA_DISTANCE_* above, for how high above the
-// melon the chase camera sits — lets players pick a low, close-to-the-ground
-// view or a higher, more overview-ish one.
+// Same presets as CAMERA_DISTANCE_* above, for how high above the melon the
+// chase camera sits — a low, close-to-the-ground view or a higher overview.
 export const CAMERA_HEIGHT_MIN = 0; // was 20 — down to the melon's own FOLLOW_OFFSET height
 export const CAMERA_HEIGHT_MAX = 160;
 export const CAMERA_HEIGHT_DEFAULT = CAMERA_HEIGHT_MIN; // lowest setting feels best in play (was 80)
-export const CAMERA_HEIGHT_STEPS = 16; // must match the camheight_seg_* buttons in speedometer.xml
+export const CAMERA_HEIGHT_STEPS = 3; // must match the camheight_seg_* buttons in speedometer.xml
 
 // Name of the custom_hud_layout entity (place one in Hammer pointing at
 // panorama/layout/custom_game/speedometer.vxml) that shows the speedometer.

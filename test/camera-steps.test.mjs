@@ -1,5 +1,5 @@
-// The user menu's camera "sliders": step <-> value math, and that the
-// panorama layout has exactly one clickable notch per step (a missing one
+// The user menu's camera presets: step <-> value math, and that the
+// panorama layout has exactly one preset button per step (a missing one
 // can't be clicked, an extra one does nothing).
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -9,6 +9,7 @@ import {
     CameraDistanceForStep,
     CameraHeightStepFor,
     CameraHeightForStep,
+    FormatMeters,
 } from "../src/melon_drive/logic/camera-steps.js";
 import {
     CAMERA_DISTANCE_MIN,
@@ -65,4 +66,10 @@ test("the default camera is the minimum distance and height (the first notch)", 
     assert.equal(CAMERA_HEIGHT_DEFAULT, CAMERA_HEIGHT_MIN);
     assert.equal(CameraDistanceStepFor(CAMERA_DISTANCE_DEFAULT), 0);
     assert.equal(CameraHeightStepFor(CAMERA_HEIGHT_DEFAULT), 0);
+});
+
+test("preset labels are the value in meters (1 unit = 1 inch), one decimal", () => {
+    assert.equal(FormatMeters(100 / 2.54), "1.0m");
+    assert.equal(FormatMeters(0), "0.0m");
+    assert.equal(FormatMeters(98.4), "2.5m");
 });

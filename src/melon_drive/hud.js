@@ -6,6 +6,7 @@ import { GetJumpChargeFraction } from "./physics/jump.js";
 import { IsJumpDebugOn } from "./physics/jump-debug.js";
 import { GetBounceRating } from "./logic/wall-bounce.js";
 import { HealthBarState } from "./logic/health.js";
+import { CameraDistanceStepFor, CameraDistanceForStep, CameraHeightStepFor, CameraHeightForStep, FormatMeters } from "./logic/camera-steps.js";
 import { GetTrackConfig } from "./track-config.js";
 import { IsModerator } from "./kart-registry.js";
 import {
@@ -20,6 +21,8 @@ import {
     BOUNCE_ANGLE_SEGMENTS,
     BOUNCE_JUMP_SEGMENTS,
     BOUNCE_RATINGS,
+    CAMERA_DISTANCE_STEPS,
+    CAMERA_HEIGHT_STEPS,
     RacePhase,
 } from "./constants.js";
 
@@ -214,7 +217,10 @@ export function SetUserMenuOpen(slot, kart, open) {
     }
     hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
     if (open) {
+        // Refreshed on every open: a layout or script reload in tools mode
+        // wipes what was set when the kart spawned.
         UpdateJumpDebugHud(slot, kart);
+        UpdateCameraPresetHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
 }
@@ -231,6 +237,32 @@ export function UpdateJumpDebugHud(slot, kart) {
     const on = IsJumpDebugOn(kart);
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_jumpdebug_button", "jumpdebug_state", on ? "ON" : "OFF");
     hud.SetHasClassForPlayer(slot, "usermenu_jumpdebug_button", "ToggleOn", on);
+}
+
+/**
+ * The user menu's camera preset buttons (camdist_seg_* / camheight_seg_* in
+ * speedometer.xml, clicks handled in index.js): each labeled with its value
+ * in meters ({s:label}), the current one marked "Selected".
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+export function UpdateCameraPresetHud(slot, kart) {
+    UpdatePresetButtons(slot, "camdist_seg_", CAMERA_DISTANCE_STEPS, CameraDistanceStepFor(kart.cameraDistance), CameraDistanceForStep);
+    UpdatePresetButtons(slot, "camheight_seg_", CAMERA_HEIGHT_STEPS, CameraHeightStepFor(kart.cameraHeight), CameraHeightForStep);
+}
+
+/**
+ * @param {number} slot @param {string} prefix @param {number} steps
+ * @param {number} selected @param {(step: number) => number} valueForStep
+ */
+function UpdatePresetButtons(slot, prefix, steps, selected, valueForStep) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    for (let i = 0; i < steps; i++) {
+        hud.SetDialogVariableStringForPlayer(slot, `${prefix}${i}`, "label", FormatMeters(valueForStep(i)));
+        hud.SetHasClassForPlayer(slot, `${prefix}${i}`, "Selected", i === selected);
+    }
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart */

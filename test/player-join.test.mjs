@@ -1,7 +1,7 @@
-// A player who picks a team must end up driving their melon at the intro,
-// even if OnPlayerReset didn't set them up (or the engine reset the camera
-// afterwards) — EnsurePlayerKarts runs every tick to catch that. And the
-// frozen pawn stays where it spawned instead of being parked in the sky.
+// A player who picks a team first sees the Melon Racer logo, then ends up
+// driving their melon at the intro — EnsurePlayerKarts runs every tick for
+// that, and also re-attaches a camera the engine reset. The frozen pawn
+// stays where it spawned instead of being parked in the sky.
 import "./helpers/register-cs-script.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -10,7 +10,7 @@ import { world, Entity, CSPlayerPawn, PointTemplate, CustomCameraMode } from "./
 const { karts } = await import("../src/melon_drive/kart-registry.js");
 const { SetUpPlayerKart, EnsurePlayerKarts, HoldPawn } = await import("../src/melon_drive/kart-spawn.js");
 const { GetIntroSpawnPoint } = await import("../src/melon_drive/spawn-points.js");
-const { MELON_TEMPLATE_NAME, INTRO_SPAWN_NAME, PAWN_DRIFT_TOLERANCE } = await import("../src/melon_drive/constants.js");
+const { MELON_TEMPLATE_NAME, INTRO_SPAWN_NAME, PAWN_DRIFT_TOLERANCE, INTRO_LOGO_SECONDS, SPEED_HUD_ENTITY_NAME } = await import("../src/melon_drive/constants.js");
 
 const INTRO = { x: -2000, y: -900, z: 24 };
 const PLAYER_SPAWN = { x: 5000, y: 5000, z: 0 };
@@ -23,16 +23,42 @@ function AddPawn({ team = 3 } = {}) {
     return pawn;
 }
 
+/** Records which HUD panels are hidden for slot 0. */
+class FakeHud extends Entity {
+    constructor() {
+        super({ name: SPEED_HUD_ENTITY_NAME, className: "custom_hud_layout" });
+        /** @type {Record<string, boolean>} */
+        this.hidden = {};
+    }
+    SetHasClassForPlayer(slot, panel, cls, on) {
+        if (cls === "Hidden") this.hidden[panel] = on;
+    }
+    SetDialogVariableStringForPlayer() {}
+}
+
+/** @type {FakeHud} */
+let hud;
+
 beforeEach(() => {
     world.reset();
     karts.clear();
+    hud = world.add(new FakeHud());
     world.add(new PointTemplate({ name: MELON_TEMPLATE_NAME, spawn: () => [new Entity({ className: "prop_physics_multiplayer" })] }));
     world.add(new Entity({ name: INTRO_SPAWN_NAME, className: "info_player_start", origin: INTRO }));
 });
 
-test("a player on a team without a kart gets a melon at the intro and its chase camera", () => {
+test("a player who picks a team sees the logo first, then gets a melon at the intro and its chase camera", () => {
     const pawn = AddPawn();
     EnsurePlayerKarts();
+    assert.equal(karts.size, 0, "no melon while the logo shows");
+    assert.equal(hud.hidden.intro_logo, false, "logo shown");
+    assert.equal(pawn.color.a, 0, "own body hidden behind the logo");
+    world.time = INTRO_LOGO_SECONDS / 2;
+    EnsurePlayerKarts();
+    assert.equal(karts.size, 0, "still the logo");
+    world.time = INTRO_LOGO_SECONDS;
+    EnsurePlayerKarts();
+    assert.equal(hud.hidden.intro_logo, true, "logo hidden once the melon is there");
     const kart = karts.get(0);
     assert.ok(kart, "kart created");
     assert.equal(kart.melon.GetAbsOrigin().x, INTRO.x);
@@ -49,7 +75,10 @@ test("spectators, unassigned and dead players get no kart", () => {
     pawn.team = 3;
     pawn.alive = false;
     EnsurePlayerKarts();
+    world.time = INTRO_LOGO_SECONDS * 2;
+    EnsurePlayerKarts();
     assert.equal(karts.size, 0);
+    assert.equal(hud.hidden.intro_logo, undefined, "no logo either");
 });
 
 test("a camera reset after the spawn is re-attached, without a second melon", () => {

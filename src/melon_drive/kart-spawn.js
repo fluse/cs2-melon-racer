@@ -3,6 +3,7 @@ import { Debug } from "./debug.js";
 import { karts, moderatorSlot, SetModeratorSlot } from "./kart-registry.js";
 import { ApplyCameraFollow, UpdateCameraDistanceHud, UpdateCameraHeightHud } from "./camera.js";
 import { FacePlayerView, GetIntroSpawnPoint } from "./spawn-points.js";
+import { GetSpeedHud } from "./hud.js";
 import {
     MELON_TEMPLATE_NAME,
     PAWN_DRIFT_TOLERANCE,
@@ -10,15 +11,22 @@ import {
     MELON_ENGINE_HEALTH,
     CAMERA_DISTANCE_DEFAULT,
     CAMERA_HEIGHT_DEFAULT,
+    INTRO_LOGO_SECONDS,
 } from "./constants.js";
 
 // Spawn flow, in one sentence: a player without a kart gets a new one at the
 // spawn point the caller picks (the intro on join); a player who already has
 // one keeps it as-is — a lost melon is brought back by the break/respawn
 // logic in physics/breaking.js, never here, so the two can't race each other.
-// OnPlayerReset is the usual trigger, but EnsurePlayerKarts (every tick)
-// also catches a player whose pawn got no melon or no chase camera from it —
-// e.g. the engine finishing a team-join spawn after that callback ran.
+// A new player's kart comes only from EnsurePlayerKarts (every tick): once
+// they've picked a team it shows the Melon Racer logo for
+// INTRO_LOGO_SECONDS, then spawns their melon at the intro. OnPlayerReset
+// only re-sets-up a player who already has a kart; EnsurePlayerKarts also
+// catches a pawn that lost its chase camera — e.g. the engine finishing a
+// team-join spawn after that callback ran.
+
+/** Game time each new player's intro logo ends, by slot — see EnsurePlayerKarts. @type {Map<number, number>} */
+const introLogoEnd = new Map();
 
 /**
  * Spawns a fresh melon from the melon_template point_template — shared by
@@ -178,12 +186,11 @@ export function SetUpPlayerKart(pawn, newKartSpawnPoint) {
 
 /**
  * Every tick: makes sure each player standing on a team has a melon and is
- * looking through its chase camera. OnPlayerReset alone left a player who
- * had just picked a team stuck in their invisible, frozen body — the
- * engine's spawn could finish after that callback (or hand them a new pawn),
- * dropping the camera again. A player without a kart gets one at the intro,
- * like OnPlayerReset does; one whose pawn changed or whose camera got reset
- * is set up again on the pawn they have now.
+ * looking through its chase camera. A player without a kart first sees the
+ * Melon Racer logo (their own body frozen and hidden meanwhile), then gets a
+ * melon at the intro. One whose pawn changed or whose camera got reset is
+ * set up again on the pawn they have now — OnPlayerReset alone left a
+ * player who had just picked a team stuck in their invisible, frozen body.
  */
 export function EnsurePlayerKarts() {
     for (const controller of Instance.GetAllPlayerControllers()) {
@@ -194,17 +201,59 @@ export function EnsurePlayerKarts() {
         if (!pawn?.IsValid() || !pawn.IsAlive() || !IsOnPlayingTeam(pawn)) {
             continue; // spectating, picking a team, or dead (waiting to respawn)
         }
-        const kart = karts.get(controller.GetPlayerSlot());
+        const slot = controller.GetPlayerSlot();
+        const kart = karts.get(slot);
         if (!kart) {
-            Debug(`EnsurePlayerKarts: slot ${controller.GetPlayerSlot()} has a pawn but no kart, spawning one at the intro`);
-            SetUpPlayerKart(pawn, GetIntroSpawnPoint());
+            ShowIntroLogoThenSpawn(slot, pawn);
         } else if (kart.pawn !== pawn) {
-            Debug(`EnsurePlayerKarts: slot ${controller.GetPlayerSlot()} got a new pawn, moving the kart over`);
+            Debug(`EnsurePlayerKarts: slot ${slot} got a new pawn, moving the kart over`);
             SetUpPlayerKart(pawn, undefined);
         } else if (kart.melon.IsValid() && !kart.breaking && pawn.GetCustomCamera().GetMode() !== CustomCameraMode.FOLLOW_POSITION) {
-            Debug(`EnsurePlayerKarts: slot ${controller.GetPlayerSlot()} lost the chase camera, re-attaching`);
+            Debug(`EnsurePlayerKarts: slot ${slot} lost the chase camera, re-attaching`);
             SetUpPlayerKart(pawn, undefined);
         }
+    }
+}
+
+/**
+ * A new player's first INTRO_LOGO_SECONDS on a team: the logo, then their
+ * melon at the intro. Retried a second later if the melon can't spawn.
+ * @param {number} slot @param {any} pawn
+ */
+function ShowIntroLogoThenSpawn(slot, pawn) {
+    const now = Instance.GetGameTime();
+    const end = introLogoEnd.get(slot);
+    if (end === undefined) {
+        Debug(`EnsurePlayerKarts: slot ${slot} joined a team, showing the logo before spawning at the intro`);
+        FreezePawn(pawn);
+        SetIntroLogoVisible(slot, true);
+        introLogoEnd.set(slot, now + INTRO_LOGO_SECONDS);
+        return;
+    }
+    if (now < end) {
+        return;
+    }
+    if (SetUpPlayerKart(pawn, GetIntroSpawnPoint())) {
+        SetIntroLogoVisible(slot, false);
+        introLogoEnd.delete(slot);
+    } else {
+        introLogoEnd.set(slot, now + 1);
+    }
+}
+
+/** @param {number} slot @param {boolean} visible */
+function SetIntroLogoVisible(slot, visible) {
+    GetSpeedHud()?.SetHasClassForPlayer(slot, "intro_logo", "Hidden", !visible);
+}
+
+/**
+ * Forgets a disconnecting player's logo state and hides the logo, so a
+ * reconnect (a first join again) shows it from the start.
+ * @param {number} slot
+ */
+export function ForgetIntroLogo(slot) {
+    if (introLogoEnd.delete(slot)) {
+        SetIntroLogoVisible(slot, false);
     }
 }
 
