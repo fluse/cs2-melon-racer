@@ -5,12 +5,15 @@
 import { Instance, CSInputs } from "cs_script/point_script";
 import { ApplyBreakCameraZoom } from "../camera.js";
 import { VerticalAccel, IsSupported } from "../logic/contact.js";
+import { SteerTowards } from "../logic/steering.js";
 import {
     FORWARD_ACCEL,
     REVERSE_ACCEL,
     STRAFE_ACCEL,
     MAX_SPEED,
     COAST_FRICTION,
+    STEER_GRIP_RATE,
+    STEER_GRIP_MAX_ANGLE,
     IMPACT_DAMAGE_THRESHOLD,
     MELON_REST_SPEED,
     SETTLE_NUDGE_ANGULAR_SPEED,
@@ -202,6 +205,15 @@ export function UpdateKart(slot, kart, dt) {
     // still steer out of the bounce the same tick.
     let vx = bounceVelocity ? bounceVelocity.x : currentVelocity.x;
     let vy = bounceVelocity ? bounceVelocity.y : currentVelocity.y;
+
+    // Steering grip (STEER_GRIP_*): on the ground, holding forward turns the
+    // velocity itself towards the look direction. Not on a bounce tick — the
+    // reflected velocity is the bounce's result and stays as computed.
+    if (forwardInput > 0 && grounded && !bounceVelocity) {
+        const steered = SteerTowards({ x: vx, y: vy }, forwardDir, STEER_GRIP_RATE * dt, STEER_GRIP_MAX_ANGLE);
+        vx = steered.x;
+        vy = steered.y;
+    }
 
     if (forwardInput !== 0 || strafeInput !== 0) {
         const forwardAccel = forwardInput > 0 ? FORWARD_ACCEL : REVERSE_ACCEL;

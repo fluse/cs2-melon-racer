@@ -420,7 +420,10 @@ back once it drifts more than `PAWN_DRIFT_TOLERANCE`. It deliberately does
 no separate turn control —
 steering direction is wherever the player is looking (mouse): W/S
 accelerate/brake along that look direction, A/D strafe left/right relative
-to it, Space jumps (only with real ground contact, or off a wall in the air — see "Jumping" below). A third-person
+to it (on the ground, holding W also turns the melon's existing velocity
+towards the look direction at up to `STEER_GRIP_RATE` °/s, speed kept — a
+"grip" so it goes where the camera points instead of drifting; none in the
+air, so bounce angles stay as they come off the wall), Space jumps (only with real ground contact, or off a wall in the air — see "Jumping" below). A third-person
 `CustomPlayerCamera` in `FOLLOW_POSITION` mode chase-cams behind the melon
 directly, so it doesn't need the pawn nearby to work.
 

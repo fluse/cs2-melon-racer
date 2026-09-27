@@ -4,7 +4,7 @@
 // (sent_melon_base/init.lua ENT:Think + gamemode/shared.lua DefXSpeed):
 // forward is the strongest push, reverse is half that, strafe is weaker
 // still — keeping FORWARD_ACCEL as our existing tuned baseline.
-export const FORWARD_ACCEL = 500; // units/sec^2 while holding forward (was 900 — lowered for a heavier, slower build-up: ~1.1s instead of ~0.7s to MAX_SPEED)
+export const FORWARD_ACCEL = 400; // units/sec^2 while holding forward (was 900, then 500 — lowered for a heavier, slower build-up: ~1.6s to MAX_SPEED)
 export const REVERSE_ACCEL = FORWARD_ACCEL * 0.5; // 0.5x forward, matches original's Reverse/Forward ratio
 export const STRAFE_ACCEL = FORWARD_ACCEL * 0.4; // 0.4x forward, matches original's Strafe/Forward ratio
 export const MAX_SPEED = 650; // units/sec, horizontal speed cap
@@ -29,3 +29,15 @@ export const MELON_REST_SPEED = 2; // units/sec
 // it's resting on — whether that nudge grows into a proper topple or just
 // gets damped straight back to rest.
 export const SETTLE_NUDGE_ANGULAR_SPEED = 40; // deg/sec, one-off pitch/roll kick on settling
+
+// Steering grip: while holding forward on the ground, the melon's horizontal
+// velocity is turned towards the look direction by up to STEER_GRIP_RATE
+// degrees per second, keeping its speed — so it goes where the camera points
+// instead of only being pushed that way by FORWARD_ACCEL (which at MAX_SPEED
+// turned it slowly, like a hovercraft). Only for velocity that is at most
+// STEER_GRIP_MAX_ANGLE off the look direction: looking back or far to the
+// side is braking/turning around via plain acceleration, not a snap U-turn.
+// No grip in the air, so a wall bounce's outgoing angle isn't bent right away.
+// Higher STEER_GRIP_RATE: more direct, less drift. 0 = off (old behavior).
+export const STEER_GRIP_RATE = 180; // degrees/sec
+export const STEER_GRIP_MAX_ANGLE = 100; // degrees
