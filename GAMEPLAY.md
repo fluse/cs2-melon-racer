@@ -395,17 +395,19 @@ instead of after the last track's `BREAK`.
 
 Free-look: each player automatically gets their own `prop_physics` melon
 (spawned per-player from a `point_template` named `melon_template` — see
-`maps/scripts/melon_drive.js`) on every `OnPlayerReset`. The player's own
-pawn is frozen and made non-solid (`CSMoveType.NOCLIP`), hidden (`SetColor`
-alpha 0), and teleported straight up (`PAWN_PARK_HEIGHT`, currently 3000
-units) right after its melon spawns — it deliberately does **not** track the
-melon's position afterward. An earlier version used `CSMoveType.NONE` and
-just parked it out of reach; cs_script has no dedicated "disable collision"
-call for a pawn, but `MOVETYPE_NONE` still leaves the hitbox solid, so the
-melon would violently collide with (and take damage from) the parked pawn
-if it ever got near it. `NOCLIP` — the same move type the engine's own
-noclip cheat uses — actually makes the hitbox non-solid, so the park height
-is now just a backup rather than the only thing preventing contact. There's
+`maps/scripts/melon_drive.js`) on every `OnPlayerReset` — and, as a
+safety net, `EnsurePlayerKarts` (every tick) gives any alive player on T or
+CT without a kart one at the intro, moves a kart over to a player's new
+pawn, and re-attaches a chase camera the engine reset (joining a team used
+to leave the player looking through their frozen body instead). T and CT
+are both fine for racing; only unassigned players/spectators are put on CT.
+The player's own pawn is frozen and made non-solid (`CSMoveType.NOCLIP` —
+`NONE` would leave its hitbox solid for the melon to crash into), hidden
+(`SetColor` alpha 0), and **stays at the map's player spawn** it appeared
+at, which sits away from the tracks (it's no longer parked high in the
+sky). WASD would still fly a noclip pawn around, so `HoldPawn` puts it
+back once it drifts more than `PAWN_DRIFT_TOLERANCE`. It deliberately does
+**not** track the melon's position. There's
 no separate turn control —
 steering direction is wherever the player is looking (mouse): W/S
 accelerate/brake along that look direction, A/D strafe left/right relative
@@ -527,8 +529,8 @@ long fall lands hard enough for the engine to destroy the melon on impact.
   A lost melon is brought back solely by the break/respawn logic, at the
   kart's own respawn point, so there's exactly one path that can put it
   anywhere.
-- The player's pawn is frozen and parked *before* a new melon spawns, so the
-  melon can never appear inside it.
+- The player's pawn is frozen (non-solid) *before* a new melon spawns, and
+  stays at its own player spawn, away from the tracks.
 
 ## Melon painting (implemented)
 

@@ -4,7 +4,16 @@ import { Instance } from 'cs_script/point_script';
 // Free-for-all race mode: no team select, no combat, no round interruptions.
 // Everyone should be able to connect and start running immediately.
 
-const RACE_TEAM = 3; // CT — arbitrary, just the one team everyone shares.
+const RACE_TEAM = 3; // CT — arbitrary, where players without a team are put.
+
+// T or CT both work for racing — only unassigned/spectators get moved.
+// Forcing everyone onto RACE_TEAM switched a player who had just picked T
+// straight over to CT, killing and respawning the pawn they'd just been
+// given its melon on.
+/** @param {number} team */
+function IsPlayingTeam(team) {
+    return team === 2 || team === 3;
+}
 
 // Warmup never ends, so there's never a "round start" that freezes/resets
 // racers mid-run. mp_warmup_pausetimer keeps the warmup clock from ever
@@ -22,7 +31,7 @@ Instance.ServerCommand("mp_friendlyfire 0");
 Instance.ServerCommand("mp_solid_teammates 0"); // don't block each other on the track
 
 function PutPlayerInRaceMode(pawn) {
-    if (pawn.GetTeamNumber() !== RACE_TEAM) {
+    if (!IsPlayingTeam(pawn.GetTeamNumber())) {
         pawn.GetPlayerController()?.JoinTeam(RACE_TEAM);
     }
     pawn.DestroyWeapons();
@@ -43,7 +52,7 @@ Instance.OnPlayerActivate(({ player }) => {
     HideDefaultHud(player.GetPlayerSlot());
     if (player.GetPlayerPawn()) {
         PutPlayerInRaceMode(player.GetPlayerPawn());
-    } else if (player.GetTeamNumber() !== RACE_TEAM) {
+    } else if (!IsPlayingTeam(player.GetTeamNumber())) {
         player.JoinTeam(RACE_TEAM);
     }
 });

@@ -25,7 +25,7 @@ export function Lifted(origin, upOffset) {
  * Turns a player's view to face `yaw` — called after every teleport or
  * spawn of their melon, so they look (and steer) the way the destination
  * faces. Teleport with only angles sets a player pawn's eye angles and
- * leaves its (parked) position alone.
+ * leaves its (frozen) position alone.
  * @param {any} pawn @param {number} yaw
  */
 export function FacePlayerView(pawn, yaw) {

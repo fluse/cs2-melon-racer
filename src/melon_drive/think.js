@@ -2,7 +2,7 @@ import { Instance, CSInputs } from "cs_script/point_script";
 import { DEBUG, Debug } from "./debug.js";
 import { HEARTBEAT_INTERVAL } from "./constants.js";
 import { karts, EnsureModerator, DropKart } from "./kart-registry.js";
-import { SetUpPlayerKart } from "./kart-spawn.js";
+import { SetUpPlayerKart, EnsurePlayerKarts, HoldPawn } from "./kart-spawn.js";
 import { GetHubSpawnPoint } from "./spawn-points.js";
 import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud,UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, ApplyHubModalState } from "./hud.js";
 import { UpdateKart, HandleMelonLost } from "./physics/index.js";
@@ -24,6 +24,12 @@ export function Think() {
     if (heartbeat) {
         lastHeartbeatTime = now;
         Debug(`Think: ${karts.size} kart(s) tracked`);
+    }
+
+    try {
+        EnsurePlayerKarts();
+    } catch (err) {
+        Debug(`Think: EnsurePlayerKarts threw: ${err}`);
     }
 
     for (const [slot, kart] of karts) {
@@ -50,6 +56,7 @@ export function Think() {
             UpdateUserMenu(slot, kart);
             continue;
         }
+        HoldPawn(kart);
         kart.lastKnownPosition = kart.melon.GetAbsOrigin();
         kart.lastKnownAngles = kart.melon.GetAbsAngles();
         // One kart's update throwing for any other reason must not take down

@@ -81,7 +81,7 @@ move progress forward — touching an earlier checkpoint again does nothing.
 
 **Filter every checkpoint trigger to `prop_physics`** (the melon prop), the
 same way as all other race triggers in this map — a player's own pawn is
-parked far overhead and can't reach ground-level triggers anyway, but the
+non-solid and held at its player spawn away from the tracks anyway, but the
 filter keeps things unambiguous if that ever changes.
 
 ## 3. The finish signal

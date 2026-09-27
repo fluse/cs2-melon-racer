@@ -10,12 +10,12 @@ export const MELON_TEMPLATE_NAME = "melon_template";
 // (sent_melon_base/init.lua ENT:Think + gamemode/shared.lua DefXSpeed):
 // forward is the strongest push, reverse is half that, strafe is weaker
 // still — keeping FORWARD_ACCEL as our existing tuned baseline.
-export const FORWARD_ACCEL = 600; // units/sec^2 while holding forward (was 900 — lowered for a heavier, slower build-up: ~1.1s instead of ~0.7s to MAX_SPEED)
+export const FORWARD_ACCEL = 500; // units/sec^2 while holding forward (was 900 — lowered for a heavier, slower build-up: ~1.1s instead of ~0.7s to MAX_SPEED)
 export const REVERSE_ACCEL = FORWARD_ACCEL * 0.5; // 0.5x forward, matches original's Reverse/Forward ratio
 export const STRAFE_ACCEL = FORWARD_ACCEL * 0.4; // 0.4x forward, matches original's Strafe/Forward ratio
 export const MAX_SPEED = 650; // units/sec, horizontal speed cap
 export const COAST_FRICTION = 120; // units/sec^2 horizontal slowdown with no input — low, so the melon keeps rolling on its own momentum instead of grinding to a stop
-export const JUMP_SPEED = 400; // units/sec upward impulse
+export const JUMP_SPEED = 370; // units/sec upward impulse
 // The ground jump needs real ground contact (see logic/contact.js), and a
 // new one since the last jump — no cooldown: touching down is what resets
 // it. (The "new contact" part stops a second press within
@@ -376,12 +376,10 @@ export const INTRO_SPAWN_NAME = "intro_spawn";
 // just above it, same trick as SPAWN_UP_OFFSET above.
 export const TELEPORT_UP_OFFSET = 40;
 
-// The frozen pawn is also set to CSMoveType.NOCLIP (see OnPlayerReset),
-// which makes its hitbox non-solid — this park height is now just a
-// belt-and-suspenders backup (e.g. in case some other code path resets its
-// move type) rather than the only thing keeping the melon off it. Lower
-// this if it turns out to exceed the map's compiled bounds.
-export const PAWN_PARK_HEIGHT = 3000;
+// The frozen pawn (CSMoveType.NOCLIP: non-solid, but WASD still flies it)
+// stays where it spawned — see HoldPawn in kart-spawn.js. It's only put back
+// once it has drifted further than this, not every tick.
+export const PAWN_DRIFT_TOLERANCE = 16;
 
 // Offsets for CameraFollowConfig — behind and above the melon. cameraOffset
 // is rotated by the player's eye angles: x is forward (negative = behind),

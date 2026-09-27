@@ -1,11 +1,11 @@
-import { Instance, PointTemplate, CSMoveType } from "cs_script/point_script";
+import { Instance, PointTemplate, CSMoveType, CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { karts, moderatorSlot, SetModeratorSlot } from "./kart-registry.js";
 import { ApplyCameraFollow, UpdateCameraDistanceHud, UpdateCameraHeightHud } from "./camera.js";
-import { FacePlayerView } from "./spawn-points.js";
+import { FacePlayerView, GetIntroSpawnPoint } from "./spawn-points.js";
 import {
     MELON_TEMPLATE_NAME,
-    PAWN_PARK_HEIGHT,
+    PAWN_DRIFT_TOLERANCE,
     MELON_MAX_HEALTH,
     MELON_ENGINE_HEALTH,
     CAMERA_DISTANCE_DEFAULT,
@@ -16,6 +16,9 @@ import {
 // spawn point the caller picks (the intro on join); a player who already has
 // one keeps it as-is — a lost melon is brought back by the break/respawn
 // logic in physics/breaking.js, never here, so the two can't race each other.
+// OnPlayerReset is the usual trigger, but EnsurePlayerKarts (every tick)
+// also catches a player whose pawn got no melon or no chase camera from it —
+// e.g. the engine finishing a team-join spawn after that callback ran.
 
 /**
  * Spawns a fresh melon from the melon_template point_template — shared by
@@ -57,14 +60,29 @@ function MakeUnbreakableByEngine(melon) {
 /**
  * Takes the player's own body out of the game: non-solid (NOCLIP — NONE
  * would leave its hitbox solid for the melon to crash into), invisible, and
- * parked high above `anchor`. Safe to call repeatedly: it always parks at the
- * same spot for the same anchor.
- * @param {any} pawn @param {{ x: number, y: number, z: number }} anchor
+ * standing still wherever it spawned — the map's player spawns sit away from
+ * the tracks, so it's out of the way there. Safe to call repeatedly.
+ * @param {any} pawn
  */
-function FreezePawn(pawn, anchor) {
+function FreezePawn(pawn) {
     pawn.SetMoveType(CSMoveType.NOCLIP);
     pawn.SetColor({ r: 255, g: 255, b: 255, a: 0 });
-    pawn.Teleport({ position: { x: anchor.x, y: anchor.y, z: anchor.z + PAWN_PARK_HEIGHT } });
+    pawn.Teleport({ velocity: { x: 0, y: 0, z: 0 } });
+}
+
+/**
+ * Keeps a frozen pawn at `kart.pawnAnchor`: WASD still flies a NOCLIP pawn
+ * around (it's the melon's input too), so without this it would drift off
+ * across the map while the player drives. Called every tick.
+ * @param {import("./kart-registry.js").Kart} kart
+ */
+export function HoldPawn(kart) {
+    const anchor = kart.pawnAnchor;
+    const at = kart.pawn.GetAbsOrigin();
+    if (!anchor || Math.hypot(at.x - anchor.x, at.y - anchor.y, at.z - anchor.z) <= PAWN_DRIFT_TOLERANCE) {
+        return;
+    }
+    kart.pawn.Teleport({ position: anchor, velocity: { x: 0, y: 0, z: 0 } });
 }
 
 /**
@@ -97,6 +115,7 @@ function NewKartRecord(pawn, melon, spawnPoint) {
         jumpDebug: false,
         cameraDistance: CAMERA_DISTANCE_DEFAULT,
         cameraHeight: CAMERA_HEIGHT_DEFAULT,
+        pawnAnchor: pawn.GetAbsOrigin(),
         lastKnownPosition: undefined,
         lastKnownAngles: undefined,
     };
@@ -104,11 +123,11 @@ function NewKartRecord(pawn, melon, spawnPoint) {
 
 /**
  * New kart for `slot`, its melon spawned at `spawnPoint`. The pawn is
- * frozen and moved away first, so the melon never appears inside it.
+ * frozen (non-solid) first, so the melon can't collide with it.
  * @param {any} pawn @param {number} slot @param {import("./spawn-points.js").SpawnPoint} spawnPoint
  */
 function CreateKart(pawn, slot, spawnPoint) {
-    FreezePawn(pawn, spawnPoint.position);
+    FreezePawn(pawn);
     const melon = SpawnMelonAt(spawnPoint.position, spawnPoint.angles);
     if (!melon) {
         return undefined;
@@ -147,11 +166,50 @@ export function SetUpPlayerKart(pawn, newKartSpawnPoint) {
         }
     }
     kart.pawn = pawn;
-    FreezePawn(pawn, kart.checkpointPosition);
+    FreezePawn(pawn);
+    kart.pawnAnchor = pawn.GetAbsOrigin();
     if (kart.melon.IsValid()) {
         ApplyCameraFollow(kart); // a lost melon gets the camera once physics/breaking.js respawns it
     }
     UpdateCameraDistanceHud(kart);
     UpdateCameraHeightHud(kart);
     return kart;
+}
+
+/**
+ * Every tick: makes sure each player standing on a team has a melon and is
+ * looking through its chase camera. OnPlayerReset alone left a player who
+ * had just picked a team stuck in their invisible, frozen body — the
+ * engine's spawn could finish after that callback (or hand them a new pawn),
+ * dropping the camera again. A player without a kart gets one at the intro,
+ * like OnPlayerReset does; one whose pawn changed or whose camera got reset
+ * is set up again on the pawn they have now.
+ */
+export function EnsurePlayerKarts() {
+    for (const controller of Instance.GetAllPlayerControllers()) {
+        if (!controller.IsConnected()) {
+            continue;
+        }
+        const pawn = controller.GetPlayerPawn();
+        if (!pawn?.IsValid() || !pawn.IsAlive() || !IsOnPlayingTeam(pawn)) {
+            continue; // spectating, picking a team, or dead (waiting to respawn)
+        }
+        const kart = karts.get(controller.GetPlayerSlot());
+        if (!kart) {
+            Debug(`EnsurePlayerKarts: slot ${controller.GetPlayerSlot()} has a pawn but no kart, spawning one at the intro`);
+            SetUpPlayerKart(pawn, GetIntroSpawnPoint());
+        } else if (kart.pawn !== pawn) {
+            Debug(`EnsurePlayerKarts: slot ${controller.GetPlayerSlot()} got a new pawn, moving the kart over`);
+            SetUpPlayerKart(pawn, undefined);
+        } else if (kart.melon.IsValid() && !kart.breaking && pawn.GetCustomCamera().GetMode() !== CustomCameraMode.FOLLOW_POSITION) {
+            Debug(`EnsurePlayerKarts: slot ${controller.GetPlayerSlot()} lost the chase camera, re-attaching`);
+            SetUpPlayerKart(pawn, undefined);
+        }
+    }
+}
+
+/** T (2) or CT (3) — not unassigned (0) or spectator (1). @param {any} pawn */
+function IsOnPlayingTeam(pawn) {
+    const team = pawn.GetTeamNumber();
+    return team === 2 || team === 3;
 }

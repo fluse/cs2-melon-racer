@@ -50,9 +50,11 @@ export class Entity {
 /** A player pawn: its eye angles are what Teleport({ angles }) changes, like the engine's. */
 export class CSPlayerPawn extends Entity {
     /** @param {{ slot: number, eyeAngles?: any }} o */
-    constructor({ slot, eyeAngles = { pitch: 0, yaw: 0, roll: 0 } }) {
+    constructor({ slot, eyeAngles = { pitch: 0, yaw: 0, roll: 0 }, team = 3 }) {
         super({ className: "player" });
         this.slot = slot;
+        this.team = team;
+        this.alive = true;
         this.eyeAngles = clone(eyeAngles);
         /** @type {Set<string>} buttons held (CSInputs names, e.g. "FORWARD") */
         this.pressed = new Set();
@@ -66,6 +68,8 @@ export class CSPlayerPawn extends Entity {
     }
     GetEyeAngles() { return clone(this.eyeAngles); }
     GetPlayerController() { return { GetPlayerSlot: () => this.slot }; }
+    GetTeamNumber() { return this.team; }
+    IsAlive() { return this.alive; }
     GetCustomCamera() { return this.camera; }
     IsInputPressed(button) { return this.pressed.has(button); }
     WasInputJustPressed(button) { return this.justPressed.has(button); }
@@ -95,12 +99,14 @@ export const world = {
     handlers: {},
     /** @type {string[]} */
     messages: [],
+    /** What GetAllPlayerControllers returns: one fake controller per pawn listed here. @type {CSPlayerPawn[]} */
+    playerPawns: [],
     /** Optional overrides for what traces hit: (config) => TraceResult. Default: nothing is ever hit. */
     traceLine: undefined,
     traceSphere: undefined,
     /** @template {Entity} T @param {T} e @returns {T} */
     add(e) { this.entities.push(e); return e; },
-    reset() { this.time = 0; this.entities = []; this.messages = []; this.traceLine = undefined; this.traceSphere = undefined; },
+    reset() { this.time = 0; this.entities = []; this.playerPawns = []; this.messages = []; this.traceLine = undefined; this.traceSphere = undefined; },
 };
 
 const noHit = (config) => ({ didHit: false, startedInSolid: false, end: clone(config.end), normal: { x: 0, y: 0, z: 1 }, fraction: 1 });
@@ -123,7 +129,11 @@ const instanceMethods = {
     DebugBox: () => {},
     DebugScreenText: () => {},
     GetPlayerController: () => undefined,
-    GetAllPlayerControllers: () => [],
+    GetAllPlayerControllers: () => world.playerPawns.map((pawn) => ({
+        IsConnected: () => true,
+        GetPlayerSlot: () => pawn.slot,
+        GetPlayerPawn: () => pawn,
+    })),
 };
 
 /** Known methods behave as above; anything else (OnScriptInput, SetThink, ...) just records its arguments. */
