@@ -1,6 +1,8 @@
 import { Instance, CSInputs } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { GetJumpChargeFraction } from "./kart-physics.js";
+import { GetBounceRating } from "./logic/wall-bounce.js";
+import { HealthBarState } from "./logic/health.js";
 import { GetTrackConfig } from "./track-config.js";
 import { IsModerator } from "./kart-registry.js";
 import {
@@ -8,9 +10,13 @@ import {
     UNITS_TO_KMH,
     JUMP_BAR_SEGMENTS,
     HEALTH_BAR_SEGMENTS,
-    HEALTH_LOW_FRACTION,
-    HEALTH_CRITICAL_FRACTION,
-    MELON_MAX_HEALTH,
+    MAX_SPEED,
+    PERFECT_BOUNCE_FLASH_SECONDS,
+    PERFECT_BOUNCE_ANGLE_FACTOR,
+    BOUNCE_HUD_SECONDS,
+    BOUNCE_ANGLE_SEGMENTS,
+    BOUNCE_JUMP_SEGMENTS,
+    BOUNCE_RATINGS,
     RacePhase,
 } from "./constants.js";
 
@@ -26,15 +32,67 @@ export function GetSpeedHud() {
     return speedHud;
 }
 
-/** @param {number} slot @param {any} melon */
-export function UpdateSpeedHud(slot, melon) {
+/** @param {number} slot @param {import("./kart-registry.js").Kart} kart */
+export function UpdateSpeedHud(slot, kart) {
     const hud = GetSpeedHud();
     if (!hud) {
         return;
     }
-    const vel = melon.GetAbsVelocity();
-    const kmh = Math.round(Math.hypot(vel.x, vel.y) * UNITS_TO_KMH);
+    const vel = kart.melon.GetAbsVelocity();
+    const horizSpeed = Math.hypot(vel.x, vel.y);
+    const kmh = Math.round(horizSpeed * UNITS_TO_KMH);
     hud.SetDialogVariableStringForPlayer(slot, "speed_panel", "speed", String(kmh));
+    // Wall-bounce feedback: Boosted while a bounce has the melon above the
+    // normal top speed, PerfectBounce as a short flash after a bounce that
+    // was clean enough to cost (almost) no health.
+    hud.SetHasClassForPlayer(slot, "speed_panel", "Boosted", horizSpeed > MAX_SPEED + 1);
+    const info = kart.lastBounceInfo;
+    const perfectFlash =
+        info !== undefined &&
+        info.angleFactor >= PERFECT_BOUNCE_ANGLE_FACTOR &&
+        kart.lastBounceTime !== undefined &&
+        Instance.GetGameTime() - kart.lastBounceTime < PERFECT_BOUNCE_FLASH_SECONDS;
+    hud.SetHasClassForPlayer(slot, "speed_panel", "PerfectBounce", perfectFlash);
+}
+
+/**
+ * Wall-bounce feedback panel (bounce_panel in speedometer.xml), shown for
+ * BOUNCE_HUD_SECONDS after each bounce: a rating word, the exact angle hit,
+ * an angle scale with the hit's segment marked against the 45° target, and
+ * how well the jump was timed. Reads kart.lastBounceInfo live, so a jump just
+ * *after* the hit still updates the timing bar while the panel is up.
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+export function UpdateBounceHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const info = kart.lastBounceInfo;
+    const visible =
+        info !== undefined &&
+        kart.lastBounceTime !== undefined &&
+        Instance.GetGameTime() - kart.lastBounceTime < BOUNCE_HUD_SECONDS;
+    hud.SetHasClassForPlayer(slot, "bounce_panel", "Hidden", !visible);
+    if (!visible || !info) {
+        return;
+    }
+
+    const rating = GetBounceRating(info.angleFactor);
+    for (const r of BOUNCE_RATINGS) {
+        hud.SetHasClassForPlayer(slot, "bounce_panel", r.cssClass, r === rating);
+    }
+    hud.SetDialogVariableStringForPlayer(slot, "bounce_panel", "bounce_rating", rating.label);
+    hud.SetDialogVariableStringForPlayer(slot, "bounce_panel", "bounce_angle", String(Math.round(info.angle)));
+
+    const hitSegment = Math.min(BOUNCE_ANGLE_SEGMENTS - 1, Math.floor((info.angle / 90) * BOUNCE_ANGLE_SEGMENTS));
+    for (let i = 0; i < BOUNCE_ANGLE_SEGMENTS; i++) {
+        hud.SetHasClassForPlayer(slot, `bounce_angle_seg_${i}`, "Hit", i === hitSegment);
+    }
+    const jumpFilled = Math.round(info.jumpFactor * BOUNCE_JUMP_SEGMENTS);
+    for (let i = 0; i < BOUNCE_JUMP_SEGMENTS; i++) {
+        hud.SetHasClassForPlayer(slot, `bounce_jump_seg_${i}`, "Filled", i < jumpFilled);
+    }
 }
 
 /** @param {number} slot @param {{ nextJumpTime: number }} kart */
@@ -57,13 +115,12 @@ export function UpdateHealthHud(slot, kart) {
     if (!hud) {
         return;
     }
-    const fraction = Math.max(0, Math.min(1, kart.health / MELON_MAX_HEALTH));
-    const filledSegments = Math.round(fraction * HEALTH_BAR_SEGMENTS);
+    const bar = HealthBarState(kart.health);
     for (let i = 0; i < HEALTH_BAR_SEGMENTS; i++) {
-        hud.SetHasClassForPlayer(slot, `health_seg_${i}`, "Filled", i < filledSegments);
+        hud.SetHasClassForPlayer(slot, `health_seg_${i}`, "Filled", i < bar.filledSegments);
     }
-    hud.SetHasClassForPlayer(slot, "health_bar", "Low", fraction <= HEALTH_LOW_FRACTION);
-    hud.SetHasClassForPlayer(slot, "health_bar", "Critical", fraction <= HEALTH_CRITICAL_FRACTION);
+    hud.SetHasClassForPlayer(slot, "health_bar", "Low", bar.low);
+    hud.SetHasClassForPlayer(slot, "health_bar", "Critical", bar.critical);
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart */

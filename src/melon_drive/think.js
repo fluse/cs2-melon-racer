@@ -2,10 +2,12 @@ import { Instance, CSInputs } from "cs_script/point_script";
 import { DEBUG, Debug } from "./debug.js";
 import { HEARTBEAT_INTERVAL } from "./constants.js";
 import { karts, EnsureModerator, DropKart } from "./kart-registry.js";
-import { GetOrCreateKart, ParkPawn } from "./kart-spawn.js";
-import { UpdateUserMenu, UpdateSpeedHud, UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, ApplyHubModalState } from "./hud.js";
+import { SetUpPlayerKart } from "./kart-spawn.js";
+import { GetHubSpawnPoint } from "./spawn-points.js";
+import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud,UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, ApplyHubModalState } from "./hud.js";
 import { UpdateKart, HandleMelonLost } from "./kart-physics.js";
 import { phase, UpdateRaceFlow } from "./race-flow.js";
+import { UpdatePrediction, HidePrediction } from "./prediction.js";
 
 let lastHeartbeatTime = 0;
 // Real elapsed time since the last Think, used for the movement math below —
@@ -37,10 +39,11 @@ export function Think() {
             // scripted BreakMelon/health system. HandleMelonLost runs it
             // through the same particle + delay + checkpoint-respawn
             // sequence as a script-detected break instead of leaving it
-            // gone for good — nothing else would ever call GetOrCreateKart
-            // again while the player's pawn stays alive (no round restarts,
-            // no fall/weapon damage — see gamemode/index.js).
+            // gone for good. This is the *only* place a lost melon comes
+            // back — SetUpPlayerKart (OnPlayerReset) deliberately never
+            // replaces one, so the two can't spawn it in different places.
             HandleMelonLost(slot, kart);
+            HidePrediction(kart);
             // Still lets USE work as an unstuck button while waiting on the
             // respawn above — it only touches kart.userMenuOpen/the pawn,
             // never the (currently missing) melon.
@@ -57,7 +60,9 @@ export function Think() {
         try {
             UpdateUserMenu(slot, kart); // checked before UpdateKart's locked/breaking early-returns — USE works as an unstuck button
             UpdateKart(slot, kart, dt);
-            UpdateSpeedHud(slot, kart.melon);
+            UpdatePrediction(kart, dt);
+            UpdateSpeedHud(slot, kart);
+            UpdateBounceHud(slot, kart);
             UpdateJumpHud(slot, kart);
             UpdateHealthHud(slot, kart);
             UpdateCheckpointHud(slot, kart);
@@ -111,9 +116,8 @@ function ScheduleKartRebuild(slot, pawn) {
             return; // already rebuilt elsewhere (e.g. OnPlayerReset), or player gone
         }
         try {
-            const kart = GetOrCreateKart(pawn);
-            if (kart) {
-                ParkPawn(pawn, kart.melon);
+            // The hub, not the intro: this player was already playing.
+            if (SetUpPlayerKart(pawn, GetHubSpawnPoint())) {
                 Debug(`ScheduleKartRebuild: slot ${slot} got a fresh kart`);
             }
         } catch (err) {

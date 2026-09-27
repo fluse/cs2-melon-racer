@@ -9,9 +9,9 @@ import {
     BREAK_SECONDS,
     GO_DISPLAY_SECONDS,
     RACE_SPAWN_LATERAL_SPACING,
-    HUB_TRIGGER_NAME,
     TELEPORT_UP_OFFSET,
 } from "./constants.js";
+import { GetHubSpawnPoint, Lifted } from "./spawn-points.js";
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
 // See GAMEPLAY.md's "Hub -> race -> next-track flow" for the full design.
@@ -26,6 +26,12 @@ export let phase = RacePhase.HUB;
 export let activeTrackId = undefined;
 /** GetGameTime() at which the current COUNTDOWN/BREAK phase should end. */
 export let phaseEndTime = 0;
+
+/** One class per countdown image on the HUD's countdown_panel (see
+ * speedometer.xml/.css) — exactly one is set at a time. There's no image for
+ * values above 3, so a COUNTDOWN_SECONDS > 3 shows nothing until 3.
+ */
+const COUNTDOWN_SHOW_CLASSES = ["Show3", "Show2", "Show1", "ShowGo"];
 
 /**
  * Restores phase/activeTrackId/phaseEndTime from an OnScriptReload snapshot
@@ -100,19 +106,18 @@ export function TryAbortRace() {
 }
 
 /**
- * Spot `i` of `count` karts lined up side by side, centered on `origin` and
- * perpendicular to `angles`' facing, lifted by TELEPORT_UP_OFFSET (see its
- * comment) so the melon drops onto the floor instead of into it.
- * @param {{ x: number, y: number, z: number }} origin @param {{ yaw: number }} angles @param {number} i @param {number} count
+ * Spot `i` of `count` karts lined up side by side, centered on `center` and
+ * perpendicular to `angles`' facing — so a group teleported together doesn't
+ * spawn inside each other. Keeps `center`'s height as-is.
+ * @param {{ x: number, y: number, z: number }} center @param {{ yaw: number }} angles @param {number} i @param {number} count
  */
-function LineUpPosition(origin, angles, i, count) {
+function LineUpPosition(center, angles, i, count) {
     const rad = (angles.yaw * Math.PI) / 180;
-    const rightDir = { x: Math.sin(rad), y: -Math.cos(rad) };
     const lateral = (i - (count - 1) / 2) * RACE_SPAWN_LATERAL_SPACING;
     return {
-        x: origin.x + rightDir.x * lateral,
-        y: origin.y + rightDir.y * lateral,
-        z: origin.z + TELEPORT_UP_OFFSET,
+        x: center.x + Math.sin(rad) * lateral,
+        y: center.y - Math.cos(rad) * lateral,
+        z: center.z,
     };
 }
 
@@ -133,12 +138,13 @@ export function BeginHeat(trackId) {
         return;
     }
     activeTrackId = trackId;
-    const origin = start.GetAbsOrigin();
+    // TELEPORT_UP_OFFSET: the start trigger's brush may be sunk into the floor.
+    const center = Lifted(start.GetAbsOrigin(), TELEPORT_UP_OFFSET);
     const angles = start.GetAbsAngles();
 
     const racers = CurrentRacers();
     racers.forEach((kart, i) => {
-        const position = LineUpPosition(origin, angles, i, racers.length);
+        const position = LineUpPosition(center, angles, i, racers.length);
         // A melon destroyed mid-BREAK is still pending its respawn (see
         // HandleMelonLost) — skip the teleport rather than throw on a dead
         // entity; that respawn lands it at the checkpointPosition set below.
@@ -152,6 +158,8 @@ export function BeginHeat(trackId) {
         kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
         kart.lastVelocity = undefined;
         kart.settled = false;
+        kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
+        kart.pendingBounce = undefined;
         // trackId is set directly instead of waiting for the physical
         // checkpoint_<trackId>_1 trigger touch to report it, so the
         // checkpoint/lap panel is already visible ("0/N", lap "1/M") the
@@ -188,12 +196,8 @@ export function FinishKart(kart) {
 
 /** @param {import("./kart-registry.js").Kart[]} returning */
 export function ReturnAllToHub(returning) {
-    const hub = Instance.FindEntityByName(HUB_TRIGGER_NAME);
-    if (!hub) {
-        Debug(`ReturnAllToHub: no entity named "${HUB_TRIGGER_NAME}" found`);
-    }
-    const hubOrigin = hub?.GetAbsOrigin();
-    const hubAngles = hub?.GetAbsAngles();
+    const hubSpawn = GetHubSpawnPoint();
+    Debug(`ReturnAllToHub: returning ${returning.length} kart(s) to ${hubSpawn ? JSON.stringify(hubSpawn.position) : "nowhere (no hub_spawn)"}`);
     returning.forEach((kart, i) => {
         kart.racing = false;
         kart.finished = false;
@@ -212,12 +216,9 @@ export function ReturnAllToHub(returning) {
         kart.trackId = undefined;
         kart.checkpointIndex = 0;
         kart.lapsCompleted = 0;
-        if (hubOrigin) {
-            // Lined up side by side like BeginHeat's start grid — teleporting
-            // everyone onto the exact same point made the melons spawn inside
-            // each other and violently shove apart, which the impact check
-            // then counted as crash damage.
-            const hubPosition = LineUpPosition(hubOrigin, hubAngles, i, returning.length);
+        if (hubSpawn) {
+            const hubAngles = hubSpawn.angles;
+            const hubPosition = LineUpPosition(hubSpawn.position, hubAngles, i, returning.length);
             kart.checkpointPosition = hubPosition;
             kart.checkpointAngles = hubAngles;
             // Same dead-melon guard as BeginHeat — its pending respawn lands
@@ -233,6 +234,8 @@ export function ReturnAllToHub(returning) {
         kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
         kart.lastVelocity = undefined;
         kart.settled = false;
+        kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
+        kart.pendingBounce = undefined;
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot === undefined) {
             return;
@@ -240,7 +243,7 @@ export function ReturnAllToHub(returning) {
         // Both labels, since ReturnAllToHub can now be reached from any
         // non-HUB phase (a moderator abort can land mid-COUNTDOWN, not just
         // after a heat finishes normally in BREAK).
-        GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", true);
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
         GetSpeedHud()?.SetHasClassForPlayer(slot, "break_label", "Hidden", true);
     });
 }
@@ -264,20 +267,22 @@ export function UpdateRaceFlow(now) {
             return;
         }
         const remaining = phaseEndTime - now;
-        const display = remaining > 0 ? String(Math.ceil(remaining)) : "GO!";
+        const showClass = remaining > 0 ? `Show${Math.ceil(remaining)}` : "ShowGo";
         for (const kart of racers) {
             const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
             if (slot === undefined) {
                 continue;
             }
-            hud?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", false);
-            hud?.SetDialogVariableStringForPlayer(slot, "countdown_label", "countdown", display);
+            hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", false);
+            for (const cls of COUNTDOWN_SHOW_CLASSES) {
+                hud?.SetHasClassForPlayer(slot, "countdown_panel", cls, cls === showClass);
+            }
         }
         if (remaining <= 0) {
             for (const kart of racers) {
                 kart.locked = false;
             }
-            // The "GO!" just written above stays up for GO_DISPLAY_SECONDS —
+            // The "GO" image just shown above stays up for GO_DISPLAY_SECONDS —
             // hiding it in this same tick meant it was never actually seen.
             // RACING reuses phaseEndTime as the moment to hide it.
             phase = RacePhase.RACING;
@@ -293,7 +298,7 @@ export function UpdateRaceFlow(now) {
             for (const kart of racers) {
                 const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
                 if (slot !== undefined) {
-                    hud?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", true);
+                    hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
                 }
             }
             phaseEndTime = Infinity; // hidden — don't re-hide every tick

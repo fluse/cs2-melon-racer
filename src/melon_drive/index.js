@@ -1,4 +1,4 @@
-import { Instance, CSMoveType } from "cs_script/point_script";
+import { Instance } from "cs_script/point_script";
 
 // Free-look melon driving: each player gets their own prop_physics melon
 // (spawned from a point_template placed in Hammer). Steering direction comes
@@ -23,7 +23,8 @@ import { Instance, CSMoveType } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, CAMERA_DISTANCE_STEPS, CAMERA_HEIGHT_STEPS } from "./constants.js";
 import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, SetModeratorSlot, DropKart } from "./kart-registry.js";
-import { GetOrCreateKart, ParkPawn } from "./kart-spawn.js";
+import { SetUpPlayerKart } from "./kart-spawn.js";
+import { GetIntroSpawnPoint } from "./spawn-points.js";
 import { RespawnKartAtCheckpoint, SetKartPaintColor } from "./kart-physics.js";
 import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen } from "./hud.js";
 import { SetCameraDistance, SetCameraHeight } from "./camera.js";
@@ -56,23 +57,11 @@ Instance.OnScriptReload({
     },
 });
 
+// A player joining for the first time starts in the tutorial (intro_spawn);
+// any later reset keeps their existing kart where it is.
 Instance.OnPlayerReset(({ player }) => {
     Debug(`OnPlayerReset: slot=${player.GetPlayerController()?.GetPlayerSlot()}`);
-    // NOCLIP, not NONE — NONE stops the pawn moving but leaves its hitbox
-    // solid, so the melon still physically collides with (and breaks
-    // against) the parked pawn. NOCLIP is the same move type the engine's
-    // own noclip cheat uses to pass through world/entities, so it actually
-    // makes the frozen pawn's hitbox non-solid instead of just far away.
-    player.SetMoveType(CSMoveType.NOCLIP);
-    const kart = GetOrCreateKart(player);
-    // Only park once we actually have a melon to anchor against — see
-    // ParkPawn's comment. If GetOrCreateKart failed (e.g. melon_template
-    // isn't spawned in yet), leave the pawn at its real origin so the next
-    // OnPlayerReset retry captures a valid ground position instead of an
-    // already-parked one.
-    if (kart) {
-        ParkPawn(player, kart.melon);
-    }
+    SetUpPlayerKart(player, GetIntroSpawnPoint());
 });
 
 Instance.OnPlayerDisconnect(({ playerSlot }) => {
@@ -118,6 +107,20 @@ Instance.OnScriptInput("hub_leave", ({ activator }) => {
     if (slot !== undefined) {
         HideHubModal(slot, kart);
     }
+});
+
+// Hub teleporter: any trigger_multiple (filtered to prop_physics) whose
+// OnStartTouch calls RunScriptInput "hub_teleport" on this point_script sends
+// the touching melon back to the hub — same single-kart path as the user
+// menu's hub button, so a racer who rolls over it also leaves the heat.
+Instance.OnScriptInput("hub_teleport", ({ activator }) => {
+    const kart = activator && FindKartByMelon(activator);
+    if (!kart) {
+        Debug("hub_teleport: activator wasn't a tracked melon, ignoring");
+        return;
+    }
+    Debug(`hub_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} returning to hub (racing=${kart.racing}, phase=${phase})`);
+    ReturnAllToHub([kart]);
 });
 
 // See PAINT_TRIGGER_NAME_PATTERN above for the Hammer-side naming
@@ -199,6 +202,7 @@ Instance.OnCustomHudClicked((event) => {
         // else keeps going — unlike hub_abort_button, which is moderator-only
         // and ends it for the whole group. ReturnAllToHub already supports a
         // single-kart list (it's the same path a disconnecting racer takes).
+        Debug(`usermenu_hub_button: slot ${slot} returning to hub (racing=${kart.racing}, phase=${phase})`);
         SetUserMenuOpen(slot, kart, false);
         ReturnAllToHub([kart]);
     } else if (event.buttonId.startsWith("usermenu_color_")) {

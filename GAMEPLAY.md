@@ -94,6 +94,83 @@ Tune via `IMPACT_DAMAGE_THRESHOLD` (units/sec of sudden velocity change
 before damage starts) and `IMPACT_DAMAGE_SCALE` (health lost per unit/sec
 beyond that).
 
+## Wall bounce — speed for health (implemented)
+
+Every wall (any surface whose normal is mostly horizontal, `|normal.z| <
+WALL_NORMAL_MAX_Z` — so floors, ceilings, and landings never count; other
+physics props like melons don't either) bounces the melon back instead of
+just stopping it: the melon's *pre-impact* horizontal velocity is reflected
+off the wall's normal and scaled by a multiplier. The normal comes from a
+`TraceLine` cast from the melon's *previous-tick* position along its
+incoming direction (then a short `TraceSphere` from the current position,
+then — last resort, skewed by wall friction/spin — the impact's own
+direction). Since a collision often spans two ticks, the incoming velocity
+is whichever of the last two commanded velocities still heads more squarely
+into the wall. With `DEBUG` on (`debug.js`), every bounce draws the wall
+normal (green), incoming (red), outgoing (blue) and look direction (yellow)
+in the world and logs the velocity angle next to the look angle. There's no global "on/off per wall" — all walls do it.
+
+- **Angle is the skill part.** The multiplier peaks
+  (`WALL_BOUNCE_PEAK_MULTIPLIER`) at exactly `WALL_BOUNCE_OPTIMAL_ANGLE` (45°
+  from the wall normal) and falls off linearly to
+  `WALL_BOUNCE_BASE_RESTITUTION` (a speed *loss*) `WALL_BOUNCE_ANGLE_FALLOFF`
+  degrees away from it — so a head-on crash or a graze gains nothing, a
+  clean 45° hit comes out faster than it went in.
+- **Jump timing** multiplies it again, up to
+  `WALL_BOUNCE_PERFECT_JUMP_MULTIPLIER` for a jump on the exact tick of the
+  hit, fading linearly to nothing at `WALL_BOUNCE_PERFECT_JUMP_WINDOW`
+  seconds before *or* after it. The timing press is the jump button but
+  **independent of the normal jump**: it counts in the air and during the
+  jump cooldown (no upward push — only timing credit), while the normal
+  jump stays ground- and cooldown-gated. Anti-spam: pressing again within
+  `WALL_TIMING_SPAM_LOCKOUT` of the previous press locks timing credit for
+  that long, so mashing never counts.
+- **Cost — and how skill waives it:** wall hits have their own damage
+  rules, separate from landings' `IMPACT_DAMAGE_*`: a base part from the
+  impact itself (`WALL_IMPACT_DAMAGE_THRESHOLD`/`_SCALE`) plus
+  `WALL_BOUNCE_DAMAGE_PER_SPEED` per unit/sec the bounce *gained*. That
+  total is multiplied by `1 − angle closeness` (0..1) — **only the angle
+  counts** (decided): any hit the HUD rates PERFECT (`BOUNCE_RATINGS[0]`)
+  costs **no health at all**, jumped or not; below that the cost scales with
+  angle closeness, and one with no angle bonus pays full price. Jump timing only adds speed
+  (and a late jump's extra speed gain is charged too, still waived by a
+  perfect angle). The damage is charged once the jump window has closed, not
+  on impact; if it takes health to 0 the melon breaks right then, after the
+  bounce already happened.
+- **No speed ceiling:** a bounce lifts the kart's speed cap above
+  `MAX_SPEED` with no upper limit, so chained bounces stack. The cap then
+  decays back at `BOOST_DECAY` and never sits above the melon's actual speed
+  (braking and re-accelerating can't reclaim a lost boost). It's reset by
+  every respawn/race-flow teleport. Very fast melons make tunneling through
+  thin checkpoint triggers likelier — keep them thick.
+- `WALL_BOUNCE_COOLDOWN` stops one wall contact from bouncing (and
+  damaging) on consecutive ticks — including the plain landing/crash damage
+  rule, which would otherwise charge the same contact a second time; `WALL_BOUNCE_MIN_IMPACT` keeps light
+  scrapes as plain physics.
+- HUD: the speedometer gets `Boosted` while above `MAX_SPEED` and a short
+  `PerfectBounce` flash after a bounce with angle closeness ≥
+  `PERFECT_BOUNCE_ANGLE_FACTOR` (`speedometer.css`). Separately, a
+  `bounce_panel` below the crosshair shows for `BOUNCE_HUD_SECONDS` after
+  each bounce: a rating word by angle closeness (`BOUNCE_RATINGS`:
+  PERFECT/GREAT/GOOD/MISS), the exact angle hit, a 0°–90° scale in 10°
+  segments with the 45° target outlined and the hit segment lit, and a
+  jump-timing bar (which still fills in if the jump comes just *after* the
+  hit).
+- **Prediction line** (`prediction.js`, `PREDICTION_*`): a dotted line in
+  front of the melon along its current direction of travel up to the next
+  wall, then on along the direction it would bounce off in, colored by the
+  rating that hit would get at the current angle (`BOUNCE_RATINGS[].color`,
+  same colors as the HUD panel; white = no wall in range). Uses the same
+  angle math as the bounce, so steer until it turns yellow (PERFECT).
+  **Decided: a dev/training aid only** — `PREDICTION_RENDER_MODE =
+  "debug"` draws it with `Instance.DebugLine`, which only shows in dev
+  environments (tools mode), never to real players on a Workshop server;
+  that's intended. The alternative `"dots"` mode (entities from a
+  `point_template` named `prediction_dot_template`, e.g. a small "Never
+  Solid" `func_brush`, visible to everyone — every kart's line to every
+  player) still exists but was judged to look worse than the debug line.
+  Traces skip dots either way (`trace.js`).
+
 ## Multiple tracks & checkpoints (implemented)
 
 The map has more than one track, so checkpoint identity is `(trackId,
@@ -212,9 +289,12 @@ Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
    input/friction handling for a locked kart and just holds its horizontal
    velocity at zero every tick (vertical velocity is left alone so gravity
    still applies normally) — melons genuinely cannot be driven until this
-   ends. A large, centered "3…2…1" HUD label (see `speedometer.xml`'s
-   `countdown_label`) counts down for the racers only. `COUNTDOWN_SECONDS`
-   at the top of `melon_drive.js` controls the length.
+   ends. A large, centered "3…2…1…GO" HUD countdown (see `speedometer.xml`'s
+   `countdown_panel`: one image per step, `number-3/2/1.png` and `word-go.png`
+   in `panorama/images/custom_game/`, switched via `Show3`/`Show2`/`Show1`/
+   `ShowGo` classes) counts down for the racers only. `COUNTDOWN_SECONDS`
+   in `constants.js` controls the length — there are only images for 3..1,
+   so a longer countdown shows nothing until 3.
 4. **RACING** — normal driving, existing checkpoint/lap logic, plus a
    dedicated `finish_<trackId>` script input (registered for every
    `1..MAX_TRACKS`, same pattern as `checkpoint_<trackId>_<index>`) that's
@@ -305,6 +385,30 @@ Tuning constants (accel, max speed, friction, jump speed, spawn offset,
 camera offsets) live at the top of `melon_drive.js` — iterate them in-game
 via hot reload
 rather than guessing.
+
+## Spawn points (implemented)
+
+All spawn-entity lookups live in `spawn-points.js`; a melon always appears
+`SPAWN_UP_OFFSET` above the floor traced straight down from the entity (no
+sideways offset, and exactly there — the `melon_template`'s own offset is
+corrected by a teleport right after `ForceSpawn`). Keep that drop short: a
+long fall lands hard enough for the engine to destroy the melon on impact.
+
+- A player's very first melon (first join, i.e. no kart entry yet) appears
+  at the `info_player_start` named `intro_spawn` — the tutorial area —
+  facing that entity's own angles. It's also that new kart's respawn point
+  until it reaches a checkpoint or is sent to the hub. Without an
+  `intro_spawn`, the first spawn uses `hub_spawn`. Reconnecting counts as a
+  first join again (the kart is dropped on disconnect).
+- Returning to the hub uses `hub_spawn` (required — there's no fallback),
+  facing `hub_spawn_facing` if placed, else `hub_spawn`'s own angles.
+- A later `OnPlayerReset` for a player who already has a kart never spawns
+  or moves a melon — it only re-freezes the pawn and re-attaches the camera.
+  A lost melon is brought back solely by the break/respawn logic, at the
+  kart's own respawn point, so there's exactly one path that can put it
+  anywhere.
+- The player's pawn is frozen and parked *before* a new melon spawns, so the
+  melon can never appear inside it.
 
 ## Melon painting (implemented)
 

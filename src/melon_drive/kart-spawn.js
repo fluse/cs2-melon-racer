@@ -1,62 +1,30 @@
-import { Instance, PointTemplate } from "cs_script/point_script";
+import { Instance, PointTemplate, CSMoveType } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { karts, moderatorSlot, SetModeratorSlot } from "./kart-registry.js";
 import { ApplyCameraFollow, UpdateCameraDistanceHud, UpdateCameraHeightHud } from "./camera.js";
 import {
     MELON_TEMPLATE_NAME,
-    SPAWN_FORWARD_OFFSET,
-    SPAWN_UP_OFFSET,
-    HUB_SPAWN_FACING_NAME,
-    HUB_SPAWN_NAME,
     PAWN_PARK_HEIGHT,
     MELON_MAX_HEALTH,
+    MELON_ENGINE_HEALTH,
     CAMERA_DISTANCE_DEFAULT,
     CAMERA_HEIGHT_DEFAULT,
 } from "./constants.js";
 
-/**
- * Yaw a freshly spawned melon should face: the hub_spawn_facing pivot's
- * angle if the mapper placed one, otherwise the player's own eye yaw (the
- * old behavior, and a reasonable fallback for a solo/dev map with no hub).
- * @param {any} pawn
- */
-export function GetSpawnFacingYaw(pawn) {
-    const pivot = Instance.FindEntityByName(HUB_SPAWN_FACING_NAME);
-    if (pivot) {
-        return pivot.GetAbsAngles().yaw;
-    }
-    return pawn.GetEyeAngles().yaw;
-}
+// Spawn flow, in one sentence: a player without a kart gets a new one at the
+// spawn point the caller picks (the intro on join); a player who already has
+// one keeps it as-is — a lost melon is brought back by the break/respawn
+// logic in kart-physics.js, never here, so the two can't race each other.
 
 /**
- * Origin a freshly spawned melon should appear at: the hub_spawn
- * info_player_start's position if the mapper placed one, otherwise the
- * player's own pawn origin (the old behavior).
- * @param {any} pawn
- */
-export function GetSpawnOrigin(pawn) {
-    const hubSpawn = Instance.FindEntityByName(HUB_SPAWN_NAME);
-    if (hubSpawn) {
-        return hubSpawn.GetAbsOrigin();
-    }
-    return pawn.GetAbsOrigin();
-}
-
-/**
- * Spawns a fresh melon from the melon_template point_template at an explicit
- * position/angles — the shared primitive behind GetOrCreateKart below (at
- * GetMelonSpawnTransform's spot for a *new* player's melon) and kart-physics.js's
- * post-break recovery (which respawns one at a kart's own checkpoint).
+ * Spawns a fresh melon from the melon_template point_template — shared by
+ * CreateKart below and kart-physics.js's respawn of a destroyed melon.
  * @param {{ x: number, y: number, z: number }} position @param {{ pitch: number, yaw: number, roll: number }} angles
  */
 export function SpawnMelonAt(position, angles) {
     const template = Instance.FindEntityByName(MELON_TEMPLATE_NAME);
-    if (!template) {
-        Debug(`SpawnMelonAt: no entity named "${MELON_TEMPLATE_NAME}" found at all`);
-        return undefined;
-    }
     if (!(template instanceof PointTemplate)) {
-        Debug(`SpawnMelonAt: entity "${MELON_TEMPLATE_NAME}" exists but is a ${template.GetClassName()}, not a point_template`);
+        Debug(`SpawnMelonAt: no point_template named "${MELON_TEMPLATE_NAME}" found`);
         return undefined;
     }
     const spawned = template.ForceSpawn(position, angles);
@@ -64,138 +32,122 @@ export function SpawnMelonAt(position, angles) {
         Debug(`SpawnMelonAt: ForceSpawn() returned nothing — check the point_template's Template entries in Hammer`);
         return undefined;
     }
-    Debug(`SpawnMelonAt: spawned ${spawned.length} entity(s) at ${JSON.stringify(position)}, using [0] = ${spawned[0].GetClassName()}`);
-    return spawned[0];
+    // ForceSpawn keeps the melon's offset from the template's own origin in
+    // Hammer, so it lands somewhere near `position`, not on it — put it
+    // exactly there.
+    const melon = spawned[0];
+    melon.Teleport({ position, angles, velocity: { x: 0, y: 0, z: 0 } });
+    Debug(`SpawnMelonAt: spawned ${melon.GetClassName()} at ${JSON.stringify(position)}, engine health was ${melon.GetHealth()}/${melon.GetMaxHealth()}`);
+    MakeUnbreakableByEngine(melon);
+    return melon;
 }
 
 /**
- * Where (and facing which way) a fresh melon for this player appears — also
- * a new kart's initial respawn point, so a break before the first checkpoint
- * lands it at the same lifted-up spot instead of hub_spawn's raw
- * floor-level origin (see SPAWN_UP_OFFSET for why that would tunnel the
- * melon through the floor).
- * @param {any} pawn
+ * Gives the melon so much engine health that the engine's own physics
+ * damage can never break it — whatever its Hammer health/damage settings
+ * are. Breaking is our job: kart.health, see kart-physics.js.
+ * @param {any} melon
  */
-export function GetMelonSpawnTransform(pawn) {
-    const origin = GetSpawnOrigin(pawn);
-    const yaw = GetSpawnFacingYaw(pawn);
-    // Spawn a bit in front of the player, not exactly on top of them —
-    // spawning overlapping the player's own hitbox causes the physics
-    // engine to violently shove the melon away the instant it appears.
-    // Offset along the same yaw it'll face, not the player's own facing, so
-    // it consistently appears "ahead, toward the track" regardless of which
-    // way the player happens to be looking when they connect.
-    const rad = (yaw * Math.PI) / 180;
-    const spawnPos = {
-        x: origin.x + Math.cos(rad) * SPAWN_FORWARD_OFFSET,
-        y: origin.y + Math.sin(rad) * SPAWN_FORWARD_OFFSET,
-        z: origin.z + SPAWN_UP_OFFSET,
-    };
-    return { position: spawnPos, angles: { pitch: 0, yaw, roll: 0 } };
+function MakeUnbreakableByEngine(melon) {
+    melon.SetMaxHealth(MELON_ENGINE_HEALTH);
+    melon.SetHealth(MELON_ENGINE_HEALTH);
 }
 
-
-/** @param {any} pawn */
-function HidePawnModel(pawn) {
-    // There's no direct "hide" call — alpha 0 is the standard trick to make
-    // the model invisible while keeping the entity (and its camera) alive.
+/**
+ * Takes the player's own body out of the game: non-solid (NOCLIP — NONE
+ * would leave its hitbox solid for the melon to crash into), invisible, and
+ * parked high above `anchor`. Safe to call repeatedly: it always parks at the
+ * same spot for the same anchor.
+ * @param {any} pawn @param {{ x: number, y: number, z: number }} anchor
+ */
+function FreezePawn(pawn, anchor) {
+    pawn.SetMoveType(CSMoveType.NOCLIP);
     pawn.SetColor({ r: 255, g: 255, b: 255, a: 0 });
+    pawn.Teleport({ position: { x: anchor.x, y: anchor.y, z: anchor.z + PAWN_PARK_HEIGHT } });
 }
 
-/** @param {any} pawn @param {any} melon */
-export function ParkPawn(pawn, melon) {
-    // Anchored to the melon's own (always ground-level) position, not the
-    // pawn's current origin. OnPlayerReset can fire more than once for the
-    // same life (e.g. a retry after GetOrCreateKart failed because the
-    // template entity wasn't ready yet), and anchoring to the pawn's own
-    // origin would stack PAWN_PARK_HEIGHT on top of itself each time,
-    // eventually parking it absurdly high. Anchoring to the melon makes
-    // re-parking idempotent, and also keeps this from ever running before a
-    // melon exists (see the call site's `if (kart)` guard) — a pawn parked
-    // with no melon yet would otherwise leave its real spawn origin
-    // unrecoverable, which is exactly what corrupted checkpointPosition
-    // (the parked pawn's own position) into a valid-looking respawn target.
-    const origin = melon.GetAbsOrigin();
-    pawn.Teleport({ position: { x: origin.x, y: origin.y, z: origin.z + PAWN_PARK_HEIGHT } });
+/**
+ * A fresh kart record whose respawn point is where its melon just appeared.
+ * @param {any} pawn @param {any} melon @param {import("./spawn-points.js").SpawnPoint} spawnPoint
+ * @returns {import("./kart-registry.js").Kart}
+ */
+function NewKartRecord(pawn, melon, spawnPoint) {
+    return {
+        pawn,
+        melon,
+        nextJumpTime: 0,
+        health: MELON_MAX_HEALTH,
+        lastVelocity: undefined,
+        trackId: undefined,
+        checkpointIndex: 0,
+        checkpointPosition: spawnPoint.position,
+        checkpointAngles: spawnPoint.angles,
+        lapsCompleted: 0,
+        inHub: false,
+        racing: false,
+        finished: false,
+        locked: false,
+        breaking: false,
+        settled: false,
+        teleportGen: 0,
+        paintColor: { r: 255, g: 255, b: 255, a: 255 },
+        userMenuOpen: false,
+        hubModalOpen: false,
+        cameraDistance: CAMERA_DISTANCE_DEFAULT,
+        cameraHeight: CAMERA_HEIGHT_DEFAULT,
+        lastKnownPosition: undefined,
+        lastKnownAngles: undefined,
+    };
 }
 
-export function GetOrCreateKart(pawn) {
-    const controller = pawn.GetPlayerController();
-    const slot = controller?.GetPlayerSlot();
-    if (slot === undefined) {
-        Debug("GetOrCreateKart: pawn has no player controller/slot, aborting");
+/**
+ * New kart for `slot`, its melon spawned at `spawnPoint`. The pawn is
+ * frozen and moved away first, so the melon never appears inside it.
+ * @param {any} pawn @param {number} slot @param {import("./spawn-points.js").SpawnPoint} spawnPoint
+ */
+function CreateKart(pawn, slot, spawnPoint) {
+    FreezePawn(pawn, spawnPoint.position);
+    const melon = SpawnMelonAt(spawnPoint.position, spawnPoint.angles);
+    if (!melon) {
         return undefined;
     }
+    const kart = NewKartRecord(pawn, melon, spawnPoint);
+    karts.set(slot, kart);
+    if (moderatorSlot === undefined) {
+        SetModeratorSlot(slot);
+        Debug(`CreateKart: slot ${slot} is the first player on the map, assigned as moderator`);
+    }
+    Debug(`CreateKart: slot ${slot} got a new kart`);
+    return kart;
+}
 
+/**
+ * Everything a (re)spawned player pawn needs: its kart — created at
+ * `newKartSpawnPoint` only if the player has none yet — plus a frozen,
+ * hidden pawn and the chase camera on the melon.
+ * @param {any} pawn @param {import("./spawn-points.js").SpawnPoint | undefined} newKartSpawnPoint
+ */
+export function SetUpPlayerKart(pawn, newKartSpawnPoint) {
+    const slot = pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot === undefined) {
+        Debug("SetUpPlayerKart: pawn has no player controller/slot, aborting");
+        return undefined;
+    }
     let kart = karts.get(slot);
-    if (!kart || !kart.melon.IsValid()) {
-        Debug(`GetOrCreateKart: slot ${slot} has no valid kart yet, spawning a new melon`);
-        // Also reused as a new kart's initial respawn point below.
-        const spawnTransform = GetMelonSpawnTransform(pawn);
-        const melon = SpawnMelonAt(spawnTransform.position, spawnTransform.angles);
-        if (!melon) {
-            Debug(`GetOrCreateKart: slot ${slot} — melon spawn failed, no kart created`);
+    if (!kart) {
+        if (!newKartSpawnPoint) {
+            return undefined; // already logged by the spawn point lookup
+        }
+        kart = CreateKart(pawn, slot, newKartSpawnPoint);
+        if (!kart) {
             return undefined;
         }
-        if (moderatorSlot === undefined) {
-            SetModeratorSlot(slot);
-            Debug(`GetOrCreateKart: slot ${slot} is the first player on the map, assigned as moderator`);
-        }
-        if (kart) {
-            // The old kart's melon went invalid (e.g. it tunneled out of the
-            // world after a hard crash) but the kart itself already had race
-            // progress — keep checkpoint/track/lap state instead of
-            // resetting it from the pawn's current position. The pawn may
-            // already be parked (invisible, high above the map) by this
-            // point, and falling back to its position here is exactly what
-            // used to make a broken melon respawn at the invisible player's
-            // spot.
-            kart.pawn = pawn;
-            kart.melon = melon;
-            kart.nextJumpTime = 0;
-            kart.health = MELON_MAX_HEALTH;
-            kart.lastVelocity = undefined;
-            kart.breaking = false;
-            kart.settled = false;
-            kart.melon.SetColor(kart.paintColor); // the fresh melon starts undyed — re-apply the kept paint job
-        } else {
-            // Truly new — no prior checkpoint, so fall back to the player's
-            // own current spawn point/facing as the "respawn here" location.
-            kart = {
-                pawn,
-                melon,
-                nextJumpTime: 0,
-                health: MELON_MAX_HEALTH,
-                lastVelocity: undefined,
-                trackId: undefined,
-                checkpointIndex: 0,
-                checkpointPosition: spawnTransform.position,
-                checkpointAngles: spawnTransform.angles,
-                lapsCompleted: 0,
-                inHub: false,
-                racing: false,
-                finished: false,
-                locked: false,
-                breaking: false,
-                settled: false,
-                teleportGen: 0,
-                paintColor: { r: 255, g: 255, b: 255, a: 255 },
-                userMenuOpen: false,
-                hubModalOpen: false,
-                cameraDistance: CAMERA_DISTANCE_DEFAULT,
-                cameraHeight: CAMERA_HEIGHT_DEFAULT,
-                lastKnownPosition: undefined,
-                lastKnownAngles: undefined,
-            };
-        }
-        karts.set(slot, kart);
-    } else {
-        kart.pawn = pawn;
-        Debug(`GetOrCreateKart: slot ${slot} reusing existing melon`);
     }
-
-    HidePawnModel(pawn);
-    ApplyCameraFollow(kart);
+    kart.pawn = pawn;
+    FreezePawn(pawn, kart.checkpointPosition);
+    if (kart.melon.IsValid()) {
+        ApplyCameraFollow(kart); // a lost melon gets the camera once kart-physics.js respawns it
+    }
     UpdateCameraDistanceHud(kart);
     UpdateCameraHeightHud(kart);
     return kart;

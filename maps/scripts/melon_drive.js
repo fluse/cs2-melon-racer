@@ -29,11 +29,20 @@ const STRAFE_ACCEL = 360; // 0.4x forward, matches original's Strafe/Forward rat
 const MAX_SPEED = 650; // units/sec, horizontal speed cap
 const COAST_FRICTION = 120; // units/sec^2 horizontal slowdown with no input — low, so the melon keeps rolling on its own momentum instead of grinding to a stop
 const JUMP_SPEED = 400; // units/sec upward impulse
-// Jump is no longer gated on being grounded (the melon wobbles/bounces
-// enough while rolling that a ground trace was unreliable) — instead it's a
-// simple cooldown: always available, but only once per JUMP_COOLDOWN
-// seconds. The HUD shows a recharge bar so the player can see when it's up.
-const JUMP_COOLDOWN = 0.8; // seconds
+// Jump needs both: the JUMP_COOLDOWN recharged (HUD recharge bar), and the
+// melon having touched ground within the last GROUND_COYOTE_TIME seconds —
+// without the ground part, jumping again every cooldown gains net height
+// each cycle, so a player could hover in the air forever. A strict "on the
+// ground this exact tick" check was unreliable (the melon wobbles/bounces
+// while rolling), hence the tolerant version: a generous downward trace
+// (GROUND_CHECK_DISTANCE from the melon's origin) *or* a detected landing
+// impact counts as ground contact, and that contact stays valid for a short
+// grace period.
+const JUMP_COOLDOWN = 0.9; // seconds
+const GROUND_CHECK_DISTANCE = 48; // units straight down from the melon's origin — melon radius plus wobble margin; raise if jumps get refused while visibly rolling on the ground
+const GROUND_NORMAL_MIN_Z = 0.5; // surface must be at least this floor-like (not a wall) to count as ground
+const GROUND_COYOTE_TIME = 0.15; // seconds a ground contact stays valid after losing it
+const LANDING_MIN_IMPACT_Z = 100; // units/sec of sudden upward velocity change while falling that counts as having landed
 
 // Below this horizontal AND vertical speed, with no steering/jump input,
 // the melon counts as fully settled — UpdateKart stops re-pinning its
@@ -61,8 +70,115 @@ const SETTLE_NUDGE_ANGULAR_SPEED = 40; // deg/sec, one-off pitch/roll kick on se
 // our own steering only ever change velocity gradually. That gap's
 // magnitude is the "impact speed" damage is based on.
 const MELON_MAX_HEALTH = 80;
+// The melon entity's *engine* health (not kart.health above) — set this high
+// on every spawn so the engine's own physics damage never destroys the prop,
+// regardless of its Hammer health/damage settings. See MakeUnbreakableByEngine.
+const MELON_ENGINE_HEALTH = 1000000;
 const IMPACT_DAMAGE_THRESHOLD = 450; // units/sec of sudden velocity change before it starts to hurt
 const IMPACT_DAMAGE_SCALE = 0.2; // health lost per unit/sec beyond the threshold
+
+// Wall bounce: an impact against a wall (any world/brush surface whose
+// normal is mostly horizontal — see WALL_NORMAL_MAX_Z) reflects the melon's
+// pre-impact velocity off that wall instead of letting vphysics just stop
+// it, and can come out *faster* than it went in — trading health for speed.
+// How much faster is skill-based: strongest when hitting the wall at exactly
+// WALL_BOUNCE_OPTIMAL_ANGLE (measured from the wall's normal, 0 = head-on,
+// 90 = grazing), fading linearly to WALL_BOUNCE_BASE_RESTITUTION (a loss of
+// speed) WALL_BOUNCE_ANGLE_FALLOFF degrees away from it. A jump timed within
+// WALL_BOUNCE_PERFECT_JUMP_WINDOW of the hit (before or after) multiplies the
+// result once more — fully for the exact same tick, fading out towards the
+// window's edges. Floors/landings never bounce — they keep using the
+// plain IMPACT_DAMAGE_* rules above.
+const WALL_BOUNCE_MIN_IMPACT = 200; // units/sec of sudden velocity change before a wall hit counts as a bounce at all
+const WALL_NORMAL_MAX_Z = 0.5; // |normal.z| above this is a floor/ceiling/steep ramp, not a wall
+const WALL_BOUNCE_TRACE_DISTANCE = 160; // ray length from last tick's position along the incoming direction — must reach the wall even at grazing angles (grows with 1/cos(angle))
+const WALL_BOUNCE_TRACE_RADIUS = 8; // backup sphere sweep from the current position, for posts/edges the ray slips past
+const WALL_BOUNCE_SPHERE_TRACE_DISTANCE = 48;
+// DEBUG only (debug.js): world lines drawn per bounce — wall normal green,
+// incoming red, outgoing blue, look direction yellow — plus a log line with
+// the velocity-based vs. look-based angle.
+const WALL_BOUNCE_DEBUG_SECONDS = 4;
+const WALL_BOUNCE_DEBUG_LINE_LENGTH = 96;
+const WALL_BOUNCE_OPTIMAL_ANGLE = 45; // degrees from the wall normal where the bounce is strongest
+const WALL_BOUNCE_ANGLE_FALLOFF = 45; // degrees away from optimal at which the bonus has faded out completely
+const WALL_BOUNCE_BASE_RESTITUTION = 0.6; // speed multiplier at a bad angle (head-on or grazing)
+const WALL_BOUNCE_PEAK_MULTIPLIER = 1.5; // speed multiplier at exactly the optimal angle
+const WALL_BOUNCE_PERFECT_JUMP_WINDOW = 0.12; // seconds, before or after the hit
+const WALL_BOUNCE_PERFECT_JUMP_MULTIPLIER = 1.3; // extra multiplier on top for a perfectly timed jump (scaled down the further off it is)
+// The timing press is the jump button, but separate from the normal jump:
+// it counts even in the air or while the jump is on cooldown (it gives no
+// upward push, only timing credit). Pressing again within this many seconds
+// of the previous press is treated as mashing and locks timing credit for
+// that long — see RegisterWallTimingPress.
+const WALL_TIMING_SPAM_LOCKOUT = 0.4; // seconds
+const WALL_BOUNCE_COOLDOWN = 0.2; // seconds — stops one wall contact from bouncing (and damaging) on consecutive ticks
+// Wall hits get their own damage rules, separate from landings: a base part
+// from the impact itself (same shape as IMPACT_DAMAGE_*), plus a cost for
+// every unit/sec of speed the bounce *gained* — that second part is the
+// actual "speed for health" trade. That total is then reduced by how close
+// to the optimal angle it hit (the angle factor, 0..1) — jump timing only
+// affects speed, not damage. A perfect 45° hit costs no health at all; one
+// with no angle bonus pays full price. Charged once the jump window has
+// closed (a late jump can still add speed), not on impact itself.
+const WALL_IMPACT_DAMAGE_THRESHOLD = 450;
+const WALL_IMPACT_DAMAGE_SCALE = 0.2;
+const WALL_BOUNCE_DAMAGE_PER_SPEED = 0.05; // health lost per unit/sec gained by a bounce
+// A bounce may lift the melon above MAX_SPEED — deliberately with no upper
+// limit, chained bounces stack. The raised cap then decays back towards
+// MAX_SPEED at this rate (and never sits above the melon's actual speed, so
+// braking and re-accelerating can't reclaim a boost already lost).
+const BOOST_DECAY = 150; // units/sec^2
+// The speedometer flashes (PerfectBounce class) for this long after a bounce
+// with at least this angle factor — i.e. one that cost little or no health.
+const PERFECT_BOUNCE_FLASH_SECONDS = 0.4;
+const PERFECT_BOUNCE_ANGLE_FACTOR = 0.8;
+// Bounce feedback panel (bounce_panel in speedometer.xml, see
+// UpdateBounceHud): shown for this long after each wall bounce.
+const BOUNCE_HUD_SECONDS = 1.5;
+// Angle scale: 0°..90° split into this many equal segments
+// ("bounce_angle_seg_0".."_{N-1}"), 10° each — the one containing 45° is
+// styled as the target in speedometer.css, the one actually hit gets "Hit".
+const BOUNCE_ANGLE_SEGMENTS = 9;
+// Jump-timing bar ("bounce_jump_seg_0".."_{N-1}"), filled by how well the
+// jump was timed (1 = same tick as the hit).
+const BOUNCE_JUMP_SEGMENTS = 5;
+// Rating word by how close to WALL_BOUNCE_OPTIMAL_ANGLE the hit was
+// (angleFactor, 1 = exact). First match wins — keep sorted high to low,
+// last entry is the catch-all. cssClass colors the panel; color is the same
+// accent for the in-world prediction line (see prediction.js) — keep the two
+// in sync with speedometer.css's .Rating* rules.
+const BOUNCE_RATINGS = [
+    { minAngleFactor: 0.9, label: "PERFECT", cssClass: "RatingPerfect", color: { r: 255, g: 224, b: 102, a: 255 } },
+    { minAngleFactor: 0.7, label: "GREAT", cssClass: "RatingGreat", color: { r: 102, g: 221, b: 102, a: 255 } },
+    { minAngleFactor: 0.4, label: "GOOD", cssClass: "RatingGood", color: { r: 102, g: 170, b: 255, a: 255 } },
+    { minAngleFactor: 0, label: "MISS", cssClass: "RatingMiss", color: { r: 255, g: 102, b: 102, a: 255 } },
+];
+
+// Wall-bounce prediction line, drawn in front of the melon (see
+// prediction.js): a dotted line along its current direction of travel up to
+// the next wall, then on along the direction it would bounce off in —
+// colored by the rating (BOUNCE_RATINGS) that wall hit would get at the
+// current angle, so the player can steer until it turns PERFECT before
+// reaching the wall. Dots are entities spawned from a point_template named
+// PREDICTION_DOT_TEMPLATE_NAME (one small, non-solid prop_dynamic inside it)
+// — Instance.DebugLine only works in dev environments, so real players
+// would never see a debug-drawn line. Without that template in the map it
+// falls back to DebugLine anyway, for testing in tools mode.
+// Note: the dots are ordinary networked entities, so every player sees every
+// kart's prediction line, not just their own.
+const PREDICTION_ENABLED = true;
+// "debug": Instance.DebugLine — a clean continuous line, but only visible in
+//          dev environments (tools mode), never to real players.
+// "dots":  entities from PREDICTION_DOT_TEMPLATE_NAME — visible to everyone.
+const PREDICTION_RENDER_MODE = "debug";
+const PREDICTION_DOT_TEMPLATE_NAME = "prediction_dot_template";
+const PREDICTION_LENGTH = 700; // units ahead to look for the next wall
+const PREDICTION_REFLECT_LENGTH = 250; // units the bounced-off part of the line continues
+const PREDICTION_DOTS_IN = 12; // dots from the melon to the wall
+const PREDICTION_DOTS_OUT = 5; // dots along the bounce direction
+const PREDICTION_START_OFFSET = 36; // first dot this far ahead of the melon's center, so it isn't hidden inside the melon
+const PREDICTION_MIN_SPEED = 80; // units/sec — below this there's no meaningful direction, line hidden
+const PREDICTION_NEUTRAL_COLOR = { r: 255, g: 255, b: 255, a: 160 }; // no wall in range
 
 // When a melon breaks it doesn't respawn instantly — it shreds apart at the
 // crash site (hidden immediately, with the break particle standing in for
@@ -82,7 +198,7 @@ const BREAK_TINT_FALLBACK = { r: 40, g: 40, b: 40, a: 255 };
 const BREAK_PARTICLE_TEMPLATE_NAME = "melon_break_template";
 // Second, separate break effect layered on top of the one above — e.g. flying
 // melon chunks, as opposed to the main burst. Same point_template convention.
-const BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME = "melon_break_chunks_particle";
+const BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME = "melon_break_chunks_template";
 
 // The map has multiple separate tracks, so a checkpoint's script input
 // parameter names both which track it belongs to and its position along
@@ -146,33 +262,30 @@ const RACE_SPAWN_LATERAL_SPACING = 120;
 // how this is parsed, cached, and used as each track's start position.
 const START_TRIGGER_NAME_PATTERN = /^track_start_(\d+)_cp(\d+)_laps(\d+)$/;
 
-// How far in front of (and above) the player to spawn their melon, so it
-// doesn't spawn overlapping the player's own hitbox.
-const SPAWN_FORWARD_OFFSET = 80;
-// Deliberately much bigger than TELEPORT_UP_OFFSET: that one only has to
-// clear a trigger brush a mapper sunk a little into the floor, but this one
-// also has to clear hub_spawn (an info_player_start, not a sunk trigger) even
-// if it's sitting at or slightly below the real floor height. ForceSpawn gets
-// no "push out of solid" recovery the way an already-alive prop_physics
-// normally would on landing, so spawning even a little embedded here means
-// falling straight through instead of settling on top.
-const SPAWN_UP_OFFSET = 128;
+// How far above the floor under a spawn entity (hub_spawn, intro_spawn) the
+// melon's origin appears — straight above it, no sideways offset (see
+// PositionAboveFloor in spawn-points.js). Just enough to clear the floor:
+// a long drop lands hard enough for the engine's own physics to destroy the
+// melon on impact (it used to be 128 plus the template's offset, ~180 units,
+// and the melon broke on every landing and respawned in a loop).
+const SPAWN_UP_OFFSET = 40;
+// The floor trace for that starts FLOOR_TRACE_UP above the spawn entity (in
+// case it's sunk into the floor) and looks FLOOR_TRACE_DOWN below it (in case
+// it's floating above the floor).
+const FLOOR_TRACE_UP = 32;
+const FLOOR_TRACE_DOWN = 512;
 
-// Name of an info_target placed in Hammer purely as a facing reference (a
-// pivot — origin doesn't matter, only its angle) pointing down the track
-// from the hub. A freshly spawned melon (first connect, or any respawn
-// before the racer has picked a track/touched a checkpoint) faces this
-// direction instead of wherever the player's camera happened to be looking
-// on connect, which has no relation to the track layout. Optional — if it's
-// not placed, spawning falls back to the player's eye yaw like before.
-const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
-
-// Name of an info_player_start placed in Hammer in the hub, marking where a
-// freshly spawned melon should appear. Optional — if it's not placed,
-// spawning falls back to the player's own pawn origin (the old behavior).
+// Spawn entities — resolved in spawn-points.js.
+// hub_spawn (info_player_start, required): where melons go in the hub.
+// hub_spawn_facing (info_target, optional): only its angle counts — which
+// way a melon at hub_spawn faces; without it, hub_spawn's own angle.
+// intro_spawn (info_player_start, optional): a player's very first melon
+// (the tutorial), facing its own angle; without it, hub_spawn.
 const HUB_SPAWN_NAME = "hub_spawn";
+const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
+const INTRO_SPAWN_NAME = "intro_spawn";
 
-// Race-flow teleports (heat start, return-to-hub) target a trigger_multiple's
+// Race-flow teleports (heat start, checkpoint respawns) target a trigger_multiple's
 // raw GetAbsOrigin() — Hammer mappers commonly sink a trigger's brush a bit
 // into the floor so a fast-moving physics prop reliably touches it instead
 // of tunneling past a paper-thin volume. Teleporting the melon to that exact
@@ -228,12 +341,53 @@ const JUMP_BAR_SEGMENTS = 10;
 // kart.health / MELON_MAX_HEALTH. Below these fractions the bar's fill color
 // shifts (green -> yellow -> red, see UpdateHealthHud/speedometer.css) to
 // warn that another hard impact will break the melon.
-const HEALTH_BAR_SEGMENTS = 10;
+const HEALTH_BAR_SEGMENTS = 20;
 const HEALTH_LOW_FRACTION = 0.6;
 const HEALTH_CRITICAL_FRACTION = 0.3;
 
 // Think's debug heartbeat log interval — see think.js.
 const HEARTBEAT_INTERVAL = 1; // seconds
+
+// Every kart's prediction-line dot entities (see prediction.js). They sit
+// right on the melon's line of travel, so a trace along it — the prediction
+// line's own, or the wall bounce's — would otherwise hit the first dot
+// instead of the actual wall if the dot template's entity is solid for
+// traces (e.g. a func_brush left at its default solidity). Entity variables
+// are reference-stable, so a Set lookup on trace.hitEntity works.
+/** @type {Set<any>} */
+const predictionDotSet = new Set();
+
+const MAX_DOT_SKIPS = 4;
+
+/**
+ * Runs a trace, and if it hit a prediction dot, re-runs it with that dot
+ * added to ignoreEntity — up to MAX_DOT_SKIPS times, after which it's
+ * reported as a miss rather than as a (bogus) hit on a dot.
+ * @template {{ ignoreEntity?: any }} C
+ * @param {(config: C) => any} traceFn @param {C} config
+ */
+function SkipDots(traceFn, config) {
+    let current = config;
+    for (let i = 0; i <= MAX_DOT_SKIPS; i++) {
+        const result = traceFn(current);
+        if (!result.didHit || !result.hitEntity || !predictionDotSet.has(result.hitEntity)) {
+            return result;
+        }
+        const ignored = current.ignoreEntity === undefined ? [] : [].concat(current.ignoreEntity);
+        current = { ...current, ignoreEntity: [...ignored, result.hitEntity] };
+    }
+    return { ...traceFn(current), didHit: false };
+}
+
+/** Instance.TraceLine, but never stops on a prediction dot. @param {Parameters<typeof Instance.TraceLine>[0]} config */
+function TraceLine(config) {
+    return SkipDots((c) => Instance.TraceLine(c), config);
+}
+
+/** Instance.TraceSphere, but never stops on a prediction dot. @param {Parameters<typeof Instance.TraceSphere>[0]} config */
+function TraceSphere(config) {
+    return SkipDots((c) => Instance.TraceSphere(c), config);
+}
 
 /**
  * @typedef {{
@@ -244,6 +398,14 @@ const HEARTBEAT_INTERVAL = 1; // seconds
  *   breaking: boolean, paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
  *   cameraDistance: number, cameraHeight: number, settled: boolean,
  *   teleportGen: number, // bumped by every race-flow teleport (BeginHeat/ReturnAllToHub) — see ScheduleRespawnAfterBreak
+ *   speedCap?: number, // current horizontal speed limit; above MAX_SPEED only while a wall-bounce boost decays — unset means MAX_SPEED
+ *   nextBounceTime?: number, lastBounceTime?: number, // wall-bounce timing, see UpdateKart
+ *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
+ *   lastJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // wall-bounce timing presses, see RegisterWallTimingPress
+ *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
+ *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
+ *   predictionDots?: any[], // this kart's prediction-line dot entities, see prediction.js
+ *   pendingBounce?: { time: number, impactSpeed: number, impactDir: { x: number, y: number, z: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number }, // damage not yet charged — waits out the jump window, see SettleWallBounceDamage
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
  * }} Kart
  */
@@ -297,6 +459,12 @@ function DropKart(slot, kart) {
     if (kart.melon.IsValid()) {
         kart.melon.Remove();
     }
+    for (const dot of kart.predictionDots ?? []) {
+        predictionDotSet.delete(dot);
+        if (dot.IsValid()) {
+            dot.Remove();
+        }
+    }
     karts.delete(slot);
 }
 
@@ -308,6 +476,115 @@ function FindKartByMelon(melon) {
         }
     }
     return undefined;
+}
+
+// Pure wall-bounce math — no cs_script import, so it's unit-testable in
+// Node (see test/wall-bounce.test.mjs). kart-physics.js does the engine side
+// (detecting the wall normal via traces, applying the velocity, debug draws)
+// and calls into these for the numbers. See "Wall bounce — speed for health"
+// in GAMEPLAY.md for the design.
+
+/**
+ * 0..1 — how close a wall hit's angle (degrees from the wall normal, 0 =
+ * head-on) is to WALL_BOUNCE_OPTIMAL_ANGLE. Shared by the bounce itself and
+ * the prediction line, so both always agree.
+ * @param {number} angle
+ */
+function WallAngleFactor(angle) {
+    return Math.max(0, 1 - Math.abs(angle - WALL_BOUNCE_OPTIMAL_ANGLE) / WALL_BOUNCE_ANGLE_FALLOFF);
+}
+
+/** @param {number} angleFactor */
+function GetBounceRating(angleFactor) {
+    for (const r of BOUNCE_RATINGS) {
+        if (angleFactor >= r.minAngleFactor) {
+            return r;
+        }
+    }
+    return BOUNCE_RATINGS[BOUNCE_RATINGS.length - 1];
+}
+
+/**
+ * How well a jump was timed against a wall hit: 1 for the exact same tick,
+ * fading linearly to 0 at WALL_BOUNCE_PERFECT_JUMP_WINDOW seconds either way.
+ * @param {number} secondsApart
+ */
+function JumpTimingFactor(secondsApart) {
+    return Math.max(0, 1 - Math.abs(secondsApart) / WALL_BOUNCE_PERFECT_JUMP_WINDOW);
+}
+
+/** @param {number} jumpFactor */
+function JumpMultiplier(jumpFactor) {
+    return 1 + (WALL_BOUNCE_PERFECT_JUMP_MULTIPLIER - 1) * jumpFactor;
+}
+
+/**
+ * Of last tick's and the tick before's commanded velocity, whichever still
+ * heads more squarely into the wall — a collision often plays out over two
+ * ticks, so the most recent one may already be half-deflected.
+ * @template {{ x: number, y: number }} V
+ * @param {V} last @param {V | undefined} prev @param {{ x: number, y: number }} n
+ * @returns {V}
+ */
+function PickIncomingVelocity(last, prev, n) {
+    if (!prev) {
+        return last;
+    }
+    /** @param {{ x: number, y: number }} v */
+    const intoRatio = (v) => {
+        const s = Math.hypot(v.x, v.y);
+        return s < 1 ? -Infinity : -(v.x * n.x + v.y * n.y) / s;
+    };
+    return intoRatio(prev) > intoRatio(last) ? prev : last;
+}
+
+/**
+ * Reflects a horizontal velocity off a wall and scales it by how well the
+ * hit was angled and timed (see WALL_BOUNCE_* in constants.js).
+ * @param {{ x: number, y: number }} v incoming velocity
+ * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal
+ * @param {number} jumpFactor 0..1, see JumpTimingFactor
+ * @returns {{ velocity: { x: number, y: number }, angle: number, angleFactor: number, speedGain: number } | null}
+ *   null if the melon wasn't actually moving into the wall
+ */
+function ReflectOffWall(v, n, jumpFactor) {
+    const speed = Math.hypot(v.x, v.y);
+    const into = -(v.x * n.x + v.y * n.y); // speed component heading into the wall
+    if (into <= 0 || speed < 1) {
+        return null;
+    }
+    // 0 = head-on, 90 = grazing along the wall.
+    const angle = (Math.acos(Math.min(1, into / speed)) * 180) / Math.PI;
+    const angleFactor = WallAngleFactor(angle);
+    const multiplier =
+        (WALL_BOUNCE_BASE_RESTITUTION + (WALL_BOUNCE_PEAK_MULTIPLIER - WALL_BOUNCE_BASE_RESTITUTION) * angleFactor) *
+        JumpMultiplier(jumpFactor);
+    return {
+        velocity: {
+            x: (v.x + 2 * into * n.x) * multiplier,
+            y: (v.y + 2 * into * n.y) * multiplier,
+        },
+        angle,
+        angleFactor,
+        speedGain: Math.max(0, speed * multiplier - speed),
+    };
+}
+
+/**
+ * Health a wall bounce costs: the wall's usual impact + speed-gain damage,
+ * reduced by how close to the optimal angle it hit — anything the HUD rates
+ * as the best rating (PERFECT) is free, one with no angle bonus pays full
+ * price. Jump timing only affects the bounce's speed, never its damage.
+ * @param {number} impactSpeed @param {number} speedGain @param {number} angleFactor
+ */
+function WallBounceDamage(impactSpeed, speedGain, angleFactor) {
+    if (GetBounceRating(angleFactor) === BOUNCE_RATINGS[0]) {
+        return 0;
+    }
+    const rawDamage =
+        Math.max(0, impactSpeed - WALL_IMPACT_DAMAGE_THRESHOLD) * WALL_IMPACT_DAMAGE_SCALE +
+        speedGain * WALL_BOUNCE_DAMAGE_PER_SPEED;
+    return rawDamage * (1 - angleFactor);
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart @param {number} dt */
@@ -323,6 +600,8 @@ function UpdateKart(slot, kart, dt) {
         melon.Move({ velocity: { x: 0, y: 0, z: vel.z } });
         kart.lastVelocity = undefined;
         kart.settled = false;
+        kart.speedCap = MAX_SPEED;
+        kart.pendingBounce = undefined; // parked/finished — a bounce's leftover damage no longer matters
         return;
     }
 
@@ -335,10 +614,22 @@ function UpdateKart(slot, kart, dt) {
         melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
         kart.lastVelocity = undefined;
         kart.settled = false;
+        kart.pendingBounce = undefined;
         return;
     }
 
+    const now = Instance.GetGameTime();
+    // A wall bounce's jump-timing window has closed — its quality is final,
+    // so charge (or waive) its damage now.
+    if (kart.pendingBounce && now - kart.pendingBounce.time > WALL_BOUNCE_PERFECT_JUMP_WINDOW) {
+        if (SettleWallBounceDamage(slot, kart)) {
+            return; // broke
+        }
+    }
+    const origin = melon.GetAbsOrigin();
     const currentVelocity = melon.GetAbsVelocity();
+    /** @type {{ x: number, y: number } | undefined} */
+    let bounceVelocity = undefined;
     if (kart.lastVelocity) {
         const impactDelta = {
             x: currentVelocity.x - kart.lastVelocity.x,
@@ -346,7 +637,46 @@ function UpdateKart(slot, kart, dt) {
             z: currentVelocity.z - kart.lastVelocity.z,
         };
         const impactSpeed = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
-        if (impactSpeed > IMPACT_DAMAGE_THRESHOLD) {
+        // Was falling, and something below just stopped it — a landing,
+        // counts as ground contact for the jump check below.
+        if (kart.lastVelocity.z < 0 && impactDelta.z > LANDING_MIN_IMPACT_Z) {
+            kart.lastGroundedTime = now;
+        }
+        // Right after a bounce the same wall contact often keeps shoving the
+        // melon for another tick or two — that's still the bounce (already
+        // charged via pendingBounce), not a new crash to take damage from.
+        const inBounceCooldown = now < (kart.nextBounceTime ?? 0);
+        const wallNormal =
+            impactSpeed > WALL_BOUNCE_MIN_IMPACT && !inBounceCooldown
+                ? DetectWallNormal(kart, impactDelta)
+                : null;
+        const bounce = wallNormal ? ComputeWallBounce(kart, wallNormal, now) : null;
+        if (bounce) {
+            // Only reachable with WALL_BOUNCE_COOLDOWN tuned below the jump
+            // window — settle the previous bounce's damage before starting a
+            // new one.
+            if (kart.pendingBounce && SettleWallBounceDamage(slot, kart)) {
+                return;
+            }
+            bounceVelocity = bounce.velocity;
+            kart.nextBounceTime = now + WALL_BOUNCE_COOLDOWN;
+            kart.lastBounceTime = now;
+            // Read by UpdateBounceHud for the angle/timing feedback panel.
+            kart.lastBounceInfo = { angle: bounce.angle, angleFactor: bounce.angleFactor, jumpFactor: bounce.jumpFactor };
+            kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, Math.hypot(bounceVelocity.x, bounceVelocity.y));
+            // Damage waits until the jump-timing window has closed (see the
+            // top of the non-locked path, and the late-jump case below) —
+            // a jump just *after* the hit can still improve its quality.
+            kart.pendingBounce = {
+                time: now,
+                impactSpeed,
+                impactDir: impactDelta,
+                angle: bounce.angle,
+                angleFactor: bounce.angleFactor,
+                jumpFactor: bounce.jumpFactor,
+                speedGain: bounce.speedGain,
+            };
+        } else if (!inBounceCooldown && impactSpeed > IMPACT_DAMAGE_THRESHOLD) {
             ApplyImpactDamage(slot, kart, impactSpeed);
             if (kart.health <= 0) {
                 // impactDelta is the sudden change physics forced onto the
@@ -368,6 +698,9 @@ function UpdateKart(slot, kart, dt) {
     const jumpPressed = pawn.WasInputJustPressed(CSInputs.JUMP);
 
     if (
+        // A head-on wall hit can leave vphysics' own velocity at ~0 this
+        // tick — that's the bounce about to be applied, not a melon at rest.
+        !bounceVelocity &&
         forwardInput === 0 &&
         strafeInput === 0 &&
         !jumpPressed &&
@@ -409,8 +742,11 @@ function UpdateKart(slot, kart, dt) {
     const forwardDir = { x: Math.cos(rad), y: Math.sin(rad) };
     const rightDir = { x: Math.sin(rad), y: -Math.cos(rad) };
 
-    let vx = currentVelocity.x;
-    let vy = currentVelocity.y;
+    // After a wall bounce, steering/friction apply on top of the reflected
+    // velocity rather than whatever vphysics left behind — so the player can
+    // still steer out of the bounce the same tick.
+    let vx = bounceVelocity ? bounceVelocity.x : currentVelocity.x;
+    let vy = bounceVelocity ? bounceVelocity.y : currentVelocity.y;
 
     if (forwardInput !== 0 || strafeInput !== 0) {
         const forwardAccel = forwardInput > 0 ? FORWARD_ACCEL : REVERSE_ACCEL;
@@ -427,42 +763,304 @@ function UpdateKart(slot, kart, dt) {
         }
     }
 
-    const horizSpeed = Math.hypot(vx, vy);
-    if (horizSpeed > MAX_SPEED) {
-        const scale = MAX_SPEED / horizSpeed;
-        vx *= scale;
-        vy *= scale;
-    }
-
-    // Jump: straight-up force, always allowed (no ground check — the melon
-    // wobbles too much while rolling for a ground trace to be reliable),
-    // but limited to once per JUMP_COOLDOWN seconds via kart.nextJumpTime.
+    // Jump: straight-up force, only with ground contact (tolerant — see
+    // UpdateGrounded/GROUND_COYOTE_TIME) and at most once per JUMP_COOLDOWN
+    // seconds via kart.nextJumpTime.
+    // Only jumps that actually fire count towards wall-bounce timing, so the
+    // cooldown also keeps jump-spamming along a wall from being "perfect".
     let vz = currentVelocity.z;
+    const grounded = UpdateGrounded(kart, origin, now);
     if (jumpPressed) {
-        const now = Instance.GetGameTime();
         const ready = now >= kart.nextJumpTime;
-        Debug(`Jump pressed: ready=${ready} forwardInput=${forwardInput} strafeInput=${strafeInput}`);
-        if (ready) {
+        const timingPress = RegisterWallTimingPress(kart, now);
+        Debug(`Jump pressed: ready=${ready} grounded=${grounded} wallTiming=${timingPress} forwardInput=${forwardInput} strafeInput=${strafeInput}`);
+        // The normal jump — ground + cooldown gated, gives the upward push.
+        if (ready && grounded) {
             vz = JUMP_SPEED;
             kart.nextJumpTime = now + JUMP_COOLDOWN;
         }
+        // Wall timing — independent of the normal jump above (works in the
+        // air and during its cooldown), purely about *when* it's pressed.
+        // Pressed just *after* a wall bounce whose damage is still pending:
+        // if this timing beats whatever press (if any) the bounce already
+        // counted, upgrade it — more speed (the speed gain it'll settle
+        // damage for grows with it; a perfect angle still makes that free).
+        if (timingPress) {
+            const pending = kart.pendingBounce;
+            if (pending) {
+                const lateFactor = JumpTimingFactor(now - pending.time);
+                if (lateFactor > pending.jumpFactor) {
+                    const ratio = JumpMultiplier(lateFactor) / JumpMultiplier(pending.jumpFactor);
+                    const before = Math.hypot(vx, vy);
+                    vx *= ratio;
+                    vy *= ratio;
+                    const after = Math.hypot(vx, vy);
+                    pending.speedGain += after - before;
+                    pending.jumpFactor = lateFactor;
+                    if (kart.lastBounceInfo) {
+                        kart.lastBounceInfo.jumpFactor = lateFactor;
+                    }
+                    kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, after);
+                }
+            }
+        }
     }
+
+    // Normally MAX_SPEED, but a wall bounce can lift it (see BOOST_DECAY):
+    // decays back down every tick, and never stays above the melon's actual
+    // speed so a lost boost can't be re-earned just by accelerating again.
+    const speedCap = kart.speedCap ?? MAX_SPEED;
+    let horizSpeed = Math.hypot(vx, vy);
+    if (horizSpeed > speedCap) {
+        const scale = speedCap / horizSpeed;
+        vx *= scale;
+        vy *= scale;
+        horizSpeed = speedCap;
+    }
+    kart.speedCap = Math.max(MAX_SPEED, Math.min(speedCap - BOOST_DECAY * dt, horizSpeed));
 
     melon.Move({ velocity: { x: vx, y: vy, z: vz } });
     // What we commanded this tick — compared against the actual velocity
     // physics settles on by next tick to detect collisions (see the top of
-    // this function).
+    // this function). The one before it and where this tick started are kept
+    // too, for measuring a wall hit's true incoming direction — see
+    // DetectWallNormal/ComputeWallBounce.
+    kart.prevLastVelocity = kart.lastVelocity;
+    kart.prevOrigin = origin;
     kart.lastVelocity = { x: vx, y: vy, z: vz };
+}
+
+/**
+ * Records a jump-button press for wall-bounce timing, separately from the
+ * normal (ground/cooldown gated) jump. Anti-spam: a press less than
+ * WALL_TIMING_SPAM_LOCKOUT after the previous one locks timing credit for
+ * that long, so mashing jump along a wall never counts — only a single,
+ * deliberately timed press does.
+ * @param {import("./kart-registry.js").Kart} kart @param {number} now
+ * @returns {boolean} whether this press counts for wall timing
+ */
+function RegisterWallTimingPress(kart, now) {
+    const previous = kart.lastJumpPressTime;
+    kart.lastJumpPressTime = now;
+    if (previous !== undefined && now - previous < WALL_TIMING_SPAM_LOCKOUT) {
+        kart.wallTimingLockedUntil = now + WALL_TIMING_SPAM_LOCKOUT;
+        kart.wallTimingPressTime = undefined; // an earlier press in the same mash doesn't count either
+        return false;
+    }
+    if (now < (kart.wallTimingLockedUntil ?? 0)) {
+        return false;
+    }
+    kart.wallTimingPressTime = now;
+    return true;
+}
+
+/**
+ * Refreshes kart.lastGroundedTime if there's floor within
+ * GROUND_CHECK_DISTANCE below the melon, and reports whether it has had
+ * ground contact (this trace, or a landing detected in UpdateKart) within the
+ * last GROUND_COYOTE_TIME seconds.
+ * @param {import("./kart-registry.js").Kart} kart @param {any} origin @param {number} now
+ */
+function UpdateGrounded(kart, origin, now) {
+    const trace = TraceLine({
+        start: origin,
+        end: { x: origin.x, y: origin.y, z: origin.z - GROUND_CHECK_DISTANCE },
+        ignoreEntity: [kart.melon, kart.pawn],
+        ignorePlayers: true,
+    });
+    if (trace.didHit && !trace.startedInSolid && trace.normal.z >= GROUND_NORMAL_MIN_Z) {
+        kart.lastGroundedTime = now;
+    }
+    return kart.lastGroundedTime !== undefined && now - kart.lastGroundedTime <= GROUND_COYOTE_TIME;
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart @param {number} impactSpeed */
 function ApplyImpactDamage(slot, kart, impactSpeed) {
     const damage = (impactSpeed - IMPACT_DAMAGE_THRESHOLD) * IMPACT_DAMAGE_SCALE;
+    DamageKart(slot, kart, damage, `impact ${impactSpeed.toFixed(0)} u/s`);
+}
+
+/** @param {number} slot @param {import("./kart-registry.js").Kart} kart @param {number} damage @param {string} reason */
+function DamageKart(slot, kart, damage, reason) {
     kart.health -= damage;
+    Debug(`slot ${slot}: ${reason} -> ${damage.toFixed(0)} dmg, health ${kart.health.toFixed(0)}/${MELON_MAX_HEALTH}`);
+}
+
+/**
+ * Whether the impact this tick was against a wall, and if so that wall's
+ * (horizontal, unit-length) normal — see the trace order inside. Floors/
+ * ceilings (mostly vertical normal) and other physics props (other karts'
+ * melons, loose melons in the map) don't count — only walls bounce.
+ * @param {import("./kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDelta
+ * @returns {{ x: number, y: number, method: string, hitPoint?: any } | null}
+ */
+function DetectWallNormal(kart, impactDelta) {
+    const v = kart.lastVelocity;
+    if (!v) {
+        return null;
+    }
+    const horizSpeed = Math.hypot(v.x, v.y);
+    if (horizSpeed < 1) {
+        return null; // purely vertical motion — a landing, never a wall
+    }
+    const dir = { x: v.x / horizSpeed, y: v.y / horizSpeed };
+    const ignoreEntity = [kart.melon, kart.pawn];
+
+    // 1st choice: a thin ray from where the melon was *last* tick (before
+    // contact) along its incoming direction — gives the wall's real face
+    // normal, independent of how vphysics resolved the collision. Long
+    // enough to still reach the wall at grazing angles, where the distance
+    // along the travel direction grows with 1/cos(angle).
+    // 2nd: a sphere sweep from the current position (catches thin posts or
+    // edges the center ray slips past).
+    // Last resort: the impact direction itself — skewed by wall friction and
+    // the melon's spin, so only used when neither trace finds anything.
+    const from = kart.prevOrigin ?? kart.melon.GetAbsOrigin();
+    const ray = TraceLine({
+        start: from,
+        end: {
+            x: from.x + dir.x * WALL_BOUNCE_TRACE_DISTANCE,
+            y: from.y + dir.y * WALL_BOUNCE_TRACE_DISTANCE,
+            z: from.z,
+        },
+        ignoreEntity,
+        ignorePlayers: true,
+    });
+    /** @type {any} */
+    let trace = ray.didHit && !ray.startedInSolid ? ray : null;
+    let method = "ray";
+    if (!trace) {
+        const start = kart.melon.GetAbsOrigin();
+        const sphere = TraceSphere({
+            radius: WALL_BOUNCE_TRACE_RADIUS,
+            start,
+            end: {
+                x: start.x + dir.x * WALL_BOUNCE_SPHERE_TRACE_DISTANCE,
+                y: start.y + dir.y * WALL_BOUNCE_SPHERE_TRACE_DISTANCE,
+                z: start.z,
+            },
+            ignoreEntity,
+            ignorePlayers: true,
+        });
+        trace = sphere.didHit && !sphere.startedInSolid ? sphere : null;
+        method = "sphere";
+    }
+
+    let nx, ny, nz;
+    /** @type {any} */
+    let hitPoint = undefined;
+    if (trace) {
+        const hit = trace.hitEntity;
+        if (hit && !hit.IsWorld() && hit.GetClassName().startsWith("prop_physics")) {
+            return null;
+        }
+        ({ x: nx, y: ny, z: nz } = trace.normal);
+        hitPoint = trace.end;
+    } else {
+        method = "impact-fallback";
+        const len = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
+        if (len < 1) {
+            return null;
+        }
+        nx = impactDelta.x / len;
+        ny = impactDelta.y / len;
+        nz = impactDelta.z / len;
+    }
+    if (Math.abs(nz) > WALL_NORMAL_MAX_Z) {
+        return null;
+    }
+    const h = Math.hypot(nx, ny);
+    return h > 0 ? { x: nx / h, y: ny / h, method, hitPoint } : null;
+}
+
+/**
+ * DEBUG only: draws the bounce in the world for a few seconds — wall normal
+ * (green), measured incoming direction (red), outgoing direction (blue),
+ * and where the player was *looking* (yellow) — and logs the velocity-based
+ * angle next to the look-based one, so a "that felt like 45°" mismatch can
+ * be told apart from a measuring bug.
+ * @param {import("./kart-registry.js").Kart} kart
+ * @param {{ x: number, y: number, method: string, hitPoint?: any }} n
+ * @param {{ x: number, y: number }} incoming @param {{ x: number, y: number }} outgoing @param {number} angle
+ */
+function DebugDrawBounce(kart, n, incoming, outgoing, angle) {
+    if (!DEBUG) {
+        return;
+    }
+    const origin = kart.melon.GetAbsOrigin();
+    const at = n.hitPoint ?? origin;
+    const len = WALL_BOUNCE_DEBUG_LINE_LENGTH;
+    const duration = WALL_BOUNCE_DEBUG_SECONDS;
+    /** @param {{ x: number, y: number }} d */
+    const unit = (d) => {
+        const l = Math.hypot(d.x, d.y) || 1;
+        return { x: d.x / l, y: d.y / l };
+    };
+    const inDir = unit(incoming);
+    const outDir = unit(outgoing);
+    const yaw = (kart.pawn.GetEyeAngles().yaw * Math.PI) / 180;
+    const lookDir = { x: Math.cos(yaw), y: Math.sin(yaw) };
+
+    Instance.DebugLine({ start: at, end: { x: at.x + n.x * len, y: at.y + n.y * len, z: at.z }, duration, color: { r: 0, g: 255, b: 0 } });
+    Instance.DebugLine({ start: { x: at.x - inDir.x * len, y: at.y - inDir.y * len, z: at.z }, end: at, duration, color: { r: 255, g: 60, b: 60 } });
+    Instance.DebugLine({ start: at, end: { x: at.x + outDir.x * len, y: at.y + outDir.y * len, z: at.z }, duration, color: { r: 80, g: 140, b: 255 } });
+    Instance.DebugLine({ start: origin, end: { x: origin.x + lookDir.x * len, y: origin.y + lookDir.y * len, z: origin.z }, duration, color: { r: 255, g: 224, b: 102 } });
+
+    const lookInto = -(lookDir.x * n.x + lookDir.y * n.y);
+    const lookAngle = lookInto > 0 ? (Math.acos(Math.min(1, lookInto)) * 180) / Math.PI : NaN;
     Debug(
-        `slot ${slot}: impact ${impactSpeed.toFixed(0)} u/s -> ${damage.toFixed(0)} dmg, ` +
-        `health ${kart.health.toFixed(0)}/${MELON_MAX_HEALTH}`
+        `bounce angle: velocity ${angle.toFixed(1)}°, look ${Number.isNaN(lookAngle) ? "away from wall" : lookAngle.toFixed(1) + "°"}, ` +
+        `normal via ${n.method}`
     );
+}
+
+/**
+ * Reflects the melon's pre-impact horizontal velocity off a wall and scales
+ * it by how well the hit was angled (see WALL_BOUNCE_* in constants.js).
+ * Vertical velocity is left to physics — a bounce never launches upward.
+ * @param {import("./kart-registry.js").Kart} kart @param {{ x: number, y: number, method: string, hitPoint?: any }} n @param {number} now
+ * @returns {{ velocity: { x: number, y: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number } | null}
+ *   null if the melon wasn't actually moving into the wall
+ */
+function ComputeWallBounce(kart, n, now) {
+    const v = PickIncomingVelocity(/** @type {{ x: number, y: number, z: number }} */ (kart.lastVelocity), kart.prevLastVelocity, n);
+    // A timing press just *before* the hit counts here; one just after is
+    // handled by UpdateKart's jump code upgrading kart.pendingBounce.
+    const jumpFactor = kart.wallTimingPressTime !== undefined ? JumpTimingFactor(now - kart.wallTimingPressTime) : 0;
+    const bounce = ReflectOffWall(v, n, jumpFactor);
+    if (!bounce) {
+        return null;
+    }
+    DebugDrawBounce(kart, n, v, bounce.velocity, bounce.angle);
+    return { ...bounce, jumpFactor };
+}
+
+/**
+ * Charges kart.pendingBounce's damage now that its jump window is over (a
+ * late jump can still have raised its speed gain): the wall's usual impact +
+ * speed-gain damage, reduced by angle closeness — a perfect 45° hit is free.
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ * @returns {boolean} whether the melon broke from it
+ */
+function SettleWallBounceDamage(slot, kart) {
+    const p = kart.pendingBounce;
+    kart.pendingBounce = undefined;
+    if (!p) {
+        return false;
+    }
+    const damage = WallBounceDamage(p.impactSpeed, p.speedGain, p.angleFactor);
+    DamageKart(
+        slot,
+        kart,
+        damage,
+        `wall bounce ${p.angle.toFixed(0)}° (angle ${p.angleFactor.toFixed(2)}, jump ${p.jumpFactor.toFixed(2)}), ` +
+        `impact ${p.impactSpeed.toFixed(0)} u/s, gained ${p.speedGain.toFixed(0)} u/s`
+    );
+    if (kart.health <= 0) {
+        BreakMelon(slot, kart, p.impactDir, p.impactSpeed);
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -529,6 +1127,8 @@ function RespawnKartAtCheckpoint(kart) {
     // velocity reset, not a physical impact to react to.
     kart.lastVelocity = undefined;
     kart.settled = false;
+    kart.speedCap = undefined;
+    kart.pendingBounce = undefined;
 }
 
 /**
@@ -608,6 +1208,8 @@ function RespawnDestroyedMelon(slot, kart) {
     kart.health = MELON_MAX_HEALTH;
     kart.lastVelocity = undefined;
     kart.settled = false;
+    kart.speedCap = undefined;
+    kart.pendingBounce = undefined;
     ApplyCameraFollow(kart);
 }
 
@@ -679,6 +1281,27 @@ function GetJumpChargeFraction(kart) {
     return 1 - remaining / JUMP_COOLDOWN;
 }
 
+// Pure health-bar math — no cs_script import, so it's unit-testable in
+// Node (see test/health.test.mjs). hud.js turns the result into HUD classes.
+
+/**
+ * What the segmented health bar should show for a given health value.
+ * @param {number} health
+ * @returns {{ fraction: number, filledSegments: number, low: boolean, critical: boolean }}
+ */
+function HealthBarState(health) {
+    const fraction = Math.max(0, Math.min(1, health / MELON_MAX_HEALTH));
+    return {
+        fraction,
+        // ceil, not round: the melon only breaks at health <= 0, so any health
+        // left must still show at least one segment — round() emptied the bar
+        // while up to half a segment's worth of health remained.
+        filledSegments: Math.ceil(fraction * HEALTH_BAR_SEGMENTS),
+        low: fraction <= HEALTH_LOW_FRACTION,
+        critical: fraction <= HEALTH_CRITICAL_FRACTION,
+    };
+}
+
 // Per-track checkpoint/lap config comes straight from Hammer instead of a
 // hand-maintained lookup: each track has one trigger_multiple named
 // "track_start_<trackId>_cp<checkpointCount>_laps<lapsToWin>" (e.g.
@@ -748,15 +1371,67 @@ function GetSpeedHud() {
     return speedHud;
 }
 
-/** @param {number} slot @param {any} melon */
-function UpdateSpeedHud(slot, melon) {
+/** @param {number} slot @param {import("./kart-registry.js").Kart} kart */
+function UpdateSpeedHud(slot, kart) {
     const hud = GetSpeedHud();
     if (!hud) {
         return;
     }
-    const vel = melon.GetAbsVelocity();
-    const kmh = Math.round(Math.hypot(vel.x, vel.y) * UNITS_TO_KMH);
+    const vel = kart.melon.GetAbsVelocity();
+    const horizSpeed = Math.hypot(vel.x, vel.y);
+    const kmh = Math.round(horizSpeed * UNITS_TO_KMH);
     hud.SetDialogVariableStringForPlayer(slot, "speed_panel", "speed", String(kmh));
+    // Wall-bounce feedback: Boosted while a bounce has the melon above the
+    // normal top speed, PerfectBounce as a short flash after a bounce that
+    // was clean enough to cost (almost) no health.
+    hud.SetHasClassForPlayer(slot, "speed_panel", "Boosted", horizSpeed > MAX_SPEED + 1);
+    const info = kart.lastBounceInfo;
+    const perfectFlash =
+        info !== undefined &&
+        info.angleFactor >= PERFECT_BOUNCE_ANGLE_FACTOR &&
+        kart.lastBounceTime !== undefined &&
+        Instance.GetGameTime() - kart.lastBounceTime < PERFECT_BOUNCE_FLASH_SECONDS;
+    hud.SetHasClassForPlayer(slot, "speed_panel", "PerfectBounce", perfectFlash);
+}
+
+/**
+ * Wall-bounce feedback panel (bounce_panel in speedometer.xml), shown for
+ * BOUNCE_HUD_SECONDS after each bounce: a rating word, the exact angle hit,
+ * an angle scale with the hit's segment marked against the 45° target, and
+ * how well the jump was timed. Reads kart.lastBounceInfo live, so a jump just
+ * *after* the hit still updates the timing bar while the panel is up.
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+function UpdateBounceHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const info = kart.lastBounceInfo;
+    const visible =
+        info !== undefined &&
+        kart.lastBounceTime !== undefined &&
+        Instance.GetGameTime() - kart.lastBounceTime < BOUNCE_HUD_SECONDS;
+    hud.SetHasClassForPlayer(slot, "bounce_panel", "Hidden", !visible);
+    if (!visible || !info) {
+        return;
+    }
+
+    const rating = GetBounceRating(info.angleFactor);
+    for (const r of BOUNCE_RATINGS) {
+        hud.SetHasClassForPlayer(slot, "bounce_panel", r.cssClass, r === rating);
+    }
+    hud.SetDialogVariableStringForPlayer(slot, "bounce_panel", "bounce_rating", rating.label);
+    hud.SetDialogVariableStringForPlayer(slot, "bounce_panel", "bounce_angle", String(Math.round(info.angle)));
+
+    const hitSegment = Math.min(BOUNCE_ANGLE_SEGMENTS - 1, Math.floor((info.angle / 90) * BOUNCE_ANGLE_SEGMENTS));
+    for (let i = 0; i < BOUNCE_ANGLE_SEGMENTS; i++) {
+        hud.SetHasClassForPlayer(slot, `bounce_angle_seg_${i}`, "Hit", i === hitSegment);
+    }
+    const jumpFilled = Math.round(info.jumpFactor * BOUNCE_JUMP_SEGMENTS);
+    for (let i = 0; i < BOUNCE_JUMP_SEGMENTS; i++) {
+        hud.SetHasClassForPlayer(slot, `bounce_jump_seg_${i}`, "Filled", i < jumpFilled);
+    }
 }
 
 /** @param {number} slot @param {{ nextJumpTime: number }} kart */
@@ -779,13 +1454,12 @@ function UpdateHealthHud(slot, kart) {
     if (!hud) {
         return;
     }
-    const fraction = Math.max(0, Math.min(1, kart.health / MELON_MAX_HEALTH));
-    const filledSegments = Math.round(fraction * HEALTH_BAR_SEGMENTS);
+    const bar = HealthBarState(kart.health);
     for (let i = 0; i < HEALTH_BAR_SEGMENTS; i++) {
-        hud.SetHasClassForPlayer(slot, `health_seg_${i}`, "Filled", i < filledSegments);
+        hud.SetHasClassForPlayer(slot, `health_seg_${i}`, "Filled", i < bar.filledSegments);
     }
-    hud.SetHasClassForPlayer(slot, "health_bar", "Low", fraction <= HEALTH_LOW_FRACTION);
-    hud.SetHasClassForPlayer(slot, "health_bar", "Critical", fraction <= HEALTH_CRITICAL_FRACTION);
+    hud.SetHasClassForPlayer(slot, "health_bar", "Low", bar.low);
+    hud.SetHasClassForPlayer(slot, "health_bar", "Critical", bar.critical);
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart */
@@ -984,49 +1658,20 @@ function ApplyCameraFollow(kart) {
     Debug(`ApplyCameraFollow: mode=${camera.GetMode()} distance=${kart.cameraDistance} for slot=${kart.pawn.GetPlayerController()?.GetPlayerSlot()}`);
 }
 
-/**
- * Yaw a freshly spawned melon should face: the hub_spawn_facing pivot's
- * angle if the mapper placed one, otherwise the player's own eye yaw (the
- * old behavior, and a reasonable fallback for a solo/dev map with no hub).
- * @param {any} pawn
- */
-function GetSpawnFacingYaw(pawn) {
-    const pivot = Instance.FindEntityByName(HUB_SPAWN_FACING_NAME);
-    if (pivot) {
-        return pivot.GetAbsAngles().yaw;
-    }
-    return pawn.GetEyeAngles().yaw;
-}
+// Spawn flow, in one sentence: a player without a kart gets a new one at the
+// spawn point the caller picks (the intro on join); a player who already has
+// one keeps it as-is — a lost melon is brought back by the break/respawn
+// logic in kart-physics.js, never here, so the two can't race each other.
 
 /**
- * Origin a freshly spawned melon should appear at: the hub_spawn
- * info_player_start's position if the mapper placed one, otherwise the
- * player's own pawn origin (the old behavior).
- * @param {any} pawn
- */
-function GetSpawnOrigin(pawn) {
-    const hubSpawn = Instance.FindEntityByName(HUB_SPAWN_NAME);
-    if (hubSpawn) {
-        return hubSpawn.GetAbsOrigin();
-    }
-    return pawn.GetAbsOrigin();
-}
-
-/**
- * Spawns a fresh melon from the melon_template point_template at an explicit
- * position/angles — the shared primitive behind GetOrCreateKart below (at
- * GetMelonSpawnTransform's spot for a *new* player's melon) and kart-physics.js's
- * post-break recovery (which respawns one at a kart's own checkpoint).
+ * Spawns a fresh melon from the melon_template point_template — shared by
+ * CreateKart below and kart-physics.js's respawn of a destroyed melon.
  * @param {{ x: number, y: number, z: number }} position @param {{ pitch: number, yaw: number, roll: number }} angles
  */
 function SpawnMelonAt(position, angles) {
     const template = Instance.FindEntityByName(MELON_TEMPLATE_NAME);
-    if (!template) {
-        Debug(`SpawnMelonAt: no entity named "${MELON_TEMPLATE_NAME}" found at all`);
-        return undefined;
-    }
     if (!(template instanceof PointTemplate)) {
-        Debug(`SpawnMelonAt: entity "${MELON_TEMPLATE_NAME}" exists but is a ${template.GetClassName()}, not a point_template`);
+        Debug(`SpawnMelonAt: no point_template named "${MELON_TEMPLATE_NAME}" found`);
         return undefined;
     }
     const spawned = template.ForceSpawn(position, angles);
@@ -1034,141 +1679,205 @@ function SpawnMelonAt(position, angles) {
         Debug(`SpawnMelonAt: ForceSpawn() returned nothing — check the point_template's Template entries in Hammer`);
         return undefined;
     }
-    Debug(`SpawnMelonAt: spawned ${spawned.length} entity(s) at ${JSON.stringify(position)}, using [0] = ${spawned[0].GetClassName()}`);
-    return spawned[0];
+    // ForceSpawn keeps the melon's offset from the template's own origin in
+    // Hammer, so it lands somewhere near `position`, not on it — put it
+    // exactly there.
+    const melon = spawned[0];
+    melon.Teleport({ position, angles, velocity: { x: 0, y: 0, z: 0 } });
+    Debug(`SpawnMelonAt: spawned ${melon.GetClassName()} at ${JSON.stringify(position)}, engine health was ${melon.GetHealth()}/${melon.GetMaxHealth()}`);
+    MakeUnbreakableByEngine(melon);
+    return melon;
 }
 
 /**
- * Where (and facing which way) a fresh melon for this player appears — also
- * a new kart's initial respawn point, so a break before the first checkpoint
- * lands it at the same lifted-up spot instead of hub_spawn's raw
- * floor-level origin (see SPAWN_UP_OFFSET for why that would tunnel the
- * melon through the floor).
- * @param {any} pawn
+ * Gives the melon so much engine health that the engine's own physics
+ * damage can never break it — whatever its Hammer health/damage settings
+ * are. Breaking is our job: kart.health, see kart-physics.js.
+ * @param {any} melon
  */
-function GetMelonSpawnTransform(pawn) {
-    const origin = GetSpawnOrigin(pawn);
-    const yaw = GetSpawnFacingYaw(pawn);
-    // Spawn a bit in front of the player, not exactly on top of them —
-    // spawning overlapping the player's own hitbox causes the physics
-    // engine to violently shove the melon away the instant it appears.
-    // Offset along the same yaw it'll face, not the player's own facing, so
-    // it consistently appears "ahead, toward the track" regardless of which
-    // way the player happens to be looking when they connect.
-    const rad = (yaw * Math.PI) / 180;
-    const spawnPos = {
-        x: origin.x + Math.cos(rad) * SPAWN_FORWARD_OFFSET,
-        y: origin.y + Math.sin(rad) * SPAWN_FORWARD_OFFSET,
-        z: origin.z + SPAWN_UP_OFFSET,
-    };
-    return { position: spawnPos, angles: { pitch: 0, yaw, roll: 0 } };
+function MakeUnbreakableByEngine(melon) {
+    melon.SetMaxHealth(MELON_ENGINE_HEALTH);
+    melon.SetHealth(MELON_ENGINE_HEALTH);
 }
 
-
-/** @param {any} pawn */
-function HidePawnModel(pawn) {
-    // There's no direct "hide" call — alpha 0 is the standard trick to make
-    // the model invisible while keeping the entity (and its camera) alive.
+/**
+ * Takes the player's own body out of the game: non-solid (NOCLIP — NONE
+ * would leave its hitbox solid for the melon to crash into), invisible, and
+ * parked high above `anchor`. Safe to call repeatedly: it always parks at the
+ * same spot for the same anchor.
+ * @param {any} pawn @param {{ x: number, y: number, z: number }} anchor
+ */
+function FreezePawn(pawn, anchor) {
+    pawn.SetMoveType(CSMoveType.NOCLIP);
     pawn.SetColor({ r: 255, g: 255, b: 255, a: 0 });
+    pawn.Teleport({ position: { x: anchor.x, y: anchor.y, z: anchor.z + PAWN_PARK_HEIGHT } });
 }
 
-/** @param {any} pawn @param {any} melon */
-function ParkPawn(pawn, melon) {
-    // Anchored to the melon's own (always ground-level) position, not the
-    // pawn's current origin. OnPlayerReset can fire more than once for the
-    // same life (e.g. a retry after GetOrCreateKart failed because the
-    // template entity wasn't ready yet), and anchoring to the pawn's own
-    // origin would stack PAWN_PARK_HEIGHT on top of itself each time,
-    // eventually parking it absurdly high. Anchoring to the melon makes
-    // re-parking idempotent, and also keeps this from ever running before a
-    // melon exists (see the call site's `if (kart)` guard) — a pawn parked
-    // with no melon yet would otherwise leave its real spawn origin
-    // unrecoverable, which is exactly what corrupted checkpointPosition
-    // (the parked pawn's own position) into a valid-looking respawn target.
-    const origin = melon.GetAbsOrigin();
-    pawn.Teleport({ position: { x: origin.x, y: origin.y, z: origin.z + PAWN_PARK_HEIGHT } });
+/**
+ * A fresh kart record whose respawn point is where its melon just appeared.
+ * @param {any} pawn @param {any} melon @param {import("./spawn-points.js").SpawnPoint} spawnPoint
+ * @returns {import("./kart-registry.js").Kart}
+ */
+function NewKartRecord(pawn, melon, spawnPoint) {
+    return {
+        pawn,
+        melon,
+        nextJumpTime: 0,
+        health: MELON_MAX_HEALTH,
+        lastVelocity: undefined,
+        trackId: undefined,
+        checkpointIndex: 0,
+        checkpointPosition: spawnPoint.position,
+        checkpointAngles: spawnPoint.angles,
+        lapsCompleted: 0,
+        inHub: false,
+        racing: false,
+        finished: false,
+        locked: false,
+        breaking: false,
+        settled: false,
+        teleportGen: 0,
+        paintColor: { r: 255, g: 255, b: 255, a: 255 },
+        userMenuOpen: false,
+        hubModalOpen: false,
+        cameraDistance: CAMERA_DISTANCE_DEFAULT,
+        cameraHeight: CAMERA_HEIGHT_DEFAULT,
+        lastKnownPosition: undefined,
+        lastKnownAngles: undefined,
+    };
 }
 
-function GetOrCreateKart(pawn) {
-    const controller = pawn.GetPlayerController();
-    const slot = controller?.GetPlayerSlot();
-    if (slot === undefined) {
-        Debug("GetOrCreateKart: pawn has no player controller/slot, aborting");
+/**
+ * New kart for `slot`, its melon spawned at `spawnPoint`. The pawn is
+ * frozen and moved away first, so the melon never appears inside it.
+ * @param {any} pawn @param {number} slot @param {import("./spawn-points.js").SpawnPoint} spawnPoint
+ */
+function CreateKart(pawn, slot, spawnPoint) {
+    FreezePawn(pawn, spawnPoint.position);
+    const melon = SpawnMelonAt(spawnPoint.position, spawnPoint.angles);
+    if (!melon) {
         return undefined;
     }
+    const kart = NewKartRecord(pawn, melon, spawnPoint);
+    karts.set(slot, kart);
+    if (moderatorSlot === undefined) {
+        SetModeratorSlot(slot);
+        Debug(`CreateKart: slot ${slot} is the first player on the map, assigned as moderator`);
+    }
+    Debug(`CreateKart: slot ${slot} got a new kart`);
+    return kart;
+}
 
+/**
+ * Everything a (re)spawned player pawn needs: its kart — created at
+ * `newKartSpawnPoint` only if the player has none yet — plus a frozen,
+ * hidden pawn and the chase camera on the melon.
+ * @param {any} pawn @param {import("./spawn-points.js").SpawnPoint | undefined} newKartSpawnPoint
+ */
+function SetUpPlayerKart(pawn, newKartSpawnPoint) {
+    const slot = pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot === undefined) {
+        Debug("SetUpPlayerKart: pawn has no player controller/slot, aborting");
+        return undefined;
+    }
     let kart = karts.get(slot);
-    if (!kart || !kart.melon.IsValid()) {
-        Debug(`GetOrCreateKart: slot ${slot} has no valid kart yet, spawning a new melon`);
-        // Also reused as a new kart's initial respawn point below.
-        const spawnTransform = GetMelonSpawnTransform(pawn);
-        const melon = SpawnMelonAt(spawnTransform.position, spawnTransform.angles);
-        if (!melon) {
-            Debug(`GetOrCreateKart: slot ${slot} — melon spawn failed, no kart created`);
+    if (!kart) {
+        if (!newKartSpawnPoint) {
+            return undefined; // already logged by the spawn point lookup
+        }
+        kart = CreateKart(pawn, slot, newKartSpawnPoint);
+        if (!kart) {
             return undefined;
         }
-        if (moderatorSlot === undefined) {
-            SetModeratorSlot(slot);
-            Debug(`GetOrCreateKart: slot ${slot} is the first player on the map, assigned as moderator`);
-        }
-        if (kart) {
-            // The old kart's melon went invalid (e.g. it tunneled out of the
-            // world after a hard crash) but the kart itself already had race
-            // progress — keep checkpoint/track/lap state instead of
-            // resetting it from the pawn's current position. The pawn may
-            // already be parked (invisible, high above the map) by this
-            // point, and falling back to its position here is exactly what
-            // used to make a broken melon respawn at the invisible player's
-            // spot.
-            kart.pawn = pawn;
-            kart.melon = melon;
-            kart.nextJumpTime = 0;
-            kart.health = MELON_MAX_HEALTH;
-            kart.lastVelocity = undefined;
-            kart.breaking = false;
-            kart.settled = false;
-            kart.melon.SetColor(kart.paintColor); // the fresh melon starts undyed — re-apply the kept paint job
-        } else {
-            // Truly new — no prior checkpoint, so fall back to the player's
-            // own current spawn point/facing as the "respawn here" location.
-            kart = {
-                pawn,
-                melon,
-                nextJumpTime: 0,
-                health: MELON_MAX_HEALTH,
-                lastVelocity: undefined,
-                trackId: undefined,
-                checkpointIndex: 0,
-                checkpointPosition: spawnTransform.position,
-                checkpointAngles: spawnTransform.angles,
-                lapsCompleted: 0,
-                inHub: false,
-                racing: false,
-                finished: false,
-                locked: false,
-                breaking: false,
-                settled: false,
-                teleportGen: 0,
-                paintColor: { r: 255, g: 255, b: 255, a: 255 },
-                userMenuOpen: false,
-                hubModalOpen: false,
-                cameraDistance: CAMERA_DISTANCE_DEFAULT,
-                cameraHeight: CAMERA_HEIGHT_DEFAULT,
-                lastKnownPosition: undefined,
-                lastKnownAngles: undefined,
-            };
-        }
-        karts.set(slot, kart);
-    } else {
-        kart.pawn = pawn;
-        Debug(`GetOrCreateKart: slot ${slot} reusing existing melon`);
     }
-
-    HidePawnModel(pawn);
-    ApplyCameraFollow(kart);
+    kart.pawn = pawn;
+    FreezePawn(pawn, kart.checkpointPosition);
+    if (kart.melon.IsValid()) {
+        ApplyCameraFollow(kart); // a lost melon gets the camera once kart-physics.js respawns it
+    }
     UpdateCameraDistanceHud(kart);
     UpdateCameraHeightHud(kart);
     return kart;
+}
+
+// The one place that turns a Hammer spawn entity into a melon position.
+// Every caller that puts a melon at the hub or the intro goes through here,
+// so they all agree on where exactly that is.
+
+/**
+ * @typedef {{ position: { x: number, y: number, z: number }, angles: { pitch: number, yaw: number, roll: number } }} SpawnPoint
+ */
+
+/**
+ * `origin` lifted by `upOffset` — a melon placed exactly at a floor-level
+ * entity's origin would start embedded in the floor and fall through it.
+ * @param {{ x: number, y: number, z: number }} origin @param {number} upOffset
+ */
+function Lifted(origin, upOffset) {
+    return { x: origin.x, y: origin.y, z: origin.z + upOffset };
+}
+
+/** Level angles (no pitch/roll) facing `yaw` — a melon should never spawn tilted. @param {number} yaw */
+function LevelAngles(yaw) {
+    return { pitch: 0, yaw, roll: 0 };
+}
+
+/**
+ * Where a melon should appear for a spawn entity at `origin`: SPAWN_UP_OFFSET
+ * above the real floor under it, found by tracing down — so it doesn't
+ * matter whether the entity sits on, slightly in, or floating above the
+ * floor in Hammer. The trace starts a bit above the entity in case it's
+ * sunk into the floor. No floor found: just SPAWN_UP_OFFSET above the entity.
+ * @param {{ x: number, y: number, z: number }} origin
+ */
+function PositionAboveFloor(origin) {
+    const trace = TraceLine({
+        start: Lifted(origin, FLOOR_TRACE_UP),
+        end: Lifted(origin, -FLOOR_TRACE_DOWN),
+        ignorePlayers: true,
+    });
+    if (!trace.didHit || trace.startedInSolid) {
+        Debug(`PositionAboveFloor: no floor found below ${JSON.stringify(origin)}, spawning relative to the entity itself`);
+        return Lifted(origin, SPAWN_UP_OFFSET);
+    }
+    return Lifted(trace.end, SPAWN_UP_OFFSET);
+}
+
+/**
+ * Spawn point of the entity named `name`, facing the entity named
+ * `facingName` if given and placed, otherwise the entity's own yaw.
+ * @param {string} name @param {string} [facingName]
+ * @returns {SpawnPoint | undefined}
+ */
+function FindSpawnPoint(name, facingName) {
+    const entity = Instance.FindEntityByName(name);
+    if (!entity) {
+        return undefined;
+    }
+    const facing = (facingName && Instance.FindEntityByName(facingName)) || entity;
+    return {
+        position: PositionAboveFloor(entity.GetAbsOrigin()),
+        angles: LevelAngles(facing.GetAbsAngles().yaw),
+    };
+}
+
+/** Where karts go in the hub: the hub_spawn info_player_start, facing hub_spawn_facing. */
+function GetHubSpawnPoint() {
+    const spawn = FindSpawnPoint(HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME);
+    if (!spawn) {
+        Debug(`GetHubSpawnPoint: no "${HUB_SPAWN_NAME}" in the map — nowhere to put melons`);
+    }
+    return spawn;
+}
+
+/** Where a player's very first melon appears: the intro_spawn tutorial spot, or the hub if there's none. */
+function GetIntroSpawnPoint() {
+    const spawn = FindSpawnPoint(INTRO_SPAWN_NAME);
+    if (!spawn) {
+        Debug(`GetIntroSpawnPoint: no "${INTRO_SPAWN_NAME}" in the map, using the hub spawn`);
+        return GetHubSpawnPoint();
+    }
+    return spawn;
 }
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
@@ -1184,6 +1893,12 @@ let phase = RacePhase.HUB;
 let activeTrackId = undefined;
 /** GetGameTime() at which the current COUNTDOWN/BREAK phase should end. */
 let phaseEndTime = 0;
+
+/** One class per countdown image on the HUD's countdown_panel (see
+ * speedometer.xml/.css) — exactly one is set at a time. There's no image for
+ * values above 3, so a COUNTDOWN_SECONDS > 3 shows nothing until 3.
+ */
+const COUNTDOWN_SHOW_CLASSES = ["Show3", "Show2", "Show1", "ShowGo"];
 
 /**
  * Restores phase/activeTrackId/phaseEndTime from an OnScriptReload snapshot
@@ -1258,19 +1973,18 @@ function TryAbortRace() {
 }
 
 /**
- * Spot `i` of `count` karts lined up side by side, centered on `origin` and
- * perpendicular to `angles`' facing, lifted by TELEPORT_UP_OFFSET (see its
- * comment) so the melon drops onto the floor instead of into it.
- * @param {{ x: number, y: number, z: number }} origin @param {{ yaw: number }} angles @param {number} i @param {number} count
+ * Spot `i` of `count` karts lined up side by side, centered on `center` and
+ * perpendicular to `angles`' facing — so a group teleported together doesn't
+ * spawn inside each other. Keeps `center`'s height as-is.
+ * @param {{ x: number, y: number, z: number }} center @param {{ yaw: number }} angles @param {number} i @param {number} count
  */
-function LineUpPosition(origin, angles, i, count) {
+function LineUpPosition(center, angles, i, count) {
     const rad = (angles.yaw * Math.PI) / 180;
-    const rightDir = { x: Math.sin(rad), y: -Math.cos(rad) };
     const lateral = (i - (count - 1) / 2) * RACE_SPAWN_LATERAL_SPACING;
     return {
-        x: origin.x + rightDir.x * lateral,
-        y: origin.y + rightDir.y * lateral,
-        z: origin.z + TELEPORT_UP_OFFSET,
+        x: center.x + Math.sin(rad) * lateral,
+        y: center.y - Math.cos(rad) * lateral,
+        z: center.z,
     };
 }
 
@@ -1291,12 +2005,13 @@ function BeginHeat(trackId) {
         return;
     }
     activeTrackId = trackId;
-    const origin = start.GetAbsOrigin();
+    // TELEPORT_UP_OFFSET: the start trigger's brush may be sunk into the floor.
+    const center = Lifted(start.GetAbsOrigin(), TELEPORT_UP_OFFSET);
     const angles = start.GetAbsAngles();
 
     const racers = CurrentRacers();
     racers.forEach((kart, i) => {
-        const position = LineUpPosition(origin, angles, i, racers.length);
+        const position = LineUpPosition(center, angles, i, racers.length);
         // A melon destroyed mid-BREAK is still pending its respawn (see
         // HandleMelonLost) — skip the teleport rather than throw on a dead
         // entity; that respawn lands it at the checkpointPosition set below.
@@ -1310,6 +2025,8 @@ function BeginHeat(trackId) {
         kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
         kart.lastVelocity = undefined;
         kart.settled = false;
+        kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
+        kart.pendingBounce = undefined;
         // trackId is set directly instead of waiting for the physical
         // checkpoint_<trackId>_1 trigger touch to report it, so the
         // checkpoint/lap panel is already visible ("0/N", lap "1/M") the
@@ -1346,12 +2063,8 @@ function FinishKart(kart) {
 
 /** @param {import("./kart-registry.js").Kart[]} returning */
 function ReturnAllToHub(returning) {
-    const hub = Instance.FindEntityByName(HUB_TRIGGER_NAME);
-    if (!hub) {
-        Debug(`ReturnAllToHub: no entity named "${HUB_TRIGGER_NAME}" found`);
-    }
-    const hubOrigin = hub?.GetAbsOrigin();
-    const hubAngles = hub?.GetAbsAngles();
+    const hubSpawn = GetHubSpawnPoint();
+    Debug(`ReturnAllToHub: returning ${returning.length} kart(s) to ${hubSpawn ? JSON.stringify(hubSpawn.position) : "nowhere (no hub_spawn)"}`);
     returning.forEach((kart, i) => {
         kart.racing = false;
         kart.finished = false;
@@ -1370,12 +2083,9 @@ function ReturnAllToHub(returning) {
         kart.trackId = undefined;
         kart.checkpointIndex = 0;
         kart.lapsCompleted = 0;
-        if (hubOrigin) {
-            // Lined up side by side like BeginHeat's start grid — teleporting
-            // everyone onto the exact same point made the melons spawn inside
-            // each other and violently shove apart, which the impact check
-            // then counted as crash damage.
-            const hubPosition = LineUpPosition(hubOrigin, hubAngles, i, returning.length);
+        if (hubSpawn) {
+            const hubAngles = hubSpawn.angles;
+            const hubPosition = LineUpPosition(hubSpawn.position, hubAngles, i, returning.length);
             kart.checkpointPosition = hubPosition;
             kart.checkpointAngles = hubAngles;
             // Same dead-melon guard as BeginHeat — its pending respawn lands
@@ -1391,6 +2101,8 @@ function ReturnAllToHub(returning) {
         kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
         kart.lastVelocity = undefined;
         kart.settled = false;
+        kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
+        kart.pendingBounce = undefined;
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot === undefined) {
             return;
@@ -1398,7 +2110,7 @@ function ReturnAllToHub(returning) {
         // Both labels, since ReturnAllToHub can now be reached from any
         // non-HUB phase (a moderator abort can land mid-COUNTDOWN, not just
         // after a heat finishes normally in BREAK).
-        GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", true);
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
         GetSpeedHud()?.SetHasClassForPlayer(slot, "break_label", "Hidden", true);
     });
 }
@@ -1422,20 +2134,22 @@ function UpdateRaceFlow(now) {
             return;
         }
         const remaining = phaseEndTime - now;
-        const display = remaining > 0 ? String(Math.ceil(remaining)) : "GO!";
+        const showClass = remaining > 0 ? `Show${Math.ceil(remaining)}` : "ShowGo";
         for (const kart of racers) {
             const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
             if (slot === undefined) {
                 continue;
             }
-            hud?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", false);
-            hud?.SetDialogVariableStringForPlayer(slot, "countdown_label", "countdown", display);
+            hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", false);
+            for (const cls of COUNTDOWN_SHOW_CLASSES) {
+                hud?.SetHasClassForPlayer(slot, "countdown_panel", cls, cls === showClass);
+            }
         }
         if (remaining <= 0) {
             for (const kart of racers) {
                 kart.locked = false;
             }
-            // The "GO!" just written above stays up for GO_DISPLAY_SECONDS —
+            // The "GO" image just shown above stays up for GO_DISPLAY_SECONDS —
             // hiding it in this same tick meant it was never actually seen.
             // RACING reuses phaseEndTime as the moment to hide it.
             phase = RacePhase.RACING;
@@ -1451,7 +2165,7 @@ function UpdateRaceFlow(now) {
             for (const kart of racers) {
                 const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
                 if (slot !== undefined) {
-                    hud?.SetHasClassForPlayer(slot, "countdown_label", "Hidden", true);
+                    hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
                 }
             }
             phaseEndTime = Infinity; // hidden — don't re-hide every tick
@@ -1504,6 +2218,118 @@ function UpdateRaceFlow(now) {
     }
 }
 
+// Pure checkpoint/lap progression rules — no cs_script import, so they're
+// unit-testable in Node (see test/checkpoint-progress.test.mjs).
+// checkpoints.js wires these to the checkpoint_<trackId>_<index> /
+// finish_<trackId> script inputs and handles the engine side (respawn
+// position, FinishKart, debug logging). See "Multiple tracks & checkpoints"
+// in GAMEPLAY.md for the design.
+//
+// Both functions mutate the kart's progress fields in place and return what
+// happened, so the caller can log it and react (e.g. call FinishKart).
+
+/**
+ * @typedef {{ trackId: number | undefined, checkpointIndex: number, lapsCompleted: number, racing: boolean, finished: boolean }} KartProgress
+ * @typedef {{ checkpoints: number, lapsToWin: number }} TrackRules
+ * @typedef {{ activeTrackId: number | undefined, config: TrackRules | undefined }} ProgressContext
+ *   config is the touched track's own config (undefined if the map has no
+ *   track_start_* trigger for it)
+ */
+
+/**
+ * @typedef {"ignored-finished" | "ignored-not-racing" | "ignored-incomplete" | "lap" | "finished"} LapResult
+ *   "finished" = that lap was the kart's last one — the caller must FinishKart it.
+ */
+
+/**
+ * finish_<trackId>: counts a completed lap if the kart is actively racing
+ * this track and has reached its last checkpoint since the previous lap.
+ * @param {KartProgress} kart @param {number} trackId @param {ProgressContext} ctx
+ * @returns {LapResult}
+ */
+function ApplyLapCompletion(kart, trackId, ctx) {
+    if (kart.finished) {
+        return "ignored-finished"; // already parked after finishing this heat
+    }
+    if (!kart.racing || trackId !== ctx.activeTrackId || kart.trackId !== trackId) {
+        return "ignored-not-racing";
+    }
+    if (!ctx.config || kart.checkpointIndex < ctx.config.checkpoints) {
+        return "ignored-incomplete";
+    }
+    kart.lapsCompleted += 1;
+    if (kart.lapsCompleted >= ctx.config.lapsToWin) {
+        return "finished";
+    }
+    // Not done yet — back to "no checkpoints reached" for the next lap
+    // (not 1: crossing the finish line itself isn't checkpoint 1 again,
+    // it's the boundary between laps).
+    kart.checkpointIndex = 0;
+    return "lap";
+}
+
+/**
+ * @typedef {"ignored-finished" | "ignored-foreign-start" | "ignored-other-track" | "ignored-skipped" | "ignored-behind" | "advanced" | "lap-advanced" | "finished"} CheckpointResult
+ *   "lap-advanced" = crossing checkpoint 1 also completed a lap (see below);
+ *   "finished" = ...and that lap was the kart's last one — the caller must
+ *   FinishKart it. Only "advanced"/"lap-advanced" moved checkpointIndex
+ *   forward, i.e. the touched checkpoint is the kart's new respawn point.
+ */
+
+/**
+ * checkpoint_<trackId>_<index>.
+ *
+ * A kart isn't on any track until it touches a "_1" checkpoint, which picks
+ * (starts its progress on) that track. Checkpoints past index 1 only count
+ * while the kart is already on that same track, and only ever move progress
+ * forward, one checkpoint at a time (no skipping ahead). A racing kart can't
+ * pick a *different* track's checkpoint 1 mid-heat either — that would
+ * silently overwrite kart.trackId to the wrong track and then reject the
+ * racer's own further progress on their actual active track.
+ *
+ * Re-touching "_1" with the whole lap already run counts the lap right here
+ * (via ApplyLapCompletion), so it doesn't matter whether Hammer fires this
+ * or finish_<trackId> first when both sit on the same trigger —
+ * finish_<trackId> firing afterwards then sees checkpointIndex 1 and is
+ * ignored. Outside a heat nothing is counted, but progress still resets, or
+ * a free-roaming kart could never start a second lap.
+ * @param {KartProgress} kart @param {number} trackId @param {number} index @param {ProgressContext} ctx
+ * @returns {CheckpointResult}
+ */
+function ApplyCheckpointTouch(kart, trackId, index, ctx) {
+    if (kart.finished) {
+        return "ignored-finished"; // parked after finishing this heat
+    }
+    let lapCounted = false;
+    if (index === 1) {
+        if (kart.racing && trackId !== ctx.activeTrackId) {
+            return "ignored-foreign-start";
+        }
+        if (kart.trackId !== trackId) {
+            kart.trackId = trackId;
+            kart.checkpointIndex = 0;
+        } else if (ctx.config && kart.checkpointIndex >= ctx.config.checkpoints) {
+            // Crossing the start line with the whole lap already run.
+            const lap = ApplyLapCompletion(kart, trackId, ctx);
+            if (lap === "finished") {
+                return "finished";
+            }
+            lapCounted = lap === "lap";
+            kart.checkpointIndex = 0;
+        }
+    } else if (kart.trackId !== trackId) {
+        return "ignored-other-track";
+    }
+    // Strictly the next checkpoint in sequence — skipping ahead (e.g. 1 -> 5
+    // via a shortcut) must not count, or touching just the last checkpoint
+    // would be enough for finish_<trackId> to accept the lap.
+    if (index !== kart.checkpointIndex + 1) {
+        return index > kart.checkpointIndex ? "ignored-skipped" : "ignored-behind";
+    }
+    kart.checkpointIndex = index;
+    return lapCounted ? "lap-advanced" : "advanced";
+}
+
 // Checkpoints: place a trigger_multiple per checkpoint, filtered to the
 // melon (prop_physics) so the frozen/parked pawn can't trigger it, with its
 // OnStartTouch calling this point_script's RunScriptInput and a parameter of
@@ -1511,79 +2337,42 @@ function UpdateRaceFlow(now) {
 // "checkpoint_2_3". The trigger's own position/angles become the respawn
 // point if the melon breaks after reaching it.
 //
-// A kart isn't on any track until it touches a "_1" checkpoint, which picks
-// (starts its progress on) that track — this is how a racer picks one of
-// several tracks in the map. Checkpoints past index 1 only count while the
-// kart is already on that same track (so straying onto a different track's
-// later checkpoints doesn't skip progress), and only ever move progress
-// forward within it, one checkpoint at a time (no skipping ahead). A kart that's racing can't pick a *different* track's
-// checkpoint 1 mid-heat either (straying into another track's start zone is
-// ignored outright) — letting it through would silently overwrite
-// kart.trackId to the wrong track and then reject the racer's own further
-// progress on their actual active track.
-//
-// Re-touching "_1" while *already on* that track (the normal case of
-// crossing the start/finish line every lap) deliberately does **not** touch
-// lapsCompleted here — that's OnFinishTouched's job, via a separate
-// finish_<trackId> input (see below). Keeping "pick a track" and "count a
-// completed lap" in two independent inputs means they can both be wired as
-// outputs on the very same trigger without caring which one Hammer fires
-// first. It *does* still bump checkpointIndex back up to 1 for the new lap
-// though — OnFinishTouched resets it to 0 when a lap completes, and without
-// this the HUD's checkpoint counter would sit at 0 for the whole first leg
-// of every lap after the first, then jump straight to 2.
+// The progression rules themselves (which touch counts, one checkpoint at
+// a time, "_1" picks the track, lap counting on a "_1" re-touch) live in
+// logic/checkpoint-progress.js so they can be unit-tested without the
+// engine — this is just the engine side around them.
 /** @param {number} trackId @param {number} index @param {import("./kart-registry.js").Kart} kart @param {any} trigger */
 function OnCheckpointTouched(trackId, index, kart, trigger) {
-    if (kart.finished) {
-        return; // parked after finishing this heat, ignore further touches
-    }
-    if (index === 1) {
-        if (kart.racing && trackId !== activeTrackId) {
+    const ctx = { activeTrackId, config: GetTrackConfig()[trackId] };
+    const result = ApplyCheckpointTouch(kart, trackId, index, ctx);
+    switch (result) {
+        case "ignored-finished":
+        case "ignored-behind":
+            return;
+        case "ignored-foreign-start":
             Debug(`checkpoint_${trackId}_1: kart is racing active track ${activeTrackId}, ignoring foreign track's start`);
             return;
-        }
-        if (kart.trackId !== trackId) {
-            kart.trackId = trackId;
-            kart.checkpointIndex = 0;
-        } else {
-            const config = GetTrackConfig()[trackId];
-            if (config && kart.checkpointIndex >= config.checkpoints) {
-                // Crossing the start line with the whole lap already run.
-                // If finish_<trackId> sits on this same trigger, Hammer may
-                // fire this input before it — count the lap right here so the
-                // order doesn't matter (finish_<trackId> firing afterwards
-                // then sees checkpointIndex 1 and is ignored). Outside a heat
-                // TryCompleteLap doesn't count anything, so reset to 0 here
-                // too, or a free-roaming kart could never start a second lap.
-                TryCompleteLap(trackId, kart);
-                if (kart.finished) {
-                    return;
-                }
-                kart.checkpointIndex = 0;
-            }
-        }
-    } else if (kart.trackId !== trackId) {
-        Debug(`checkpoint_${trackId}_${index}: kart is on track ${kart.trackId}, ignoring`);
-        return;
-    }
-    // Strictly the next checkpoint in sequence — skipping ahead (e.g. 1 -> 5
-    // via a shortcut) must not count, or touching just the last checkpoint
-    // would be enough for finish_<trackId> to accept the lap.
-    if (index !== kart.checkpointIndex + 1) {
-        if (index > kart.checkpointIndex) {
+        case "ignored-other-track":
+            Debug(`checkpoint_${trackId}_${index}: kart is on track ${kart.trackId}, ignoring`);
+            return;
+        case "ignored-skipped":
             Debug(`checkpoint_${trackId}_${index}: kart is at checkpoint ${kart.checkpointIndex}, skipped one — ignoring`);
-        }
-        return;
+            return;
+        case "finished":
+            LogLapCompleted(trackId, kart, ctx.config);
+            FinishKart(kart);
+            return;
+        case "lap-advanced":
+            LogLapCompleted(trackId, kart, ctx.config);
+            break;
     }
-    kart.checkpointIndex = index;
-    // + TELEPORT_UP_OFFSET for the same reason BeginHeat/ReturnAllToHub add
+    // + TELEPORT_UP_OFFSET for the same reason BeginHeat adds
     // it to their teleport targets: mappers commonly sink a checkpoint
     // trigger's brush into the floor so a fast-moving melon reliably
     // touches it, and teleporting to that exact (embedded) height would
     // otherwise make a later respawn (e.g. after BreakMelon) tunnel the
     // melon down through the floor instead of landing on it.
-    const origin = trigger.GetAbsOrigin();
-    kart.checkpointPosition = { x: origin.x, y: origin.y, z: origin.z + TELEPORT_UP_OFFSET };
+    kart.checkpointPosition = Lifted(trigger.GetAbsOrigin(), TELEPORT_UP_OFFSET);
     kart.checkpointAngles = trigger.GetAbsAngles();
     Debug(`checkpoint_${trackId}_${index}: kart advanced to checkpoint ${index} on track ${trackId}`);
 }
@@ -1605,41 +2394,33 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
 // GAMEPLAY.md.
 /** @param {number} trackId @param {import("./kart-registry.js").Kart} kart */
 function OnFinishTouched(trackId, kart) {
-    TryCompleteLap(trackId, kart);
+    const config = GetTrackConfig()[trackId];
+    const result = ApplyLapCompletion(kart, trackId, { activeTrackId, config });
+    switch (result) {
+        case "ignored-finished":
+            return;
+        case "ignored-not-racing":
+            Debug(
+                `finish_${trackId}: kart isn't actively racing this track ` +
+                `(racing=${kart.racing}, trackId=${kart.trackId}, activeTrackId=${activeTrackId}), ignoring`
+            );
+            return;
+        case "ignored-incomplete":
+            Debug(`finish_${trackId}: kart hasn't reached all ${config?.checkpoints ?? "?"} checkpoint(s) this lap yet (at ${kart.checkpointIndex}), ignoring`);
+            return;
+        case "lap":
+            LogLapCompleted(trackId, kart, config);
+            return;
+        case "finished":
+            LogLapCompleted(trackId, kart, config);
+            FinishKart(kart);
+            return;
+    }
 }
 
-/**
- * Counts a completed lap if the kart is actively racing this track and has
- * reached its last checkpoint — shared by finish_<trackId> and the
- * checkpoint_<trackId>_1 re-touch (see OnCheckpointTouched).
- * @param {number} trackId @param {import("./kart-registry.js").Kart} kart
- */
-function TryCompleteLap(trackId, kart) {
-    if (kart.finished) {
-        return; // already parked after finishing this heat
-    }
-    if (!kart.racing || trackId !== activeTrackId || kart.trackId !== trackId) {
-        Debug(
-            `finish_${trackId}: kart isn't actively racing this track ` +
-            `(racing=${kart.racing}, trackId=${kart.trackId}, activeTrackId=${activeTrackId}), ignoring`
-        );
-        return;
-    }
-    const config = GetTrackConfig()[trackId];
-    if (!config || kart.checkpointIndex < config.checkpoints) {
-        Debug(`finish_${trackId}: kart hasn't reached all ${config?.checkpoints ?? "?"} checkpoint(s) this lap yet (at ${kart.checkpointIndex}), ignoring`);
-        return;
-    }
-    kart.lapsCompleted += 1;
-    Debug(`finish_${trackId}: lap ${kart.lapsCompleted}/${config.lapsToWin} completed on track ${trackId}`);
-    if (kart.lapsCompleted >= config.lapsToWin) {
-        FinishKart(kart);
-    } else {
-        // Not done yet — back to "no checkpoints reached" for the next lap
-        // (not 1: crossing the finish line itself isn't checkpoint 1 again,
-        // it's the boundary between laps).
-        kart.checkpointIndex = 0;
-    }
+/** @param {number} trackId @param {import("./kart-registry.js").Kart} kart @param {{ lapsToWin: number } | undefined} config */
+function LogLapCompleted(trackId, kart, config) {
+    Debug(`finish_${trackId}: lap ${kart.lapsCompleted}/${config?.lapsToWin ?? "?"} completed on track ${trackId}`);
 }
 
 /** Registers the checkpoint_<trackId>_<index> and finish_<trackId> OnScriptInput handlers for every track/checkpoint slot the map is allowed to use. Called once from index.js. */
@@ -1669,6 +2450,210 @@ function RegisterCheckpointAndFinishInputs() {
             }
             OnFinishTouched(trackId, kart);
         });
+    }
+}
+
+// Wall-bounce prediction line — see PREDICTION_* in constants.js for the
+// design. Recomputed every tick from the melon's actual velocity (the same
+// direction the bounce itself measures its angle from), and its angle
+// rating comes from the same WallAngleFactor/GetBounceRating the bounce
+// uses, so the line's color always matches the rating the hit would get.
+
+const HIDDEN_COLOR = { r: 255, g: 255, b: 255, a: 0 };
+// Only warn about a missing template once, not every tick.
+let warnedMissingTemplate = false;
+
+/**
+ * @param {import("./kart-registry.js").Kart} kart
+ * @returns {any[] | null} this kart's dot entities, spawning them on first use; null if the map has no template
+ */
+function GetDots(kart) {
+    const total = PREDICTION_DOTS_IN + PREDICTION_DOTS_OUT;
+    const existing = (kart.predictionDots ?? []).filter((d) => d.IsValid());
+    // Re-registered every call rather than only on spawn: a tools-mode hot
+    // reload rebuilds trace.js's Set empty while karts (and their dots) persist.
+    for (const dot of existing) {
+        predictionDotSet.add(dot);
+    }
+    if (existing.length >= total) {
+        kart.predictionDots = existing;
+        return existing;
+    }
+    const template = Instance.FindEntityByName(PREDICTION_DOT_TEMPLATE_NAME);
+    if (!(template instanceof PointTemplate)) {
+        if (!warnedMissingTemplate) {
+            warnedMissingTemplate = true;
+            Debug(
+                `prediction: no point_template named "${PREDICTION_DOT_TEMPLATE_NAME}" — falling back to DebugLine ` +
+                `(dev environments only, real players won't see it)`
+            );
+        }
+        return null;
+    }
+    const origin = kart.melon.GetAbsOrigin();
+    while (existing.length < total) {
+        const spawned = template.ForceSpawn(origin, { pitch: 0, yaw: 0, roll: 0 });
+        if (!spawned || spawned.length === 0) {
+            Debug(`prediction: ForceSpawn of "${PREDICTION_DOT_TEMPLATE_NAME}" returned nothing — check its Template entries`);
+            break;
+        }
+        existing.push(spawned[0]);
+        predictionDotSet.add(spawned[0]);
+    }
+    Debug(`prediction: kart has ${existing.length}/${total} dots, class ${existing[0]?.GetClassName() ?? "-"}`);
+    kart.predictionDots = existing;
+    return existing;
+}
+
+/** @param {any} dot @param {{ r: number, g: number, b: number, a: number }} color */
+function SetDotColor(dot, color) {
+    // Entity variables are reference-stable, so the last applied color can
+    // be cached on the dot itself — skips re-sending an unchanged color
+    // every tick.
+    const key = `${color.r},${color.g},${color.b},${color.a}`;
+    if (dot.predictionColorKey !== key && typeof dot.SetColor === "function") {
+        dot.SetColor(color);
+        dot.predictionColorKey = key;
+    }
+}
+
+/** @param {import("./kart-registry.js").Kart} kart */
+function HidePrediction(kart) {
+    for (const dot of kart.predictionDots ?? []) {
+        if (dot.IsValid()) {
+            SetDotColor(dot, HIDDEN_COLOR);
+        }
+    }
+}
+
+/**
+ * @param {any} from @param {{ x: number, y: number }} dir @param {number} length
+ * @param {any[]} ignoreEntity
+ */
+function TraceAhead(from, dir, length, ignoreEntity) {
+    return TraceLine({
+        start: from,
+        end: { x: from.x + dir.x * length, y: from.y + dir.y * length, z: from.z },
+        ignoreEntity,
+        ignorePlayers: true,
+    });
+}
+
+/** @param {any} trace */
+function IsWallHit(trace) {
+    if (!trace.didHit || trace.startedInSolid || Math.abs(trace.normal.z) > WALL_NORMAL_MAX_Z) {
+        return false;
+    }
+    const hit = trace.hitEntity;
+    // Same rule as the bounce's DetectWallNormal: other physics props aren't walls.
+    return !(hit && !hit.IsWorld() && hit.GetClassName().startsWith("prop_physics"));
+}
+
+/**
+ * Evenly spaced points from `a` to `b`, `count` of them (b included).
+ * @param {any} a @param {any} b @param {number} count
+ */
+function PointsAlong(a, b, count) {
+    const points = [];
+    for (let i = 1; i <= count; i++) {
+        const t = i / count;
+        points.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t });
+    }
+    return points;
+}
+
+/** @param {import("./kart-registry.js").Kart} kart @param {number} dt */
+function UpdatePrediction(kart, dt) {
+    if (PREDICTION_RENDER_MODE !== "dots") {
+        HidePrediction(kart); // switched away from dots at runtime (hot reload) — don't leave them standing
+    }
+    if (!PREDICTION_ENABLED || kart.locked || kart.breaking || !kart.melon.IsValid()) {
+        HidePrediction(kart);
+        return;
+    }
+    const vel = kart.melon.GetAbsVelocity();
+    const speed = Math.hypot(vel.x, vel.y);
+    if (speed < PREDICTION_MIN_SPEED) {
+        HidePrediction(kart);
+        return;
+    }
+    const dir = { x: vel.x / speed, y: vel.y / speed };
+    const center = kart.melon.GetAbsOrigin();
+    const start = {
+        x: center.x + dir.x * PREDICTION_START_OFFSET,
+        y: center.y + dir.y * PREDICTION_START_OFFSET,
+        z: center.z,
+    };
+    const ignoreEntity = [kart.melon, kart.pawn];
+
+    const ahead = TraceAhead(center, dir, PREDICTION_LENGTH, ignoreEntity);
+    const wallHit = IsWallHit(ahead);
+    const end = ahead.didHit ? ahead.end : { x: center.x + dir.x * PREDICTION_LENGTH, y: center.y + dir.y * PREDICTION_LENGTH, z: center.z };
+
+    let color = PREDICTION_NEUTRAL_COLOR;
+    /** @type {any[]} */
+    let outPoints = [];
+    if (wallHit) {
+        const nLen = Math.hypot(ahead.normal.x, ahead.normal.y) || 1;
+        const n = { x: ahead.normal.x / nLen, y: ahead.normal.y / nLen };
+        const into = -(dir.x * n.x + dir.y * n.y);
+        if (into > 0) {
+            const angle = (Math.acos(Math.min(1, into)) * 180) / Math.PI;
+            color = GetBounceRating(WallAngleFactor(angle)).color;
+            // Continue along the reflected direction, stopping at whatever
+            // it would run into next.
+            const out = { x: dir.x + 2 * into * n.x, y: dir.y + 2 * into * n.y };
+            const back = TraceAhead(end, out, PREDICTION_REFLECT_LENGTH, ignoreEntity);
+            const outEnd = back.didHit
+                ? back.end
+                : { x: end.x + out.x * PREDICTION_REFLECT_LENGTH, y: end.y + out.y * PREDICTION_REFLECT_LENGTH, z: end.z };
+            outPoints = PointsAlong(end, outEnd, PREDICTION_DOTS_OUT);
+        }
+    }
+    // The first leg starts at `start`, not the melon's center — skip the
+    // leg entirely if the wall is closer than that.
+    const firstLegLength = Math.hypot(end.x - center.x, end.y - center.y);
+    const inPoints = firstLegLength > PREDICTION_START_OFFSET ? [start, ...PointsAlong(start, end, PREDICTION_DOTS_IN - 1)] : [];
+
+    const dots = PREDICTION_RENDER_MODE === "dots" ? GetDots(kart) : null;
+    if (!dots) {
+        DrawDebugPrediction(start, end, inPoints.length > 0, outPoints, color, dt);
+        return;
+    }
+    const inDots = dots.slice(0, PREDICTION_DOTS_IN);
+    const outDots = dots.slice(PREDICTION_DOTS_IN);
+    PlaceDots(inDots, inPoints, color);
+    PlaceDots(outDots, outPoints, color);
+}
+
+/** @param {any[]} dots @param {any[]} points @param {{ r: number, g: number, b: number, a: number }} color */
+function PlaceDots(dots, points, color) {
+    for (let i = 0; i < dots.length; i++) {
+        const dot = dots[i];
+        if (i < points.length) {
+            dot.Teleport({ position: points[i] });
+            SetDotColor(dot, color);
+        } else {
+            SetDotColor(dot, HIDDEN_COLOR);
+        }
+    }
+}
+
+/**
+ * Fallback when the map has no dot template — only visible in dev
+ * environments (tools mode), see PREDICTION_DOT_TEMPLATE_NAME.
+ * @param {any} start @param {any} end @param {boolean} drawFirstLeg @param {any[]} outPoints
+ * @param {{ r: number, g: number, b: number, a: number }} color @param {number} dt
+ */
+function DrawDebugPrediction(start, end, drawFirstLeg, outPoints, color, dt) {
+    // Slightly longer than one tick so the line doesn't flicker between
+    // redraws, short enough not to leave a visible trail.
+    const duration = Math.max(0.02, dt * 1.5);
+    if (drawFirstLeg) {
+        Instance.DebugLine({ start, end, duration, color });
+    }
+    if (outPoints.length > 0) {
+        Instance.DebugLine({ start: end, end: outPoints[outPoints.length - 1], duration, color });
     }
 }
 
@@ -1702,10 +2687,11 @@ function Think() {
             // scripted BreakMelon/health system. HandleMelonLost runs it
             // through the same particle + delay + checkpoint-respawn
             // sequence as a script-detected break instead of leaving it
-            // gone for good — nothing else would ever call GetOrCreateKart
-            // again while the player's pawn stays alive (no round restarts,
-            // no fall/weapon damage — see gamemode/index.js).
+            // gone for good. This is the *only* place a lost melon comes
+            // back — SetUpPlayerKart (OnPlayerReset) deliberately never
+            // replaces one, so the two can't spawn it in different places.
             HandleMelonLost(slot, kart);
+            HidePrediction(kart);
             // Still lets USE work as an unstuck button while waiting on the
             // respawn above — it only touches kart.userMenuOpen/the pawn,
             // never the (currently missing) melon.
@@ -1722,7 +2708,9 @@ function Think() {
         try {
             UpdateUserMenu(slot, kart); // checked before UpdateKart's locked/breaking early-returns — USE works as an unstuck button
             UpdateKart(slot, kart, dt);
-            UpdateSpeedHud(slot, kart.melon);
+            UpdatePrediction(kart, dt);
+            UpdateSpeedHud(slot, kart);
+            UpdateBounceHud(slot, kart);
             UpdateJumpHud(slot, kart);
             UpdateHealthHud(slot, kart);
             UpdateCheckpointHud(slot, kart);
@@ -1776,9 +2764,8 @@ function ScheduleKartRebuild(slot, pawn) {
             return; // already rebuilt elsewhere (e.g. OnPlayerReset), or player gone
         }
         try {
-            const kart = GetOrCreateKart(pawn);
-            if (kart) {
-                ParkPawn(pawn, kart.melon);
+            // The hub, not the intro: this player was already playing.
+            if (SetUpPlayerKart(pawn, GetHubSpawnPoint())) {
                 Debug(`ScheduleKartRebuild: slot ${slot} got a fresh kart`);
             }
         } catch (err) {
@@ -1812,23 +2799,11 @@ Instance.OnScriptReload({
     },
 });
 
+// A player joining for the first time starts in the tutorial (intro_spawn);
+// any later reset keeps their existing kart where it is.
 Instance.OnPlayerReset(({ player }) => {
     Debug(`OnPlayerReset: slot=${player.GetPlayerController()?.GetPlayerSlot()}`);
-    // NOCLIP, not NONE — NONE stops the pawn moving but leaves its hitbox
-    // solid, so the melon still physically collides with (and breaks
-    // against) the parked pawn. NOCLIP is the same move type the engine's
-    // own noclip cheat uses to pass through world/entities, so it actually
-    // makes the frozen pawn's hitbox non-solid instead of just far away.
-    player.SetMoveType(CSMoveType.NOCLIP);
-    const kart = GetOrCreateKart(player);
-    // Only park once we actually have a melon to anchor against — see
-    // ParkPawn's comment. If GetOrCreateKart failed (e.g. melon_template
-    // isn't spawned in yet), leave the pawn at its real origin so the next
-    // OnPlayerReset retry captures a valid ground position instead of an
-    // already-parked one.
-    if (kart) {
-        ParkPawn(player, kart.melon);
-    }
+    SetUpPlayerKart(player, GetIntroSpawnPoint());
 });
 
 Instance.OnPlayerDisconnect(({ playerSlot }) => {
@@ -1874,6 +2849,20 @@ Instance.OnScriptInput("hub_leave", ({ activator }) => {
     if (slot !== undefined) {
         HideHubModal(slot, kart);
     }
+});
+
+// Hub teleporter: any trigger_multiple (filtered to prop_physics) whose
+// OnStartTouch calls RunScriptInput "hub_teleport" on this point_script sends
+// the touching melon back to the hub — same single-kart path as the user
+// menu's hub button, so a racer who rolls over it also leaves the heat.
+Instance.OnScriptInput("hub_teleport", ({ activator }) => {
+    const kart = activator && FindKartByMelon(activator);
+    if (!kart) {
+        Debug("hub_teleport: activator wasn't a tracked melon, ignoring");
+        return;
+    }
+    Debug(`hub_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} returning to hub (racing=${kart.racing}, phase=${phase})`);
+    ReturnAllToHub([kart]);
 });
 
 // See PAINT_TRIGGER_NAME_PATTERN above for the Hammer-side naming
@@ -1955,6 +2944,7 @@ Instance.OnCustomHudClicked((event) => {
         // else keeps going — unlike hub_abort_button, which is moderator-only
         // and ends it for the whole group. ReturnAllToHub already supports a
         // single-kart list (it's the same path a disconnecting racer takes).
+        Debug(`usermenu_hub_button: slot ${slot} returning to hub (racing=${kart.racing}, phase=${phase})`);
         SetUserMenuOpen(slot, kart, false);
         ReturnAllToHub([kart]);
     } else if (event.buttonId.startsWith("usermenu_color_")) {

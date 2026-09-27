@@ -1,4 +1,5 @@
 import { Debug } from "./debug.js";
+import { predictionDotSet } from "./trace.js";
 
 /**
  * @typedef {{
@@ -9,6 +10,14 @@ import { Debug } from "./debug.js";
  *   breaking: boolean, paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
  *   cameraDistance: number, cameraHeight: number, settled: boolean,
  *   teleportGen: number, // bumped by every race-flow teleport (BeginHeat/ReturnAllToHub) — see ScheduleRespawnAfterBreak
+ *   speedCap?: number, // current horizontal speed limit; above MAX_SPEED only while a wall-bounce boost decays — unset means MAX_SPEED
+ *   nextBounceTime?: number, lastBounceTime?: number, // wall-bounce timing, see UpdateKart
+ *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
+ *   lastJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // wall-bounce timing presses, see RegisterWallTimingPress
+ *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
+ *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
+ *   predictionDots?: any[], // this kart's prediction-line dot entities, see prediction.js
+ *   pendingBounce?: { time: number, impactSpeed: number, impactDir: { x: number, y: number, z: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number }, // damage not yet charged — waits out the jump window, see SettleWallBounceDamage
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
  * }} Kart
  */
@@ -61,6 +70,12 @@ export function IsModerator(slot) {
 export function DropKart(slot, kart) {
     if (kart.melon.IsValid()) {
         kart.melon.Remove();
+    }
+    for (const dot of kart.predictionDots ?? []) {
+        predictionDotSet.delete(dot);
+        if (dot.IsValid()) {
+            dot.Remove();
+        }
     }
     karts.delete(slot);
 }

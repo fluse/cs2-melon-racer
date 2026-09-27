@@ -8,7 +8,7 @@
 .CheckpointPanel {
     horizontal-align: center;
     vertical-align: top;
-    margin-top: 120px;
+    margin-top: 18%;
 
     flow-children: down;
 
@@ -210,15 +210,14 @@
 
 /* Big centered pre-race countdown ("3", "2", "1", "GO!") — locked karts
    can't move while this is showing, see UpdateKart's `locked` handling. */
-.CountdownLabel {
+.CountdownPanel {
     horizontal-align: center;
     vertical-align: center;
     margin-top: -140px;
 
-    font-size: 140px;
-    font-weight: bold;
-    color: white;
-    text-shadow: 3px 3px 6px black;
+    /* Sized for the 256x256 GO image; the 192x192 numbers are centered in it. */
+    width: 256px;
+    height: 256px;
 
     transition-property: opacity;
     transition-duration: .1s;
@@ -227,6 +226,26 @@
     &.Hidden {
         opacity: 0;
     }
+}
+
+.CountdownImage {
+    horizontal-align: center;
+    vertical-align: center;
+    width: 192px;
+    height: 192px;
+    visibility: collapse;
+}
+
+.CountdownGo {
+    width: 256px;
+    height: 256px;
+}
+
+.CountdownPanel.Show3 .Countdown3,
+.CountdownPanel.Show2 .Countdown2,
+.CountdownPanel.Show1 .Countdown1,
+.CountdownPanel.ShowGo .CountdownGo {
+    visibility: visible;
 }
 
 /* Between-heat banner ("Ziel! Nächste Strecke in 10s…"). */
@@ -261,6 +280,24 @@
     background-color: #00000088;
     border: 2px solid #ffffff55;
     border-radius: 14px;
+
+    transition-property: border-color, background-color;
+    transition-duration: .15s;
+}
+
+/* Wall-bounce feedback (see UpdateSpeedHud): Boosted while above normal top
+   speed, PerfectBounce as a short flash after a perfectly timed jump. */
+#speed_panel.Boosted {
+    border-color: #ff9933;
+}
+
+#speed_panel.Boosted .SpeedValue {
+    color: #ffb347;
+}
+
+#speed_panel.PerfectBounce {
+    border-color: #ffe066;
+    background-color: #ffe06666;
 }
 
 .SpeedValue {
@@ -277,6 +314,122 @@
     horizontal-align: center;
     margin-top: -4px;
 }
+
+/* Wall-bounce feedback panel (see UpdateBounceHud): centered just below the
+   crosshair, shown briefly after each bounce. The Rating* class on the panel
+   sets the accent color used by the rating word, border and hit segment. */
+.BouncePanel {
+    horizontal-align: center;
+    vertical-align: center;
+    margin-top: 140px;
+    flow-children: down;
+
+    padding: 8px 16px;
+    background-color: #000000aa;
+    border: 2px solid #ffffff55;
+    border-radius: 8px;
+
+    transition-property: opacity, border-color;
+    transition-duration: .15s;
+    opacity: 1;
+
+    &.Hidden {
+        opacity: 0;
+    }
+}
+
+.BounceRating {
+    horizontal-align: center;
+    font-size: 30px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: white;
+    text-shadow: 2px 2px 3px black;
+}
+
+.BounceAngle {
+    horizontal-align: center;
+    font-size: 18px;
+    color: #ffffffcc;
+    margin-bottom: 4px;
+}
+
+.BounceAngleScale {
+    horizontal-align: center;
+    flow-children: right;
+}
+
+.BounceScaleEdge {
+    font-size: 12px;
+    color: #ffffff88;
+    vertical-align: center;
+    margin-left: 4px;
+    margin-right: 4px;
+}
+
+.BounceAngleSegment {
+    width: 18px;
+    height: 12px;
+    margin-left: 2px;
+    vertical-align: center;
+    background-color: #ffffff33;
+    border-radius: 2px;
+    border: 1px solid #00000000;
+
+    transition-property: background-color;
+    transition-duration: .1s;
+}
+
+/* The 40°..50° segment — where the bounce is strongest. */
+.BounceAngleTarget {
+    border: 1px solid #ffe066;
+}
+
+.BounceAngleSegment.Hit {
+    background-color: white;
+}
+
+.BounceJumpRow {
+    horizontal-align: center;
+    flow-children: right;
+    margin-top: 6px;
+}
+
+.BounceJumpLabel {
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: #ffffff88;
+    vertical-align: center;
+    margin-right: 6px;
+}
+
+.BounceJumpSegment {
+    width: 14px;
+    height: 10px;
+    margin-left: 2px;
+    vertical-align: center;
+    background-color: #ffffff33;
+    border-radius: 2px;
+
+    &.Filled {
+        background-color: #ffe066;
+    }
+}
+
+.BouncePanel.RatingPerfect { border-color: #ffe066; }
+.BouncePanel.RatingPerfect .BounceRating { color: #ffe066; }
+.BouncePanel.RatingPerfect .BounceAngleSegment.Hit { background-color: #ffe066; }
+
+.BouncePanel.RatingGreat { border-color: #66dd66; }
+.BouncePanel.RatingGreat .BounceRating { color: #66dd66; }
+.BouncePanel.RatingGreat .BounceAngleSegment.Hit { background-color: #66dd66; }
+
+.BouncePanel.RatingGood { border-color: #66aaff; }
+.BouncePanel.RatingGood .BounceRating { color: #66aaff; }
+.BouncePanel.RatingGood .BounceAngleSegment.Hit { background-color: #66aaff; }
+
+.BouncePanel.RatingMiss .BounceRating { color: #ff6666; }
+.BouncePanel.RatingMiss .BounceAngleSegment.Hit { background-color: #ff6666; }
 
 /* Melon health bar: a row of segments that light up left-to-right with
    remaining health, same visual language as .JumpBar/.JumpSegment below.
@@ -305,11 +458,11 @@
 }
 
 .HealthSegment {
-    width: 16px;
+    width: 7px;
     height: 10px;
-    margin-left: 3px;
+    margin-left: 2px;
     background-color: #ffffff33;
-    border-radius: 3px;
+    border-radius: 2px;
 
     transition-property: background-color;
     transition-duration: .1s;

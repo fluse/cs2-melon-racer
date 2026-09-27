@@ -31,8 +31,10 @@ src/tsconfig.json                        # editor tooling config for src/**/*.js
 src/gamemode/index.js                    # gamemode entry: a single small file
 src/melon_drive/index.js, *.js           # melon_drive entry: split into one file per concern —
                                           #   constants.js, debug.js, kart-registry.js, track-config.js,
-                                          #   camera.js, hud.js, race-flow.js, kart-spawn.js, kart-physics.js,
-                                          #   checkpoints.js, think.js — index.js just wires them together
+                                          #   camera.js, hud.js, race-flow.js, spawn-points.js, kart-spawn.js, kart-physics.js,
+                                          #   checkpoints.js, prediction.js, trace.js, think.js — index.js just wires them together
+src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, checkpoint progress) — no engine import, unit-tested
+test/*.test.mjs                          # node:test unit tests for src/*/logic/ (`npm test`)
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
 ```
 
@@ -257,7 +259,18 @@ examples — read these instead of guessing signatures:
   generated files directly. `point_script.d.ts`/`src/tsconfig.json` give
   editors type-checking against the real API; keep them in sync if Valve
   updates the demo addon's copies.
-- There is no CLI compiler or test harness available here — verifying a
-  change means loading the map in Hammer / launching CS2 in-game
-  (`map melon_racer`), which only the user can do. Don't claim a gameplay
-  change "works" without that manual check having happened.
+- **Pure logic goes in `src/<entry>/logic/`, with tests.** Game rules that
+  are just math/state transitions (no traces, entities, HUD calls) live in
+  `logic/*.js` files that must **not** import `cs_script/point_script` (or
+  any sibling that does — only `constants.js` and other `logic/` files), so
+  Node can load them. The engine-side files call into them and handle the
+  side effects (e.g. `checkpoints.js` logs/`FinishKart`s based on the result
+  string `ApplyCheckpointTouch` returns). Each has a `test/<name>.test.mjs`
+  using the built-in `node:test` runner — run `npm test` after touching
+  them, and add/adjust a test when changing a rule. Write assertions in
+  terms of the constants (`WALL_BOUNCE_PEAK_MULTIPLIER`, ...) rather than
+  their current values, so retuning `constants.js` doesn't break tests.
+- Beyond those unit tests there's no way to exercise the engine side here —
+  verifying a gameplay change means loading the map in Hammer / launching
+  CS2 in-game (`map melon_racer`), which only the user can do. Don't claim a
+  gameplay change "works" without that manual check having happened.
