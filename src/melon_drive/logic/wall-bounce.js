@@ -1,5 +1,5 @@
 // Pure wall-bounce math — no cs_script import, so it's unit-testable in
-// Node (see test/wall-bounce.test.mjs). kart-physics.js does the engine side
+// Node (see test/wall-bounce.test.mjs). physics/wall-bounce.js does the engine side
 // (detecting the wall normal via traces, applying the velocity, debug draws)
 // and calls into these for the numbers. See "Wall bounce — speed for health"
 // in GAMEPLAY.md for the design.

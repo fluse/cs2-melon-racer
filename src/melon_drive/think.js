@@ -5,7 +5,7 @@ import { karts, EnsureModerator, DropKart } from "./kart-registry.js";
 import { SetUpPlayerKart } from "./kart-spawn.js";
 import { GetHubSpawnPoint } from "./spawn-points.js";
 import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud,UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, ApplyHubModalState } from "./hud.js";
-import { UpdateKart, HandleMelonLost } from "./kart-physics.js";
+import { UpdateKart, HandleMelonLost } from "./physics/index.js";
 import { phase, UpdateRaceFlow } from "./race-flow.js";
 import { UpdatePrediction, HidePrediction } from "./prediction.js";
 

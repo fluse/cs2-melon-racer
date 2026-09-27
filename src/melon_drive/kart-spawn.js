@@ -15,11 +15,11 @@ import {
 // Spawn flow, in one sentence: a player without a kart gets a new one at the
 // spawn point the caller picks (the intro on join); a player who already has
 // one keeps it as-is — a lost melon is brought back by the break/respawn
-// logic in kart-physics.js, never here, so the two can't race each other.
+// logic in physics/breaking.js, never here, so the two can't race each other.
 
 /**
  * Spawns a fresh melon from the melon_template point_template — shared by
- * CreateKart below and kart-physics.js's respawn of a destroyed melon.
+ * CreateKart below and physics/breaking.js's respawn of a destroyed melon.
  * @param {{ x: number, y: number, z: number }} position @param {{ pitch: number, yaw: number, roll: number }} angles
  */
 export function SpawnMelonAt(position, angles) {
@@ -46,7 +46,7 @@ export function SpawnMelonAt(position, angles) {
 /**
  * Gives the melon so much engine health that the engine's own physics
  * damage can never break it — whatever its Hammer health/damage settings
- * are. Breaking is our job: kart.health, see kart-physics.js.
+ * are. Breaking is our job: kart.health, see physics/.
  * @param {any} melon
  */
 function MakeUnbreakableByEngine(melon) {
@@ -76,7 +76,7 @@ function NewKartRecord(pawn, melon, spawnPoint) {
     return {
         pawn,
         melon,
-        nextJumpTime: 0,
+        wallJumpCharge: 1,
         health: MELON_MAX_HEALTH,
         lastVelocity: undefined,
         trackId: undefined,
@@ -148,7 +148,7 @@ export function SetUpPlayerKart(pawn, newKartSpawnPoint) {
     kart.pawn = pawn;
     FreezePawn(pawn, kart.checkpointPosition);
     if (kart.melon.IsValid()) {
-        ApplyCameraFollow(kart); // a lost melon gets the camera once kart-physics.js respawns it
+        ApplyCameraFollow(kart); // a lost melon gets the camera once physics/breaking.js respawns it
     }
     UpdateCameraDistanceHud(kart);
     UpdateCameraHeightHud(kart);

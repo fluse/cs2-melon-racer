@@ -426,8 +426,10 @@ rather than guessing.
 
 ## Jumping (implemented)
 
-- **Ground jump** needs real ground contact plus the recharged
-  `JUMP_COOLDOWN`. Contact is measured from physics, not guessed from the
+- **Ground jump** needs real ground contact — **no cooldown**: touching
+  down again is what resets it, and the next jump needs a ground contact
+  newer than the last jump (`CanGroundJump`), so a second press right
+  after taking off doesn't jump twice. Contact is measured from physics, not guessed from the
   distance to the floor: each tick the vertical velocity the script
   commanded is compared with what physics left of it. Falling freely,
   gravity takes the full `GRAVITY` (800 u/s²) off; anything holding the
@@ -443,12 +445,19 @@ rather than guessing.
 - **Wall jump**: in the air, touching a wall and pressing jump pushes the
   melon off the wall (`WALL_JUMP_PUSH_SPEED`, more if it's already moving
   away faster — e.g. right after a wall bounce) and up
-  (`WALL_JUMP_UP_SPEED`), keeping its speed along the wall. "Touching" =
+  (`WALL_JUMP_UP_SPEED`), keeping its speed along the wall. **Its strength
+  is a charge** (`kart.wallJumpCharge`, shown by the HUD jump bar, which
+  no longer shows a ground-jump cooldown): a wall jump is as strong as the
+  charge is full and uses up `WALL_JUMP_CHARGE_COST` of it, so chained
+  wall jumps get weaker (≈3 in a row) until below `WALL_JUMP_MIN_CHARGE`
+  there's none; it refills over `WALL_JUMP_RECHARGE_SECONDS`. A wall jump
+  never raises the speed cap — chaining them used to make the melon faster
+  and faster. "Touching" =
   a line trace in any of `WALL_PROBE_DIRECTIONS` horizontal directions
   finds a steep, non-prop surface within `WALL_CONTACT_DISTANCE`, or a wall
   bounce just happened (the melon leaves the wall the moment it bounces);
-  either stays jumpable for `WALL_JUMP_WINDOW`. Independent of the ground
-  jump's cooldown, `WALL_JUMP_COOLDOWN` between two wall jumps, and one
+  either stays jumpable for `WALL_JUMP_WINDOW`. `WALL_JUMP_COOLDOWN`
+  between two wall jumps, and one
   wall can't be climbed forever: the next wall jump needs ground contact
   first or a different wall (`WALL_JUMP_SAME_WALL_DOT`) — bouncing between
   two facing walls chains. The same press still counts as wall-bounce

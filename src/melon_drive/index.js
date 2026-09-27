@@ -15,8 +15,8 @@ import { Instance } from "cs_script/point_script";
 // This file only wires cs_script's entity-lifecycle/input callbacks to the
 // logic in the sibling modules below — see constants.js for tunables,
 // kart-registry.js for the kart/moderator bookkeeping, race-flow.js for the
-// hub/countdown/racing/break state machine, kart-spawn.js/kart-physics.js
-// for melon spawning and per-tick movement/damage, hud.js/camera.js for the
+// hub/countdown/racing/break state machine, kart-spawn.js / physics/ for
+// melon spawning and per-tick movement, jumping, damage and breaking, hud.js/camera.js for the
 // speedometer/HUD and chase camera, checkpoints.js for lap tracking, and
 // think.js for the per-tick driver.
 
@@ -26,7 +26,7 @@ import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, Se
 import { SetUpPlayerKart } from "./kart-spawn.js";
 import { GetIntroSpawnPoint, Lifted, LevelAngles } from "./spawn-points.js";
 import { ParseTeleportTarget, TeleportExitVelocity } from "./logic/teleport.js";
-import { RespawnKartAtCheckpoint, SetKartPaintColor, TeleportKartTo } from "./kart-physics.js";
+import { RespawnKartAtCheckpoint, SetKartPaintColor, TeleportKartTo } from "./physics/index.js";
 import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen } from "./hud.js";
 import { SetCameraDistance, SetCameraHeight } from "./camera.js";
 import { phase, activeTrackId, phaseEndTime, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, RestoreRaceFlowSnapshot } from "./race-flow.js";

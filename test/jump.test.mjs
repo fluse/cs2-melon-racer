@@ -9,7 +9,7 @@ import { world, Entity, CSPlayerPawn, PointTemplate } from "./helpers/cs-script-
 const { karts } = await import("../src/melon_drive/kart-registry.js");
 const { SetUpPlayerKart } = await import("../src/melon_drive/kart-spawn.js");
 const { GetIntroSpawnPoint } = await import("../src/melon_drive/spawn-points.js");
-const { UpdateKart } = await import("../src/melon_drive/kart-physics.js");
+const { UpdateKart } = await import("../src/melon_drive/physics/index.js");
 const C = await import("../src/melon_drive/constants.js");
 
 const DT = 1 / 64;
@@ -61,7 +61,6 @@ beforeEach(() => {
     world.add(new Entity({ name: C.INTRO_SPAWN_NAME, className: "info_player_start", origin: { x: 0, y: 0, z: 30 } }));
     pawn = world.add(new CSPlayerPawn({ slot: 0 }));
     kart = SetUpPlayerKart(pawn, GetIntroSpawnPoint());
-    kart.nextJumpTime = 0;
     kart.lastGroundedTime = undefined;
 });
 
@@ -115,4 +114,54 @@ test("wall jump: only once per wall until the ground is touched again", () => {
     kart.melon.origin = { ...kart.melon.origin, x: wallX - C.WALL_CONTACT_DISTANCE / 2 }; // back at the same wall
     const again = Tick({ ...falling(-100, 300), jump: true });
     assert.ok(again.z < 0, "same wall a second time: no wall jump");
+});
+
+test("no double jump right after taking off (second press within the hop tolerance)", () => {
+    Geometry();
+    const first = Tick({ ...rolling(), jump: true });
+    assert.equal(first.z, C.JUMP_SPEED);
+    const second = Tick({ commanded: first, actual: { ...first, z: first.z - C.GRAVITY * C.GROUND_COYOTE_TIME / 4 }, jump: true });
+    assert.ok(second.z < C.JUMP_SPEED, `no second jump (vz=${second.z})`);
+});
+
+test("jumping again right after landing works — no cooldown", () => {
+    Geometry();
+    Tick({ ...rolling(), jump: true });
+    world.time += 0.3;
+    Tick(rolling()); // landed
+    const again = Tick({ ...rolling(), jump: true });
+    assert.equal(again.z, C.JUMP_SPEED);
+});
+
+test("wall jump: strength follows the charge, and a spent charge means no wall jump", () => {
+    const wallX = kart.melon.GetAbsOrigin().x + C.WALL_CONTACT_DISTANCE / 2;
+    Geometry({ floorBelow: false, wallX });
+    kart.wallJumpCharge = 0.5;
+    const half = Tick({ ...falling(-100, 300), jump: true });
+    assert.ok(Math.abs(half.z - C.WALL_JUMP_UP_SPEED * (0.5 + DT / C.WALL_JUMP_RECHARGE_SECONDS)) < 1e-6, `half-strength jump (vz=${half.z})`);
+    assert.ok(kart.wallJumpCharge < 0.5, "the jump used up charge");
+
+    kart.lastWallJump = undefined;
+    kart.wallJumpCharge = 0;
+    const spent = Tick({ ...falling(-100, 300), jump: true });
+    assert.ok(spent.z < 0, "no wall jump with an empty charge");
+});
+
+// Regression: a wall jump used to raise the speed cap, so chaining them
+// built up speed without limit.
+test("wall jump never pushes the melon past its speed cap", () => {
+    const wallX = kart.melon.GetAbsOrigin().x + C.WALL_CONTACT_DISTANCE / 2;
+    Geometry({ floorBelow: false, wallX });
+    kart.speedCap = undefined; // plain MAX_SPEED
+    // along the wall at top speed already
+    const v = Tick({ commanded: { x: 0, y: C.MAX_SPEED, z: -100 }, actual: { x: 0, y: C.MAX_SPEED, z: -100 - C.GRAVITY * DT }, jump: true });
+    assert.equal(v.z, C.WALL_JUMP_UP_SPEED, "the wall jump happened");
+    assert.ok(Math.hypot(v.x, v.y) <= C.MAX_SPEED + 1e-6, `horizontal speed ${Math.hypot(v.x, v.y)} > MAX_SPEED`);
+    assert.equal(kart.speedCap, C.MAX_SPEED);
+});
+
+test("the jump bar shows the wall-jump charge", async () => {
+    const { GetJumpChargeFraction } = await import("../src/melon_drive/physics/index.js");
+    kart.wallJumpCharge = 0.25;
+    assert.equal(GetJumpChargeFraction(kart), 0.25);
 });

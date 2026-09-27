@@ -1,5 +1,5 @@
 // Checks the Hammer side of what the script spawns by name: every
-// point_template kart-spawn.js / kart-physics.js ForceSpawns must exist in
+// point_template kart-spawn.js / physics/break-effects.js ForceSpawn must exist in
 // maps/melon_racer.vmap exactly once, and point at real entities (the break
 // templates at info_particle_systems with an effect set) — otherwise the
 // script silently spawns nothing, e.g. no melon burst on a break.

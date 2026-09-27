@@ -16,10 +16,10 @@ export const STRAFE_ACCEL = FORWARD_ACCEL * 0.4; // 0.4x forward, matches origin
 export const MAX_SPEED = 650; // units/sec, horizontal speed cap
 export const COAST_FRICTION = 120; // units/sec^2 horizontal slowdown with no input — low, so the melon keeps rolling on its own momentum instead of grinding to a stop
 export const JUMP_SPEED = 400; // units/sec upward impulse
-// Jump needs both: the JUMP_COOLDOWN recharged (HUD recharge bar), and real
-// ground contact (see logic/contact.js) — without the ground part, jumping
-// again every cooldown gains net height each cycle, so a player could hover
-// in the air forever.
+// The ground jump needs real ground contact (see logic/contact.js), and a
+// new one since the last jump — no cooldown: touching down is what resets
+// it. (The "new contact" part stops a second press within
+// GROUND_COYOTE_TIME of taking off from jumping again.)
 //
 // Ground contact is measured, not guessed from distance: each tick the
 // vertical velocity we commanded is compared with what physics made of it.
@@ -31,7 +31,6 @@ export const JUMP_SPEED = 400; // units/sec upward impulse
 // what's holding it up is floor-like (GROUND_NORMAL_MIN_Z), not a wall or
 // an edge. GROUND_COYOTE_TIME only bridges the tiny hops a rolling,
 // egg-shaped melon makes — keep it short.
-export const JUMP_COOLDOWN = 0.9; // seconds
 export const GRAVITY = 800; // units/sec^2 — CS2's sv_gravity, what vphysics pulls the melon down with
 export const FREE_FALL_FRACTION = 0.8; // vertical accel at or below -FREE_FALL_FRACTION * GRAVITY counts as falling freely (not supported); lower = stricter
 export const GROUND_CHECK_DISTANCE = 48; // units down from the melon's center the floor-confirming trace reaches — melon radius plus margin
@@ -41,13 +40,21 @@ export const GROUND_COYOTE_TIME = 0.08; // seconds a ground contact stays valid 
 // Wall jump: in the air, touching a wall (a line trace in any of
 // WALL_PROBE_DIRECTIONS horizontal directions finds a steep surface within
 // WALL_CONTACT_DISTANCE, or a wall impact just happened) and pressing jump
-// pushes the melon off that wall and up. Independent of the ground jump's
-// cooldown. Can't climb one wall forever: after a wall jump, the next one
+// pushes the melon off that wall and up. Its strength comes from a charge
+// (the HUD jump bar): a wall jump is as strong as the charge is full
+// (WALL_JUMP_UP_SPEED / WALL_JUMP_PUSH_SPEED at 100%) and uses up
+// WALL_JUMP_CHARGE_COST of it, so chained wall jumps get weaker and weaker;
+// the charge refills over WALL_JUMP_RECHARGE_SECONDS. A wall jump never
+// raises the melon's speed cap, so chaining them can't build up speed.
+// Can't climb one wall forever: after a wall jump, the next one
 // needs ground contact first or a different wall (normal differing by more
 // than WALL_JUMP_SAME_WALL_DOT) — bouncing between two facing walls chains.
 export const WALL_PROBE_DIRECTIONS = 8;
 export const WALL_JUMP_WINDOW = 0.2; // seconds a wall contact stays jumpable — the melon usually bounces off the wall the moment it hits it
 export const WALL_JUMP_COOLDOWN = 0.3; // seconds between two wall jumps
+export const WALL_JUMP_CHARGE_COST = 0.34; // share of a full charge one wall jump uses — ~3 in a row, each weaker
+export const WALL_JUMP_MIN_CHARGE = 0.1; // below this there's no wall jump at all
+export const WALL_JUMP_RECHARGE_SECONDS = 3; // empty -> full
 export const WALL_JUMP_UP_SPEED = 380; // units/sec upward
 export const WALL_JUMP_PUSH_SPEED = 250; // units/sec at least away from the wall (more if already moving away faster)
 export const WALL_JUMP_SAME_WALL_DOT = 0.7; // normals closer than this (dot product, ~45°) count as the same wall
@@ -383,7 +390,7 @@ export const SPEED_HUD_ENTITY_NAME = "speed_hud";
 // Hammer units/sec -> km/h (1 unit = 1 inch: units/sec * 0.0254 * 3.6).
 export const UNITS_TO_KMH = 0.0254 * 3.6;
 
-// Segmented jump-recharge bar — see JUMP_BAR_SEGMENTS panel ids
+// Segmented wall-jump charge bar (kart.wallJumpCharge) — see JUMP_BAR_SEGMENTS panel ids
 // ("jump_seg_0" .. "jump_seg_{N-1}") in speedometer.xml.
 export const JUMP_BAR_SEGMENTS = 10;
 

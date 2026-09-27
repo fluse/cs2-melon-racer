@@ -81,7 +81,15 @@ melon_racer/
         ├── constants.js      # every tunable value (speeds, accel, health, timings, ...)
         ├── kart-registry.js  # per-player kart state (the `karts` map)
         ├── kart-spawn.js     # spawning/parking melons and player pawns
-        ├── kart-physics.js   # per-tick movement, impact damage, breaking/respawn
+        ├── physics/          # melon physics, one file per concern (import via physics/index.js):
+        │   ├── drive.js         # UpdateKart: the per-tick order, steering, friction, speed cap
+        │   ├── jump.js          # ground jump, wall jump + its charge, wall-bounce jump timing
+        │   ├── contact.js       # floor/wall contact probes + DEBUG overlay
+        │   ├── wall-bounce.js   # wall detection on impact, the bounce, its damage
+        │   ├── damage.js        # impact damage
+        │   ├── breaking.js      # breaking, the delay at the crash site, respawn after it
+        │   ├── break-effects.js # particles + physics pieces at the crash site
+        │   └── teleport.js      # checkpoint respawn, generic teleports, paint color
         ├── camera.js         # third-person chase camera + distance/height controls
         ├── hud.js            # drives the custom_hud_layout (speedometer, menus, banners)
         ├── checkpoints.js    # checkpoint/finish script-input handlers, lap counting

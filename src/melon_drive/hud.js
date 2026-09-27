@@ -1,6 +1,8 @@
 import { Instance, CSInputs } from "cs_script/point_script";
 import { Debug } from "./debug.js";
-import { GetJumpChargeFraction } from "./kart-physics.js";
+// Straight from jump.js, not physics/index.js: hud.js is imported by camera.js,
+// which the physics files import — going through the index would make a cycle.
+import { GetJumpChargeFraction } from "./physics/jump.js";
 import { GetBounceRating } from "./logic/wall-bounce.js";
 import { HealthBarState } from "./logic/health.js";
 import { GetTrackConfig } from "./track-config.js";
@@ -95,7 +97,7 @@ export function UpdateBounceHud(slot, kart) {
     }
 }
 
-/** @param {number} slot @param {{ nextJumpTime: number }} kart */
+/** Jump bar = the wall-jump charge (see GetJumpChargeFraction). @param {number} slot @param {{ wallJumpCharge?: number }} kart */
 export function UpdateJumpHud(slot, kart) {
     const hud = GetSpeedHud();
     if (!hud) {

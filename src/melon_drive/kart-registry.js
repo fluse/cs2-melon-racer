@@ -3,7 +3,9 @@ import { predictionDotSet } from "./trace.js";
 
 /**
  * @typedef {{
- *   pawn: any, melon: any, nextJumpTime: number,
+ *   pawn: any, melon: any,
+ *   wallJumpCharge: number, // 0..1, see WALL_JUMP_CHARGE_COST — the HUD jump bar
+ *   lastJumpTime?: number, // last ground jump — the next needs a newer ground contact, see CanGroundJump
  *   health: number, lastVelocity: { x: number, y: number, z: number } | undefined,
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,

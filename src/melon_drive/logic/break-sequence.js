@@ -1,5 +1,5 @@
 // Pure rules for the melon-break sequence — no cs_script import, so it's
-// unit-testable in Node (see test/break-sequence.test.mjs). kart-physics.js
+// unit-testable in Node (see test/break-sequence.test.mjs). physics/break-effects.js
 // and camera.js apply the results (camera config, entity removal).
 import {
     BREAK_CAMERA_ZOOM_SECONDS,
