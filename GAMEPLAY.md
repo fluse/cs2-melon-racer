@@ -189,11 +189,12 @@ in the world and logs the velocity angle next to the look angle. There's no glob
   jump-timing bar (which still fills in if the jump comes just *after* the
   hit).
 - **Perfect spark:** every bounce rated PERFECT (`BOUNCE_RATINGS[0]`, same
-  as the HUD) moves the map's single `info_particle_system` named
-  `particle_perfect_spark` (`PERFECT_SPARK_PARTICLE_NAME`) onto the melon
-  and restarts it (`Stop` + `Start`). One shared entity, so two perfect hits
-  at the same moment show only the later one; `test/map-templates.test.mjs`
-  checks it exists in the .vmap.
+  as the HUD) spawns a fresh copy of the `point_template` named
+  `perfect_hit_particle_template` (`PERFECT_SPARK_TEMPLATE_NAME`, holding an
+  `info_particle_system`) at the melon, starts it, and removes it after
+  `PERFECT_SPARK_LIFETIME`. One copy per hit, so several karts' perfect hits
+  at the same moment each show their own spark; `test/map-templates.test.mjs`
+  checks the template exists in the .vmap and points at a particle system.
 - **Prediction line** (`prediction.js`, `PREDICTION_*`): a dotted line in
   front of the melon along its current direction of travel up to the next
   wall, then on along the direction it would bounce off in, colored by the

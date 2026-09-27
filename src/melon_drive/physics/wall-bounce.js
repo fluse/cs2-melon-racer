@@ -2,7 +2,7 @@
 // (traces + IsWallContact), computing the bounce, DEBUG drawing, and
 // charging its damage once the jump-timing window closes. The math is in
 // ../logic/wall-bounce.js.
-import { Instance } from "cs_script/point_script";
+import { Instance, PointTemplate } from "cs_script/point_script";
 import { DEBUG, Debug } from "../debug.js";
 import { TraceLine, TraceSphere } from "../trace.js";
 import {
@@ -21,7 +21,8 @@ import {
     WALL_BOUNCE_DEBUG_SECONDS,
     WALL_BOUNCE_DEBUG_LINE_LENGTH,
     BOUNCE_RATINGS,
-    PERFECT_SPARK_PARTICLE_NAME,
+    PERFECT_SPARK_TEMPLATE_NAME,
+    PERFECT_SPARK_LIFETIME,
 } from "../constants/index.js";
 import { DamageKart } from "./damage.js";
 import { BreakMelon } from "./breaking.js";
@@ -181,20 +182,35 @@ export function ComputeWallBounce(kart, n, now) {
 }
 
 /**
- * Plays the particle_perfect_spark info_particle_system at the melon: moved
- * there, then stopped and started again so a second perfect hit while the
- * first is still playing restarts it.
+ * Spawns a fresh copy of the perfect_hit_particle_template at the melon and
+ * starts it, removed again after PERFECT_SPARK_LIFETIME — one copy per hit,
+ * so several karts' perfect hits at the same moment each show their own.
  * @param {import("../kart-registry.js").Kart} kart
  */
 function PlayPerfectSpark(kart) {
-    const spark = Instance.FindEntityByName(PERFECT_SPARK_PARTICLE_NAME);
-    if (!spark) {
-        Debug(`PlayPerfectSpark: no entity named "${PERFECT_SPARK_PARTICLE_NAME}" in the map`);
+    const template = Instance.FindEntityByName(PERFECT_SPARK_TEMPLATE_NAME);
+    if (!(template instanceof PointTemplate)) {
+        Debug(`PlayPerfectSpark: no point_template named "${PERFECT_SPARK_TEMPLATE_NAME}" in the map`);
         return;
     }
-    spark.Teleport({ position: kart.melon.GetAbsOrigin() });
-    Instance.EntFireAtTarget({ target: spark, input: "Stop" });
-    Instance.EntFireAtTarget({ target: spark, input: "Start" });
+    const position = kart.melon.GetAbsOrigin();
+    const spawned = template.ForceSpawn(position) ?? [];
+    for (const entity of spawned) {
+        // ForceSpawn keeps the entity's Hammer offset from its template — put
+        // it exactly on the melon, and start it explicitly (see
+        // SpawnParticleTemplate in break-effects.js for why).
+        entity.Teleport({ position });
+        if (entity.GetClassName() === "info_particle_system") {
+            Instance.EntFireAtTarget({ target: entity, input: "Start" });
+        }
+    }
+    Instance.Delay(PERFECT_SPARK_LIFETIME).then(() => {
+        for (const entity of spawned) {
+            if (entity.IsValid()) {
+                entity.Remove();
+            }
+        }
+    });
 }
 
 /**

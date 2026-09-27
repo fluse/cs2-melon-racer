@@ -221,10 +221,18 @@ const BOOST_DECAY = 150; // units/sec^2
 // with at least this angle factor — i.e. one that cost little or no health.
 const PERFECT_BOUNCE_FLASH_SECONDS = 0.4;
 const PERFECT_BOUNCE_ANGLE_FACTOR = 0.8;
-// info_particle_system placed in Hammer that's moved onto the melon and
-// (re)started on every wall bounce the HUD rates PERFECT (BOUNCE_RATINGS[0]).
-// One shared entity: two perfect hits at the same moment show only the later.
-const PERFECT_SPARK_PARTICLE_NAME = "particle_perfect_spark";
+// point_template placed in Hammer holding the spark's info_particle_system:
+// spawned at the melon on every wall bounce the HUD rates PERFECT
+// (BOUNCE_RATINGS[0]) — a fresh copy per hit, so perfect hits by several
+// karts at once each get their own spark. Must match the name in Hammer.
+const PERFECT_SPARK_TEMPLATE_NAME = "perfect_hit_particle_template";
+// Seconds a spawned spark is kept before it's removed. Removing the
+// info_particle_system ends its particles, so this is an upper bound.
+// Higher: the effect is never cut short, but more entities pile up when
+//   perfect hits come in fast succession.
+// Lower: cleaned up sooner; below the .vpcf's own duration the spark is
+//   cut off mid-play.
+const PERFECT_SPARK_LIFETIME = 2;
 // Bounce feedback panel (bounce_panel in speedometer.xml, see
 // UpdateBounceHud): shown for this long after each wall bounce.
 const BOUNCE_HUD_SECONDS = 1.5;
@@ -2799,20 +2807,35 @@ function ComputeWallBounce(kart, n, now) {
 }
 
 /**
- * Plays the particle_perfect_spark info_particle_system at the melon: moved
- * there, then stopped and started again so a second perfect hit while the
- * first is still playing restarts it.
+ * Spawns a fresh copy of the perfect_hit_particle_template at the melon and
+ * starts it, removed again after PERFECT_SPARK_LIFETIME — one copy per hit,
+ * so several karts' perfect hits at the same moment each show their own.
  * @param {import("../kart-registry.js").Kart} kart
  */
 function PlayPerfectSpark(kart) {
-    const spark = Instance.FindEntityByName(PERFECT_SPARK_PARTICLE_NAME);
-    if (!spark) {
-        Debug(`PlayPerfectSpark: no entity named "${PERFECT_SPARK_PARTICLE_NAME}" in the map`);
+    const template = Instance.FindEntityByName(PERFECT_SPARK_TEMPLATE_NAME);
+    if (!(template instanceof PointTemplate)) {
+        Debug(`PlayPerfectSpark: no point_template named "${PERFECT_SPARK_TEMPLATE_NAME}" in the map`);
         return;
     }
-    spark.Teleport({ position: kart.melon.GetAbsOrigin() });
-    Instance.EntFireAtTarget({ target: spark, input: "Stop" });
-    Instance.EntFireAtTarget({ target: spark, input: "Start" });
+    const position = kart.melon.GetAbsOrigin();
+    const spawned = template.ForceSpawn(position) ?? [];
+    for (const entity of spawned) {
+        // ForceSpawn keeps the entity's Hammer offset from its template — put
+        // it exactly on the melon, and start it explicitly (see
+        // SpawnParticleTemplate in break-effects.js for why).
+        entity.Teleport({ position });
+        if (entity.GetClassName() === "info_particle_system") {
+            Instance.EntFireAtTarget({ target: entity, input: "Start" });
+        }
+    }
+    Instance.Delay(PERFECT_SPARK_LIFETIME).then(() => {
+        for (const entity of spawned) {
+            if (entity.IsValid()) {
+                entity.Remove();
+            }
+        }
+    });
 }
 
 /**

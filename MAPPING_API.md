@@ -75,7 +75,7 @@ The script works without these, with the fallback shown.
 | `hub_spawn_facing` | `info_target` | Only its angle counts: which way a melon at `hub_spawn` faces. | `hub_spawn`'s own angle. |
 | `melon_break_template` | `point_template` | Main break burst: an `info_particle_system` with a `.vpcf` effect. Moved onto the crash site and started. | No burst on break. |
 | `melon_break_chunks_template` | `point_template` | Chunk flecks: an `info_particle_system`, plus up to 9 `prop_physics` break pieces (`models/cs_italy/italy_food_melon/italy_food_melon/piece.vmdl`, `piece1.vmdl` … `piece8.vmdl`) arranged roughly melon-shaped. Pieces are tinted, flung outward and left lying for a while. | No chunks on break. |
-| `particle_perfect_spark` | `info_particle_system` (a plain entity, **not** inside a template) | Moved onto the melon and restarted on every PERFECT wall bounce. | No spark. |
+| `perfect_hit_particle_template` | `point_template` | Perfect spark: an `info_particle_system` with a `.vpcf` effect. A fresh copy is spawned at the melon on every PERFECT wall bounce (so several karts' sparks can play at once) and removed after `PERFECT_SPARK_LIFETIME`. | No spark. |
 | `prediction_dot_template` | `point_template` | Only used when `PREDICTION_RENDER_MODE = "dots"` (default is `"debug"`): one small dot entity, e.g. a "Never Solid" `func_brush`. | Falls back to the debug line. |
 
 There are exactly **two** break templates — don't add other
@@ -221,7 +221,8 @@ Script inputs are pre-registered up to these limits; raise them in
 - a trigger feeding the script without "Physics Objects" ticked,
 - `melon_template` without a `prop_physics`, a break template without a
   `.vpcf` particle system, any extra `melon_break_*` template,
-- a missing or duplicated `particle_perfect_spark`,
+- a missing or duplicated `perfect_hit_particle_template`, or one without a
+  `.vpcf` particle system,
 - entity names with leading/trailing whitespace.
 
 In game, with `DEBUG` on (`src/melon_drive/debug.js`), the console logs
@@ -238,6 +239,6 @@ output is missing, mistargeted, or its filter/spawnflags keep the melon out.
 - [ ] `point_template` `melon_template` with the melon `prop_physics`
 - [ ] `hub_spawn` near the hub floor, `hub_start_trigger` with `hub_enter` + `hub_leave`
 - [ ] per track: `track_start_<id>_cp<N>_laps<M>`, `checkpoint_<id>_1` … `_<N>`, a `finish_<id>` output
-- [ ] optional: `intro_spawn`, `hub_spawn_facing`, both break templates, `particle_perfect_spark`, paint triggers, teleporters
+- [ ] optional: `intro_spawn`, `hub_spawn_facing`, both break templates, `perfect_hit_particle_template`, paint triggers, teleporters
 - [ ] every melon trigger: `trigger_multiple`, "Physics Objects", filtered to `prop_physics`
 - [ ] `npm test` passes

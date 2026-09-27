@@ -1,7 +1,8 @@
 // Checks the Hammer side of what the script spawns by name: every
-// point_template kart-spawn.js / physics/break-effects.js ForceSpawn must exist in
-// maps/melon_racer.vmap exactly once, and point at real entities (the break
-// templates at info_particle_systems with an effect set) — otherwise the
+// point_template kart-spawn.js / physics/break-effects.js /
+// physics/wall-bounce.js (perfect spark) ForceSpawn must exist in
+// maps/melon_racer.vmap exactly once, and point at real entities (the break and
+// spark templates at info_particle_systems with an effect set) — otherwise the
 // script silently spawns nothing, e.g. no melon burst on a break.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -11,7 +12,7 @@ import {
     MELON_TEMPLATE_NAME,
     BREAK_PARTICLE_TEMPLATE_NAME,
     BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME,
-    PERFECT_SPARK_PARTICLE_NAME,
+    PERFECT_SPARK_TEMPLATE_NAME,
 } from "../src/melon_drive/constants/index.js";
 
 const entities = ReadVmapEntities(fileURLToPath(new URL("../maps/melon_racer.vmap", import.meta.url)));
@@ -47,7 +48,7 @@ test(`"${MELON_TEMPLATE_NAME}" spawns a physics prop`, () => {
     assert.ok(targets.some((e) => String(e.classname).startsWith("prop_physics")));
 });
 
-for (const name of [BREAK_PARTICLE_TEMPLATE_NAME, BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME]) {
+for (const name of [BREAK_PARTICLE_TEMPLATE_NAME, BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, PERFECT_SPARK_TEMPLATE_NAME]) {
     test(`"${name}" spawns a particle system with an effect`, () => {
         const particles = TemplateTargets(name).filter((e) => e.classname === "info_particle_system");
         assert.ok(particles.length > 0, `"${name}" doesn't spawn any info_particle_system`);
@@ -75,13 +76,4 @@ test("no entity name has leading or trailing whitespace", () => {
         .filter((e) => typeof e.targetname === "string" && e.targetname !== e.targetname.trim())
         .map((e) => `${e.classname} ${JSON.stringify(e.targetname)}`);
     assert.deepEqual(bad, []);
-});
-
-// Moved onto the melon and started on every PERFECT wall bounce (see
-// PlayPerfectSpark in physics/wall-bounce.js) — a plain entity, not a template.
-test(`"${PERFECT_SPARK_PARTICLE_NAME}" is one info_particle_system with an effect`, () => {
-    const matches = ByName(PERFECT_SPARK_PARTICLE_NAME);
-    assert.equal(matches.length, 1, `expected exactly one entity named "${PERFECT_SPARK_PARTICLE_NAME}", found ${matches.length}`);
-    assert.equal(matches[0].classname, "info_particle_system");
-    assert.ok(matches[0].effect_name, "no particle effect set");
 });

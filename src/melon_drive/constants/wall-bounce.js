@@ -70,10 +70,18 @@ export const BOOST_DECAY = 150; // units/sec^2
 // with at least this angle factor — i.e. one that cost little or no health.
 export const PERFECT_BOUNCE_FLASH_SECONDS = 0.4;
 export const PERFECT_BOUNCE_ANGLE_FACTOR = 0.8;
-// info_particle_system placed in Hammer that's moved onto the melon and
-// (re)started on every wall bounce the HUD rates PERFECT (BOUNCE_RATINGS[0]).
-// One shared entity: two perfect hits at the same moment show only the later.
-export const PERFECT_SPARK_PARTICLE_NAME = "particle_perfect_spark";
+// point_template placed in Hammer holding the spark's info_particle_system:
+// spawned at the melon on every wall bounce the HUD rates PERFECT
+// (BOUNCE_RATINGS[0]) — a fresh copy per hit, so perfect hits by several
+// karts at once each get their own spark. Must match the name in Hammer.
+export const PERFECT_SPARK_TEMPLATE_NAME = "perfect_hit_particle_template";
+// Seconds a spawned spark is kept before it's removed. Removing the
+// info_particle_system ends its particles, so this is an upper bound.
+// Higher: the effect is never cut short, but more entities pile up when
+//   perfect hits come in fast succession.
+// Lower: cleaned up sooner; below the .vpcf's own duration the spark is
+//   cut off mid-play.
+export const PERFECT_SPARK_LIFETIME = 2;
 // Bounce feedback panel (bounce_panel in speedometer.xml, see
 // UpdateBounceHud): shown for this long after each wall bounce.
 export const BOUNCE_HUD_SECONDS = 1.5;
