@@ -20,7 +20,8 @@ import {
     BOOST_DECAY,
 } from "../constants.js";
 import { ApplyJump } from "./jump.js";
-import { UpdateGrounded, UpdateWallContact, DebugDrawContact } from "./contact.js";
+import { UpdateGrounded, UpdateWallContact } from "./contact.js";
+import { DrawJumpDebug } from "./jump-debug.js";
 import { ApplyImpactDamage } from "./damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage } from "./wall-bounce.js";
 import { BreakMelon } from "./breaking.js";
@@ -75,9 +76,9 @@ export function UpdateKart(slot, kart, dt) {
     // that was lying still is on something, anything else counts as not.
     const verticalAccel = kart.lastVelocity ? VerticalAccel(kart.lastVelocity.z, currentVelocity.z, dt) : undefined;
     const supported = verticalAccel !== undefined ? IsSupported(verticalAccel) : kart.settled;
-    const grounded = UpdateGrounded(kart, origin, now, supported);
-    const wallNormalNow = grounded ? undefined : UpdateWallContact(kart, origin, now);
-    DebugDrawContact(slot, kart, grounded, supported, verticalAccel, wallNormalNow);
+    const grounded = UpdateGrounded(kart, origin, now, supported, verticalAccel);
+    const wallNormalNow = grounded ? undefined : UpdateWallContact(kart, origin, now, currentVelocity);
+    DrawJumpDebug(slot, kart, grounded, wallNormalNow);
     /** @type {{ x: number, y: number } | undefined} */
     let bounceVelocity = undefined;
     if (kart.lastVelocity) {

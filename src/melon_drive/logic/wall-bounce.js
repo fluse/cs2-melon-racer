@@ -6,8 +6,6 @@
 import {
     WALL_BOUNCE_OPTIMAL_ANGLE,
     WALL_BOUNCE_ANGLE_FALLOFF,
-    WALL_BOUNCE_BASE_RESTITUTION,
-    WALL_BOUNCE_PEAK_MULTIPLIER,
     WALL_BOUNCE_PERFECT_JUMP_WINDOW,
     WALL_BOUNCE_PERFECT_JUMP_MULTIPLIER,
     WALL_IMPACT_DAMAGE_THRESHOLD,
@@ -99,8 +97,9 @@ export function PickIncomingVelocity(last, prev, n) {
 }
 
 /**
- * Reflects a horizontal velocity off a wall and scales it by how well the
- * hit was angled and timed (see WALL_BOUNCE_* in constants.js).
+ * Reflects a horizontal velocity off a wall and scales it by the angle's
+ * rating (BOUNCE_RATINGS[].speedMultiplier) and the jump timing (see
+ * WALL_BOUNCE_* in constants.js).
  * @param {{ x: number, y: number }} v incoming velocity
  * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal
  * @param {number} jumpFactor 0..1, see JumpTimingFactor
@@ -116,9 +115,7 @@ export function ReflectOffWall(v, n, jumpFactor) {
     // 0 = head-on, 90 = grazing along the wall.
     const angle = (Math.acos(Math.min(1, into / speed)) * 180) / Math.PI;
     const angleFactor = WallAngleFactor(angle);
-    const multiplier =
-        (WALL_BOUNCE_BASE_RESTITUTION + (WALL_BOUNCE_PEAK_MULTIPLIER - WALL_BOUNCE_BASE_RESTITUTION) * angleFactor) *
-        JumpMultiplier(jumpFactor);
+    const multiplier = GetBounceRating(angleFactor).speedMultiplier * JumpMultiplier(jumpFactor);
     return {
         velocity: {
             x: (v.x + 2 * into * n.x) * multiplier,

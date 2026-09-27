@@ -26,8 +26,8 @@ import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, Se
 import { SetUpPlayerKart } from "./kart-spawn.js";
 import { GetIntroSpawnPoint, Lifted, LevelAngles } from "./spawn-points.js";
 import { ParseTeleportTarget, TeleportExitVelocity } from "./logic/teleport.js";
-import { RespawnKartAtCheckpoint, SetKartPaintColor, TeleportKartTo } from "./physics/index.js";
-import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen } from "./hud.js";
+import { RespawnKartAtCheckpoint, SetKartPaintColor, TeleportKartTo, IsJumpDebugOn, SetJumpDebug } from "./physics/index.js";
+import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen, UpdateJumpDebugHud } from "./hud.js";
 import { SetCameraDistance, SetCameraHeight } from "./camera.js";
 import { phase, activeTrackId, phaseEndTime, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, RestoreRaceFlowSnapshot } from "./race-flow.js";
 import { RegisterCheckpointAndFinishInputs } from "./checkpoints.js";
@@ -265,6 +265,15 @@ Instance.OnCustomHudClicked((event) => {
         Debug(`usermenu_tutorial_button: slot ${slot} going to the tutorial (racing=${kart.racing}, phase=${phase})`);
         SetUserMenuOpen(slot, kart, false);
         SendKartToTutorial(kart);
+    } else if (event.buttonId === "usermenu_jumpdebug_button") {
+        // Per player: only this player's melon is drawn/logged (debug
+        // draws themselves only show in tools mode).
+        const slot = event.player.GetPlayerSlot();
+        const kart = karts.get(slot);
+        if (kart) {
+            SetJumpDebug(kart, !IsJumpDebugOn(kart));
+            UpdateJumpDebugHud(slot, kart);
+        }
     } else if (event.buttonId.startsWith("usermenu_color_")) {
         const key = event.buttonId.slice("usermenu_color_".length);
         const preset = COLOR_PRESETS[key];

@@ -19,8 +19,6 @@ import {
     WALL_CONTACT_DISTANCE,
     WALL_CONTACT_MIN_STOP,
     WALL_BOUNCE_ANGLE_FALLOFF,
-    WALL_BOUNCE_BASE_RESTITUTION,
-    WALL_BOUNCE_PEAK_MULTIPLIER,
     WALL_BOUNCE_PERFECT_JUMP_WINDOW,
     WALL_BOUNCE_PERFECT_JUMP_MULTIPLIER,
     WALL_IMPACT_DAMAGE_THRESHOLD,
@@ -84,22 +82,30 @@ test("a bounce reflects off the wall: away from it, same side along it", () => {
     near((Math.atan2(b.velocity.y, b.velocity.x) * 180) / Math.PI, 30);
 });
 
-test("a perfect-angle bounce comes out at the peak multiplier", () => {
+test("a perfect-angle bounce comes out at the best rating's multiplier", () => {
     const speed = 500;
     const b = ReflectOffWall(Incoming(speed, WALL_BOUNCE_OPTIMAL_ANGLE), WALL, 0);
     assert.ok(b);
     near(b.angleFactor, 1);
-    near(Math.hypot(b.velocity.x, b.velocity.y), speed * WALL_BOUNCE_PEAK_MULTIPLIER);
-    near(b.speedGain, Math.max(0, speed * WALL_BOUNCE_PEAK_MULTIPLIER - speed));
+    const m = BOUNCE_RATINGS[0].speedMultiplier;
+    near(Math.hypot(b.velocity.x, b.velocity.y), speed * m);
+    near(b.speedGain, Math.max(0, speed * m - speed));
 });
 
-test("a bounce with no angle bonus comes out at base restitution", () => {
+test("every bounce comes out at its rating's speed multiplier", () => {
     const speed = 500;
-    const worstAngle = Math.min(89, WALL_BOUNCE_OPTIMAL_ANGLE + WALL_BOUNCE_ANGLE_FALLOFF);
-    const b = ReflectOffWall(Incoming(speed, worstAngle), WALL, 0);
-    assert.ok(b);
-    const expected = speed * (WALL_BOUNCE_BASE_RESTITUTION + (WALL_BOUNCE_PEAK_MULTIPLIER - WALL_BOUNCE_BASE_RESTITUTION) * b.angleFactor);
-    near(Math.hypot(b.velocity.x, b.velocity.y), expected);
+    for (let angle = 1; angle < 90; angle += 1) {
+        const b = ReflectOffWall(Incoming(speed, angle), WALL, 0);
+        assert.ok(b);
+        const m = GetBounceRating(b.angleFactor).speedMultiplier;
+        near(Math.hypot(b.velocity.x, b.velocity.y), speed * m, `angle ${angle}`);
+    }
+});
+
+test("ratings are sorted: a better rating is never slower", () => {
+    for (let i = 1; i < BOUNCE_RATINGS.length; i++) {
+        assert.ok(BOUNCE_RATINGS[i - 1].speedMultiplier >= BOUNCE_RATINGS[i].speedMultiplier);
+    }
 });
 
 test("a perfectly timed jump multiplies the bounce speed", () => {

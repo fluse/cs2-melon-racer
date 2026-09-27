@@ -94,6 +94,7 @@ function NewKartRecord(pawn, melon, spawnPoint) {
         paintColor: { r: 255, g: 255, b: 255, a: 255 },
         userMenuOpen: false,
         hubModalOpen: false,
+        jumpDebug: false,
         cameraDistance: CAMERA_DISTANCE_DEFAULT,
         cameraHeight: CAMERA_HEIGHT_DEFAULT,
         lastKnownPosition: undefined,

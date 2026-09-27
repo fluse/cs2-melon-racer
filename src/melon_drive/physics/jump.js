@@ -6,6 +6,7 @@ import { Debug } from "../debug.js";
 import { CanGroundJump, CanWallJump, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter } from "../logic/contact.js";
 import { JumpTimingFactor, JumpMultiplier } from "../logic/wall-bounce.js";
 import { JUMP_SPEED, MAX_SPEED, WALL_TIMING_SPAM_LOCKOUT } from "../constants.js";
+import { LogJumpPress } from "./jump-debug.js";
 
 /**
  * Records a jump-button press for wall-bounce timing, separately from the
@@ -55,7 +56,7 @@ export function ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v) {
     if (jumpPressed) {
         const groundJump = CanGroundJump({ grounded, lastGroundedTime: kart.lastGroundedTime, lastJumpTime: kart.lastJumpTime });
         const timingPress = RegisterWallTimingPress(kart, now);
-        Debug(`Jump pressed: grounded=${grounded} groundJump=${groundJump} wallCharge=${kart.wallJumpCharge.toFixed(2)} wallTiming=${timingPress}`);
+        LogJumpPress(slot, kart, now, grounded, groundJump, timingPress);
         // The normal jump — gives the upward push.
         if (groundJump) {
             v.z = JUMP_SPEED;

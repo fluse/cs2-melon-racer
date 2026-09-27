@@ -3,6 +3,7 @@
 // melon_drive import from here, not from the individual files.
 export { UpdateKart } from "./drive.js";
 export { GetJumpChargeFraction } from "./jump.js";
+export { IsJumpDebugOn, SetJumpDebug } from "./jump-debug.js";
 export { ApplyImpactDamage } from "./damage.js";
 export { BreakMelon, HandleMelonLost } from "./breaking.js";
 export { RespawnKartAtCheckpoint, TeleportKartTo, SetKartPaintColor } from "./teleport.js";

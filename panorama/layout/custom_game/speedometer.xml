@@ -221,6 +221,14 @@
 				<Button id="camheight_seg_14" class="DistanceSegment" />
 				<Button id="camheight_seg_15" class="DistanceSegment" />
 			</Panel>
+
+			<!-- Per-player debug view of how ground/wall contact and jump
+			     presses are judged (physics/jump-debug.js). Its drawing only
+			     shows in tools mode. -->
+			<Label class="UserMenuSectionLabel" text="DEBUG" />
+			<Button id="usermenu_jumpdebug_button" class="UserMenuActionButton">
+				<Label text="Jump debug: {s:jumpdebug_state}" />
+			</Button>
 		</Panel>
 	</Panel>
 </root>

@@ -3,6 +3,7 @@ import { Debug } from "./debug.js";
 // Straight from jump.js, not physics/index.js: hud.js is imported by camera.js,
 // which the physics files import — going through the index would make a cycle.
 import { GetJumpChargeFraction } from "./physics/jump.js";
+import { IsJumpDebugOn } from "./physics/jump-debug.js";
 import { GetBounceRating } from "./logic/wall-bounce.js";
 import { HealthBarState } from "./logic/health.js";
 import { GetTrackConfig } from "./track-config.js";
@@ -212,7 +213,24 @@ export function SetUserMenuOpen(slot, kart, open) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
+    if (open) {
+        UpdateJumpDebugHud(slot, kart);
+    }
     SyncInputCapture(hud, slot, kart);
+}
+
+/**
+ * The user menu's jump debug toggle button: its ON/OFF text and highlight.
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+export function UpdateJumpDebugHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const on = IsJumpDebugOn(kart);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_jumpdebug_button", "jumpdebug_state", on ? "ON" : "OFF");
+    hud.SetHasClassForPlayer(slot, "usermenu_jumpdebug_button", "ToggleOn", on);
 }
 
 /** @param {number} slot @param {import("./kart-registry.js").Kart} kart */

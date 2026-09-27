@@ -2,7 +2,7 @@
 // terms of the constants.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { VerticalAccel, IsSupported, IsGrounded, CanGroundJump, CanWallJump, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter } from "../src/melon_drive/logic/contact.js";
+import { VerticalAccel, IsSupported, IsGrounded, CanGroundJump, CanWallJump, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter, StoppedByWall, InLiftoff } from "../src/melon_drive/logic/contact.js";
 import {
     GRAVITY,
     FREE_FALL_FRACTION,
@@ -14,6 +14,9 @@ import {
     WALL_JUMP_CHARGE_COST,
     WALL_JUMP_MIN_CHARGE,
     WALL_JUMP_RECHARGE_SECONDS,
+    WALL_TOUCH_MIN_STOP_SPEED,
+    GROUND_LIFTOFF_TIME,
+    WALL_CONTACT_MIN_STOP,
 } from "../src/melon_drive/constants.js";
 
 const DT = 1 / 64;
@@ -123,4 +126,29 @@ test("the charge refills to full over WALL_JUMP_RECHARGE_SECONDS, and not beyond
     assert.equal(RechargeWallJump(0, WALL_JUMP_RECHARGE_SECONDS / 2), 0.5);
     assert.equal(RechargeWallJump(0.9, WALL_JUMP_RECHARGE_SECONDS), 1);
     assert.equal(RechargeWallJump(0.4, -1), 0.4, "time never runs backwards");
+});
+
+test("touching a wall: physics stopped the melon's speed into it", () => {
+    const n = { x: -1, y: 0 }; // wall ahead in +x
+    const into = WALL_TOUCH_MIN_STOP_SPEED * 4;
+    assert.ok(StoppedByWall(n, { x: into, y: 50 }, { x: 0, y: 50 }), "stopped dead");
+    assert.ok(StoppedByWall(n, { x: into, y: 0 }, { x: into * (1 - WALL_CONTACT_MIN_STOP), y: 0 }), "just enough stopped");
+    assert.ok(!StoppedByWall(n, { x: into, y: 0 }, { x: into, y: 0 }), "still flying at it: near, not touching");
+    assert.ok(!StoppedByWall(n, { x: -into, y: 0 }, { x: 0, y: 0 }), "moving away from it");
+    assert.ok(!StoppedByWall(n, { x: WALL_TOUCH_MIN_STOP_SPEED / 2, y: 0 }, { x: 0, y: 0 }), "too slow to tell");
+});
+
+// Regression: flying almost parallel past a nearby wall, physics noise on
+// the few units/sec heading into it counted as "stopped by the wall".
+test("touching a wall: flying past it in parallel with a little noise isn't touching", () => {
+    const n = { x: -1, y: 0 };
+    const intoBefore = WALL_TOUCH_MIN_STOP_SPEED * 0.8;
+    assert.ok(!StoppedByWall(n, { x: intoBefore, y: 600 }, { x: 0, y: 600 }));
+});
+
+test("liftoff: ground contact doesn't count right after a ground or wall jump", () => {
+    assert.ok(InLiftoff(10, 10, undefined));
+    assert.ok(InLiftoff(10 + GROUND_LIFTOFF_TIME / 2, undefined, 10));
+    assert.ok(!InLiftoff(10 + GROUND_LIFTOFF_TIME, 10, undefined));
+    assert.ok(!InLiftoff(10, undefined, undefined));
 });

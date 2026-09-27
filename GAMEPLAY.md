@@ -141,12 +141,13 @@ into the wall. With `DEBUG` on (`debug.js`), every bounce draws the wall
 normal (green), incoming (red), outgoing (blue) and look direction (yellow)
 in the world and logs the velocity angle next to the look angle. There's no global "on/off per wall" — all walls do it.
 
-- **Angle is the skill part.** The multiplier peaks
-  (`WALL_BOUNCE_PEAK_MULTIPLIER`) at exactly `WALL_BOUNCE_OPTIMAL_ANGLE` (45°
-  from the wall normal) and falls off linearly to
-  `WALL_BOUNCE_BASE_RESTITUTION` (a speed *loss*) `WALL_BOUNCE_ANGLE_FALLOFF`
-  degrees away from it — so a head-on crash or a graze gains nothing, a
-  clean 45° hit comes out faster than it went in.
+- **Angle is the skill part.** Angle closeness is 1 at exactly
+  `WALL_BOUNCE_OPTIMAL_ANGLE` (45° from the wall normal) and falls off
+  linearly to 0 `WALL_BOUNCE_ANGLE_FALLOFF` degrees away from it; it picks
+  the rating (`BOUNCE_RATINGS`), and each rating has a fixed speed
+  multiplier (`speedMultiplier`, decided): PERFECT ×1.35, GOOD ×1.1,
+  BAD ×0.5, MISS ×0.3 — so only PERFECT and GOOD come out faster than they
+  went in, BAD and MISS cost speed.
 - **Jump timing** multiplies it again, up to
   `WALL_BOUNCE_PERFECT_JUMP_MULTIPLIER` for a jump on the exact tick of the
   hit, fading linearly to nothing at `WALL_BOUNCE_PERFECT_JUMP_WINDOW`
@@ -183,7 +184,7 @@ in the world and logs the velocity angle next to the look angle. There's no glob
   `PERFECT_BOUNCE_ANGLE_FACTOR` (`speedometer.css`). Separately, a
   `bounce_panel` in the bottom-right HUD cluster, right above the speedometer (centered below the crosshair it covered the track), shows for `BOUNCE_HUD_SECONDS` after
   each bounce: a rating word by angle closeness (`BOUNCE_RATINGS`:
-  PERFECT/GREAT/GOOD/MISS), the exact angle hit, a 0°–90° scale in 10°
+  PERFECT/GOOD/BAD/MISS), the exact angle hit, a 0°–90° scale in 10°
   segments with the 45° target outlined and the hit segment lit, and a
   jump-timing bar (which still fills in if the jump comes just *after* the
   hit).
@@ -442,6 +443,12 @@ rather than guessing.
   `GROUND_COYOTE_TIME` (0.08 s) only bridges the tiny hops a rolling melon
   makes. (Before: a 48-unit ray down from the center counted as ground,
   plus 0.15 s grace — a melon well into a jump could jump again.)
+  The floor trace (`GROUND_CHECK_DISTANCE`) is short on purpose: a resting
+  melon's center is only ~7 units above the floor, and a longer trace still
+  found it ~40 units up in a jump — one tick of measured support there was
+  enough for a mid-air jump. Nor does ground contact count for
+  `GROUND_LIFTOFF_TIME` after any jump (the floor still pushes the melon up
+  for a tick while it takes off).
 - **Wall jump**: in the air, touching a wall and pressing jump pushes the
   melon off the wall (`WALL_JUMP_PUSH_SPEED`, more if it's already moving
   away faster — e.g. right after a wall bounce) and up
@@ -449,12 +456,19 @@ rather than guessing.
   is a charge** (`kart.wallJumpCharge`, shown by the HUD jump bar, which
   no longer shows a ground-jump cooldown): a wall jump is as strong as the
   charge is full and uses up `WALL_JUMP_CHARGE_COST` of it, so chained
-  wall jumps get weaker (≈3 in a row) until below `WALL_JUMP_MIN_CHARGE`
+  wall jumps get weaker (2 in a row, the second at half strength) until below `WALL_JUMP_MIN_CHARGE`
   there's none; it refills over `WALL_JUMP_RECHARGE_SECONDS`. A wall jump
   never raises the speed cap — chaining them used to make the melon faster
   and faster. "Touching" =
   a line trace in any of `WALL_PROBE_DIRECTIONS` horizontal directions
-  finds a steep, non-prop surface within `WALL_CONTACT_DISTANCE`, or a wall
+  finds a steep, non-prop surface within `WALL_CONTACT_DISTANCE` of the
+  melon's center **and** physics just stopped the melon against it,
+  measured like ground contact: of the speed into that wall commanded last
+  tick, at least `WALL_CONTACT_MIN_STOP` and at least
+  `WALL_TOUCH_MIN_STOP_SPEED` must be gone now (the absolute part keeps
+  flying past a wall in parallel from counting via physics noise). The center distance alone let a
+  melon still flying at a wall jump off it before touching it; a trace back
+  onto the melon's own surface was tried and found nothing in-engine — or a wall
   bounce just happened (the melon leaves the wall the moment it bounces);
   either stays jumpable for `WALL_JUMP_WINDOW`. `WALL_JUMP_COOLDOWN`
   between two wall jumps, and one
@@ -462,10 +476,29 @@ rather than guessing.
   first or a different wall (`WALL_JUMP_SAME_WALL_DOT`) — bouncing between
   two facing walls chains. The same press still counts as wall-bounce
   jump timing.
-- With `DEBUG` on, the contact state is on screen every tick
-  (`GROUND` / `AIR` / `AIR + WALL`, whether it's supported, the measured
-  vertical acceleration, what the floor trace saw), and the touched wall's normal is drawn as an
-  orange line — for checking the detection while driving.
+- **Jump debug view** (`physics/jump-debug.js`, all of it in that one file):
+  toggled per player in the user menu ("Jump debug: ON/OFF", off by
+  default), only for that player's own melon. While on, the contact state
+  is on screen every tick (`GROUND` / `AIR` / `AIR + WALL`, whether it's
+  supported, the measured vertical acceleration, what the floor trace saw
+  and how far below, the speed into a nearby wall last tick vs. now,
+  `TOUCH` once it counts), every jump press is logged to the console
+  (`[jump debug] … jump pressed: …` — why it was or wasn't allowed), and
+  the probes are drawn into the world (tools mode only), every tick:
+  - floor trace straight down: green = ground contact, white = hit
+    something but not held up by it, grey = nothing below;
+  - in the air, a grey ring = `WALL_CONTACT_DISTANCE` around the center
+    (walls outside it aren't considered), and the wall probes: grey = hit
+    nothing, purple = hit a floor/ceiling or a prop (ignored), dark blue =
+    wall outside the ring, cyan = wall inside it, orange = the nearest one,
+    the only one checked;
+  - at that wall its normal and a small orange sphere (only *near*), or a
+    big green one when it's *touching* this tick;
+  - from the melon: red = velocity commanded last tick, blue = what
+    physics left of it now — red reaching into the wall while blue is cut
+    short is exactly what counts as touching;
+  - a small green ring around the melon while a touch is still jumpable
+    (`WALL_JUMP_WINDOW`).
 - Tests: `test/contact.test.mjs` (rules) and `test/jump.test.mjs` (the real
   `UpdateKart` against the fake engine).
 

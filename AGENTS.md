@@ -35,7 +35,7 @@ src/melon_drive/index.js, *.js           # melon_drive entry: split into one fil
                                           #   checkpoints.js, prediction.js, trace.js, think.js — index.js just wires them together
 src/melon_drive/physics/*.js             # melon physics, one file per concern: drive.js (UpdateKart, the per-tick order),
                                           #   jump.js, contact.js (floor/wall probes), wall-bounce.js, damage.js, breaking.js,
-                                          #   break-effects.js, teleport.js — others import from physics/index.js
+                                          #   break-effects.js, teleport.js, jump-debug.js (the user-menu jump debug view) — others import from physics/index.js
 src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, checkpoint progress, break sequence, camera steps, teleport, ground/wall contact) — no engine import, unit-tested
 test/*.test.mjs                          # node:test unit tests for src/*/logic/ (`npm test`), plus checks of the .vmap/.xml the script relies on
 test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities
@@ -283,7 +283,7 @@ examples — read these instead of guessing signatures:
   string `ApplyCheckpointTouch` returns). Each has a `test/<name>.test.mjs`
   using the built-in `node:test` runner — run `npm test` after touching
   them, and add/adjust a test when changing a rule. Write assertions in
-  terms of the constants (`WALL_BOUNCE_PEAK_MULTIPLIER`, ...) rather than
+  terms of the constants (`WALL_BOUNCE_OPTIMAL_ANGLE`, ...) rather than
   their current values, so retuning `constants.js` doesn't break tests.
 - **Engine-side files can be tested against a fake engine** when a rule
   spans them (e.g. `test/view-facing.test.mjs`: every teleport/spawn path

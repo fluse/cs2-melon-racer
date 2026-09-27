@@ -33,13 +33,26 @@ export const JUMP_SPEED = 400; // units/sec upward impulse
 // egg-shaped melon makes — keep it short.
 export const GRAVITY = 800; // units/sec^2 — CS2's sv_gravity, what vphysics pulls the melon down with
 export const FREE_FALL_FRACTION = 0.8; // vertical accel at or below -FREE_FALL_FRACTION * GRAVITY counts as falling freely (not supported); lower = stricter
-export const GROUND_CHECK_DISTANCE = 48; // units down from the melon's center the floor-confirming trace reaches — melon radius plus margin
+// Units down from the melon's center the floor-confirming trace reaches.
+// A resting melon's center sits only ~7 units above the floor (see the
+// floor distance in the DEBUG overlay / jump log), so this is its half
+// height, rolled onto its long side or on a slope, plus a small margin. It
+// used to be 48, which found the floor while the melon was still ~40 units
+// up in a jump — together with a moment of measured "support" that allowed
+// a jump in mid-air.
+export const GROUND_CHECK_DISTANCE = 20;
 export const GROUND_NORMAL_MIN_Z = 0.5; // surface must be at least this floor-like (not a wall) to count as ground
 export const GROUND_COYOTE_TIME = 0.08; // seconds a ground contact stays valid after losing it — only bridges rolling hops
+// Right after a jump (ground or wall) the floor can still be pushing the
+// melon up for a tick, which reads exactly like support — so ground contact
+// doesn't count for this long after any jump. Otherwise a second press just
+// after taking off jumped again in mid-air.
+export const GROUND_LIFTOFF_TIME = 0.15; // seconds
 
 // Wall jump: in the air, touching a wall (a line trace in any of
 // WALL_PROBE_DIRECTIONS horizontal directions finds a steep surface within
-// WALL_CONTACT_DISTANCE, or a wall impact just happened) and pressing jump
+// WALL_CONTACT_DISTANCE and physics just stopped the melon's motion into
+// it — see WALL_TOUCH_MIN_STOP_SPEED — or a wall impact just happened) and pressing jump
 // pushes the melon off that wall and up. Its strength comes from a charge
 // (the HUD jump bar): a wall jump is as strong as the charge is full
 // (WALL_JUMP_UP_SPEED / WALL_JUMP_PUSH_SPEED at 100%) and uses up
@@ -51,12 +64,12 @@ export const GROUND_COYOTE_TIME = 0.08; // seconds a ground contact stays valid 
 // than WALL_JUMP_SAME_WALL_DOT) — bouncing between two facing walls chains.
 export const WALL_PROBE_DIRECTIONS = 8;
 export const WALL_JUMP_WINDOW = 0.2; // seconds a wall contact stays jumpable — the melon usually bounces off the wall the moment it hits it
-export const WALL_JUMP_COOLDOWN = 0.3; // seconds between two wall jumps
-export const WALL_JUMP_CHARGE_COST = 0.34; // share of a full charge one wall jump uses — ~3 in a row, each weaker
-export const WALL_JUMP_MIN_CHARGE = 0.1; // below this there's no wall jump at all
-export const WALL_JUMP_RECHARGE_SECONDS = 3; // empty -> full
-export const WALL_JUMP_UP_SPEED = 380; // units/sec upward
-export const WALL_JUMP_PUSH_SPEED = 250; // units/sec at least away from the wall (more if already moving away faster)
+export const WALL_JUMP_COOLDOWN = 0.45; // seconds between two wall jumps (was 0.3)
+export const WALL_JUMP_CHARGE_COST = 0.5; // share of a full charge one wall jump uses — 2 in a row, the second at half strength (was 0.34, ~3 in a row)
+export const WALL_JUMP_MIN_CHARGE = 0.15; // below this there's no wall jump at all (was 0.1)
+export const WALL_JUMP_RECHARGE_SECONDS = 5; // empty -> full (was 3)
+export const WALL_JUMP_UP_SPEED = 240; // units/sec upward — well below the ground jump's JUMP_SPEED (was 380)
+export const WALL_JUMP_PUSH_SPEED = 160; // units/sec at least away from the wall (more if already moving away faster) (was 250)
 export const WALL_JUMP_SAME_WALL_DOT = 0.7; // normals closer than this (dot product, ~45°) count as the same wall
 
 // Below this horizontal AND vertical speed, with no steering/jump input,
@@ -96,10 +109,11 @@ export const IMPACT_DAMAGE_SCALE = 0.2; // health lost per unit/sec beyond the t
 // normal is mostly horizontal — see WALL_NORMAL_MAX_Z) reflects the melon's
 // pre-impact velocity off that wall instead of letting vphysics just stop
 // it, and can come out *faster* than it went in — trading health for speed.
-// How much faster is skill-based: strongest when hitting the wall at exactly
-// WALL_BOUNCE_OPTIMAL_ANGLE (measured from the wall's normal, 0 = head-on,
-// 90 = grazing), fading linearly to WALL_BOUNCE_BASE_RESTITUTION (a loss of
-// speed) WALL_BOUNCE_ANGLE_FALLOFF degrees away from it. A jump timed within
+// How much faster is skill-based: the speed multiplier is fixed per rating
+// (BOUNCE_RATINGS[].speedMultiplier), and the rating comes from how close
+// the hit was to WALL_BOUNCE_OPTIMAL_ANGLE (measured from the wall's normal,
+// 0 = head-on, 90 = grazing) — closeness falls off linearly to 0 at
+// WALL_BOUNCE_ANGLE_FALLOFF degrees away from it. A jump timed within
 // WALL_BOUNCE_PERFECT_JUMP_WINDOW of the hit (before or after) multiplies the
 // result once more — fully for the exact same tick, fading out towards the
 // window's edges. Floors/landings never bounce — they keep using the
@@ -111,7 +125,17 @@ export const WALL_BOUNCE_TRACE_DISTANCE = 160; // ray length from last tick's po
 // (see IsWallContact in logic/wall-bounce.js) — the trace reaches far ahead,
 // so in a small room it finds *some* wall on almost every hard landing or
 // bump, which used to bounce the melon off a wall it never touched.
-export const WALL_CONTACT_DISTANCE = 56; // max units from the melon's center to the wall plane — melon radius (see GROUND_CHECK_DISTANCE) plus margin for the tick physics already pushed it back
+export const WALL_CONTACT_DISTANCE = 56; // max units from the melon's center to the wall plane — melon radius plus margin for the tick physics already pushed it back
+// A wall the probes find only counts as touched for a wall jump if physics
+// actually stopped the melon against it, measured like ground contact: of
+// the speed into the wall we commanded last tick, at least
+// WALL_CONTACT_MIN_STOP must be gone now — and at least this much in
+// absolute terms. Without the absolute part, flying almost parallel past a
+// nearby wall (only a few units/sec into it) counted as touching it from
+// small physics noise alone.
+// (WALL_CONTACT_DISTANCE alone is from the melon's center and let a melon
+// still flying towards a wall jump off it before touching it.)
+export const WALL_TOUCH_MIN_STOP_SPEED = 60; // units/sec of speed into the wall that must have been stopped
 export const WALL_CONTACT_MIN_STOP = 0.5; // fraction of the into-the-wall speed the impact must have taken away — a landing or friction leaves it almost untouched, a real wall stops it
 export const WALL_BOUNCE_TRACE_RADIUS = 8; // backup sphere sweep from the current position, for posts/edges the ray slips past
 export const WALL_BOUNCE_SPHERE_TRACE_DISTANCE = 48;
@@ -122,8 +146,6 @@ export const WALL_BOUNCE_DEBUG_SECONDS = 4;
 export const WALL_BOUNCE_DEBUG_LINE_LENGTH = 96;
 export const WALL_BOUNCE_OPTIMAL_ANGLE = 45; // degrees from the wall normal where the bounce is strongest
 export const WALL_BOUNCE_ANGLE_FALLOFF = 45; // degrees away from optimal at which the bonus has faded out completely
-export const WALL_BOUNCE_BASE_RESTITUTION = 0.6; // speed multiplier at a bad angle (head-on or grazing)
-export const WALL_BOUNCE_PEAK_MULTIPLIER = 1.5; // speed multiplier at exactly the optimal angle
 export const WALL_BOUNCE_PERFECT_JUMP_WINDOW = 0.12; // seconds, before or after the hit
 export const WALL_BOUNCE_PERFECT_JUMP_MULTIPLIER = 1.3; // extra multiplier on top for a perfectly timed jump (scaled down the further off it is)
 // The timing press is the jump button, but separate from the normal jump:
@@ -165,14 +187,15 @@ export const BOUNCE_ANGLE_SEGMENTS = 9;
 export const BOUNCE_JUMP_SEGMENTS = 5;
 // Rating word by how close to WALL_BOUNCE_OPTIMAL_ANGLE the hit was
 // (angleFactor, 1 = exact). First match wins — keep sorted high to low,
-// last entry is the catch-all. cssClass colors the panel; color is the same
+// last entry is the catch-all. speedMultiplier is what a bounce with that
+// rating does to the melon's speed (before jump timing). cssClass colors the panel; color is the same
 // accent for the in-world prediction line (see prediction.js) — keep the two
 // in sync with speedometer.css's .Rating* rules.
 export const BOUNCE_RATINGS = [
-    { minAngleFactor: 0.9, label: "PERFECT", cssClass: "RatingPerfect", color: { r: 255, g: 224, b: 102, a: 255 } },
-    { minAngleFactor: 0.7, label: "GREAT", cssClass: "RatingGreat", color: { r: 102, g: 221, b: 102, a: 255 } },
-    { minAngleFactor: 0.4, label: "GOOD", cssClass: "RatingGood", color: { r: 102, g: 170, b: 255, a: 255 } },
-    { minAngleFactor: 0, label: "MISS", cssClass: "RatingMiss", color: { r: 255, g: 102, b: 102, a: 255 } },
+    { minAngleFactor: 0.9, label: "PERFECT", speedMultiplier: 1.35, cssClass: "RatingPerfect", color: { r: 255, g: 224, b: 102, a: 255 } },
+    { minAngleFactor: 0.7, label: "GOOD", speedMultiplier: 1.1, cssClass: "RatingGood", color: { r: 102, g: 221, b: 102, a: 255 } },
+    { minAngleFactor: 0.4, label: "BAD", speedMultiplier: 0.5, cssClass: "RatingBad", color: { r: 102, g: 170, b: 255, a: 255 } },
+    { minAngleFactor: 0, label: "MISS", speedMultiplier: 0.3, cssClass: "RatingMiss", color: { r: 255, g: 102, b: 102, a: 255 } },
 ];
 
 // Wall-bounce prediction line, drawn in front of the melon (see

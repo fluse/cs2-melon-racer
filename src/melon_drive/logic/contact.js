@@ -14,6 +14,9 @@ import {
     WALL_JUMP_CHARGE_COST,
     WALL_JUMP_MIN_CHARGE,
     WALL_JUMP_RECHARGE_SECONDS,
+    WALL_TOUCH_MIN_STOP_SPEED,
+    GROUND_LIFTOFF_TIME,
+    WALL_CONTACT_MIN_STOP,
 } from "../constants.js";
 
 /**
@@ -45,6 +48,16 @@ export function IsGrounded(supported, floorNormalZ) {
 }
 
 /**
+ * Whether the melon is still taking off from a jump (ground or wall, see
+ * GROUND_LIFTOFF_TIME) — ground contact measured now doesn't count then.
+ * @param {number} now @param {number | undefined} lastJumpTime @param {number | undefined} lastWallJumpTime
+ */
+export function InLiftoff(now, lastJumpTime, lastWallJumpTime) {
+    const last = Math.max(lastJumpTime ?? -Infinity, lastWallJumpTime ?? -Infinity);
+    return now - last < GROUND_LIFTOFF_TIME;
+}
+
+/**
  * Whether a jump press right now is a ground jump: on the ground, and it's
  * a new ground contact since the last jump — touching down is what resets
  * the jump, no cooldown.
@@ -55,6 +68,22 @@ export function CanGroundJump({ grounded, lastGroundedTime, lastJumpTime }) {
         return false;
     }
     return lastJumpTime === undefined || (lastGroundedTime !== undefined && lastGroundedTime > lastJumpTime);
+}
+
+/**
+ * Whether physics just stopped the melon against a wall: of the speed into
+ * it we commanded last tick, at least WALL_CONTACT_MIN_STOP and at least
+ * WALL_TOUCH_MIN_STOP_SPEED is gone now. A wall that's merely near (still a
+ * few units ahead, or flown past in parallel) leaves that speed untouched.
+ * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal (pointing away from it)
+ * @param {{ x: number, y: number }} commanded velocity we set last tick
+ * @param {{ x: number, y: number }} actual the melon's velocity now
+ */
+export function StoppedByWall(n, commanded, actual) {
+    const intoBefore = -(commanded.x * n.x + commanded.y * n.y);
+    const intoAfter = -(actual.x * n.x + actual.y * n.y);
+    const stopped = intoBefore - intoAfter;
+    return intoBefore > 0 && stopped >= WALL_TOUCH_MIN_STOP_SPEED && stopped / intoBefore >= WALL_CONTACT_MIN_STOP;
 }
 
 /**

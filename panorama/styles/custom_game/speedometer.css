@@ -445,13 +445,13 @@
 .BouncePanel.RatingPerfect .BounceRating { color: #ffe066; }
 .BouncePanel.RatingPerfect .BounceAngleSegment.Hit { background-color: #ffe066; }
 
-.BouncePanel.RatingGreat { border-color: #66dd66; }
-.BouncePanel.RatingGreat .BounceRating { color: #66dd66; }
-.BouncePanel.RatingGreat .BounceAngleSegment.Hit { background-color: #66dd66; }
+.BouncePanel.RatingGood { border-color: #66dd66; }
+.BouncePanel.RatingGood .BounceRating { color: #66dd66; }
+.BouncePanel.RatingGood .BounceAngleSegment.Hit { background-color: #66dd66; }
 
-.BouncePanel.RatingGood { border-color: #66aaff; }
-.BouncePanel.RatingGood .BounceRating { color: #66aaff; }
-.BouncePanel.RatingGood .BounceAngleSegment.Hit { background-color: #66aaff; }
+.BouncePanel.RatingBad { border-color: #66aaff; }
+.BouncePanel.RatingBad .BounceRating { color: #66aaff; }
+.BouncePanel.RatingBad .BounceAngleSegment.Hit { background-color: #66aaff; }
 
 .BouncePanel.RatingMiss .BounceRating { color: #ff6666; }
 .BouncePanel.RatingMiss .BounceAngleSegment.Hit { background-color: #ff6666; }
@@ -633,6 +633,14 @@
     background-color: #dd444422;
     &:hover {
         background-color: #dd444444;
+    }
+}
+
+/* A settings toggle that's currently on (e.g. the jump debug button). */
+.UserMenuActionButton.ToggleOn {
+    background-color: #44dd4455;
+    &:hover {
+        background-color: #44dd4477;
     }
 }
 
