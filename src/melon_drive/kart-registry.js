@@ -24,6 +24,10 @@ import { predictionDotSet } from "./trace.js";
  *   lastWallContact?: { time: number, normal: { x: number, y: number } }, // last wall touched in the air (probe or bounce) — see UpdateWallContact
  *   lastWallJump?: { time: number, normal: { x: number, y: number } }, // see CanWallJump
  *   bufferedWallJumpTime?: number, // a lift-zone jump press not yet used, fired on the next wall touch — see LIFT_ZONE_JUMP_BUFFER
+ *   perfectBounceBoost?: boolean, // its speed above MAX_SPEED is from a PERFECT bounce — no boost trail for that, see boost-trail.js
+ *   attackBoosting?: boolean, // the attack boost is on this tick — shows the boost trail, see boost-trail.js
+ *   attackGuardUntil?: number, // until when engine pushes from attack are cancelled — see ATTACK_PUSH_GUARD_SECONDS
+ *   nextAttackDebugTime?: number, // when physics/attack-debug.js may log this kart's attack state again
  *   jumpDebug?: boolean, // this player's jump debug view is on (user menu toggle) — see physics/jump-debug.js
  *   contactDebug?: import("./physics/jump-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement

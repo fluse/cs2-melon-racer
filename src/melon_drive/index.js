@@ -33,6 +33,7 @@ import { phase, activeTrackId, phaseEndTime, TryStartRace, TryAbortRace, ReturnA
 import { RegisterCheckpointAndFinishInputs } from "./checkpoints.js";
 import { RegisterZoneInputs } from "./zone-inputs.js";
 import { Think } from "./think.js";
+import { RegisterAttackDebug } from "./physics/attack-debug.js";
 
 Instance.SetThink(Think);
 Instance.SetNextThink(Instance.GetGameTime());
@@ -199,6 +200,7 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
 
 // Heal and lift zones (heal_enter/heal_leave, lift_enter/lift_leave).
 RegisterZoneInputs();
+RegisterAttackDebug();
 
 Instance.OnCustomHudClicked((event) => {
     if (event.layout !== GetSpeedHud()) {

@@ -31,6 +31,33 @@ test("hysteresis: between the margins it keeps whatever state it's in", () => {
 test("never for a broken or race-locked melon, however fast", () => {
     assert.equal(ShouldShowBoostTrail(false, MAX_SPEED * 3, true), false);
     assert.equal(ShouldShowBoostTrail(true, MAX_SPEED * 3, true), false);
+    assert.equal(ShouldShowBoostTrail(false, MAX_SPEED * 3, true, true), false);
+});
+
+test("a PERFECT bounce's speed shows no trail (only its spark); the attack boost still does", () => {
+    const fast = MAX_SPEED + BOOST_TRAIL_START_MARGIN + 100;
+    assert.equal(ShouldShowBoostTrail(false, fast, false, false, true), false);
+    assert.equal(ShouldShowBoostTrail(true, fast, false, false, true), false);
+    assert.equal(ShouldShowBoostTrail(false, fast, false, true, true), true);
+});
+
+test("after a PERFECT bounce no trail starts; once back at normal speed, the next boost shows one again", () => {
+    AddTemplate();
+    const kart = Kart(MAX_SPEED * 1.3);
+    kart.perfectBounceBoost = true;
+    UpdateBoostTrail(kart);
+    assert.equal(firedInputs("Start").length, 0);
+    kart.melon.Teleport({ velocity: { x: MAX_SPEED, y: 0, z: 0 } });
+    UpdateBoostTrail(kart);
+    assert.equal(kart.perfectBounceBoost, false);
+    kart.melon.Teleport({ velocity: { x: MAX_SPEED * 1.3, y: 0, z: 0 } });
+    UpdateBoostTrail(kart);
+    assert.equal(firedInputs("Start").length, 1);
+});
+
+test("the attack boost shows it at once, at any speed — like Rocket League", () => {
+    assert.equal(ShouldShowBoostTrail(false, 0, false, true), true);
+    assert.equal(ShouldShowBoostTrail(false, MAX_SPEED / 2, false, true), true);
 });
 
 /** A template holding one particle system at a Hammer offset from it. */
@@ -62,6 +89,18 @@ test("a boost starts one trail on the melon, riding along, and doesn't respawn i
     assert.equal(started.length, 1);
     assert.deepEqual(started[0].GetAbsOrigin(), HERE);
     assert.equal(started[0].GetParent(), kart.melon);
+});
+
+test("pressing attack boost starts it on a slow melon, letting go stops it", () => {
+    AddTemplate();
+    const kart = Kart(MAX_SPEED / 2);
+    kart.attackBoosting = true;
+    UpdateBoostTrail(kart);
+    assert.equal(firedInputs("Start").length, 1);
+    kart.attackBoosting = false;
+    UpdateBoostTrail(kart);
+    assert.equal(firedInputs("Stop").length, 1);
+    assert.equal(kart.boostTrail, undefined);
 });
 
 test("slowing down stops it, and its entities go once the particles have faded", async () => {

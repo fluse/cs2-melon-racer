@@ -337,7 +337,7 @@ const BOUNCE_RATINGS = [
 ];
 
 // Boost trail: a glowing band (particles/melon_racer/boost_trail.vpcf, with
-// juice droplets as its child) behind a melon while a wall-bounce boost has
+// juice droplets as a second particle system in the same template) behind a melon while a wall-bounce boost has
 // it faster than MAX_SPEED. Started and stopped by ../boost-trail.js.
 
 // point_template placed in Hammer holding the trail's info_particle_system
@@ -359,6 +359,38 @@ const BOOST_TRAIL_STOP_MARGIN = 5;
 // fade out instead of vanishing. Must cover the .vpcf's longest particle
 // lifetime (0.75 s for the juice droplets).
 const BOOST_TRAIL_FADE_SECONDS = 1;
+
+// Attack boost: holding the attack button (mouse1) pushes the melon faster
+// than MAX_SPEED along the look direction — paid for with health, drained
+// every tick while the boost is on. High risk, high reward: there's no
+// floor — hold it too long and the health runs out and the melon breaks. Rule: ../logic/attack-boost.js, applied
+// in ../physics/drive.js.
+
+// Extra acceleration along the look direction while attack is held, on top
+// of whatever W/S/A/D do (units/sec^2).
+// Higher: the boost kicks in almost instantly.
+// Lower: it takes a while to build up the extra speed.
+const ATTACK_BOOST_ACCEL = 450;
+// Speed cap while boosting (units/sec). Letting go, the cap decays back to
+// MAX_SPEED at BOOST_DECAY like a wall-bounce boost (so the boost trail shows
+// too while above MAX_SPEED + BOOST_TRAIL_START_MARGIN).
+// Higher: boosting gets much faster than normal driving.
+// Lower (= MAX_SPEED): the boost only accelerates quicker, no higher top speed.
+const ATTACK_BOOST_MAX_SPEED = 850;
+// Health lost per second while boosting (MELON_MAX_HEALTH = 70, so 20 = a
+// full melon breaks after ~3.5 s of boosting).
+// Higher: the boost is expensive, short bursts only.
+// Lower: nearly free, can be held for long stretches.
+const ATTACK_BOOST_HEALTH_PER_SECOND = 20; // was 10
+// The engine itself reacts to attack too — a knife swing shoves the melon
+// ~140 u/s, even with the pawn's weapons taken away every tick. While attack
+// is held and for this long after letting go, physics may not add
+// horizontal speed on top of what the script commanded last tick, so speed
+// only ever comes from driving and the paid boost.
+// Higher: covers pushes that arrive later after the press; also blocks a
+//   downhill roll's speed-up for longer after letting go.
+// Lower (0): only while held — a push landing just after release gets through.
+const ATTACK_PUSH_GUARD_SECONDS = 0.3;
 
 // Lift zones: triggers where wall bounces and wall jumps are tuned for
 // climbing a shaft or a high wall by bouncing between its walls. What
@@ -458,7 +490,7 @@ const BREAK_CAMERA_EXTRA_DISTANCE = 260;
 //   are easier to see; in low rooms the camera may end up in the ceiling.
 // Lower: flatter view from the side; 0 = no rise (only
 //   BREAK_CAMERA_EXTRA_DISTANCE).
-const BREAK_CAMERA_EXTRA_HEIGHT = 160;
+const BREAK_CAMERA_EXTRA_HEIGHT = 100;
 // How long a break's spawned effect entities (both templates below) are
 // kept before being removed — long, so the chunks stay lying at the crash
 // site. Removing the info_particle_system ends its particles, so this is an
@@ -792,6 +824,10 @@ function TraceSphere(config) {
  *   lastWallContact?: { time: number, normal: { x: number, y: number } }, // last wall touched in the air (probe or bounce) — see UpdateWallContact
  *   lastWallJump?: { time: number, normal: { x: number, y: number } }, // see CanWallJump
  *   bufferedWallJumpTime?: number, // a lift-zone jump press not yet used, fired on the next wall touch — see LIFT_ZONE_JUMP_BUFFER
+ *   perfectBounceBoost?: boolean, // its speed above MAX_SPEED is from a PERFECT bounce — no boost trail for that, see boost-trail.js
+ *   attackBoosting?: boolean, // the attack boost is on this tick — shows the boost trail, see boost-trail.js
+ *   attackGuardUntil?: number, // until when engine pushes from attack are cancelled — see ATTACK_PUSH_GUARD_SECONDS
+ *   nextAttackDebugTime?: number, // when physics/attack-debug.js may log this kart's attack state again
  *   jumpDebug?: boolean, // this player's jump debug view is on (user menu toggle) — see physics/jump-debug.js
  *   contactDebug?: import("./physics/jump-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
@@ -2838,10 +2874,18 @@ function FreezePawn(pawn) {
 /**
  * Keeps a frozen pawn at `kart.pawnAnchor`: WASD still flies a NOCLIP pawn
  * around (it's the melon's input too), so without this it would drift off
- * across the map while the player drives. Called every tick.
+ * across the map while the player drives. Also takes away any weapon it got
+ * back (see below). Called every tick.
  * @param {import("./kart-registry.js").Kart} kart
  */
 function HoldPawn(kart) {
+    // No weapons either: the engine hands the pawn a knife again after the
+    // gamemode's DestroyWeapons on spawn, and every knife swing (attack)
+    // shoved the melon ~140 u/s forward — a free boost that skipped the
+    // attack boost's health cost (ATTACK_BOOST_*).
+    if (kart.pawn.GetActiveWeapon()) {
+        kart.pawn.DestroyWeapons();
+    }
     const anchor = kart.pawnAnchor;
     const at = kart.pawn.GetAbsOrigin();
     if (!anchor || Math.hypot(at.x - anchor.x, at.y - anchor.y, at.z - anchor.z) <= PAWN_DRIFT_TOLERANCE) {
@@ -3043,6 +3087,104 @@ function SteerTowards(v, dir, maxTurn, maxAngle) {
     const limit = (maxTurn * Math.PI) / 180;
     const angle = current + Math.max(-limit, Math.min(limit, diff));
     return { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed };
+}
+
+// Attack boost — speed for health (ATTACK_BOOST_* in constants/attack-boost.js).
+// Pure rule, no cs_script import; physics/drive.js applies it
+// (test/attack-boost.test.mjs).
+
+/**
+ * `velocity`'s horizontal part limited to the horizontal speed of
+ * `commanded` (what the script set last tick) — drops whatever speed an
+ * engine push (knife swing, see ATTACK_PUSH_GUARD_SECONDS) added, keeping
+ * the direction and the vertical part.
+ * @param {{ x: number, y: number, z: number }} velocity @param {{ x: number, y: number, z: number }} commanded
+ */
+function WithoutEnginePush(velocity, commanded) {
+    const speed = Math.hypot(velocity.x, velocity.y);
+    const allowed = Math.hypot(commanded.x, commanded.y);
+    if (speed <= allowed) {
+        return velocity;
+    }
+    const scale = allowed / speed;
+    return { x: velocity.x * scale, y: velocity.y * scale, z: velocity.z };
+}
+
+/**
+ * Whether the boost is on this tick and the health left after paying for
+ * it. On whenever attack is held and there's health left — no floor: at 0
+ * or below the melon breaks (the caller's job).
+ * @param {number} health @param {boolean} attackHeld @param {number} dt
+ * @returns {{ boosting: boolean, health: number }}
+ */
+function AttackBoost(health, attackHeld, dt) {
+    if (!attackHeld || health <= 0) {
+        return { boosting: false, health };
+    }
+    return {
+        boosting: true,
+        health: health - ATTACK_BOOST_HEALTH_PER_SECOND * dt,
+    };
+}
+
+// Diagnostics for the attack button (DEBUG only, console). Found with it: the
+// engine gave the pawn a knife back after spawn, and each knife swing shoved
+// the melon ~140 u/s even with the attack boost off — HoldPawn now takes
+// weapons away every tick. Kept in case anything else reacts to attack. These logs show
+// what's going on: per kart while attack is held, how much speed physics
+// added on top of what the script commanded last tick, and which weapon the
+// pawn holds; plus every gun shot, bullet impact and knife attack.
+
+const ATTACK_DEBUG_INTERVAL = 0.25; // seconds between two per-kart lines while attack is held
+
+/** @param {any} entity */
+function Describe(entity) {
+    if (!entity?.IsValid?.()) {
+        return "none";
+    }
+    const name = entity.GetEntityName?.();
+    return `${entity.GetClassName()}${name ? ` "${name}"` : ""}`;
+}
+
+/**
+ * Called by UpdateKart every tick attack is held.
+ * @param {number} slot @param {import("../kart-registry.js").Kart} kart
+ * @param {{ x: number, y: number, z: number }} currentVelocity @param {boolean} boosting
+ */
+function LogAttackHeld(slot, kart, currentVelocity, boosting) {
+    const now = Instance.GetGameTime();
+    if (!DEBUG || now < (kart.nextAttackDebugTime ?? 0)) {
+        return;
+    }
+    kart.nextAttackDebugTime = now + ATTACK_DEBUG_INTERVAL;
+    const actual = Math.hypot(currentVelocity.x, currentVelocity.y);
+    const commanded = kart.lastVelocity ? Math.hypot(kart.lastVelocity.x, kart.lastVelocity.y) : undefined;
+    const added = commanded === undefined ? "?" : (actual - commanded).toFixed(1);
+    Debug(
+        `[attack debug] slot ${slot}: health ${kart.health.toFixed(1)}, boost ${boosting ? "ON" : "off"}, ` +
+        `speed commanded ${commanded?.toFixed(0) ?? "?"} -> now ${actual.toFixed(0)} (physics added ${added} u/s this tick), ` +
+        `weapon ${Describe(kart.pawn.GetActiveWeapon?.())}`
+    );
+}
+
+/** Registers the engine-event logs. Called once from index.js. */
+function RegisterAttackDebug() {
+    if (!DEBUG) {
+        return;
+    }
+    Instance.OnGunFire(({ weapon }) => {
+        Debug(`[attack debug] gun fired: ${Describe(weapon)}`);
+    });
+    Instance.OnBulletImpact(({ weapon, position, hitEntity }) => {
+        const melonKart = hitEntity ? FindKartByMelon(hitEntity) : undefined;
+        Debug(
+            `[attack debug] bullet from ${Describe(weapon)} hit ${Describe(hitEntity)}` +
+            `${melonKart ? " — A MELON" : ""} at (${position.x.toFixed(0)}, ${position.y.toFixed(0)}, ${position.z.toFixed(0)})`
+        );
+    });
+    Instance.OnKnifeAttack(({ weapon, attackType }) => {
+        Debug(`[attack debug] knife attack: ${Describe(weapon)} (type ${attackType})`);
+    });
 }
 
 // Engine side of ground/wall contact: the floor and wall probes (line
@@ -3815,7 +3957,10 @@ function ComputeWallBounce(kart, n, now) {
         return null;
     }
     DebugLogBounce(kart, n, bounce.angle);
-    if (GetBounceRating(bounce.angleFactor) === BOUNCE_RATINGS[0]) {
+    // A PERFECT hit shows its own spark instead of the boost trail — see
+    // ShouldShowBoostTrail. Any other rating's speed shows the trail again.
+    kart.perfectBounceBoost = GetBounceRating(bounce.angleFactor) === BOUNCE_RATINGS[0];
+    if (kart.perfectBounceBoost) {
         PlayPerfectSpark(kart);
     }
     return { ...bounce, jumpFactor };
@@ -3883,6 +4028,7 @@ function UpdateKart(slot, kart, dt) {
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.speedCap = MAX_SPEED;
+        kart.attackBoosting = false;
         kart.pendingBounce = undefined; // parked/finished — a bounce's leftover damage no longer matters
         return;
     }
@@ -3896,6 +4042,7 @@ function UpdateKart(slot, kart, dt) {
         melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
         kart.lastVelocity = undefined;
         kart.settled = false;
+        kart.attackBoosting = false;
         kart.pendingBounce = undefined;
         // Pull the chase camera back from the crash site so the burst is
         // actually visible; restored by ScheduleRespawnAfterBreak.
@@ -3998,8 +4145,25 @@ function UpdateKart(slot, kart, dt) {
     const strafeInput =
         (pawn.IsInputPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.LEFT) ? 1 : 0);
     const jumpPressed = pawn.WasInputJustPressed(CSInputs.JUMP);
+    // Attack boost (ATTACK_BOOST_*): holding attack pushes along the look
+    // direction and lifts the speed cap, paid for with health every tick —
+    // no floor: boost until it's gone and the melon breaks.
+    const attackHeld = pawn.IsInputPressed(CSInputs.ATTACK);
+    const boost = AttackBoost(kart.health, attackHeld, dt);
+    kart.health = boost.health;
+    kart.attackBoosting = boost.boosting; // shows the boost trail, see boost-trail.js
+    if (attackHeld) {
+        LogAttackHeld(slot, kart, currentVelocity, boost.boosting);
+    }
+    if (boost.boosting && kart.health <= 0) {
+        Debug(`slot ${slot}: boosted until the health ran out`);
+        const speed = Math.hypot(currentVelocity.x, currentVelocity.y, currentVelocity.z);
+        BreakMelon(slot, kart, speed > 0 ? currentVelocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+        return;
+    }
 
     if (
+        !boost.boosting &&
         // A head-on wall hit can leave vphysics' own velocity at ~0 this
         // tick — that's the bounce about to be applied, not a melon at rest.
         !bounceVelocity &&
@@ -4049,6 +4213,19 @@ function UpdateKart(slot, kart, dt) {
     // still steer out of the bounce the same tick.
     let vx = bounceVelocity ? bounceVelocity.x : currentVelocity.x;
     let vy = bounceVelocity ? bounceVelocity.y : currentVelocity.y;
+    // Attack also makes the engine shove the melon (knife swing) — no speed
+    // from that, see ATTACK_PUSH_GUARD_SECONDS.
+    if (attackHeld) {
+        kart.attackGuardUntil = now + ATTACK_PUSH_GUARD_SECONDS;
+    }
+    // Coming out of rest there's no command to compare against (settled
+    // melons aren't commanded) — then it was standing still, and a swing
+    // must not get it rolling either.
+    if (!bounceVelocity && now <= (kart.attackGuardUntil ?? -Infinity)) {
+        const guarded = WithoutEnginePush({ x: vx, y: vy, z: 0 }, kart.lastVelocity ?? { x: 0, y: 0, z: 0 });
+        vx = guarded.x;
+        vy = guarded.y;
+    }
 
     // Steering grip (STEER_GRIP_*): holding forward turns the velocity itself
     // towards the look direction — on the ground and (at STEER_AIR_GRIP_RATE)
@@ -4067,13 +4244,19 @@ function UpdateKart(slot, kart, dt) {
         let ay = forwardDir.y * forwardInput * forwardAccel + rightDir.y * strafeInput * STRAFE_ACCEL;
         vx += ax * dt;
         vy += ay * dt;
-    } else {
+    } else if (!boost.boosting) {
         const speed = Math.hypot(vx, vy);
         if (speed > 0) {
             const scale = Math.max(0, speed - COAST_FRICTION * dt) / speed;
             vx *= scale;
             vy *= scale;
         }
+    }
+
+    if (boost.boosting) {
+        vx += forwardDir.x * ATTACK_BOOST_ACCEL * dt;
+        vy += forwardDir.y * ATTACK_BOOST_ACCEL * dt;
+        kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, ATTACK_BOOST_MAX_SPEED);
     }
 
     // Jump press (ground jump / wall jump / wall-bounce timing) and the
@@ -4774,14 +4957,25 @@ function RegisterZoneInputs() {
 /**
  * Whether the trail should show this tick. Starts above MAX_SPEED +
  * BOOST_TRAIL_START_MARGIN, then keeps going down to MAX_SPEED +
- * BOOST_TRAIL_STOP_MARGIN (hysteresis, so it doesn't flicker). Never while
- * `blocked` (the melon is broken or race-locked).
+ * BOOST_TRAIL_STOP_MARGIN (hysteresis, so it doesn't flicker). Always while
+ * the attack boost is on (like Rocket League's boost: pressing it shows the
+ * trail at once, whatever the speed). Not for speed a PERFECT wall bounce
+ * gave — that one shows only its perfect-hit spark. Never while `blocked`
+ * (the melon is broken or race-locked).
  * @param {boolean} showing whether it's on right now
  * @param {number} horizSpeed the melon's horizontal speed, units/sec
  * @param {boolean} blocked
+ * @param {boolean} [attackBoosting] the attack boost is on this tick
+ * @param {boolean} [perfectBounceBoost] the speed above MAX_SPEED is from a PERFECT bounce
  */
-function ShouldShowBoostTrail(showing, horizSpeed, blocked) {
+function ShouldShowBoostTrail(showing, horizSpeed, blocked, attackBoosting = false, perfectBounceBoost = false) {
     if (blocked) {
+        return false;
+    }
+    if (attackBoosting) {
+        return true;
+    }
+    if (perfectBounceBoost) {
         return false;
     }
     const margin = showing ? BOOST_TRAIL_STOP_MARGIN : BOOST_TRAIL_START_MARGIN;
@@ -4795,7 +4989,7 @@ function ShouldShowBoostTrail(showing, horizSpeed, blocked) {
 // already out fade instead of vanishing. Tested in test/boost-trail.test.mjs.
 
 /**
- * Starts or stops the kart's trail to match its speed. Called every tick
+ * Starts or stops the kart's trail to match its speed and attack boost. Called every tick
  * for a kart whose melon is valid (think.js).
  * @param {import("./kart-registry.js").Kart} kart
  */
@@ -4804,7 +4998,13 @@ function UpdateBoostTrail(kart) {
         StopBoostTrail(kart); // a new melon entity — the old trail rode on the old one
     }
     const velocity = kart.melon.GetAbsVelocity();
-    const show = ShouldShowBoostTrail(kart.boostTrail !== undefined, Math.hypot(velocity.x, velocity.y), kart.breaking || kart.locked);
+    const horizSpeed = Math.hypot(velocity.x, velocity.y);
+    // A PERFECT bounce's speed shows no trail — until that boost is used up
+    // (back to normal speed) or the attack boost takes over.
+    if (kart.attackBoosting || horizSpeed <= MAX_SPEED + BOOST_TRAIL_STOP_MARGIN) {
+        kart.perfectBounceBoost = false;
+    }
+    const show = ShouldShowBoostTrail(kart.boostTrail !== undefined, horizSpeed, kart.breaking || kart.locked, kart.attackBoosting, kart.perfectBounceBoost);
     if (show && !kart.boostTrail) {
         StartBoostTrail(kart);
     } else if (!show && kart.boostTrail) {
@@ -5133,6 +5333,7 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
 
 // Heal and lift zones (heal_enter/heal_leave, lift_enter/lift_leave).
 RegisterZoneInputs();
+RegisterAttackDebug();
 
 Instance.OnCustomHudClicked((event) => {
     if (event.layout !== GetSpeedHud()) {

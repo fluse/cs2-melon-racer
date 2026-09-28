@@ -186,12 +186,16 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
 - **Boost trail:** while a bounce has the melon above `MAX_SPEED` +
   `BOOST_TRAIL_START_MARGIN`, a glowing band (white-yellow, fading to
   orange) with a few falling juice droplets follows it — the addon's own
-  `particles/melon_racer/boost_trail.vpcf` (+ `boost_trail_juice.vpcf`
-  as its child), played from the `particle_boost_trail_template` point_template,
+  `particles/melon_racer/boost_trail.vpcf` and `boost_trail_juice.vpcf`,
+  one `info_particle_system` each in the `particle_boost_trail_template`
+  point_template (the juice as a child system never showed in-game),
   riding along on the melon. It stops once the boost has decayed below
   `MAX_SPEED` + `BOOST_TRAIL_STOP_MARGIN` (lower, so it doesn't flicker)
   and when the melon breaks or is race-locked; the particles already out
-  fade over `BOOST_TRAIL_FADE_SECONDS`. Visible to every player, so the
+  fade over `BOOST_TRAIL_FADE_SECONDS`. **Not after a PERFECT bounce**
+  (decided): that speed shows only the perfect-hit spark, no trail, until it
+  has decayed back to normal speed (a later non-PERFECT bounce or the attack
+  boost shows the trail again). Visible to every player, so the
   others see who's boosting. Rule: `logic/boost-trail.js`, applied by
   `boost-trail.js` (`test/boost-trail.test.mjs`).
 - **Upward kick:** every bounce (any rating) also lifts the melon — its
@@ -477,6 +481,32 @@ Tuning constants (accel, max speed, friction, jump speed, spawn offset,
 camera offsets) live at the top of `melon_drive.js` — iterate them in-game
 via hot reload
 rather than guessing.
+
+## Attack boost — speed for health (implemented)
+
+Holding the attack button (mouse1) boosts the melon: it's pushed along the
+look direction at an extra `ATTACK_BOOST_ACCEL` and its speed cap rises to
+`ATTACK_BOOST_MAX_SPEED` (above `MAX_SPEED`, so the speedometer's `Boosted`
+state and the boost trail show too). Letting go, the cap decays back at
+`BOOST_DECAY` like a wall-bounce boost. The price: while boosting, the melon
+loses `ATTACK_BOOST_HEALTH_PER_SECOND` health. **High risk, high reward
+(decided): there's no floor** — boost too long and the health runs out and
+the melon breaks, like any other break (respawn at the last checkpoint).
+While the attack boost is on, the boost trail shows from the first tick,
+whatever the speed (like Rocket League); letting go it keeps going only as
+long as the melon is still above the usual trail speed (see "Boost trail").
+Works on the ground and in the air, not while broken or race-locked.
+Constants: `constants/attack-boost.js`; rule: `logic/attack-boost.js`,
+applied in `physics/drive.js` (`test/attack-boost.test.mjs`).
+The pawn must hold no weapon: the engine gives it a knife back after spawn,
+and every knife swing shoved the melon ~140 u/s — a free boost without the
+health cost. `HoldPawn` (`kart-spawn.js`) removes weapons every tick; with
+`DEBUG` on, `physics/attack-debug.js` logs what attack does (`[attack debug]`).
+That alone didn't stop the push in-game, so on top: while attack is held
+and for `ATTACK_PUSH_GUARD_SECONDS` after, physics may not add horizontal
+speed beyond what the script commanded last tick (`WithoutEnginePush`) —
+speed then only comes from driving (W, up to `MAX_SPEED` as always) and the
+paid boost.
 
 ## Jumping (implemented)
 

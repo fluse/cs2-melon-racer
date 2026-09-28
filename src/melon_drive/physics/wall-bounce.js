@@ -153,7 +153,10 @@ export function ComputeWallBounce(kart, n, now) {
         return null;
     }
     DebugLogBounce(kart, n, bounce.angle);
-    if (GetBounceRating(bounce.angleFactor) === BOUNCE_RATINGS[0]) {
+    // A PERFECT hit shows its own spark instead of the boost trail — see
+    // ShouldShowBoostTrail. Any other rating's speed shows the trail again.
+    kart.perfectBounceBoost = GetBounceRating(bounce.angleFactor) === BOUNCE_RATINGS[0];
+    if (kart.perfectBounceBoost) {
         PlayPerfectSpark(kart);
     }
     return { ...bounce, jumpFactor };

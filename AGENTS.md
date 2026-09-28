@@ -49,9 +49,9 @@ src/melon_drive/physics/*.js             # melon physics, one file per concern: 
 src/melon_drive/heal/*.js                # everything that heals a melon, together so it's easy to find: constants.js (HEAL_ZONE_*,
                                           #   heal_zone_full), logic.js (pure rules, test/heal.test.mjs), zone.js (ApplyHealing per tick,
                                           #   RestoreFullHealth on respawn), effect.js (heal particle on entering a zone) — heal_enter/heal_leave are registered in zone-inputs.js
-src/melon_drive/constants/*.js           # every tunable/Hammer name, one file per system (driving, jump, health, wall-bounce, boost-trail, lift, prediction,
+src/melon_drive/constants/*.js           # every tunable/Hammer name, one file per system (driving, jump, health, wall-bounce, boost-trail, attack-boost, lift, prediction,
                                           #   breaking, race, paint, teleport, spawn, camera, hud, debug) — import from constants/index.js
-src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, lift zones, checkpoint progress, break sequence, lift/zone camera zoom, teleport, ground/wall contact) — no engine import, unit-tested
+src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, attack boost, lift zones, checkpoint progress, break sequence, lift/zone camera zoom, teleport, ground/wall contact) — no engine import, unit-tested
 test/*.test.mjs                          # node:test unit tests for src/*/logic/ (`npm test`), plus checks of the .vmap/.xml the script relies on
 test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities
 test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files
@@ -61,7 +61,7 @@ tools/make-decal.mjs                     # generates materials/melon_racer/<deca
                                           #   (HUD logo, rawDecals/*.png|jpg — JPG via Windows System.Drawing; can key out a baked-in checkerboard, writes <name>_transparent.png)
 rawDecals/*.png                          # new source images for decals (make-decal.mjs input); once done, the tool moves
                                           #   them (+ their _transparent.png) to rawDecals/done/ and reads them from there
-particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3, hand-written): boost_trail (+ boost_trail_juice child).
+particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3, hand-written): boost_trail + boost_trail_juice (two info_particle_systems in one template, not parent/child).
                                           #   Write the editor source format, not resourceinfo's compiled dump — see the comments in boost_trail.vpcf;
                                           #   compile with resourcecompiler.exe (-f) like Panorama
 materials/melon_racer/*_decal.vmat       # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal — textures from make-decal.mjs

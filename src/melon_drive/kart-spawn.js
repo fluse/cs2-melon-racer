@@ -79,10 +79,18 @@ function FreezePawn(pawn) {
 /**
  * Keeps a frozen pawn at `kart.pawnAnchor`: WASD still flies a NOCLIP pawn
  * around (it's the melon's input too), so without this it would drift off
- * across the map while the player drives. Called every tick.
+ * across the map while the player drives. Also takes away any weapon it got
+ * back (see below). Called every tick.
  * @param {import("./kart-registry.js").Kart} kart
  */
 export function HoldPawn(kart) {
+    // No weapons either: the engine hands the pawn a knife again after the
+    // gamemode's DestroyWeapons on spawn, and every knife swing (attack)
+    // shoved the melon ~140 u/s forward — a free boost that skipped the
+    // attack boost's health cost (ATTACK_BOOST_*).
+    if (kart.pawn.GetActiveWeapon()) {
+        kart.pawn.DestroyWeapons();
+    }
     const anchor = kart.pawnAnchor;
     const at = kart.pawn.GetAbsOrigin();
     if (!anchor || Math.hypot(at.x - anchor.x, at.y - anchor.y, at.z - anchor.z) <= PAWN_DRIFT_TOLERANCE) {

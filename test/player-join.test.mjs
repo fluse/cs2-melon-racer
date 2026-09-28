@@ -120,3 +120,11 @@ test("a pawn flown away by WASD is put back at its spawn", () => {
     HoldPawn(kart);
     assert.deepEqual(pawn.GetAbsOrigin(), PLAYER_SPAWN);
 });
+
+test("a weapon the engine gives the pawn back is taken away again — a knife swing would shove the melon", () => {
+    const pawn = AddPawn();
+    const kart = SetUpPlayerKart(pawn, GetIntroSpawnPoint());
+    pawn.weapons = [new Entity({ className: "weapon_knife" })];
+    HoldPawn(kart);
+    assert.equal(pawn.GetActiveWeapon(), undefined);
+});

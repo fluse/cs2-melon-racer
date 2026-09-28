@@ -63,6 +63,8 @@ export class CSPlayerPawn extends Entity {
         this.pressed = new Set();
         /** @type {Set<string>} buttons pressed this tick (e.g. "JUMP") */
         this.justPressed = new Set();
+        /** @type {Entity[]} weapons held, the first is the active one */
+        this.weapons = [];
         this.camera = { mode: 0, config: undefined, SetMode(m) { this.mode = m; }, GetMode() { return this.mode; }, SetFollowConfig(c) { this.config = c; } };
     }
     Teleport(values = {}) {
@@ -76,6 +78,8 @@ export class CSPlayerPawn extends Entity {
     GetCustomCamera() { return this.camera; }
     IsInputPressed(button) { return this.pressed.has(button); }
     WasInputJustPressed(button) { return this.justPressed.has(button); }
+    GetActiveWeapon() { return this.weapons[0]; }
+    DestroyWeapons() { this.weapons = []; }
 }
 
 export class PointTemplate extends Entity {

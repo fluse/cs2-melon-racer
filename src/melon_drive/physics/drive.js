@@ -23,7 +23,13 @@ import {
     WALL_BOUNCE_COOLDOWN,
     WALL_BOUNCE_PERFECT_JUMP_WINDOW,
     BOOST_DECAY,
+    ATTACK_BOOST_ACCEL,
+    ATTACK_BOOST_MAX_SPEED,
+    ATTACK_PUSH_GUARD_SECONDS,
 } from "../constants/index.js";
+import { AttackBoost, WithoutEnginePush } from "../logic/attack-boost.js";
+import { LogAttackHeld } from "./attack-debug.js";
+import { Debug } from "../debug.js";
 import { ApplyJump } from "./jump.js";
 import { UpdateGrounded, UpdateWallContact } from "./contact.js";
 import { DrawJumpDebug } from "./jump-debug.js";
@@ -47,6 +53,7 @@ export function UpdateKart(slot, kart, dt) {
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.speedCap = MAX_SPEED;
+        kart.attackBoosting = false;
         kart.pendingBounce = undefined; // parked/finished — a bounce's leftover damage no longer matters
         return;
     }
@@ -60,6 +67,7 @@ export function UpdateKart(slot, kart, dt) {
         melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
         kart.lastVelocity = undefined;
         kart.settled = false;
+        kart.attackBoosting = false;
         kart.pendingBounce = undefined;
         // Pull the chase camera back from the crash site so the burst is
         // actually visible; restored by ScheduleRespawnAfterBreak.
@@ -162,8 +170,25 @@ export function UpdateKart(slot, kart, dt) {
     const strafeInput =
         (pawn.IsInputPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.LEFT) ? 1 : 0);
     const jumpPressed = pawn.WasInputJustPressed(CSInputs.JUMP);
+    // Attack boost (ATTACK_BOOST_*): holding attack pushes along the look
+    // direction and lifts the speed cap, paid for with health every tick —
+    // no floor: boost until it's gone and the melon breaks.
+    const attackHeld = pawn.IsInputPressed(CSInputs.ATTACK);
+    const boost = AttackBoost(kart.health, attackHeld, dt);
+    kart.health = boost.health;
+    kart.attackBoosting = boost.boosting; // shows the boost trail, see boost-trail.js
+    if (attackHeld) {
+        LogAttackHeld(slot, kart, currentVelocity, boost.boosting);
+    }
+    if (boost.boosting && kart.health <= 0) {
+        Debug(`slot ${slot}: boosted until the health ran out`);
+        const speed = Math.hypot(currentVelocity.x, currentVelocity.y, currentVelocity.z);
+        BreakMelon(slot, kart, speed > 0 ? currentVelocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+        return;
+    }
 
     if (
+        !boost.boosting &&
         // A head-on wall hit can leave vphysics' own velocity at ~0 this
         // tick — that's the bounce about to be applied, not a melon at rest.
         !bounceVelocity &&
@@ -213,6 +238,19 @@ export function UpdateKart(slot, kart, dt) {
     // still steer out of the bounce the same tick.
     let vx = bounceVelocity ? bounceVelocity.x : currentVelocity.x;
     let vy = bounceVelocity ? bounceVelocity.y : currentVelocity.y;
+    // Attack also makes the engine shove the melon (knife swing) — no speed
+    // from that, see ATTACK_PUSH_GUARD_SECONDS.
+    if (attackHeld) {
+        kart.attackGuardUntil = now + ATTACK_PUSH_GUARD_SECONDS;
+    }
+    // Coming out of rest there's no command to compare against (settled
+    // melons aren't commanded) — then it was standing still, and a swing
+    // must not get it rolling either.
+    if (!bounceVelocity && now <= (kart.attackGuardUntil ?? -Infinity)) {
+        const guarded = WithoutEnginePush({ x: vx, y: vy, z: 0 }, kart.lastVelocity ?? { x: 0, y: 0, z: 0 });
+        vx = guarded.x;
+        vy = guarded.y;
+    }
 
     // Steering grip (STEER_GRIP_*): holding forward turns the velocity itself
     // towards the look direction — on the ground and (at STEER_AIR_GRIP_RATE)
@@ -231,13 +269,19 @@ export function UpdateKart(slot, kart, dt) {
         let ay = forwardDir.y * forwardInput * forwardAccel + rightDir.y * strafeInput * STRAFE_ACCEL;
         vx += ax * dt;
         vy += ay * dt;
-    } else {
+    } else if (!boost.boosting) {
         const speed = Math.hypot(vx, vy);
         if (speed > 0) {
             const scale = Math.max(0, speed - COAST_FRICTION * dt) / speed;
             vx *= scale;
             vy *= scale;
         }
+    }
+
+    if (boost.boosting) {
+        vx += forwardDir.x * ATTACK_BOOST_ACCEL * dt;
+        vy += forwardDir.y * ATTACK_BOOST_ACCEL * dt;
+        kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, ATTACK_BOOST_MAX_SPEED);
     }
 
     // Jump press (ground jump / wall jump / wall-bounce timing) and the

@@ -6,14 +6,25 @@ import { BOOST_TRAIL_START_MARGIN, BOOST_TRAIL_STOP_MARGIN } from "../constants/
 /**
  * Whether the trail should show this tick. Starts above MAX_SPEED +
  * BOOST_TRAIL_START_MARGIN, then keeps going down to MAX_SPEED +
- * BOOST_TRAIL_STOP_MARGIN (hysteresis, so it doesn't flicker). Never while
- * `blocked` (the melon is broken or race-locked).
+ * BOOST_TRAIL_STOP_MARGIN (hysteresis, so it doesn't flicker). Always while
+ * the attack boost is on (like Rocket League's boost: pressing it shows the
+ * trail at once, whatever the speed). Not for speed a PERFECT wall bounce
+ * gave — that one shows only its perfect-hit spark. Never while `blocked`
+ * (the melon is broken or race-locked).
  * @param {boolean} showing whether it's on right now
  * @param {number} horizSpeed the melon's horizontal speed, units/sec
  * @param {boolean} blocked
+ * @param {boolean} [attackBoosting] the attack boost is on this tick
+ * @param {boolean} [perfectBounceBoost] the speed above MAX_SPEED is from a PERFECT bounce
  */
-export function ShouldShowBoostTrail(showing, horizSpeed, blocked) {
+export function ShouldShowBoostTrail(showing, horizSpeed, blocked, attackBoosting = false, perfectBounceBoost = false) {
     if (blocked) {
+        return false;
+    }
+    if (attackBoosting) {
+        return true;
+    }
+    if (perfectBounceBoost) {
         return false;
     }
     const margin = showing ? BOOST_TRAIL_STOP_MARGIN : BOOST_TRAIL_START_MARGIN;

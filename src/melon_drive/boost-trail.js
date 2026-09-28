@@ -5,10 +5,10 @@
 // already out fade instead of vanishing. Tested in test/boost-trail.test.mjs.
 import { SpawnFromTemplate, PlaceAll, StartParticles, StopParticles, RemoveAfter } from "./particles.js";
 import { ShouldShowBoostTrail } from "./logic/boost-trail.js";
-import { BOOST_TRAIL_TEMPLATE_NAME, BOOST_TRAIL_FADE_SECONDS } from "./constants/index.js";
+import { BOOST_TRAIL_TEMPLATE_NAME, BOOST_TRAIL_FADE_SECONDS, BOOST_TRAIL_STOP_MARGIN, MAX_SPEED } from "./constants/index.js";
 
 /**
- * Starts or stops the kart's trail to match its speed. Called every tick
+ * Starts or stops the kart's trail to match its speed and attack boost. Called every tick
  * for a kart whose melon is valid (think.js).
  * @param {import("./kart-registry.js").Kart} kart
  */
@@ -17,7 +17,13 @@ export function UpdateBoostTrail(kart) {
         StopBoostTrail(kart); // a new melon entity — the old trail rode on the old one
     }
     const velocity = kart.melon.GetAbsVelocity();
-    const show = ShouldShowBoostTrail(kart.boostTrail !== undefined, Math.hypot(velocity.x, velocity.y), kart.breaking || kart.locked);
+    const horizSpeed = Math.hypot(velocity.x, velocity.y);
+    // A PERFECT bounce's speed shows no trail — until that boost is used up
+    // (back to normal speed) or the attack boost takes over.
+    if (kart.attackBoosting || horizSpeed <= MAX_SPEED + BOOST_TRAIL_STOP_MARGIN) {
+        kart.perfectBounceBoost = false;
+    }
+    const show = ShouldShowBoostTrail(kart.boostTrail !== undefined, horizSpeed, kart.breaking || kart.locked, kart.attackBoosting, kart.perfectBounceBoost);
     if (show && !kart.boostTrail) {
         StartBoostTrail(kart);
     } else if (!show && kart.boostTrail) {
