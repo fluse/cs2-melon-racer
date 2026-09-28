@@ -1,0 +1,33 @@
+// Arrow as a decal/overlay. Textures come from
+// rawDecals/Arrow.jpg via `node tools/make-decal.mjs` — re-run that after
+// changing the image.
+
+Layer0
+{
+	shader "csgo_static_overlay.vfx"
+
+	//---- Blend Mode ----
+	F_BLEND_MODE 1 // Translucent
+
+	//---- Color ----
+	g_vColorTint "[1.000000 1.000000 1.000000 0.000000]"
+	TextureColor "materials/melon_racer/arrow_decal_color.png"
+
+	//---- Translucent ----
+	g_flOpacityScale "1.000"
+	TextureTranslucency "materials/melon_racer/arrow_decal_trans.png"
+
+	//---- Fog ----
+	g_bFogEnabled "1"
+
+	//---- Lighting ----
+	g_flMetalness "0.000"
+	TextureRoughness "materials/default/default_rough.tga"
+
+	//---- Normal Map ----
+	TextureNormal "materials/default/default_normal.tga"
+
+	//---- Texture Address Mode ----
+	g_nTextureAddressModeU "1" // Clamp
+	g_nTextureAddressModeV "1" // Clamp
+}

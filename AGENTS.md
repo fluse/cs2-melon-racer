@@ -56,6 +56,11 @@ test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests ca
 test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
 tools/make-icons.mjs                     # generates panorama/images/custom_game/icons/*.png (user menu icons) — edit shapes there, re-run with node
+tools/make-decal.mjs                     # generates materials/melon_racer/<decal>_{color,trans}.png for every decal in its DECALS list
+                                          #   (HUD logo, rawDecals/*.png|jpg — JPG via Windows System.Drawing; can key out a baked-in checkerboard, writes <name>_transparent.png)
+rawDecals/*.png                          # new source images for decals (make-decal.mjs input); once done, the tool moves
+                                          #   them (+ their _transparent.png) to rawDecals/done/ and reads them from there
+materials/melon_racer/*_decal.vmat       # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal — textures from make-decal.mjs
 ```
 
 `src/<entry>/` is where gameplay code goes — one directory per `point_script`
