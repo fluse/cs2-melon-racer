@@ -63,12 +63,16 @@ for (const name of PARTICLE_TEMPLATES) {
 }
 
 // The boost trail is optional (no template = no trail), so this only checks
-// it once it's been placed — and then it must point at the trail's own .vpcf.
-test(`"${BOOST_TRAIL_TEMPLATE_NAME}" spawns the boost trail particle system`, { skip: ByName(BOOST_TRAIL_TEMPLATE_NAME).length === 0 && "not placed in the map yet" }, () => {
+// it once it's been placed — and then it must spawn the band and the juice
+// droplets, each as its own info_particle_system, and nothing else.
+const BOOST_TRAIL_EFFECTS = ["particles/melon_racer/boost_trail.vpcf", "particles/melon_racer/boost_trail_juice.vpcf"];
+test(`"${BOOST_TRAIL_TEMPLATE_NAME}" spawns the boost trail's band and juice particle systems`, { skip: ByName(BOOST_TRAIL_TEMPLATE_NAME).length === 0 && "not placed in the map yet" }, () => {
     const particles = TemplateTargets(BOOST_TRAIL_TEMPLATE_NAME).filter((e) => e.classname === "info_particle_system");
-    assert.ok(particles.length > 0, `"${BOOST_TRAIL_TEMPLATE_NAME}" doesn't spawn any info_particle_system`);
     for (const particle of particles) {
-        assert.equal(particle.effect_name, "particles/melon_racer/boost_trail.vpcf", `"${particle.targetname}" plays the wrong effect`);
+        assert.ok(BOOST_TRAIL_EFFECTS.includes(particle.effect_name), `"${particle.targetname}" plays the wrong effect (${particle.effect_name})`);
+    }
+    for (const effect of BOOST_TRAIL_EFFECTS) {
+        assert.ok(particles.some((p) => p.effect_name === effect), `"${BOOST_TRAIL_TEMPLATE_NAME}" has no info_particle_system playing ${effect}`);
     }
 });
 

@@ -6,9 +6,11 @@
 	// (started/stopped by src/melon_drive/boost-trail.js). Continuous soft
 	// glow sprites left behind in world space — overlapping, they read as a
 	// band — white-yellow at the melon, fading to orange and shrinking
-	// behind it. The juice droplets are the child system.
+	// behind it. The juice droplets (boost_trail_juice.vpcf) are their own
+	// info_particle_system in the same point_template, not a child system —
+	// as a child they never showed in-game.
 	m_nMaxParticles = 160
-	m_flConstantRadius = 14.0
+	m_flConstantRadius = 8.5
 	m_ConstantColor = [ 255, 240, 170, 255 ]
 	m_flMaxDrawDistance = 6000.0
 	m_Renderers =
@@ -56,7 +58,7 @@
 		{
 			_class = "C_INIT_CreateWithinSphereTransform"
 			m_fRadiusMin = 0.0
-			m_fRadiusMax = 2.0
+			m_fRadiusMax = 1.2
 		},
 		// lifetime (s)
 		{
@@ -76,8 +78,8 @@
 			m_InputValue =
 			{
 				m_nType = "PF_TYPE_RANDOM_UNIFORM"
-				m_flRandomMin = 12.0
-				m_flRandomMax = 16.0
+				m_flRandomMin = 7.0
+				m_flRandomMax = 10.0
 				m_nRandomMode = "PF_RANDOM_MODE_CONSTANT"
 			}
 		},
@@ -105,12 +107,6 @@
 			_class = "C_OP_ContinuousEmitter"
 			// A plain number here — the { m_nType ... } form compiles to 0.
 			m_flEmitRate = 180.0
-		},
-	]
-	m_Children =
-	[
-		{
-			m_ChildRef = resource:"particles/melon_racer/boost_trail_juice.vpcf"
 		},
 	]
 }

@@ -1,5 +1,5 @@
 // Boost trail: a glowing band (particles/melon_racer/boost_trail.vpcf, with
-// juice droplets as its child) behind a melon while a wall-bounce boost has
+// juice droplets as a second particle system in the same template) behind a melon while a wall-bounce boost has
 // it faster than MAX_SPEED. Started and stopped by ../boost-trail.js.
 
 // point_template placed in Hammer holding the trail's info_particle_system
