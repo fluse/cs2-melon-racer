@@ -14,6 +14,7 @@ import {
     BOUNCE_RATINGS,
     WALL_CONTACT_DISTANCE,
     WALL_CONTACT_MIN_STOP,
+    WALL_BOUNCE_UP_SPEED,
 } from "../constants/index.js";
 
 /**
@@ -142,4 +143,28 @@ export function WallBounceDamage(impactSpeed, speedGain, angleFactor) {
         Math.max(0, impactSpeed - WALL_IMPACT_DAMAGE_THRESHOLD) * WALL_IMPACT_DAMAGE_SCALE +
         speedGain * WALL_BOUNCE_DAMAGE_PER_SPEED;
     return rawDamage * (1 - angleFactor);
+}
+
+/**
+ * Vertical velocity right after a wall bounce: a fall is cancelled, then
+ * the kick is added on top (a melon already rising keeps that plus the kick).
+ * @param {number} currentZ vertical velocity physics left this tick
+ * @param {number} [upSpeed] the kick — WALL_BOUNCE_UP_SPEED, or a lift zone's
+ */
+export function BounceUpVelocity(currentZ, upSpeed = WALL_BOUNCE_UP_SPEED) {
+    return Math.max(currentZ, 0) + upSpeed;
+}
+
+/**
+ * `v` (horizontal) scaled up to at least `minSpeed`, direction kept. A zero
+ * velocity has no direction and stays as it is.
+ * @param {{ x: number, y: number }} v @param {number} minSpeed
+ */
+export function WithMinSpeed(v, minSpeed) {
+    const speed = Math.hypot(v.x, v.y);
+    if (speed <= 0 || speed >= minSpeed) {
+        return v;
+    }
+    const scale = minSpeed / speed;
+    return { x: v.x * scale, y: v.y * scale };
 }

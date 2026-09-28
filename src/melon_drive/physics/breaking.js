@@ -5,11 +5,11 @@ import { Debug } from "../debug.js";
 import { karts } from "../kart-registry.js";
 import { SpawnMelonAt } from "../kart-spawn.js";
 import { FacePlayerView } from "../spawn-points.js";
-import { ApplyCameraFollow } from "../camera.js";
+import { ApplyCameraFollow } from "../camera/index.js";
 import { MELON_MAX_HEALTH, BREAK_RESPAWN_DELAY, BREAK_TINT_FALLBACK } from "../constants/index.js";
 import { DirectionToAngles, SpawnBreakParticles } from "./break-effects.js";
 import { RespawnKartAtCheckpoint } from "./teleport.js";
-import { LeaveHealZones } from "./heal.js";
+import { LeaveZones } from "./zones.js";
 
 /**
  * Common tail end of every break, whether it was caught by our own
@@ -81,7 +81,7 @@ function RespawnDestroyedMelon(slot, kart) {
     kart.settled = false;
     kart.speedCap = undefined;
     kart.pendingBounce = undefined;
-    LeaveHealZones(kart); // a new melon entity — the old one's zones never send heal_leave
+    LeaveZones(kart); // a new melon entity — the old one's zones never send heal_leave/lift_leave
     ApplyCameraFollow(kart);
 }
 

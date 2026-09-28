@@ -7,4 +7,4 @@ export { IsJumpDebugOn, SetJumpDebug } from "./jump-debug.js";
 export { ApplyImpactDamage } from "./damage.js";
 export { BreakMelon, HandleMelonLost } from "./breaking.js";
 export { RespawnKartAtCheckpoint, TeleportKartTo, SetKartPaintColor } from "./teleport.js";
-export { LeaveHealZones } from "./heal.js";
+export { EnterZone, LeaveZone, LeaveZones } from "./zones.js";

@@ -44,6 +44,12 @@ export const WALL_BOUNCE_PERFECT_JUMP_MULTIPLIER = 1.3; // extra multiplier on t
 // of the previous press is treated as mashing and locks timing credit for
 // that long — see RegisterWallTimingPress.
 export const WALL_TIMING_SPAM_LOCKOUT = 0.4; // seconds
+// Every bounce also lifts the melon: its vertical speed is set to at least
+// this much upward (a falling melon's fall is cancelled first, one already
+// rising keeps its upward speed plus this). Same for every rating.
+// Higher: bounces send it up in an arc; 0 = vertical left to physics (old).
+// Stronger inside lift zones — see constants/lift.js.
+export const WALL_BOUNCE_UP_SPEED = 220; // units/sec upward
 export const WALL_BOUNCE_COOLDOWN = 0.2; // seconds — stops one wall contact from bouncing (and damaging) on consecutive ticks
 // Wall hits get their own damage rules, separate from landings: a base part
 // from the impact itself (same shape as IMPACT_DAMAGE_*), plus a cost for

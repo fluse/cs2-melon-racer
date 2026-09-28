@@ -50,7 +50,7 @@ These apply to everything below unless a section says otherwise.
    bounces; a thin trigger can be tunneled through in one tick.
 7. **Prefixes are reserved.** Don't give unrelated entities names starting
    with `track_start_`, `checkpoint_`, `paint_trigger_`, `teleport_to_`, `teleport_stop_to_`,
-   `teleport_keep_to_`, `heal_zone_`,
+   `teleport_keep_to_`, `heal_zone_`, `lift_zone_`, `camera_zone_`,
    `melon_break` or `hub_` — the script or tests may pick them up.
 
 ## 2. Required core entities
@@ -98,6 +98,10 @@ follows the general conventions in section 1.
 | `melon_teleport` | `teleport_[stop_\|keep_]to_<destination>` | name (mode, destination) | Teleports the melon. See 4.5. |
 | `heal_enter` | any heal trigger | name (optional rate) | Melon starts healing over time. See 4.6. |
 | `heal_leave` | the same heal trigger, **`OnEndTouch`** | — | Stops healing from that trigger. |
+| `lift_enter` | any lift trigger | name (optional kick) | Wall bounces kick the melon higher up. See 4.7. |
+| `lift_leave` | the same lift trigger, **`OnEndTouch`** | — | Back to the normal bounce kick. |
+| `camera_enter` | any camera trigger | name (optional zoom) | Chase camera zooms in or out. See 4.8. |
+| `camera_leave` | the same camera trigger, **`OnEndTouch`** | — | Camera eases back to normal. |
 
 Anything else is ignored by the script, and `npm test` fails on it.
 
@@ -222,6 +226,74 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → heal_enter
   applies inside a zone.
 - Teleports and respawns drop the melon out of every zone; a zone it lands
   in picks it up again on its next `OnStartTouch`.
+
+### 4.7 Lift zones
+
+For shafts and high walls that melons climb by bouncing between walls.
+
+```
+name:    anything, or lift_zone_<speed>   e.g. lift_zone_600 (600 u/s up per bounce)
+outputs: OnStartTouch → melon_drive_script → RunScriptInput → lift_enter
+         OnEndTouch   → melon_drive_script → RunScriptInput → lift_leave
+```
+
+- Every wall bounce kicks the melon upward: `WALL_BOUNCE_UP_SPEED` (220 u/s)
+  normally, inside a lift zone its own kick instead. Parsed from a name
+  matching `^lift_zone_(\d+(?:\.\d+)?)$`, any other name uses
+  `LIFT_ZONE_UP_SPEED` (450 u/s). A fall is cancelled first; a melon already
+  rising keeps that plus the kick.
+- Height gained per bounce ≈ kick² / 1600 units (gravity 800): 220 → ~30,
+  450 → ~125, 600 → ~225. Size the zone to cover the whole climb, top
+  included.
+- Only wall **bounces** get the kick — not driving through. Wall jumps in
+  a zone cost no wall-jump charge (the HUD jump bar), are always full
+  strength, and don't cut a bounce's higher kick short. Between two wall
+  jumps there only `LIFT_ZONE_WALL_JUMP_COOLDOWN` (0.1 s) must pass instead
+  of `WALL_JUMP_COOLDOWN` (still alternating walls), and a jump pressed up
+  to `LIFT_ZONE_JUMP_BUFFER` (0.2 s) before touching the next wall fires
+  the wall jump on the touch.
+  A bounce needs an impact of at least `WALL_BOUNCE_MIN_IMPACT` (200 u/s), so
+  a shaft must be wide enough to gather that speed between walls. Inside
+  the zone every bounce leaves the wall with at least
+  `LIFT_ZONE_MIN_BOUNCE_SPEED` (450 u/s) sideways, whatever its rating, so
+  the chain doesn't die at the opposite wall.
+- While inside, the chase camera eases out (`LIFT_CAMERA_EXTRA_DISTANCE`
+  back, `LIFT_CAMERA_EXTRA_HEIGHT` up) so the climb stays in view, and
+  isn't pulled in at walls meanwhile — it looks through the shaft walls.
+- Both outputs are required; overlapping zones don't stack (the strongest
+  counts); teleports and respawns drop the melon out of every zone, like
+  heal zones.
+
+### 4.8 Camera zones
+
+Areas where the chase camera zooms out (overview of a big jump, an open
+hall) or in (tight tunnels).
+
+```
+name:    anything, or camera_zone_<distance>_<height>   e.g. camera_zone_250_40 (250 back, 40 up)
+                      camera_zone_<distance>            e.g. camera_zone_-30   (30 closer)
+                      camera_zone_noclip_<distance>_<height>
+outputs: OnStartTouch → melon_drive_script → RunScriptInput → camera_enter
+         OnEndTouch   → melon_drive_script → RunScriptInput → camera_leave
+```
+
+- `<distance>`: units further back than the player's own camera setting,
+  negative = closer. `<height>`: units higher, negative = lower (default 0).
+  Decimals allowed. Parsed from a name matching
+  `^camera_zone_(noclip_)?(-?\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?$`,
+  any other name uses `CAMERA_ZONE_EXTRA_DISTANCE` (150) /
+  `CAMERA_ZONE_EXTRA_HEIGHT` (0).
+- The camera eases there over `CAMERA_ZONE_EASE_SECONDS` (0.6 s) and back
+  the same way after leaving. Zooming in never gets closer than
+  `CAMERA_ZONE_MIN_DISTANCE` (20) behind the melon.
+- Walls still pull the camera in as usual, which can cancel a zoom-out
+  next to a wall. `camera_zone_noclip_…` turns that off while its zoom is
+  on — the camera looks through walls instead (like in lift zones).
+- Overlapping camera zones don't add up: the one entered last counts;
+  moving from one into another eases straight to the new zoom. A lift
+  zone's own zoom (4.7) does add on top.
+- Both outputs are required; teleports and respawns drop the melon out of
+  every zone, like heal zones.
 
 ## 5. Limits
 

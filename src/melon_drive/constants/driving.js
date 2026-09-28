@@ -4,7 +4,7 @@
 // (sent_melon_base/init.lua ENT:Think + gamemode/shared.lua DefXSpeed):
 // forward is the strongest push, reverse is half that, strafe is weaker
 // still — keeping FORWARD_ACCEL as our existing tuned baseline.
-export const FORWARD_ACCEL = 450; // units/sec^2 while holding forward (was 900, then 500, then 400 — a heavier, slower build-up: ~1.45s to MAX_SPEED)
+export const FORWARD_ACCEL = 325; // units/sec^2 while holding forward (was 900, then 500, then 400, then 450 — a heavier, slower build-up: ~2s to MAX_SPEED)
 export const REVERSE_ACCEL = FORWARD_ACCEL * 0.5; // 0.5x forward, matches original's Reverse/Forward ratio
 export const STRAFE_ACCEL = FORWARD_ACCEL * 0.4; // 0.4x forward, matches original's Strafe/Forward ratio
 export const MAX_SPEED = 650; // units/sec, horizontal speed cap
@@ -37,7 +37,12 @@ export const SETTLE_NUDGE_ANGULAR_SPEED = 40; // deg/sec, one-off pitch/roll kic
 // turned it slowly, like a hovercraft). Only for velocity that is at most
 // STEER_GRIP_MAX_ANGLE off the look direction: looking back or far to the
 // side is braking/turning around via plain acceleration, not a snap U-turn.
-// No grip in the air, so a wall bounce's outgoing angle isn't bent right away.
 // Higher STEER_GRIP_RATE: more direct, less drift. 0 = off (old behavior).
 export const STEER_GRIP_RATE = 180; // degrees/sec
 export const STEER_GRIP_MAX_ANGLE = 100; // degrees
+// The same grip in the air (jumps, falls, after a wall bounce), at its own
+// rate — without it, FORWARD_ACCEL alone barely turned a melon at speed.
+// The bounce tick itself is never steered, so the reflected angle is applied
+// as computed; lower this if bounces should keep their angle longer. 0 = no
+// air steering beyond plain acceleration.
+export const STEER_AIR_GRIP_RATE = 180; // degrees/sec

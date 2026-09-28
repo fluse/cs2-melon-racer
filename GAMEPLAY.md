@@ -175,6 +175,21 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   (braking and re-accelerating can't reclaim a lost boost). It's reset by
   every respawn/race-flow teleport. Very fast melons make tunneling through
   thin checkpoint triggers likelier — keep them thick.
+- **Upward kick:** every bounce (any rating) also lifts the melon — its
+  vertical speed becomes `WALL_BOUNCE_UP_SPEED` upward (a fall is cancelled
+  first; a melon already rising keeps that plus the kick), so a bounce sends
+  it up in an arc instead of along the ground. Inside a **lift zone**
+  (`lift_enter`/`lift_leave` trigger, `LIFT_ZONE_UP_SPEED` or
+  `lift_zone_<speed>` in its name — see MAPPING_API.md 4.7) the kick is
+  stronger, so shafts and high walls can be climbed by bouncing between
+  them; bounces there leave the wall with at least
+  `LIFT_ZONE_MIN_BOUNCE_SPEED` (a head-on MISS would otherwise be too slow
+  to reach the far wall), and wall jumps there cost no charge, are always
+  full strength, have a shorter cooldown (`LIFT_ZONE_WALL_JUMP_COOLDOWN`)
+  and fire from a press made shortly before touching the wall
+  (`LIFT_ZONE_JUMP_BUFFER`). While in a lift zone the chase camera eases back and
+  up (`LIFT_CAMERA_*` in `constants/camera.js`) so the climb stays in view,
+  looking through walls instead of being pulled in by them.
 - `WALL_BOUNCE_COOLDOWN` stops one wall contact from bouncing (and
   damaging) on consecutive ticks — including the plain landing/crash damage
   rule, which would otherwise charge the same contact a second time; `WALL_BOUNCE_MIN_IMPACT` keeps light
@@ -420,10 +435,11 @@ back once it drifts more than `PAWN_DRIFT_TOLERANCE`. It deliberately does
 no separate turn control —
 steering direction is wherever the player is looking (mouse): W/S
 accelerate/brake along that look direction, A/D strafe left/right relative
-to it (on the ground, holding W also turns the melon's existing velocity
-towards the look direction at up to `STEER_GRIP_RATE` °/s, speed kept — a
-"grip" so it goes where the camera points instead of drifting; none in the
-air, so bounce angles stay as they come off the wall), Space jumps (only with real ground contact, or off a wall in the air — see "Jumping" below). A third-person
+to it (holding W also turns the melon's existing velocity towards the look
+direction at up to `STEER_GRIP_RATE` °/s on the ground and
+`STEER_AIR_GRIP_RATE` °/s in the air, speed kept — a "grip" so it goes where
+the camera points instead of drifting; only the bounce tick itself is left
+unsteered, so a bounce starts off at its computed angle), Space jumps (only with real ground contact, or off a wall in the air — see "Jumping" below). A third-person
 `CustomPlayerCamera` in `FOLLOW_POSITION` mode chase-cams behind the melon
 directly, so it doesn't need the pawn nearby to work.
 
@@ -625,6 +641,23 @@ Broken or race-locked melons don't heal. Teleports/respawns drop the melon
 out of all zones (the trigger's `OnEndTouch` isn't guaranteed to reach the
 script after a teleport, and a respawned new melon entity never gets one),
 so a zone it lands in re-adds it on its next touch.
+
+## Camera zones (implemented)
+
+Areas where the chase camera zooms out or in: a `trigger_multiple`
+(filtered to `prop_physics`) with `OnStartTouch` → `RunScriptInput`
+`camera_enter` and `OnEndTouch` → `camera_leave`. The zoom comes from the
+trigger's name, same convention as heal/lift zones:
+`camera_zone_<distance>_<height>` (units further back / higher up than the
+player's own camera preset, negative = closer / lower; e.g.
+`camera_zone_250_40`, `camera_zone_-30_0`), with a `camera_zone_noclip_…`
+variant that stops walls pulling the camera in while zoomed. Any other
+name uses `CAMERA_ZONE_EXTRA_*` (`constants/camera.js`). The camera eases
+over `CAMERA_ZONE_EASE_SECONDS` in and back out, never closer than
+`CAMERA_ZONE_MIN_DISTANCE`; overlapping camera zones don't stack (last
+entered counts), but a lift zone's zoom adds on top. Rules:
+`logic/camera-zone.js` (`test/camera-zone.test.mjs`), applied by
+`camera/zone-zoom.js`. Details for mappers: MAPPING_API.md 4.8.
 
 ## Open design questions (not yet decided — ask before assuming)
 

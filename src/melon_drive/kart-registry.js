@@ -21,12 +21,17 @@ import { predictionDotSet } from "./trace.js";
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
  *   lastWallContact?: { time: number, normal: { x: number, y: number } }, // last wall touched in the air (probe or bounce) — see UpdateWallContact
  *   lastWallJump?: { time: number, normal: { x: number, y: number } }, // see CanWallJump
+ *   bufferedWallJumpTime?: number, // a lift-zone jump press not yet used, fired on the next wall touch — see LIFT_ZONE_JUMP_BUFFER
  *   jumpDebug?: boolean, // this player's jump debug view is on (user menu toggle) — see physics/jump-debug.js
  *   contactDebug?: import("./physics/jump-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   predictionDots?: any[], // this kart's prediction-line dot entities, see prediction.js
  *   pendingBounce?: { time: number, impactSpeed: number, impactDir: { x: number, y: number, z: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number }, // damage not yet charged — waits out the jump window, see SettleWallBounceDamage
  *   healZones?: Map<any, number>, // heal triggers the melon is inside -> their rate (health/s), see physics/heal.js
+ *   liftCameraBlend?: number, // 0..1, how far the camera is zoomed out for a lift zone — see UpdateLiftCamera
+ *   liftZones?: Map<any, number>, // lift triggers the melon is inside -> their wall-bounce kick (u/s up), see physics/zones.js
+ *   cameraZones?: Map<any, import("./logic/camera-zone.js").CameraZone>, // camera triggers the melon is inside -> their zoom, see physics/zones.js
+ *   zoneCamera?: import("./logic/camera-zone.js").ZoneCameraState, // the camera-zone zoom being eased in/out — see UpdateZoneCamera
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
  * }} Kart
  */

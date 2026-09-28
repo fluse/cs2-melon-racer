@@ -138,7 +138,7 @@ function DebugLogBounce(kart, n, angle) {
 /**
  * Reflects the melon's pre-impact horizontal velocity off a wall and scales
  * it by how well the hit was angled (see WALL_BOUNCE_* in constants/wall-bounce.js).
- * Vertical velocity is left to physics — a bounce never launches upward.
+ * Horizontal only — the upward kick (WALL_BOUNCE_UP_SPEED) is added by UpdateKart.
  * @param {import("../kart-registry.js").Kart} kart @param {{ x: number, y: number, method: string, hitPoint?: any }} n @param {number} now
  * @returns {{ velocity: { x: number, y: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number } | null}
  *   null if the melon wasn't actually moving into the wall

@@ -101,6 +101,15 @@ export function WallJumpChargeAfter(charge) {
 
 /**
  * Whether a jump press right now is a wall jump.
+ * @param {Parameters<typeof WallJumpBlockReason>[0]} s
+ */
+export function CanWallJump(s) {
+    return WallJumpBlockReason(s) === null;
+}
+
+/**
+ * Why a jump press right now is *not* a wall jump, or null if it is one —
+ * the jump debug log prints this.
  * @param {{
  *   now: number,
  *   grounded: boolean,
@@ -108,27 +117,34 @@ export function WallJumpChargeAfter(charge) {
  *   lastWallJump?: { time: number, normal: { x: number, y: number } },
  *   lastGroundedTime?: number,
  *   charge: number,
+ *   cooldown?: number, // WALL_JUMP_COOLDOWN, shorter in a lift zone
  * }} s
  */
-export function CanWallJump({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge }) {
-    if (grounded || !wallContact || now - wallContact.time > WALL_JUMP_WINDOW) {
-        return false;
+export function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN }) {
+    if (grounded) {
+        return "on the ground";
+    }
+    if (!wallContact) {
+        return "no wall contact yet";
+    }
+    if (now - wallContact.time > WALL_JUMP_WINDOW) {
+        return `wall contact too old (${(now - wallContact.time).toFixed(2)}s > WALL_JUMP_WINDOW ${WALL_JUMP_WINDOW}s)`;
     }
     if (charge < WALL_JUMP_MIN_CHARGE) {
-        return false; // spent — wait for it to refill
+        return `charge spent (${charge.toFixed(2)} < WALL_JUMP_MIN_CHARGE ${WALL_JUMP_MIN_CHARGE})`; // wait for it to refill
     }
     if (!lastWallJump) {
-        return true;
+        return null;
     }
-    if (now - lastWallJump.time < WALL_JUMP_COOLDOWN) {
-        return false;
+    if (now - lastWallJump.time < cooldown) {
+        return `cooldown (${(now - lastWallJump.time).toFixed(2)}s since the last wall jump < ${cooldown}s)`;
     }
     if (lastGroundedTime !== undefined && lastGroundedTime > lastWallJump.time) {
-        return true; // touched ground since — any wall is fresh again
+        return null; // touched ground since — any wall is fresh again
     }
     const sameWall =
         wallContact.normal.x * lastWallJump.normal.x + wallContact.normal.y * lastWallJump.normal.y > WALL_JUMP_SAME_WALL_DOT;
-    return !sameWall;
+    return sameWall ? "same wall as the last wall jump (touch ground or another wall first)" : null;
 }
 
 /**

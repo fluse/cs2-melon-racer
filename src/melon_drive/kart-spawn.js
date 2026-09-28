@@ -1,7 +1,7 @@
 import { Instance, PointTemplate, CSMoveType, CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { karts, moderatorSlot, SetModeratorSlot } from "./kart-registry.js";
-import { ApplyCameraFollow, UpdateCameraDistanceHud, UpdateCameraHeightHud } from "./camera.js";
+import { ApplyCameraFollow, UpdateCameraDistanceHud, UpdateCameraHeightHud } from "./camera/index.js";
 import { FacePlayerView, GetIntroSpawnPoint } from "./spawn-points.js";
 import { GetSpeedHud } from "./hud.js";
 import {

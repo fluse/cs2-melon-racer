@@ -19,7 +19,7 @@ function Debug(text) {
 // (sent_melon_base/init.lua ENT:Think + gamemode/shared.lua DefXSpeed):
 // forward is the strongest push, reverse is half that, strafe is weaker
 // still — keeping FORWARD_ACCEL as our existing tuned baseline.
-const FORWARD_ACCEL = 450; // units/sec^2 while holding forward (was 900, then 500, then 400 — a heavier, slower build-up: ~1.45s to MAX_SPEED)
+const FORWARD_ACCEL = 325; // units/sec^2 while holding forward (was 900, then 500, then 400, then 450 — a heavier, slower build-up: ~2s to MAX_SPEED)
 const REVERSE_ACCEL = FORWARD_ACCEL * 0.5; // 0.5x forward, matches original's Reverse/Forward ratio
 const STRAFE_ACCEL = FORWARD_ACCEL * 0.4; // 0.4x forward, matches original's Strafe/Forward ratio
 const MAX_SPEED = 650; // units/sec, horizontal speed cap
@@ -52,10 +52,15 @@ const SETTLE_NUDGE_ANGULAR_SPEED = 40; // deg/sec, one-off pitch/roll kick on se
 // turned it slowly, like a hovercraft). Only for velocity that is at most
 // STEER_GRIP_MAX_ANGLE off the look direction: looking back or far to the
 // side is braking/turning around via plain acceleration, not a snap U-turn.
-// No grip in the air, so a wall bounce's outgoing angle isn't bent right away.
 // Higher STEER_GRIP_RATE: more direct, less drift. 0 = off (old behavior).
 const STEER_GRIP_RATE = 180; // degrees/sec
 const STEER_GRIP_MAX_ANGLE = 100; // degrees
+// The same grip in the air (jumps, falls, after a wall bounce), at its own
+// rate — without it, FORWARD_ACCEL alone barely turned a melon at speed.
+// The bounce tick itself is never steered, so the reflected angle is applied
+// as computed; lower this if bounces should keep their angle longer. 0 = no
+// air steering beyond plain acceleration.
+const STEER_AIR_GRIP_RATE = 180; // degrees/sec
 
 // Jumping: ground jump, wall jump, and the ground contact they rely on (see logic/contact.js).
 
@@ -222,6 +227,12 @@ const WALL_BOUNCE_PERFECT_JUMP_MULTIPLIER = 1.3; // extra multiplier on top for 
 // of the previous press is treated as mashing and locks timing credit for
 // that long — see RegisterWallTimingPress.
 const WALL_TIMING_SPAM_LOCKOUT = 0.4; // seconds
+// Every bounce also lifts the melon: its vertical speed is set to at least
+// this much upward (a falling melon's fall is cancelled first, one already
+// rising keeps its upward speed plus this). Same for every rating.
+// Higher: bounces send it up in an arc; 0 = vertical left to physics (old).
+// Stronger inside lift zones — see constants/lift.js.
+const WALL_BOUNCE_UP_SPEED = 220; // units/sec upward
 const WALL_BOUNCE_COOLDOWN = 0.2; // seconds — stops one wall contact from bouncing (and damaging) on consecutive ticks
 // Wall hits get their own damage rules, separate from landings: a base part
 // from the impact itself (same shape as IMPACT_DAMAGE_*), plus a cost for
@@ -281,6 +292,41 @@ const BOUNCE_RATINGS = [
     { minAngleFactor: 0.4, label: "BAD", speedMultiplier: 0.5, cssClass: "RatingBad", color: { r: 102, g: 170, b: 255, a: 255 } },
     { minAngleFactor: 0, label: "MISS", speedMultiplier: 0.3, cssClass: "RatingMiss", color: { r: 255, g: 102, b: 102, a: 255 } },
 ];
+
+// Lift zones: triggers where wall bounces and wall jumps are tuned for
+// climbing a shaft or a high wall by bouncing between its walls. What
+// changes inside one is gathered in WallRules (logic/lift.js); the camera
+// zoom there is LIFT_CAMERA_* in camera.js.
+
+// A trigger_multiple (filtered to prop_physics like the other triggers) with
+// OnStartTouch -> RunScriptInput "lift_enter" and OnEndTouch -> RunScriptInput
+// "lift_leave". While the melon is inside, a wall bounce kicks it up by this
+// much instead of WALL_BOUNCE_UP_SPEED. Per zone, the name can set it (see
+// LIFT_ZONE_NAME_PATTERN). Overlapping zones: the strongest counts.
+// Gravity is 800 u/s², so a kick of v climbs about v² / 1600 units:
+// 220 -> ~30, 450 -> ~125, 600 -> ~225 per bounce.
+const LIFT_ZONE_UP_SPEED = 450; // units/sec upward
+// Optional per-zone kick: a lift trigger named "lift_zone_<speed>" (e.g.
+// "lift_zone_600") kicks <speed> units/sec up instead of LIFT_ZONE_UP_SPEED.
+const LIFT_ZONE_NAME_PATTERN = /^lift_zone_(\d+(?:\.\d+)?)$/;
+// In a lift zone a bounce always leaves the wall with at least this much
+// horizontal speed, whatever its rating. Shafts are climbed by bouncing
+// almost head-on — a MISS (x0.3) — so the melon used to arrive at the
+// opposite wall below WALL_BOUNCE_MIN_IMPACT and the chain died there. The
+// speed added this way is free (not counted as speed gained for damage).
+// Higher: easier to reach the far wall of wide shafts; lower: more skill.
+const LIFT_ZONE_MIN_BOUNCE_SPEED = 450; // units/sec
+// Wall jumps in a lift zone cost no charge, are always full strength and
+// keep a bounce's higher upward kick. A narrow shaft has the melon at the
+// opposite wall sooner than WALL_JUMP_COOLDOWN, so there the cooldown is only
+// this (the next wall jump still needs the *other* wall, so one wall can't be
+// climbed alone) ...
+const LIFT_ZONE_WALL_JUMP_COOLDOWN = 0.1; // seconds
+// ... and a jump pressed up to this long *before* touching the next wall is
+// remembered and fires the wall jump the moment the melon touches it —
+// pressing a little early used to be lost (only presses after the contact
+// counted, within WALL_JUMP_WINDOW).
+const LIFT_ZONE_JUMP_BUFFER = 0.2; // seconds
 
 // Wall-bounce prediction line (see prediction.js).
 
@@ -557,6 +603,35 @@ const CAMERA_HEIGHT_MAX = 160;
 const CAMERA_HEIGHT_DEFAULT = CAMERA_HEIGHT_MIN; // lowest setting feels best in play (was 80)
 const CAMERA_HEIGHT_STEPS = 3; // must match the camheight_seg_* buttons in speedometer.xml
 
+// Lift zones (see constants/lift.js): while the melon is inside one, the
+// chase camera eases back and up by this much on top of the player's own
+// distance/height setting, so the climb and the opposite wall stay in view;
+// it eases back in after leaving. While zoomed out, the camera is NOT pulled
+// in at walls (clipCameraOffset off) — in a shaft the wall right behind the
+// melon would undo the zoom — so it looks through the shaft walls instead.
+// Higher: more overview, the melon gets smaller on screen.
+const LIFT_CAMERA_EXTRA_DISTANCE = 300; // units further back (was 150)
+const LIFT_CAMERA_EXTRA_HEIGHT = 30; // units higher up (was 120 — too high)
+const LIFT_CAMERA_EASE_SECONDS = 0.6; // seconds to zoom fully out (or back in)
+
+// Camera zones (MAPPING_API.md 4.8): a trigger_multiple (filtered to
+// prop_physics) with OnStartTouch -> RunScriptInput "camera_enter" and
+// OnEndTouch -> "camera_leave". While the melon is inside, the chase camera
+// eases to the player's own offset plus the zone's: further back (negative =
+// closer) and higher up (negative = lower). The values come from the name:
+//   camera_zone_<distance>_<height>          e.g. camera_zone_250_40 (out), camera_zone_-30_0 (in)
+//   camera_zone_<distance>                   height 0
+//   camera_zone_noclip_<distance>_<height>   same, but the camera isn't pulled in at walls
+// Any other name uses CAMERA_ZONE_EXTRA_DISTANCE/_HEIGHT. Overlapping zones:
+// the one entered last counts. Adds up with the lift zoom above.
+const CAMERA_ZONE_NAME_PATTERN = /^camera_zone_(noclip_)?(-?\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?$/;
+const CAMERA_ZONE_EXTRA_DISTANCE = 150; // units further back, for a zone without values in its name
+const CAMERA_ZONE_EXTRA_HEIGHT = 0; // units higher up, same
+const CAMERA_ZONE_EASE_SECONDS = 0.6; // seconds for a whole zoom in or out (also between two zones)
+// Zooming in never brings the camera closer than this behind the melon
+// (a negative distance past the player's own setting would put it in front).
+const CAMERA_ZONE_MIN_DISTANCE = 20;
+
 // HUD entity and the speedometer/jump/health bars in speedometer.xml.
 
 // Name of the custom_hud_layout entity (place one in Hammer pointing at
@@ -650,12 +725,17 @@ function TraceSphere(config) {
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
  *   lastWallContact?: { time: number, normal: { x: number, y: number } }, // last wall touched in the air (probe or bounce) — see UpdateWallContact
  *   lastWallJump?: { time: number, normal: { x: number, y: number } }, // see CanWallJump
+ *   bufferedWallJumpTime?: number, // a lift-zone jump press not yet used, fired on the next wall touch — see LIFT_ZONE_JUMP_BUFFER
  *   jumpDebug?: boolean, // this player's jump debug view is on (user menu toggle) — see physics/jump-debug.js
  *   contactDebug?: import("./physics/jump-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   predictionDots?: any[], // this kart's prediction-line dot entities, see prediction.js
  *   pendingBounce?: { time: number, impactSpeed: number, impactDir: { x: number, y: number, z: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number }, // damage not yet charged — waits out the jump window, see SettleWallBounceDamage
  *   healZones?: Map<any, number>, // heal triggers the melon is inside -> their rate (health/s), see physics/heal.js
+ *   liftCameraBlend?: number, // 0..1, how far the camera is zoomed out for a lift zone — see UpdateLiftCamera
+ *   liftZones?: Map<any, number>, // lift triggers the melon is inside -> their wall-bounce kick (u/s up), see physics/zones.js
+ *   cameraZones?: Map<any, import("./logic/camera-zone.js").CameraZone>, // camera triggers the melon is inside -> their zoom, see physics/zones.js
+ *   zoneCamera?: import("./logic/camera-zone.js").ZoneCameraState, // the camera-zone zoom being eased in/out — see UpdateZoneCamera
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
  * }} Kart
  */
@@ -815,6 +895,15 @@ function WallJumpChargeAfter(charge) {
 
 /**
  * Whether a jump press right now is a wall jump.
+ * @param {Parameters<typeof WallJumpBlockReason>[0]} s
+ */
+function CanWallJump(s) {
+    return WallJumpBlockReason(s) === null;
+}
+
+/**
+ * Why a jump press right now is *not* a wall jump, or null if it is one —
+ * the jump debug log prints this.
  * @param {{
  *   now: number,
  *   grounded: boolean,
@@ -822,27 +911,34 @@ function WallJumpChargeAfter(charge) {
  *   lastWallJump?: { time: number, normal: { x: number, y: number } },
  *   lastGroundedTime?: number,
  *   charge: number,
+ *   cooldown?: number, // WALL_JUMP_COOLDOWN, shorter in a lift zone
  * }} s
  */
-function CanWallJump({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge }) {
-    if (grounded || !wallContact || now - wallContact.time > WALL_JUMP_WINDOW) {
-        return false;
+function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN }) {
+    if (grounded) {
+        return "on the ground";
+    }
+    if (!wallContact) {
+        return "no wall contact yet";
+    }
+    if (now - wallContact.time > WALL_JUMP_WINDOW) {
+        return `wall contact too old (${(now - wallContact.time).toFixed(2)}s > WALL_JUMP_WINDOW ${WALL_JUMP_WINDOW}s)`;
     }
     if (charge < WALL_JUMP_MIN_CHARGE) {
-        return false; // spent — wait for it to refill
+        return `charge spent (${charge.toFixed(2)} < WALL_JUMP_MIN_CHARGE ${WALL_JUMP_MIN_CHARGE})`; // wait for it to refill
     }
     if (!lastWallJump) {
-        return true;
+        return null;
     }
-    if (now - lastWallJump.time < WALL_JUMP_COOLDOWN) {
-        return false;
+    if (now - lastWallJump.time < cooldown) {
+        return `cooldown (${(now - lastWallJump.time).toFixed(2)}s since the last wall jump < ${cooldown}s)`;
     }
     if (lastGroundedTime !== undefined && lastGroundedTime > lastWallJump.time) {
-        return true; // touched ground since — any wall is fresh again
+        return null; // touched ground since — any wall is fresh again
     }
     const sameWall =
         wallContact.normal.x * lastWallJump.normal.x + wallContact.normal.y * lastWallJump.normal.y > WALL_JUMP_SAME_WALL_DOT;
-    return !sameWall;
+    return sameWall ? "same wall as the last wall jump (touch ground or another wall first)" : null;
 }
 
 /**
@@ -995,6 +1091,30 @@ function WallBounceDamage(impactSpeed, speedGain, angleFactor) {
     return rawDamage * (1 - angleFactor);
 }
 
+/**
+ * Vertical velocity right after a wall bounce: a fall is cancelled, then
+ * the kick is added on top (a melon already rising keeps that plus the kick).
+ * @param {number} currentZ vertical velocity physics left this tick
+ * @param {number} [upSpeed] the kick — WALL_BOUNCE_UP_SPEED, or a lift zone's
+ */
+function BounceUpVelocity(currentZ, upSpeed = WALL_BOUNCE_UP_SPEED) {
+    return Math.max(currentZ, 0) + upSpeed;
+}
+
+/**
+ * `v` (horizontal) scaled up to at least `minSpeed`, direction kept. A zero
+ * velocity has no direction and stays as it is.
+ * @param {{ x: number, y: number }} v @param {number} minSpeed
+ */
+function WithMinSpeed(v, minSpeed) {
+    const speed = Math.hypot(v.x, v.y);
+    if (speed <= 0 || speed >= minSpeed) {
+        return v;
+    }
+    const scale = minSpeed / speed;
+    return { x: v.x * scale, y: v.y * scale };
+}
+
 // Jump debug view: everything that shows how ground/wall contact and jump
 // presses are judged — the on-screen status line, the probes drawn into the
 // world, and the "Jump pressed" console log. Toggled per player from the
@@ -1101,6 +1221,18 @@ function LogJumpPress(slot, kart, now, grounded, groundJump, timingPress) {
     );
 }
 
+/**
+ * Console log of whether that press became a wall jump, and if not, why.
+ * @param {number} slot @param {import("../kart-registry.js").Kart} kart
+ * @param {string | null} blockedBy see WallJumpBlockReason @param {boolean} inLift
+ */
+function LogWallJumpVerdict(slot, kart, blockedBy, inLift) {
+    if (!IsJumpDebugOn(kart)) {
+        return;
+    }
+    Instance.Msg(`[jump debug] slot ${slot} wall jump: ${blockedBy === null ? "YES" : `no — ${blockedBy}`}${inLift ? " (in lift zone)" : " (not in a lift zone)"}`);
+}
+
 // Colors — see the legend in GAMEPLAY.md's "Jumping".
 const COLOR_MISS = { r: 110, g: 110, b: 110 };
 const COLOR_IGNORED = { r: 170, g: 80, b: 200 };
@@ -1201,7 +1333,8 @@ function DrawJumpDebug(slot, kart, grounded, wallNormal) {
 // Engine side of jumping: what a jump press does each tick (ground jump,
 // wall jump, wall-bounce timing credit) and the wall-jump charge the HUD
 // jump bar shows. The rules themselves are in ../logic/contact.js and
-// ../logic/wall-bounce.js.
+// ../logic/wall-bounce.js; what a lift zone changes arrives as WallRules
+// (../logic/lift.js).
 
 /**
  * Records a jump-button press for wall-bounce timing, separately from the
@@ -1236,75 +1369,134 @@ function GetJumpChargeFraction(kart) {
  * Everything a jump press does this tick, applied to `v` (the velocity
  * UpdateKart is about to command, modified in place): the ground jump, the
  * wall-bounce timing credit, and the wall jump. Also refills the wall-jump
- * charge every tick, pressed or not.
+ * charge every tick, and fires a buffered wall jump (lift zones) without a
+ * new press.
  * @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} now @param {number} dt
  * @param {boolean} grounded see UpdateGrounded @param {boolean} jumpPressed
  * @param {{ x: number, y: number, z: number }} v
+ * @param {import("../logic/lift.js").WallRules} rules see CurrentWallRules
  */
-function ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v) {
+function ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v, rules) {
+    // ?? 1: karts carried over a hot reload from before the charge existed.
+    kart.wallJumpCharge = RechargeWallJump(kart.wallJumpCharge ?? 1, dt);
+    if (!jumpPressed) {
+        FireBufferedWallJump(slot, kart, now, grounded, v, rules);
+        return;
+    }
     // Jump: straight-up force, only with real ground contact (see
     // UpdateGrounded / IsSupported) — no cooldown, touching down again is
     // what resets it (CanGroundJump). In the air at a wall, a wall jump
-    // instead (see the end of this block), as strong as its charge.
-    // ?? 1: karts carried over a hot reload from before the charge existed.
-    kart.wallJumpCharge = RechargeWallJump(kart.wallJumpCharge ?? 1, dt);
-    if (jumpPressed) {
-        const groundJump = CanGroundJump({ grounded, lastGroundedTime: kart.lastGroundedTime, lastJumpTime: kart.lastJumpTime });
-        const timingPress = RegisterWallTimingPress(kart, now);
-        LogJumpPress(slot, kart, now, grounded, groundJump, timingPress);
-        // The normal jump — gives the upward push.
-        if (groundJump) {
-            v.z = JUMP_SPEED;
-            kart.lastJumpTime = now;
-        }
-        // Wall timing — independent of the normal jump above (works in the
-        // air too), purely about *when* it's pressed.
-        // Pressed just *after* a wall bounce whose damage is still pending:
-        // if this timing beats whatever press (if any) the bounce already
-        // counted, upgrade it — more speed (the speed gain it'll settle
-        // damage for grows with it; a perfect angle still makes that free).
-        if (timingPress) {
-            const pending = kart.pendingBounce;
-            if (pending) {
-                const lateFactor = JumpTimingFactor(now - pending.time);
-                if (lateFactor > pending.jumpFactor) {
-                    const ratio = JumpMultiplier(lateFactor) / JumpMultiplier(pending.jumpFactor);
-                    const before = Math.hypot(v.x, v.y);
-                    v.x *= ratio;
-                    v.y *= ratio;
-                    const after = Math.hypot(v.x, v.y);
-                    pending.speedGain += after - before;
-                    pending.jumpFactor = lateFactor;
-                    if (kart.lastBounceInfo) {
-                        kart.lastBounceInfo.jumpFactor = lateFactor;
-                    }
-                    kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, after);
-                }
-            }
-        }
-        // Wall jump — in the air, at (or just off) a wall: push away from
-        // it and up, as strong as the charge is full, then the charge drops
-        // (so chained wall jumps get weaker). After the bounce-timing
-        // upgrade above, so that one's extra speed isn't lost;
-        // WallJumpVelocity keeps whichever push away from the wall is
-        // stronger. Deliberately does NOT raise kart.speedCap: chained wall
-        // jumps used to ratchet the melon ever faster.
-        const wallContact = kart.lastWallContact;
-        const charge = kart.wallJumpCharge;
-        if (
-            !groundJump &&
-            wallContact &&
-            CanWallJump({ now, grounded, wallContact, lastWallJump: kart.lastWallJump, lastGroundedTime: kart.lastGroundedTime, charge })
-        ) {
-            const jump = WallJumpVelocity({ x: v.x, y: v.y }, wallContact.normal, charge);
-            v.x = jump.x;
-            v.y = jump.y;
-            v.z = jump.z;
-            kart.lastWallJump = { time: now, normal: wallContact.normal };
-            kart.wallJumpCharge = WallJumpChargeAfter(charge);
-            Debug(`wall jump: slot ${slot}, strength ${charge.toFixed(2)}, off wall normal (${wallContact.normal.x.toFixed(2)}, ${wallContact.normal.y.toFixed(2)})`);
-        }
+    // instead, as strong as its charge.
+    const groundJump = CanGroundJump({ grounded, lastGroundedTime: kart.lastGroundedTime, lastJumpTime: kart.lastJumpTime });
+    const timingPress = RegisterWallTimingPress(kart, now);
+    LogJumpPress(slot, kart, now, grounded, groundJump, timingPress);
+    if (groundJump) {
+        v.z = JUMP_SPEED;
+        kart.lastJumpTime = now;
     }
+    // Wall timing — independent of the normal jump above (works in the air
+    // too), purely about *when* it's pressed.
+    if (timingPress) {
+        UpgradePendingBounce(kart, now, v);
+    }
+    // Wall jump — after the bounce-timing upgrade, so that one's extra speed
+    // isn't lost.
+    const blockedBy = groundJump ? "ground jump instead" : TryWallJump(slot, kart, now, grounded, v, rules);
+    LogWallJumpVerdict(slot, kart, blockedBy, rules.inLift);
+    // In the air and not a wall jump yet: where there's a jump buffer (lift
+    // zones), remember the press — a wall touched soon after still gets it.
+    kart.bufferedWallJumpTime = blockedBy !== null && !grounded && rules.jumpBuffer > 0 ? now : undefined;
+}
+
+/**
+ * A timing press just *after* a wall bounce whose damage is still pending:
+ * if this timing beats whatever press (if any) the bounce already counted,
+ * upgrade it — more speed (the speed gain it'll settle damage for grows with
+ * it; a perfect angle still makes that free).
+ * @param {import("../kart-registry.js").Kart} kart @param {number} now @param {{ x: number, y: number, z: number }} v
+ */
+function UpgradePendingBounce(kart, now, v) {
+    const pending = kart.pendingBounce;
+    if (!pending) {
+        return;
+    }
+    const lateFactor = JumpTimingFactor(now - pending.time);
+    if (lateFactor <= pending.jumpFactor) {
+        return;
+    }
+    const ratio = JumpMultiplier(lateFactor) / JumpMultiplier(pending.jumpFactor);
+    const before = Math.hypot(v.x, v.y);
+    v.x *= ratio;
+    v.y *= ratio;
+    const after = Math.hypot(v.x, v.y);
+    pending.speedGain += after - before;
+    pending.jumpFactor = lateFactor;
+    if (kart.lastBounceInfo) {
+        kart.lastBounceInfo.jumpFactor = lateFactor;
+    }
+    kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, after);
+}
+
+/**
+ * A jump pressed shortly *before* touching a wall (within rules.jumpBuffer,
+ * lift zones only) fires the wall jump once the melon touches one.
+ * @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
+ * @param {{ x: number, y: number, z: number }} v @param {import("../logic/lift.js").WallRules} rules
+ */
+function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
+    const pressed = kart.bufferedWallJumpTime;
+    if (pressed === undefined) {
+        return;
+    }
+    if (now - pressed > rules.jumpBuffer) {
+        kart.bufferedWallJumpTime = undefined; // too long ago, or left the lift zone (no buffer outside)
+        return;
+    }
+    const wallContact = kart.lastWallContact;
+    if (wallContact && wallContact.time > pressed && TryWallJump(slot, kart, now, grounded, v, rules) === null) {
+        kart.bufferedWallJumpTime = undefined;
+        Debug(`wall jump: slot ${slot} from a press ${(now - pressed).toFixed(2)}s before touching the wall`);
+    }
+}
+
+/**
+ * Wall jump, if allowed right now: in the air, at (or just off) a wall, push
+ * away from it and up, as strong as the charge is full, then the charge
+ * drops (so chained wall jumps get weaker). WallJumpVelocity keeps whichever
+ * push away from the wall is stronger. Deliberately does NOT raise
+ * kart.speedCap: chained wall jumps used to ratchet the melon ever faster.
+ * With rules.freeWallJumps (lift zones) it's always full strength, costs no
+ * charge and keeps a bounce's higher upward kick; the cooldown is
+ * rules.wallJumpCooldown.
+ * @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
+ * @param {{ x: number, y: number, z: number }} v modified in place @param {import("../logic/lift.js").WallRules} rules
+ * @returns {string | null} why it didn't happen, or null if it did
+ */
+function TryWallJump(slot, kart, now, grounded, v, rules) {
+    const wallContact = kart.lastWallContact;
+    const charge = rules.freeWallJumps ? 1 : kart.wallJumpCharge;
+    const blockedBy = WallJumpBlockReason({
+        now,
+        grounded,
+        wallContact,
+        lastWallJump: kart.lastWallJump,
+        lastGroundedTime: kart.lastGroundedTime,
+        charge,
+        cooldown: rules.wallJumpCooldown,
+    });
+    if (!wallContact || blockedBy !== null) {
+        return blockedBy;
+    }
+    const jump = WallJumpVelocity({ x: v.x, y: v.y }, wallContact.normal, charge);
+    v.x = jump.x;
+    v.y = jump.y;
+    v.z = rules.freeWallJumps ? Math.max(v.z, jump.z) : jump.z;
+    kart.lastWallJump = { time: now, normal: wallContact.normal };
+    if (!rules.freeWallJumps) {
+        kart.wallJumpCharge = WallJumpChargeAfter(charge);
+    }
+    Debug(`wall jump: slot ${slot}, strength ${charge.toFixed(2)}${rules.freeWallJumps ? " (lift zone, free)" : ""}, off wall normal (${wallContact.normal.x.toFixed(2)}, ${wallContact.normal.y.toFixed(2)})`);
+    return null;
 }
 
 // Pure health-bar math — no cs_script import, so it's unit-testable in
@@ -1696,6 +1888,214 @@ function UpdateUserMenu(slot, kart) {
     }
 }
 
+// Pure rules for the lift-zone camera zoom — no cs_script import, so it's
+// unit-testable in Node (see test/lift-camera.test.mjs). camera.js applies
+// the resulting offset.
+
+/**
+ * How far the lift camera is zoomed out after `dt` more seconds, 0 (normal)
+ * to 1 (fully out): moves linearly towards 1 inside a lift zone and towards
+ * 0 outside, taking LIFT_CAMERA_EASE_SECONDS for the whole way.
+ * @param {number} blend current value @param {boolean} inLiftZone @param {number} dt
+ */
+function LiftCameraBlend(blend, inLiftZone, dt) {
+    const step = LIFT_CAMERA_EASE_SECONDS > 0 ? Math.max(0, dt) / LIFT_CAMERA_EASE_SECONDS : 1;
+    return inLiftZone ? Math.min(1, blend + step) : Math.max(0, blend - step);
+}
+
+/**
+ * The chase camera offset with the lift zoom applied: further back (x is
+ * forward, negative = behind) and higher up, eased in and out (smoothstep)
+ * so it doesn't start or stop with a jolt.
+ * @param {{ x: number, y: number, z: number }} base the player's normal offset @param {number} blend see LiftCameraBlend
+ */
+function LiftCameraOffset(base, blend) {
+    const t = Math.max(0, Math.min(1, blend));
+    const eased = t * t * (3 - 2 * t);
+    return {
+        x: base.x - LIFT_CAMERA_EXTRA_DISTANCE * eased,
+        y: base.y,
+        z: base.z + LIFT_CAMERA_EXTRA_HEIGHT * eased,
+    };
+}
+
+// Pure rules for camera zones — no cs_script import, so it's unit-testable in
+// Node (see test/camera-zone.test.mjs). camera/zone-zoom.js applies the
+// resulting offset.
+
+/** @typedef {{ distance: number, height: number, clip: boolean }} CameraZone what a zone adds to the chase camera */
+
+/**
+ * @typedef {{
+ *   from: CameraZone, to: CameraZone, // easing from -> to
+ *   t: number, // 0..1, how far along
+ * }} ZoneCameraState
+ */
+
+/** Outside every camera zone: nothing added, walls pull the camera in as usual. @type {CameraZone} */
+const NO_CAMERA_ZONE = { distance: 0, height: 0, clip: true };
+
+/**
+ * What a camera trigger adds, from its name (see CAMERA_ZONE_NAME_PATTERN),
+ * else CAMERA_ZONE_EXTRA_DISTANCE/_HEIGHT.
+ * @param {string} triggerName @returns {CameraZone}
+ */
+function CameraZoneFromName(triggerName) {
+    const match = CAMERA_ZONE_NAME_PATTERN.exec(triggerName.trim());
+    if (!match) {
+        return { distance: CAMERA_ZONE_EXTRA_DISTANCE, height: CAMERA_ZONE_EXTRA_HEIGHT, clip: true };
+    }
+    return { distance: Number(match[2]), height: match[3] === undefined ? 0 : Number(match[3]), clip: !match[1] };
+}
+
+/** How much the zone zoom adds right now (smoothstep-eased). @param {ZoneCameraState | undefined} state */
+function ZoneCameraExtra(state) {
+    if (!state) {
+        return { distance: 0, height: 0 };
+    }
+    const t = Math.max(0, Math.min(1, state.t));
+    const eased = t * t * (3 - 2 * t);
+    return {
+        distance: state.from.distance + (state.to.distance - state.from.distance) * eased,
+        height: state.from.height + (state.to.height - state.from.height) * eased,
+    };
+}
+
+/**
+ * Whether walls may pull the camera in: not while a noclip zone's zoom is on,
+ * including while easing away from one (it would snap in mid-ease).
+ * @param {ZoneCameraState | undefined} state
+ */
+function ZoneCameraClips(state) {
+    return !state || (state.to.clip && (state.from.clip || state.t >= 1));
+}
+
+/**
+ * The zone zoom after `dt` more seconds, easing towards `target` (the zone
+ * the melon is in, or NO_CAMERA_ZONE). A new target starts a fresh ease from
+ * wherever the camera is now, so switching zones mid-ease doesn't jump.
+ * Returns the same object when nothing changes, so callers can skip the camera update.
+ * @param {ZoneCameraState | undefined} state @param {CameraZone} target @param {number} dt
+ * @returns {ZoneCameraState | undefined}
+ */
+function StepZoneCamera(state, target, dt) {
+    const current = state ?? { from: NO_CAMERA_ZONE, to: NO_CAMERA_ZONE, t: 1 };
+    let next = current;
+    const to = current.to;
+    if (to.distance !== target.distance || to.height !== target.height || to.clip !== target.clip) {
+        const extra = ZoneCameraExtra(current);
+        next = { from: { ...extra, clip: ZoneCameraClips(current) }, to: target, t: 0 };
+    }
+    if (next.t < 1) {
+        const step = CAMERA_ZONE_EASE_SECONDS > 0 ? Math.max(0, dt) / CAMERA_ZONE_EASE_SECONDS : 1;
+        next = { ...next, t: Math.min(1, next.t + step) };
+    }
+    if (next === current) {
+        return state;
+    }
+    // Fully back to normal: forget the state, same as never having been in a zone.
+    return next.t >= 1 && next.to === NO_CAMERA_ZONE ? undefined : next;
+}
+
+/**
+ * The chase camera offset with the zone zoom applied: x is forward (negative
+ * = behind), z up. Zooming in stops CAMERA_ZONE_MIN_DISTANCE behind the melon.
+ * @param {{ x: number, y: number, z: number }} base @param {ZoneCameraState | undefined} state
+ */
+function ZoneCameraOffset(base, state) {
+    const extra = ZoneCameraExtra(state);
+    return {
+        x: Math.min(base.x - extra.distance, Math.max(base.x, -CAMERA_ZONE_MIN_DISTANCE)),
+        y: base.y,
+        z: base.z + extra.height,
+    };
+}
+
+// The third-person chase camera: attaching it to the melon, the player's
+// distance/height presets from the user menu, and the one place that writes
+// the follow config (SetFollowOffset) — the break and lift zooms in this
+// folder go through it too, and so do the lift and camera-zone zooms.
+
+// The preset buttons' labels and "Selected" mark: UpdateCameraPresetHud in
+// hud.js (which also runs every time the user menu opens).
+/** @param {import("../kart-registry.js").Kart} kart */
+function UpdateCameraDistanceHud(kart) {
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot !== undefined) {
+        UpdateCameraPresetHud(slot, kart);
+    }
+}
+
+/** Applies a new camera distance (picked in the user menu) immediately, without waiting for a respawn. @param {import("../kart-registry.js").Kart} kart @param {number} step */
+function SetCameraDistance(kart, step) {
+    kart.cameraDistance = CameraDistanceForStep(step);
+    ApplyCameraFollow(kart);
+    UpdateCameraDistanceHud(kart);
+}
+
+/** @param {import("../kart-registry.js").Kart} kart */
+function UpdateCameraHeightHud(kart) {
+    UpdateCameraDistanceHud(kart); // one update covers both rows
+}
+
+/** Applies a new camera height (picked in the user menu) immediately, without waiting for a respawn. @param {import("../kart-registry.js").Kart} kart @param {number} step */
+function SetCameraHeight(kart, step) {
+    kart.cameraHeight = CameraHeightForStep(step);
+    ApplyCameraFollow(kart);
+    UpdateCameraHeightHud(kart);
+}
+
+/** The player's own chase offset (distance/height presets), before any zoom. @param {import("../kart-registry.js").Kart} kart */
+function GetCameraOffsetFor(kart) {
+    return { x: -kart.cameraDistance, y: CAMERA_LATERAL, z: kart.cameraHeight };
+}
+
+/**
+ * (Re-)applies the third-person follow camera from a kart's current
+ * pawn/melon/cameraDistance. Called both when the camera first needs
+ * attaching (CustomPlayerCamera lives on the pawn instance, so this must be
+ * re-called every time the player gets a fresh pawn, i.e. each respawn) and
+ * whenever the user menu's distance control changes cameraDistance, so the
+ * new distance takes effect immediately instead of waiting for a respawn.
+ * Keeps a lift zone's or camera zone's zoom if one is on (see ApplyZonedFollowOffset).
+ * @param {import("../kart-registry.js").Kart} kart
+ */
+function ApplyCameraFollow(kart) {
+    const camera = kart.pawn.GetCustomCamera();
+    camera.SetMode(CustomCameraMode.FOLLOW_POSITION);
+    ApplyZonedFollowOffset(kart);
+    Debug(`ApplyCameraFollow: mode=${camera.GetMode()} distance=${kart.cameraDistance} for slot=${kart.pawn.GetPlayerController()?.GetPlayerSlot()}`);
+}
+
+/**
+ * The player's own offset with both zone zooms on top — the lift zoom
+ * (kart.liftCameraBlend, lift-zoom.js) and the camera-zone zoom
+ * (kart.zoneCamera, zone-zoom.js); they add up. Walls pull the camera in
+ * only while neither turns that off.
+ * @param {import("../kart-registry.js").Kart} kart
+ */
+function ApplyZonedFollowOffset(kart) {
+    const liftBlend = kart.liftCameraBlend ?? 0;
+    const offset = ZoneCameraOffset(LiftCameraOffset(GetCameraOffsetFor(kart), liftBlend), kart.zoneCamera);
+    SetFollowOffset(kart, offset, liftBlend === 0 && ZoneCameraClips(kart.zoneCamera));
+}
+
+/**
+ * Points the chase camera at the melon from `cameraOffset` (x forward,
+ * negative = behind; z up — rotated by the player's eye angles).
+ * @param {import("../kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} cameraOffset
+ * @param {boolean} clipToWalls pull the camera in instead of letting it clip through walls — off while
+ *   zoomed out for a lift zone, where the shaft wall right behind the melon would pull it straight back in
+ */
+function SetFollowOffset(kart, cameraOffset, clipToWalls) {
+    kart.pawn.GetCustomCamera().SetFollowConfig({
+        followEntity: kart.melon,
+        followOffset: FOLLOW_OFFSET,
+        cameraOffset,
+        clipCameraOffset: clipToWalls,
+    });
+}
+
 // Pure rules for the melon-break sequence — no cs_script import, so it's
 // unit-testable in Node (see test/break-sequence.test.mjs). physics/break-effects.js
 // and camera.js apply the results (camera config, entity removal).
@@ -1793,75 +2193,213 @@ function PruneBreakEffects(effects, now) {
     return { expired, kept };
 }
 
-// The preset buttons' labels and "Selected" mark: UpdateCameraPresetHud in
-// hud.js (which also runs every time the user menu opens).
-/** @param {import("./kart-registry.js").Kart} kart */
-function UpdateCameraDistanceHud(kart) {
-    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-    if (slot !== undefined) {
-        UpdateCameraPresetHud(slot, kart);
-    }
-}
-
-/** Applies a new camera distance (picked in the user menu) immediately, without waiting for a respawn. @param {import("./kart-registry.js").Kart} kart @param {number} step */
-function SetCameraDistance(kart, step) {
-    kart.cameraDistance = CameraDistanceForStep(step);
-    ApplyCameraFollow(kart);
-    UpdateCameraDistanceHud(kart);
-}
-
-/** @param {import("./kart-registry.js").Kart} kart */
-function UpdateCameraHeightHud(kart) {
-    UpdateCameraDistanceHud(kart); // one update covers both rows
-}
-
-/** Applies a new camera height (picked in the user menu) immediately, without waiting for a respawn. @param {import("./kart-registry.js").Kart} kart @param {number} step */
-function SetCameraHeight(kart, step) {
-    kart.cameraHeight = CameraHeightForStep(step);
-    ApplyCameraFollow(kart);
-    UpdateCameraHeightHud(kart);
-}
-
-/** @param {import("./kart-registry.js").Kart} kart */
-function GetCameraOffsetFor(kart) {
-    return { x: -kart.cameraDistance, y: CAMERA_LATERAL, z: kart.cameraHeight };
-}
-
-/**
- * (Re-)applies the third-person follow camera from a kart's current
- * pawn/melon/cameraDistance. Called both when the camera first needs
- * attaching (CustomPlayerCamera lives on the pawn instance, so this must be
- * re-called every time the player gets a fresh pawn, i.e. each respawn) and
- * whenever the user menu's distance control changes cameraDistance, so the
- * new distance takes effect immediately instead of waiting for a respawn.
- * @param {import("./kart-registry.js").Kart} kart
- */
-function ApplyCameraFollow(kart) {
-    const camera = kart.pawn.GetCustomCamera();
-    camera.SetMode(CustomCameraMode.FOLLOW_POSITION);
-    camera.SetFollowConfig({
-        followEntity: kart.melon,
-        followOffset: FOLLOW_OFFSET,
-        cameraOffset: GetCameraOffsetFor(kart),
-        clipCameraOffset: true, // pull the camera in instead of letting it clip through walls
-    });
-    Debug(`ApplyCameraFollow: mode=${camera.GetMode()} distance=${kart.cameraDistance} for slot=${kart.pawn.GetPlayerController()?.GetPlayerSlot()}`);
-}
+// Break camera: pulls back from a broken melon so the burst is visible
+// (BREAK_CAMERA_* — the math is BreakCameraOffset in ../logic/break-sequence.js).
 
 /**
  * Pulls the chase camera back from a broken melon (still frozen, hidden, at
  * the crash site) so the burst is visible — called every tick while
  * kart.breaking; ApplyCameraFollow restores the normal offset on respawn.
- * @param {import("./kart-registry.js").Kart} kart @param {number} elapsed seconds since the break
+ * @param {import("../kart-registry.js").Kart} kart @param {number} elapsed seconds since the break
  */
 function ApplyBreakCameraZoom(kart, elapsed) {
-    kart.pawn.GetCustomCamera().SetFollowConfig({
-        followEntity: kart.melon,
-        followOffset: FOLLOW_OFFSET,
-        cameraOffset: BreakCameraOffset(GetCameraOffsetFor(kart), elapsed),
-        clipCameraOffset: true,
-    });
+    SetFollowOffset(kart, BreakCameraOffset(GetCameraOffsetFor(kart), elapsed), true);
 }
+
+// Pure lift-zone rules — no cs_script import, so it's unit-testable in Node
+// (see test/lift-zone.test.mjs). Everything a lift zone changes about wall
+// bounces and wall jumps is decided here, in one place: drive.js and jump.js
+// just read the WallRules they're handed.
+
+/**
+ * @typedef {{
+ *   inLift: boolean,
+ *   bounceUpSpeed: number, // upward kick of a wall bounce (u/s)
+ *   minBounceSpeed: number, // a bounce leaves the wall at least this fast (u/s), 0 = no minimum
+ *   wallJumpCooldown: number, // seconds between two wall jumps
+ *   freeWallJumps: boolean, // wall jumps cost no charge, are full strength, keep a higher upward kick
+ *   jumpBuffer: number, // seconds a jump press before touching a wall still counts, 0 = none
+ * }} WallRules
+ */
+
+/**
+ * The wall bounce / wall jump rules for a melon, given the kick of the
+ * strongest lift zone it's in (undefined = not in one).
+ * @param {number | undefined} liftUpSpeed
+ * @returns {WallRules}
+ */
+function WallRules(liftUpSpeed) {
+    if (liftUpSpeed === undefined) {
+        return {
+            inLift: false,
+            bounceUpSpeed: WALL_BOUNCE_UP_SPEED,
+            minBounceSpeed: 0,
+            wallJumpCooldown: WALL_JUMP_COOLDOWN,
+            freeWallJumps: false,
+            jumpBuffer: 0,
+        };
+    }
+    return {
+        inLift: true,
+        // A lift zone never kicks weaker than outside one.
+        bounceUpSpeed: Math.max(WALL_BOUNCE_UP_SPEED, liftUpSpeed),
+        minBounceSpeed: LIFT_ZONE_MIN_BOUNCE_SPEED,
+        wallJumpCooldown: LIFT_ZONE_WALL_JUMP_COOLDOWN,
+        freeWallJumps: true,
+        jumpBuffer: LIFT_ZONE_JUMP_BUFFER,
+    };
+}
+
+/**
+ * Upward kick of a lift trigger: parsed from a "lift_zone_<speed>" name,
+ * else LIFT_ZONE_UP_SPEED.
+ * @param {string} triggerName
+ */
+function LiftZoneUpSpeed(triggerName) {
+    const match = LIFT_ZONE_NAME_PATTERN.exec(triggerName.trim());
+    return match ? Number(match[1]) : LIFT_ZONE_UP_SPEED;
+}
+
+// Trigger zones the melon can be inside — heal zones (heal_enter/heal_leave,
+// HEAL_ZONE_RATE), lift zones (lift_enter/lift_leave, constants/lift.js) and
+// camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in constants/camera.js):
+// entering/leaving them (registered in ../zone-inputs.js), what they add up
+// to right now, and leaving them all at once on a teleport/respawn.
+// Each kind is a Map on the kart: trigger entity -> its value (heal rate in
+// health/s, lift kick in u/s, camera zoom), so overlapping zones and their leaves are
+// tracked separately.
+
+/** @typedef {"healZones" | "liftZones" | "cameraZones"} ZoneKind */
+
+/**
+ * The melon entered a zone trigger of this kind, worth `value`.
+ * @param {import("../kart-registry.js").Kart} kart @param {ZoneKind} kind @param {any} trigger @param {any} value
+ */
+function EnterZone(kart, kind, trigger, value) {
+    (kart[kind] ??= new Map()).set(trigger, value);
+}
+
+/** @param {import("../kart-registry.js").Kart} kart @param {ZoneKind} kind @param {any} trigger */
+function LeaveZone(kart, kind, trigger) {
+    kart[kind]?.delete(trigger);
+}
+
+/**
+ * Forgets every zone the melon was in — for teleports/respawns, where the
+ * zone's OnEndTouch may never reach us (the melon left it by teleport, or
+ * it's a brand new melon entity). If the melon lands inside a zone, the
+ * zone's next OnStartTouch adds it back.
+ * @param {import("../kart-registry.js").Kart} kart
+ */
+function LeaveZones(kart) {
+    kart.healZones?.clear();
+    kart.liftZones?.clear();
+    kart.cameraZones?.clear();
+}
+
+/**
+ * The strongest value of the zones of this kind the melon is inside, or
+ * undefined if none — overlapping zones don't stack. Zone entities that no
+ * longer exist are dropped.
+ * @param {import("../kart-registry.js").Kart} kart @param {ZoneKind} kind
+ */
+function StrongestZone(kart, kind) {
+    const zones = kart[kind];
+    let strongest = undefined;
+    for (const [zone, value] of zones ?? []) {
+        if (!zone.IsValid()) {
+            zones?.delete(zone);
+            continue;
+        }
+        strongest = strongest === undefined ? value : Math.max(strongest, value);
+    }
+    return strongest;
+}
+
+/** Health per second the melon heals right now (0 outside heal zones). @param {import("../kart-registry.js").Kart} kart */
+function CurrentHealRate(kart) {
+    return StrongestZone(kart, "healZones") ?? 0;
+}
+
+/** Whether the melon is inside a lift zone. @param {import("../kart-registry.js").Kart} kart */
+function InLiftZone(kart) {
+    return StrongestZone(kart, "liftZones") !== undefined;
+}
+
+/** The wall bounce / wall jump rules for where the melon is now (see WallRules). @param {import("../kart-registry.js").Kart} kart */
+function CurrentWallRules(kart) {
+    return WallRules(StrongestZone(kart, "liftZones"));
+}
+
+/**
+ * The zoom of the camera zone the melon entered last (of those it's still
+ * inside), or undefined if none — overlapping camera zones don't add up.
+ * @param {import("../kart-registry.js").Kart} kart
+ * @returns {import("../logic/camera-zone.js").CameraZone | undefined}
+ */
+function CurrentCameraZone(kart) {
+    const zones = kart.cameraZones;
+    let latest = undefined;
+    for (const [zone, value] of zones ?? []) {
+        if (!zone.IsValid()) {
+            zones?.delete(zone);
+            continue;
+        }
+        latest = value; // Map order = entry order
+    }
+    return latest;
+}
+
+// Lift camera: zooms out while the melon is in a lift zone (LIFT_CAMERA_* —
+// the math is in ../logic/lift-camera.js).
+
+/**
+ * Per tick: eases the chase camera out while the melon is in a lift zone and
+ * back in after it leaves. Only touches the camera while the zoom is
+ * actually changing. Wall clipping is off for as long as it's zoomed out at
+ * all (it looks through the shaft walls instead). Left alone while the melon
+ * is breaking — the break camera owns it then, and the respawn re-applies it.
+ * @param {import("../kart-registry.js").Kart} kart @param {number} dt
+ */
+function UpdateLiftCamera(kart, dt) {
+    if (kart.breaking) {
+        return;
+    }
+    const before = kart.liftCameraBlend ?? 0;
+    const after = LiftCameraBlend(before, InLiftZone(kart), dt);
+    if (after === before) {
+        return;
+    }
+    kart.liftCameraBlend = after;
+    ApplyZonedFollowOffset(kart);
+}
+
+// Camera zones: zoom in or out while the melon is in a camera_enter/_leave
+// trigger (CAMERA_ZONE_* — the math is in ../logic/camera-zone.js).
+
+/**
+ * Per tick: eases the chase camera towards the zoom of the camera zone the
+ * melon is in, and back to normal after it leaves. Only touches the camera
+ * while the zoom is actually changing. Left alone while the melon is
+ * breaking — the break camera owns it then, and the respawn re-applies it.
+ * @param {import("../kart-registry.js").Kart} kart @param {number} dt
+ */
+function UpdateZoneCamera(kart, dt) {
+    if (kart.breaking) {
+        return;
+    }
+    const before = kart.zoneCamera;
+    const after = StepZoneCamera(before, CurrentCameraZone(kart) ?? NO_CAMERA_ZONE, dt);
+    if (after === before) {
+        return;
+    }
+    kart.zoneCamera = after;
+    ApplyZonedFollowOffset(kart);
+}
+
+// Chase camera — one file per concern: follow.js (the normal chase camera and
+// the user menu's presets), break-zoom.js (pull-back on a break), lift-zoom.js
+// (zoom-out in lift zones), zone-zoom.js (zoom in/out in camera zones). Other parts of melon_drive import from here.
 
 // Pure rules for generic teleporters — no cs_script import, so it's
 // unit-testable in Node (see test/teleport.test.mjs). index.js's
@@ -2551,40 +3089,6 @@ function SpawnBreakParticles(position, angles, color) {
     return true;
 }
 
-// Heal zones: while a melon is inside one or more heal triggers (heal_enter /
-// heal_leave, see HEAL_ZONE_RATE), its health refills over time.
-
-/**
- * Heals the melon for this tick at the fastest rate of the zones it's in.
- * Zone entities that no longer exist are dropped.
- * @param {import("../kart-registry.js").Kart} kart @param {number} dt
- */
-function ApplyHealing(kart, dt) {
-    if (!kart.healZones || kart.healZones.size === 0) {
-        return;
-    }
-    let rate = 0;
-    for (const [zone, zoneRate] of kart.healZones) {
-        if (!zone.IsValid()) {
-            kart.healZones.delete(zone);
-            continue;
-        }
-        rate = Math.max(rate, zoneRate);
-    }
-    kart.health = HealedHealth(kart.health, rate, dt);
-}
-
-/**
- * Forgets every heal zone the melon was in — for teleports/respawns, where
- * the zone's OnEndTouch may never reach us (the melon left it by teleport,
- * or it's a brand new melon entity). If the melon lands inside a zone, the
- * zone's next OnStartTouch adds it back.
- * @param {import("../kart-registry.js").Kart} kart
- */
-function LeaveHealZones(kart) {
-    kart.healZones?.clear();
-}
-
 // Moving a kart's melon on purpose: checkpoint respawn, generic teleports,
 // and its paint color (kept across breaks).
 
@@ -2610,7 +3114,7 @@ function RespawnKartAtCheckpoint(kart) {
     kart.settled = false;
     kart.speedCap = undefined;
     kart.pendingBounce = undefined;
-    LeaveHealZones(kart);
+    LeaveZones(kart);
 }
 
 /**
@@ -2631,7 +3135,7 @@ function TeleportKartTo(kart, position, angles, velocity) {
     kart.prevOrigin = undefined;
     kart.settled = false;
     kart.pendingBounce = undefined;
-    LeaveHealZones(kart);
+    LeaveZones(kart);
 }
 
 /**
@@ -2721,7 +3225,7 @@ function RespawnDestroyedMelon(slot, kart) {
     kart.settled = false;
     kart.speedCap = undefined;
     kart.pendingBounce = undefined;
-    LeaveHealZones(kart); // a new melon entity — the old one's zones never send heal_leave
+    LeaveZones(kart); // a new melon entity — the old one's zones never send heal_leave/lift_leave
     ApplyCameraFollow(kart);
 }
 
@@ -2902,7 +3406,7 @@ function DebugLogBounce(kart, n, angle) {
 /**
  * Reflects the melon's pre-impact horizontal velocity off a wall and scales
  * it by how well the hit was angled (see WALL_BOUNCE_* in constants/wall-bounce.js).
- * Vertical velocity is left to physics — a bounce never launches upward.
+ * Horizontal only — the upward kick (WALL_BOUNCE_UP_SPEED) is added by UpdateKart.
  * @param {import("../kart-registry.js").Kart} kart @param {{ x: number, y: number, method: string, hitPoint?: any }} n @param {number} now
  * @returns {{ velocity: { x: number, y: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number } | null}
  *   null if the melon wasn't actually moving into the wall
@@ -2995,6 +3499,21 @@ function SettleWallBounceDamage(slot, kart) {
     return false;
 }
 
+// Heal zones: while a melon is inside one or more heal triggers (heal_enter /
+// heal_leave, see HEAL_ZONE_RATE), its health refills over time. Which zones
+// it's in: zones.js.
+
+/**
+ * Heals the melon for this tick at the fastest rate of the zones it's in.
+ * @param {import("../kart-registry.js").Kart} kart @param {number} dt
+ */
+function ApplyHealing(kart, dt) {
+    const rate = CurrentHealRate(kart);
+    if (rate > 0) {
+        kart.health = HealedHealth(kart.health, rate, dt);
+    }
+}
+
 // Per-tick melon driving (UpdateKart): the order everything happens in each
 // tick — break/lock handling, contact measurement, impact and wall-bounce
 // detection, steering, friction, jump, speed cap. The individual parts live
@@ -3056,6 +3575,8 @@ function UpdateKart(slot, kart, dt) {
     const grounded = UpdateGrounded(kart, origin, now, supported, verticalAccel);
     const wallNormalNow = grounded ? undefined : UpdateWallContact(kart, origin, now, currentVelocity);
     DrawJumpDebug(slot, kart, grounded, wallNormalNow);
+    // Wall bounce / wall jump tuning for where the melon is (lift zone or not).
+    const wallRules = CurrentWallRules(kart);
     /** @type {{ x: number, y: number } | undefined} */
     let bounceVelocity = undefined;
     if (kart.lastVelocity) {
@@ -3083,7 +3604,10 @@ function UpdateKart(slot, kart, dt) {
             if (kart.pendingBounce && SettleWallBounceDamage(slot, kart)) {
                 return;
             }
-            bounceVelocity = bounce.velocity;
+            // In a lift zone, never so slow that the melon can't reach the
+            // opposite wall and bounce again (wallRules.minBounceSpeed) —
+            // free: speedGain below stays what the bounce itself earned.
+            bounceVelocity = WithMinSpeed(bounce.velocity, wallRules.minBounceSpeed);
             // The melon leaves the wall right away after bouncing, so the
             // probes won't see it next tick — this is its wall contact.
             kart.lastWallContact = { time: now, normal: { x: wallNormal.x, y: wallNormal.y } };
@@ -3176,11 +3700,13 @@ function UpdateKart(slot, kart, dt) {
     let vx = bounceVelocity ? bounceVelocity.x : currentVelocity.x;
     let vy = bounceVelocity ? bounceVelocity.y : currentVelocity.y;
 
-    // Steering grip (STEER_GRIP_*): on the ground, holding forward turns the
-    // velocity itself towards the look direction. Not on a bounce tick — the
-    // reflected velocity is the bounce's result and stays as computed.
-    if (forwardInput > 0 && grounded && !bounceVelocity) {
-        const steered = SteerTowards({ x: vx, y: vy }, forwardDir, STEER_GRIP_RATE * dt, STEER_GRIP_MAX_ANGLE);
+    // Steering grip (STEER_GRIP_*): holding forward turns the velocity itself
+    // towards the look direction — on the ground and (at STEER_AIR_GRIP_RATE)
+    // in the air. Not on a bounce tick — the reflected velocity is the
+    // bounce's result and stays as computed.
+    if (forwardInput > 0 && !bounceVelocity) {
+        const gripRate = grounded ? STEER_GRIP_RATE : STEER_AIR_GRIP_RATE;
+        const steered = SteerTowards({ x: vx, y: vy }, forwardDir, gripRate * dt, STEER_GRIP_MAX_ANGLE);
         vx = steered.x;
         vy = steered.y;
     }
@@ -3202,8 +3728,11 @@ function UpdateKart(slot, kart, dt) {
 
     // Jump press (ground jump / wall jump / wall-bounce timing) and the
     // wall-jump charge refill — see ApplyJump in jump.js.
-    const v = { x: vx, y: vy, z: currentVelocity.z };
-    ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v);
+    // A wall bounce also kicks it upward (WALL_BOUNCE_UP_SPEED, stronger in a
+    // lift zone).
+    const vzBase = bounceVelocity ? BounceUpVelocity(currentVelocity.z, wallRules.bounceUpSpeed) : currentVelocity.z;
+    const v = { x: vx, y: vy, z: vzBase };
+    ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v, wallRules);
     vx = v.x;
     vy = v.y;
     const vz = v.z;
@@ -3383,7 +3912,7 @@ function BeginHeat(trackId) {
         kart.settled = false;
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
         kart.pendingBounce = undefined;
-        LeaveHealZones(kart);
+        LeaveZones(kart);
         // trackId is set directly instead of waiting for the physical
         // checkpoint_<trackId>_1 trigger touch to report it, so the
         // checkpoint/lap panel is already visible ("0/N", lap "1/M") the
@@ -3496,7 +4025,7 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.settled = false;
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
         kart.pendingBounce = undefined;
-        LeaveHealZones(kart);
+        LeaveZones(kart);
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot === undefined) {
             return;
@@ -3849,6 +4378,46 @@ function RegisterCheckpointAndFinishInputs() {
     }
 }
 
+// Script inputs of the zone triggers — heal, lift and camera zones. All work
+// the same way: OnStartTouch -> "<kind>_enter", OnEndTouch -> "<kind>_leave",
+// and the touched trigger's own name may carry its value (heal_zone_<rate>,
+// lift_zone_<speed>, camera_zone_<distance>_<height>). What the zones do is in
+// physics/zones.js and the systems reading it (healing, wall rules, cameras).
+
+/**
+ * @param {string} enterInput @param {string} leaveInput
+ * @param {import("./physics/zones.js").ZoneKind} kind
+ * @param {(triggerName: string) => any} valueFromName @param {string} unit for the debug log
+ */
+function RegisterZone(enterInput, leaveInput, kind, valueFromName, unit) {
+    Instance.OnScriptInput(enterInput, ({ caller, activator }) => {
+        const kart = activator && FindKartByMelon(activator);
+        if (!kart || !caller) {
+            Debug(`${enterInput}: activator wasn't a tracked melon, ignoring`);
+            return;
+        }
+        const value = valueFromName(caller.GetEntityName());
+        EnterZone(kart, kind, caller, value);
+        Debug(`${enterInput}: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} in "${caller.GetEntityName()}" (${typeof value === "object" ? JSON.stringify(value) : value} ${unit})`);
+    });
+    Instance.OnScriptInput(leaveInput, ({ caller, activator }) => {
+        const kart = activator && FindKartByMelon(activator);
+        if (kart && caller) {
+            LeaveZone(kart, kind, caller);
+        }
+    });
+}
+
+function RegisterZoneInputs() {
+    // Heal zones — see HEAL_ZONE_RATE. Healing: ApplyHealing (physics/heal.js).
+    RegisterZone("heal_enter", "heal_leave", "healZones", HealZoneRate, "health/s");
+    // Lift zones — see constants/lift.js. Read by CurrentWallRules (every wall
+    // bounce and wall jump) and the lift camera.
+    RegisterZone("lift_enter", "lift_leave", "liftZones", LiftZoneUpSpeed, "u/s up per bounce");
+    // Camera zones — see CAMERA_ZONE_* in constants/camera.js. Read by the zone camera (camera/zone-zoom.js).
+    RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
+}
+
 // Wall-bounce prediction line — see PREDICTION_* in constants/prediction.js for the
 // design. Recomputed every tick from the melon's actual velocity (the same
 // direction the bounce itself measures its angle from), and its angle
@@ -4111,6 +4680,8 @@ function Think() {
         try {
             UpdateUserMenu(slot, kart); // checked before UpdateKart's locked/breaking early-returns — USE works as an unstuck button
             UpdateKart(slot, kart, dt);
+            UpdateLiftCamera(kart, dt);
+            UpdateZoneCamera(kart, dt);
             UpdatePrediction(kart, dt);
             UpdateSpeedHud(slot, kart);
             UpdateBounceHud(slot, kart);
@@ -4340,29 +4911,8 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
     Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"`);
 });
 
-// Heal zones — see HEAL_ZONE_RATE for the Hammer convention: OnStartTouch ->
-// "heal_enter", OnEndTouch -> "heal_leave". The trigger itself (caller) is
-// remembered, so overlapping zones and their leaves are tracked separately;
-// its name may set the rate (heal_zone_<rate>). Healing happens per tick in
-// ApplyHealing (physics/heal.js).
-Instance.OnScriptInput("heal_enter", ({ caller, activator }) => {
-    const kart = activator && FindKartByMelon(activator);
-    if (!kart || !caller) {
-        Debug("heal_enter: activator wasn't a tracked melon, ignoring");
-        return;
-    }
-    const rate = HealZoneRate(caller.GetEntityName());
-    (kart.healZones ??= new Map()).set(caller, rate);
-    Debug(`heal_enter: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} in "${caller.GetEntityName()}" (${rate}/s)`);
-});
-
-Instance.OnScriptInput("heal_leave", ({ caller, activator }) => {
-    const kart = activator && FindKartByMelon(activator);
-    if (!kart || !caller) {
-        return;
-    }
-    kart.healZones?.delete(caller);
-});
+// Heal and lift zones (heal_enter/heal_leave, lift_enter/lift_leave).
+RegisterZoneInputs();
 
 Instance.OnCustomHudClicked((event) => {
     if (event.layout !== GetSpeedHud()) {

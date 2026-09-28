@@ -106,6 +106,18 @@ export function LogJumpPress(slot, kart, now, grounded, groundJump, timingPress)
     );
 }
 
+/**
+ * Console log of whether that press became a wall jump, and if not, why.
+ * @param {number} slot @param {import("../kart-registry.js").Kart} kart
+ * @param {string | null} blockedBy see WallJumpBlockReason @param {boolean} inLift
+ */
+export function LogWallJumpVerdict(slot, kart, blockedBy, inLift) {
+    if (!IsJumpDebugOn(kart)) {
+        return;
+    }
+    Instance.Msg(`[jump debug] slot ${slot} wall jump: ${blockedBy === null ? "YES" : `no — ${blockedBy}`}${inLift ? " (in lift zone)" : " (not in a lift zone)"}`);
+}
+
 // Colors — see the legend in GAMEPLAY.md's "Jumping".
 const COLOR_MISS = { r: 110, g: 110, b: 110 };
 const COLOR_IGNORED = { r: 170, g: 80, b: 200 };

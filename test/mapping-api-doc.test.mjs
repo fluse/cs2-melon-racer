@@ -20,6 +20,10 @@ const SCRIPT_INPUTS = [
     "melon_teleport",
     "heal_enter",
     "heal_leave",
+    "lift_enter",
+    "lift_leave",
+    "camera_enter",
+    "camera_leave",
 ];
 
 test("every entity name the script looks up is in MAPPING_API.md", () => {

@@ -18,16 +18,21 @@ function IsPlayingTeam(team) {
 // racers mid-run. mp_warmup_pausetimer keeps the warmup clock from ever
 // ticking down to a real match.
 Instance.ServerCommand("sv_cheats 1");
-Instance.ServerCommand("mp_warmup_enabled 1");
+// Instance.ServerCommand("mp_warmup_enabled 1");
 // mp_warmup_enabled alone isn't reliable on a local/offline listen server
 // (the usual way this map gets tested) — mp_warmup_offline_enabled is the
 // cvar CS2 actually checks there. Setting both covers dedicated servers too.
-Instance.ServerCommand("mp_warmup_offline_enabled 1");
-Instance.ServerCommand("mp_warmup_pausetimer 1");
+// Instance.ServerCommand("mp_warmup_offline_enabled 1");
+// Instance.ServerCommand("mp_warmup_pausetimer 1");
+Instance.ServerCommand("mp_warmup_end");
+Instance.ServerCommand("mp_roundtime 60");
 Instance.ServerCommand("mp_autoteambalance 0");
+Instance.ServerCommand("mp_roundtime_defuse 60");
+Instance.ServerCommand("mp_roundtime_hostage 60");
 Instance.ServerCommand("mp_limitteams 0");
 Instance.ServerCommand("mp_friendlyfire 0");
 Instance.ServerCommand("mp_solid_teammates 0"); // don't block each other on the track
+Instance.ServerCommand("mp_ignore_round_win_conditions 1");
 
 function PutPlayerInRaceMode(pawn) {
     if (!IsPlayingTeam(pawn.GetTeamNumber())) {

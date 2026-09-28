@@ -8,6 +8,7 @@ import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud,UpdateJumpHud, UpdateHe
 import { UpdateKart, HandleMelonLost } from "./physics/index.js";
 import { phase, UpdateRaceFlow } from "./race-flow.js";
 import { UpdatePrediction, HidePrediction } from "./prediction.js";
+import { UpdateLiftCamera, UpdateZoneCamera } from "./camera/index.js";
 
 let lastHeartbeatTime = 0;
 // Real elapsed time since the last Think, used for the movement math below —
@@ -67,6 +68,8 @@ export function Think() {
         try {
             UpdateUserMenu(slot, kart); // checked before UpdateKart's locked/breaking early-returns — USE works as an unstuck button
             UpdateKart(slot, kart, dt);
+            UpdateLiftCamera(kart, dt);
+            UpdateZoneCamera(kart, dt);
             UpdatePrediction(kart, dt);
             UpdateSpeedHud(slot, kart);
             UpdateBounceHud(slot, kart);

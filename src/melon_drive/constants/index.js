@@ -8,6 +8,7 @@ export * from "./driving.js";
 export * from "./jump.js";
 export * from "./health.js";
 export * from "./wall-bounce.js";
+export * from "./lift.js";
 export * from "./prediction.js";
 export * from "./breaking.js";
 export * from "./race.js";

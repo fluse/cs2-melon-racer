@@ -120,6 +120,81 @@ test("wall jump: once the wall has stopped the melon, it stays jumpable for WALL
     assert.equal(v.z, C.WALL_JUMP_UP_SPEED);
 });
 
+test("wall bounce: lifts the melon by WALL_BOUNCE_UP_SPEED, cancelling its fall", () => {
+    const wallX = kart.melon.GetAbsOrigin().x + C.WALL_CONTACT_DISTANCE / 2;
+    Geometry({ floorBelow: false, wallX });
+    const v = Tick(fallingIntoWall(-100));
+    assert.ok(kart.lastBounceTime === world.time, "the hit counted as a wall bounce");
+    assert.equal(v.z, C.WALL_BOUNCE_UP_SPEED);
+});
+
+test("wall bounce in a lift zone: kicked up by the zone's speed instead", () => {
+    const wallX = kart.melon.GetAbsOrigin().x + C.WALL_CONTACT_DISTANCE / 2;
+    Geometry({ floorBelow: false, wallX });
+    kart.liftZones = new Map([[new Entity({ name: "lift_zone_600" }), 600]]);
+    const v = Tick(fallingIntoWall(-100));
+    assert.equal(v.z, 600);
+});
+
+test("wall jump in a lift zone: full strength, costs no charge, keeps the bounce's higher kick", () => {
+    const wallX = kart.melon.GetAbsOrigin().x + C.WALL_CONTACT_DISTANCE / 2;
+    Geometry({ floorBelow: false, wallX });
+    kart.liftZones = new Map([[new Entity({ name: "lift_zone" }), C.LIFT_ZONE_UP_SPEED]]);
+    kart.wallJumpCharge = C.WALL_JUMP_MIN_CHARGE; // nearly spent outside a zone
+    const v = Tick({ ...fallingIntoWall(-100), jump: true });
+    assert.ok(kart.lastWallJump, "wall jump happened");
+    assert.ok(kart.wallJumpCharge >= C.WALL_JUMP_MIN_CHARGE, "no charge used");
+    assert.equal(v.z, Math.max(C.LIFT_ZONE_UP_SPEED, C.WALL_JUMP_UP_SPEED));
+    assert.ok(v.x <= -C.WALL_JUMP_PUSH_SPEED + 1e-9, `full-strength push off the wall (vx=${v.x})`);
+});
+
+test("head-on wall bounce in a lift zone still leaves at LIFT_ZONE_MIN_BOUNCE_SPEED", () => {
+    const wallX = kart.melon.GetAbsOrigin().x + C.WALL_CONTACT_DISTANCE / 2;
+    Geometry({ floorBelow: false, wallX });
+    kart.liftZones = new Map([[new Entity({ name: "lift_zone" }), C.LIFT_ZONE_UP_SPEED]]);
+    const v = Tick(fallingIntoWall(-100, 300)); // head-on: a MISS
+    // (minus this tick's coasting friction, applied on top of the bounce)
+    assert.ok(v.x <= -C.LIFT_ZONE_MIN_BOUNCE_SPEED + C.COAST_FRICTION * DT + 1e-6, `away from the wall at the minimum speed (vx=${v.x})`);
+});
+
+// Lift zone, narrow shaft: wall A, then the opposite wall B only 0.2 s later.
+function LiftShaft() {
+    kart.liftZones = new Map([[new Entity({ name: "lift_zone" }), C.LIFT_ZONE_UP_SPEED]]);
+    const wallX = kart.melon.GetAbsOrigin().x + C.WALL_CONTACT_DISTANCE / 2;
+    Geometry({ floorBelow: false, wallX });
+    Tick({ ...fallingIntoWall(-100), jump: true }); // wall jump off wall A
+    assert.ok(kart.lastWallJump, "first wall jump");
+    return kart.lastWallJump;
+}
+
+test("lift zone: the next wall jump only needs LIFT_ZONE_WALL_JUMP_COOLDOWN, not WALL_JUMP_COOLDOWN", () => {
+    const first = LiftShaft();
+    world.time += C.LIFT_ZONE_WALL_JUMP_COOLDOWN + DT; // still well inside WALL_JUMP_COOLDOWN
+    kart.lastWallContact = { time: world.time + DT, normal: { x: 1, y: 0 } }; // touching wall B this tick
+    Tick({ ...falling(-100), jump: true });
+    assert.notEqual(kart.lastWallJump, first, "second wall jump off wall B");
+});
+
+test("lift zone: a jump pressed just before touching the next wall fires on the touch", () => {
+    const first = LiftShaft();
+    world.time += C.LIFT_ZONE_WALL_JUMP_COOLDOWN;
+    Tick({ ...falling(-100), jump: true }); // pressed early: no fresh wall yet
+    assert.equal(kart.lastWallJump, first, "nothing to jump off yet");
+    kart.lastWallContact = { time: world.time + DT, normal: { x: 1, y: 0 } }; // touches wall B next tick
+    Tick(falling(-100)); // no new press
+    assert.notEqual(kart.lastWallJump, first, "the early press fired the wall jump");
+});
+
+test("lift zone: an early press older than LIFT_ZONE_JUMP_BUFFER is dropped", () => {
+    const first = LiftShaft();
+    world.time += C.LIFT_ZONE_WALL_JUMP_COOLDOWN;
+    Tick({ ...falling(-100), jump: true });
+    world.time += C.LIFT_ZONE_JUMP_BUFFER + DT;
+    kart.lastWallContact = { time: world.time + DT, normal: { x: 1, y: 0 } };
+    Tick(falling(-100));
+    assert.equal(kart.lastWallJump, first, "too early — no wall jump");
+});
+
 test("wall jump: no wall nearby, no jump in the air", () => {
     Geometry({ floorBelow: false });
     const v = Tick({ ...falling(-100, 300), jump: true });
@@ -130,10 +205,14 @@ test("wall jump: only once per wall until the ground is touched again", () => {
     const wallX = kart.melon.GetAbsOrigin().x + C.WALL_CONTACT_DISTANCE / 2;
     Geometry({ floorBelow: false, wallX });
     Tick({ ...fallingIntoWall(-100), jump: true });
+    const firstWallJump = kart.lastWallJump;
+    assert.ok(firstWallJump, "first wall jump happened");
     world.time += C.WALL_JUMP_COOLDOWN + DT;
     kart.melon.origin = { ...kart.melon.origin, x: wallX - C.WALL_CONTACT_DISTANCE / 2 }; // back at the same wall
-    const again = Tick({ ...fallingIntoWall(-100), jump: true });
-    assert.ok(again.z < 0, "same wall a second time: no wall jump");
+    // (Checked via lastWallJump, not vz: the hit also counts as a wall
+    // bounce, whose WALL_BOUNCE_UP_SPEED kick makes vz positive anyway.)
+    Tick({ ...fallingIntoWall(-100), jump: true });
+    assert.equal(kart.lastWallJump, firstWallJump, "same wall a second time: no wall jump");
 });
 
 test("no double jump right after taking off (second press within the hop tolerance)", () => {

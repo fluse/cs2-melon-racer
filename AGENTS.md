@@ -35,14 +35,18 @@ src/tsconfig.json                        # editor tooling config for src/**/*.js
 src/gamemode/index.js                    # gamemode entry: a single small file
 src/melon_drive/index.js, *.js           # melon_drive entry: split into one file per concern —
                                           #   debug.js, kart-registry.js, track-config.js,
-                                          #   camera.js, hud.js, race-flow.js, spawn-points.js, kart-spawn.js,
-                                          #   checkpoints.js, prediction.js, trace.js, think.js — index.js just wires them together
+                                          #   hud.js, race-flow.js, spawn-points.js, kart-spawn.js,
+                                          #   checkpoints.js, zone-inputs.js (heal/lift zone script inputs),
+                                          #   prediction.js, trace.js, think.js — index.js just wires them together
+src/melon_drive/camera/*.js              # chase camera, one file per concern: follow.js (chase camera, user-menu presets,
+                                          #   the only SetFollowConfig), break-zoom.js, lift-zoom.js, zone-zoom.js (camera zones) — others import from camera/index.js
 src/melon_drive/physics/*.js             # melon physics, one file per concern: drive.js (UpdateKart, the per-tick order),
                                           #   jump.js, contact.js (floor/wall probes), wall-bounce.js, damage.js, breaking.js,
-                                          #   break-effects.js, teleport.js, jump-debug.js (the user-menu jump debug view) — others import from physics/index.js
-src/melon_drive/constants/*.js           # every tunable/Hammer name, one file per system (driving, jump, health, wall-bounce, prediction,
+                                          #   break-effects.js, teleport.js, heal.js, zones.js (which heal/lift zones a melon is in, and the
+                                          #   WallRules that follow from it), jump-debug.js (the user-menu jump debug view) — others import from physics/index.js
+src/melon_drive/constants/*.js           # every tunable/Hammer name, one file per system (driving, jump, health, wall-bounce, lift, prediction,
                                           #   breaking, race, paint, teleport, spawn, camera, hud, debug) — import from constants/index.js
-src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, checkpoint progress, break sequence, camera steps, teleport, ground/wall contact) — no engine import, unit-tested
+src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, lift zones, checkpoint progress, break sequence, camera steps/lift zoom, teleport, ground/wall contact) — no engine import, unit-tested
 test/*.test.mjs                          # node:test unit tests for src/*/logic/ (`npm test`), plus checks of the .vmap/.xml the script relies on
 test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities
 test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files

@@ -3,9 +3,10 @@
 // detection, steering, friction, jump, speed cap. The individual parts live
 // in the sibling files; this one wires them together.
 import { Instance, CSInputs } from "cs_script/point_script";
-import { ApplyBreakCameraZoom } from "../camera.js";
+import { ApplyBreakCameraZoom } from "../camera/index.js";
 import { VerticalAccel, IsSupported } from "../logic/contact.js";
 import { SteerTowards } from "../logic/steering.js";
+import { BounceUpVelocity, WithMinSpeed } from "../logic/wall-bounce.js";
 import {
     FORWARD_ACCEL,
     REVERSE_ACCEL,
@@ -13,6 +14,7 @@ import {
     MAX_SPEED,
     COAST_FRICTION,
     STEER_GRIP_RATE,
+    STEER_AIR_GRIP_RATE,
     STEER_GRIP_MAX_ANGLE,
     IMPACT_DAMAGE_THRESHOLD,
     MELON_REST_SPEED,
@@ -29,6 +31,7 @@ import { ApplyImpactDamage } from "./damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage } from "./wall-bounce.js";
 import { BreakMelon } from "./breaking.js";
 import { ApplyHealing } from "./heal.js";
+import { CurrentWallRules } from "./zones.js";
 
 /** @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} dt */
 export function UpdateKart(slot, kart, dt) {
@@ -86,6 +89,8 @@ export function UpdateKart(slot, kart, dt) {
     const grounded = UpdateGrounded(kart, origin, now, supported, verticalAccel);
     const wallNormalNow = grounded ? undefined : UpdateWallContact(kart, origin, now, currentVelocity);
     DrawJumpDebug(slot, kart, grounded, wallNormalNow);
+    // Wall bounce / wall jump tuning for where the melon is (lift zone or not).
+    const wallRules = CurrentWallRules(kart);
     /** @type {{ x: number, y: number } | undefined} */
     let bounceVelocity = undefined;
     if (kart.lastVelocity) {
@@ -113,7 +118,10 @@ export function UpdateKart(slot, kart, dt) {
             if (kart.pendingBounce && SettleWallBounceDamage(slot, kart)) {
                 return;
             }
-            bounceVelocity = bounce.velocity;
+            // In a lift zone, never so slow that the melon can't reach the
+            // opposite wall and bounce again (wallRules.minBounceSpeed) —
+            // free: speedGain below stays what the bounce itself earned.
+            bounceVelocity = WithMinSpeed(bounce.velocity, wallRules.minBounceSpeed);
             // The melon leaves the wall right away after bouncing, so the
             // probes won't see it next tick — this is its wall contact.
             kart.lastWallContact = { time: now, normal: { x: wallNormal.x, y: wallNormal.y } };
@@ -206,11 +214,13 @@ export function UpdateKart(slot, kart, dt) {
     let vx = bounceVelocity ? bounceVelocity.x : currentVelocity.x;
     let vy = bounceVelocity ? bounceVelocity.y : currentVelocity.y;
 
-    // Steering grip (STEER_GRIP_*): on the ground, holding forward turns the
-    // velocity itself towards the look direction. Not on a bounce tick — the
-    // reflected velocity is the bounce's result and stays as computed.
-    if (forwardInput > 0 && grounded && !bounceVelocity) {
-        const steered = SteerTowards({ x: vx, y: vy }, forwardDir, STEER_GRIP_RATE * dt, STEER_GRIP_MAX_ANGLE);
+    // Steering grip (STEER_GRIP_*): holding forward turns the velocity itself
+    // towards the look direction — on the ground and (at STEER_AIR_GRIP_RATE)
+    // in the air. Not on a bounce tick — the reflected velocity is the
+    // bounce's result and stays as computed.
+    if (forwardInput > 0 && !bounceVelocity) {
+        const gripRate = grounded ? STEER_GRIP_RATE : STEER_AIR_GRIP_RATE;
+        const steered = SteerTowards({ x: vx, y: vy }, forwardDir, gripRate * dt, STEER_GRIP_MAX_ANGLE);
         vx = steered.x;
         vy = steered.y;
     }
@@ -232,8 +242,11 @@ export function UpdateKart(slot, kart, dt) {
 
     // Jump press (ground jump / wall jump / wall-bounce timing) and the
     // wall-jump charge refill — see ApplyJump in jump.js.
-    const v = { x: vx, y: vy, z: currentVelocity.z };
-    ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v);
+    // A wall bounce also kicks it upward (WALL_BOUNCE_UP_SPEED, stronger in a
+    // lift zone).
+    const vzBase = bounceVelocity ? BounceUpVelocity(currentVelocity.z, wallRules.bounceUpSpeed) : currentVelocity.z;
+    const v = { x: vx, y: vy, z: vzBase };
+    ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v, wallRules);
     vx = v.x;
     vy = v.y;
     const vz = v.z;
