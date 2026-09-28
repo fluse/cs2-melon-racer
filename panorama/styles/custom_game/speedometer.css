@@ -552,15 +552,15 @@
 }
 
 /* General user menu (USE to toggle) — a green-framed card with the Melon
-   Racer logo sitting on its top edge. #user_menu itself is just an
-   unstyled wrapper (no flow-children), so the card, the logo and the close
-   button can overlap: the card starts UserMenuLogo's half-height down, the
-   logo and close button are drawn after it (later children on top). See
-   SetUserMenuOpen for the Hidden toggle. */
+   Racer logo sitting on its top edge, over full-screen holo scanlines.
+   #user_menu fills the screen (it only fades, see SetUserMenuOpen for the
+   Hidden toggle); UserMenuFrame inside it is just an unstyled wrapper (no
+   flow-children), so the card, the logo and the close button can overlap:
+   the card starts UserMenuLogo's half-height down, the logo and close
+   button are drawn after it (later children on top). */
 .UserMenu {
-    width: 560px; /* the logo's width — the card itself is narrower */
-    horizontal-align: center;
-    vertical-align: center;
+    width: 100%;
+    height: 100%;
 
     transition-property: opacity;
     transition-duration: .15s;
@@ -568,6 +568,53 @@
 
     &.Hidden {
         opacity: 0;
+    }
+}
+
+.UserMenuFrame {
+    width: 560px; /* the logo's width — the card itself is narrower */
+    horizontal-align: center;
+    vertical-align: center;
+}
+
+/* Holo scanlines over the whole screen, behind the menu: 1px panels every
+   3px rather than a texture — a tiled image moirés into wide soft bands
+   whenever the HUD is scaled to a non-1080p screen, panels snap to whole
+   pixels and stay crisp. 400 of them (UserMenuScanline in speedometer.xml)
+   cover 1200px; the rest is clipped. The lines stay still (moving thin lines
+   by fractions of a pixel flickers); UserMenuScanBar, a soft glow band,
+   sweeps down over them instead. */
+.UserMenuScanlines {
+    width: 100%;
+    height: 100%;
+    flow-children: down;
+    overflow: clip;
+}
+
+.UserMenuScanline {
+    width: 100%;
+    height: 1px;
+    margin-bottom: 2px;
+    background-color: #9a9a9a88;
+}
+
+.UserMenuScanBar {
+    width: 100%;
+    height: 220px;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #7fd13b00 ), color-stop( 0.5, #7fd13b1c ), to( #7fd13b00 ) );
+
+    animation-name: UserMenuScanBar;
+    animation-duration: 5s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+@keyframes 'UserMenuScanBar' {
+    0% {
+        transform: translateY(-220px);
+    }
+    100% {
+        transform: translateY(1200px);
     }
 }
 

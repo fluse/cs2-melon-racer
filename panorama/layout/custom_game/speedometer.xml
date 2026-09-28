@@ -140,93 +140,142 @@
 		     new option as another card. The logo is last in the wrapper so it
 		     draws over the card's top edge; icons come from
 		     tools/make-icons.mjs. -->
-		<Panel id="user_menu" class="UserMenu Hidden">
-			<Panel class="UserMenuCard">
-				<Panel class="UserMenuSection">
-					<Panel class="UserMenuSectionHeader">
-						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/navigation.png" />
-						<Label class="UserMenuSectionLabel" text="NAVIGATION" />
-					</Panel>
-					<Panel class="UserMenuButtonRow">
-						<Button id="usermenu_respawn_button" class="UserMenuActionButton UserMenuButtonGreen UserMenuButtonHalf">
-							<Panel class="UserMenuButtonContent">
-								<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/respawn.png" />
-								<Label class="UserMenuButtonLabel" text="Respawn at Checkpoint" />
-							</Panel>
-						</Button>
-						<Button id="usermenu_hub_button" class="UserMenuActionButton UserMenuButtonRed UserMenuButtonHalf">
-							<Panel class="UserMenuButtonContent">
-								<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/home.png" />
-								<Label class="UserMenuButtonLabel" text="Return to Hub" />
-							</Panel>
-						</Button>
-					</Panel>
-				</Panel>
-
-				<!-- Same as the hub button (also leaves a running heat), but to
-				     intro_spawn — see SendKartToTutorial. -->
-				<Panel class="UserMenuSection">
-					<Panel class="UserMenuSectionHeader">
-						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/tutorial-box.png" />
-						<Label class="UserMenuSectionLabel" text="GO TO TUTORIAL" />
-					</Panel>
-					<Button id="usermenu_tutorial_button" class="UserMenuActionButton UserMenuButtonBlue UserMenuButtonFull">
-						<Panel class="UserMenuButtonContent">
-							<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/tutorial.png" />
-							<Label class="UserMenuButtonLabel" text="Go to Tutorial" />
-						</Panel>
-					</Button>
-				</Panel>
-
-				<Panel class="UserMenuSection">
-					<Panel class="UserMenuSectionHeader">
-						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/palette.png" />
-						<Label class="UserMenuSectionLabel" text="COLOR (Melon Skin)" />
-					</Panel>
-					<Panel class="UserMenuColorRow">
-						<Button id="usermenu_color_red" class="ColorSwatch ColorSwatchRed" />
-						<Button id="usermenu_color_orange" class="ColorSwatch ColorSwatchOrange" />
-						<Button id="usermenu_color_yellow" class="ColorSwatch ColorSwatchYellow" />
-						<Button id="usermenu_color_green" class="ColorSwatch ColorSwatchGreen" />
-						<Button id="usermenu_color_blue" class="ColorSwatch ColorSwatchBlue" />
-						<Button id="usermenu_color_purple" class="ColorSwatch ColorSwatchPurple" />
-						<Button id="usermenu_color_white" class="ColorSwatch ColorSwatchWhite" />
-						<Button id="usermenu_color_black" class="ColorSwatch ColorSwatchBlack" />
-					</Panel>
-				</Panel>
-
-				<!-- Per-player wall-bounce guide line: where the melon hits the
-				     next wall and at what rating (prediction.js). Off by
-				     default; in the default render mode it only shows in
-				     tools mode. -->
-				<Panel class="UserMenuSection">
-					<Panel class="UserMenuSectionHeader">
-						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/guide-line.png" />
-						<Label class="UserMenuSectionLabel" text="GUIDE LINE" />
-					</Panel>
-					<Button id="usermenu_prediction_button" class="UserMenuOutlineButton">
-						<Label class="UserMenuOutlineLabel" text="GUIDE LINE: {s:prediction_state}" />
-					</Button>
-				</Panel>
-
-				<!-- Per-player debug view of how ground/wall contact and jump
-				     presses are judged (physics/jump-debug.js). Its drawing only
-				     shows in tools mode. -->
-				<Panel class="UserMenuSection">
-					<Panel class="UserMenuSectionHeader">
-						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/debug.png" />
-						<Label class="UserMenuSectionLabel" text="JUMP DEBUG" />
-					</Panel>
-					<Button id="usermenu_jumpdebug_button" class="UserMenuOutlineButton">
-						<Label class="UserMenuOutlineLabel" text="JUMP DEBUG: {s:jumpdebug_state}" />
-					</Button>
-				</Panel>
+		<Panel id="user_menu" class="UserMenu Hidden" hittest="false">
+			<!-- Full-screen holo scanlines behind the menu (see
+			     .UserMenuScanlines): 40 rows x 10 = 400 lines, then the
+			     sweeping glow band over them. -->
+			<Panel class="UserMenuScanlines" hittest="false">
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
+				<Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" /> <Panel class="UserMenuScanline" hittest="false" />
 			</Panel>
+			<Panel class="UserMenuScanBar" hittest="false" />
 
-			<Image class="UserMenuLogo" src="file://{images}/custom_game/logo_melon_racer.png" />
-			<Button id="usermenu_close_button" class="UserMenuCloseButton">
-				<Label class="UserMenuCloseIcon" text="✕" />
-			</Button>
+			<Panel class="UserMenuFrame" hittest="false">
+				<Panel class="UserMenuCard">
+					<Panel class="UserMenuSection">
+						<Panel class="UserMenuSectionHeader">
+							<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/navigation.png" />
+							<Label class="UserMenuSectionLabel" text="NAVIGATION" />
+						</Panel>
+						<Panel class="UserMenuButtonRow">
+							<Button id="usermenu_respawn_button" class="UserMenuActionButton UserMenuButtonGreen UserMenuButtonHalf">
+								<Panel class="UserMenuButtonContent">
+									<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/respawn.png" />
+									<Label class="UserMenuButtonLabel" text="Respawn at Checkpoint" />
+								</Panel>
+							</Button>
+							<Button id="usermenu_hub_button" class="UserMenuActionButton UserMenuButtonRed UserMenuButtonHalf">
+								<Panel class="UserMenuButtonContent">
+									<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/home.png" />
+									<Label class="UserMenuButtonLabel" text="Return to Hub" />
+								</Panel>
+							</Button>
+						</Panel>
+					</Panel>
+
+					<!-- Same as the hub button (also leaves a running heat), but to
+					     intro_spawn — see SendKartToTutorial. -->
+					<Panel class="UserMenuSection">
+						<Panel class="UserMenuSectionHeader">
+							<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/tutorial-box.png" />
+							<Label class="UserMenuSectionLabel" text="GO TO TUTORIAL" />
+						</Panel>
+						<Button id="usermenu_tutorial_button" class="UserMenuActionButton UserMenuButtonBlue UserMenuButtonFull">
+							<Panel class="UserMenuButtonContent">
+								<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/tutorial.png" />
+								<Label class="UserMenuButtonLabel" text="Go to Tutorial" />
+							</Panel>
+						</Button>
+					</Panel>
+
+					<Panel class="UserMenuSection">
+						<Panel class="UserMenuSectionHeader">
+							<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/palette.png" />
+							<Label class="UserMenuSectionLabel" text="COLOR (Melon Skin)" />
+						</Panel>
+						<Panel class="UserMenuColorRow">
+							<Button id="usermenu_color_red" class="ColorSwatch ColorSwatchRed" />
+							<Button id="usermenu_color_orange" class="ColorSwatch ColorSwatchOrange" />
+							<Button id="usermenu_color_yellow" class="ColorSwatch ColorSwatchYellow" />
+							<Button id="usermenu_color_green" class="ColorSwatch ColorSwatchGreen" />
+							<Button id="usermenu_color_blue" class="ColorSwatch ColorSwatchBlue" />
+							<Button id="usermenu_color_purple" class="ColorSwatch ColorSwatchPurple" />
+							<Button id="usermenu_color_white" class="ColorSwatch ColorSwatchWhite" />
+							<Button id="usermenu_color_black" class="ColorSwatch ColorSwatchBlack" />
+						</Panel>
+					</Panel>
+
+					<!-- Per-player wall-bounce guide line: where the melon hits the
+					     next wall and at what rating (prediction.js). Off by
+					     default; in the default render mode it only shows in
+					     tools mode. -->
+					<Panel class="UserMenuSection">
+						<Panel class="UserMenuSectionHeader">
+							<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/guide-line.png" />
+							<Label class="UserMenuSectionLabel" text="GUIDE LINE" />
+						</Panel>
+						<Button id="usermenu_prediction_button" class="UserMenuOutlineButton">
+							<Label class="UserMenuOutlineLabel" text="GUIDE LINE: {s:prediction_state}" />
+						</Button>
+					</Panel>
+
+					<!-- Per-player debug view of how ground/wall contact and jump
+					     presses are judged (physics/jump-debug.js). Its drawing only
+					     shows in tools mode. -->
+					<Panel class="UserMenuSection">
+						<Panel class="UserMenuSectionHeader">
+							<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/debug.png" />
+							<Label class="UserMenuSectionLabel" text="JUMP DEBUG" />
+						</Panel>
+						<Button id="usermenu_jumpdebug_button" class="UserMenuOutlineButton">
+							<Label class="UserMenuOutlineLabel" text="JUMP DEBUG: {s:jumpdebug_state}" />
+						</Button>
+					</Panel>
+				</Panel>
+
+				<Image class="UserMenuLogo" src="file://{images}/custom_game/logo_melon_racer.png" />
+				<Button id="usermenu_close_button" class="UserMenuCloseButton">
+					<Label class="UserMenuCloseIcon" text="✕" />
+				</Button>
+			</Panel>
 		</Panel>
 
 		<!-- Melon Racer logo over a dark backdrop, shown for INTRO_LOGO_SECONDS
