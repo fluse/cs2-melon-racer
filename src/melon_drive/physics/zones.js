@@ -2,7 +2,7 @@
 // read by ../heal/), lift zones (lift_enter/lift_leave, constants/lift.js) and
 // camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in constants/camera.js):
 // entering/leaving them (registered in ../zone-inputs.js), what they add up
-// to right now, and leaving them all at once on a teleport/respawn.
+// to right now, and leaving them all at once when a new melon replaces the old.
 // Each kind is a Map on the kart: trigger entity -> its value (heal rate in
 // health/s, lift kick in u/s, camera zoom), so overlapping zones and their leaves are
 // tracked separately.
@@ -24,10 +24,12 @@ export function LeaveZone(kart, kind, trigger) {
 }
 
 /**
- * Forgets every zone the melon was in — for teleports/respawns, where the
- * zone's OnEndTouch may never reach us (the melon left it by teleport, or
- * it's a brand new melon entity). If the melon lands inside a zone, the
- * zone's next OnStartTouch adds it back.
+ * Forgets every zone the melon was in — only for a brand new melon entity,
+ * whose predecessor's zones never send OnEndTouch (the new one gets its own
+ * OnStartTouch). Not for teleports of the same melon: landing back inside the
+ * same trigger (e.g. respawning in the zone it broke in) sends no new
+ * OnStartTouch, so clearing would lose the zone; leaving it by teleport
+ * sends OnEndTouch like any other exit.
  * @param {import("../kart-registry.js").Kart} kart
  */
 export function LeaveZones(kart) {

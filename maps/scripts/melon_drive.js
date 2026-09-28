@@ -1195,7 +1195,7 @@ function LiftZoneUpSpeed(triggerName) {
 // read by ../heal/), lift zones (lift_enter/lift_leave, constants/lift.js) and
 // camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in constants/camera.js):
 // entering/leaving them (registered in ../zone-inputs.js), what they add up
-// to right now, and leaving them all at once on a teleport/respawn.
+// to right now, and leaving them all at once when a new melon replaces the old.
 // Each kind is a Map on the kart: trigger entity -> its value (heal rate in
 // health/s, lift kick in u/s, camera zoom), so overlapping zones and their leaves are
 // tracked separately.
@@ -1216,10 +1216,12 @@ function LeaveZone(kart, kind, trigger) {
 }
 
 /**
- * Forgets every zone the melon was in — for teleports/respawns, where the
- * zone's OnEndTouch may never reach us (the melon left it by teleport, or
- * it's a brand new melon entity). If the melon lands inside a zone, the
- * zone's next OnStartTouch adds it back.
+ * Forgets every zone the melon was in — only for a brand new melon entity,
+ * whose predecessor's zones never send OnEndTouch (the new one gets its own
+ * OnStartTouch). Not for teleports of the same melon: landing back inside the
+ * same trigger (e.g. respawning in the zone it broke in) sends no new
+ * OnStartTouch, so clearing would lose the zone; leaving it by teleport
+ * sends OnEndTouch like any other exit.
  * @param {import("../kart-registry.js").Kart} kart
  */
 function LeaveZones(kart) {
@@ -3460,7 +3462,8 @@ function RespawnKartAtCheckpoint(kart) {
     kart.settled = false;
     kart.speedCap = undefined;
     kart.pendingBounce = undefined;
-    LeaveZones(kart);
+    // Zones are kept: a respawn inside the zone the melon broke in never sends
+    // a new OnStartTouch, and leaving one by teleport still sends OnEndTouch.
 }
 
 /**
@@ -3481,7 +3484,8 @@ function TeleportKartTo(kart, position, angles, velocity) {
     kart.prevOrigin = undefined;
     kart.settled = false;
     kart.pendingBounce = undefined;
-    LeaveZones(kart);
+    // Zones are kept: a respawn inside the zone the melon broke in never sends
+    // a new OnStartTouch, and leaving one by teleport still sends OnEndTouch.
 }
 
 /**
@@ -4214,7 +4218,6 @@ function BeginHeat(trackId) {
         kart.settled = false;
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
         kart.pendingBounce = undefined;
-        LeaveZones(kart);
         // trackId is set directly instead of waiting for the physical
         // checkpoint_<trackId>_1 trigger touch to report it, so the
         // checkpoint/lap panel is already visible ("0/N", lap "1/M") the
@@ -4327,7 +4330,6 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.settled = false;
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
         kart.pendingBounce = undefined;
-        LeaveZones(kart);
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot === undefined) {
             return;

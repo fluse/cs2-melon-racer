@@ -652,10 +652,13 @@ convention as paint triggers. A trigger named exactly `heal_zone_full` is a
 kept full while inside. All healing code (constants, rules, zones and the
 full refill on respawn) lives in `src/melon_drive/heal/`. Capped at `MELON_MAX_HEALTH`; damage still
 applies inside, and overlapping zones don't stack (the fastest counts).
-Broken or race-locked melons don't heal. Teleports/respawns drop the melon
-out of all zones (the trigger's `OnEndTouch` isn't guaranteed to reach the
-script after a teleport, and a respawned new melon entity never gets one),
-so a zone it lands in re-adds it on its next touch. Every entry into a heal
+Broken or race-locked melons don't heal. Teleports/respawns **keep** the
+melon's zones (heal, lift, camera): landing back inside the same trigger —
+e.g. respawning at a checkpoint inside the zone it broke in — sends no new
+`OnStartTouch`, so clearing them lost the zone (the camera zone's zoom
+reset after such a respawn); leaving a zone by teleport still sends its
+`OnEndTouch`. Only a brand-new melon entity (the old one was destroyed)
+starts with no zones — its own `OnStartTouch` re-adds them. Every entry into a heal
 zone plays the `particle_health_template` point_template's particle effect
 on the melon, riding along with it (`HEAL_PARTICLE_LIFETIME`; not for broken
 or race-locked melons). All particle effects (break burst, PERFECT spark,

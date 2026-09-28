@@ -2,7 +2,6 @@
 // and its paint color (kept across breaks).
 import { FacePlayerView } from "../spawn-points.js";
 import { RestoreFullHealth } from "../heal/index.js";
-import { LeaveZones } from "./zones.js";
 
 /**
  * Teleports a kart's melon back to its last checkpoint and resets it to a
@@ -26,7 +25,8 @@ export function RespawnKartAtCheckpoint(kart) {
     kart.settled = false;
     kart.speedCap = undefined;
     kart.pendingBounce = undefined;
-    LeaveZones(kart);
+    // Zones are kept: a respawn inside the zone the melon broke in never sends
+    // a new OnStartTouch, and leaving one by teleport still sends OnEndTouch.
 }
 
 /**
@@ -47,7 +47,8 @@ export function TeleportKartTo(kart, position, angles, velocity) {
     kart.prevOrigin = undefined;
     kart.settled = false;
     kart.pendingBounce = undefined;
-    LeaveZones(kart);
+    // Zones are kept: a respawn inside the zone the melon broke in never sends
+    // a new OnStartTouch, and leaving one by teleport still sends OnEndTouch.
 }
 
 /**

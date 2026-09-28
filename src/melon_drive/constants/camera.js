@@ -24,7 +24,7 @@ export const CAMERA_HEIGHT = 0;
 // in at walls (clipCameraOffset off) — in a shaft the wall right behind the
 // melon would undo the zoom — so it looks through the shaft walls instead.
 // Higher: more overview, the melon gets smaller on screen.
-export const LIFT_CAMERA_EXTRA_DISTANCE = 300; // units further back (was 150)
+export const LIFT_CAMERA_EXTRA_DISTANCE = 220; // units further back (was 150)
 export const LIFT_CAMERA_EXTRA_HEIGHT = 30; // units higher up (was 120 — too high)
 export const LIFT_CAMERA_EASE_SECONDS = 0.6; // seconds to zoom fully out (or back in)
 

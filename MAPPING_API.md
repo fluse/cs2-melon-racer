@@ -230,8 +230,9 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → heal_enter
   after leaving (until its next teleport/respawn).
 - Overlapping zones don't stack; the fastest one counts. Damage still
   applies inside a zone.
-- Teleports and respawns drop the melon out of every zone; a zone it lands
-  in picks it up again on its next `OnStartTouch`.
+- Teleports and respawns keep the melon in its zones (respawning inside the
+  zone it broke in sends no new `OnStartTouch`); leaving one by teleport
+  goes through its `OnEndTouch` as usual.
 - Every entry into a heal zone (any kind) plays `particle_health_template`
   on the melon (not for broken or race-locked melons).
 
@@ -269,8 +270,8 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → lift_enter
   back, `LIFT_CAMERA_EXTRA_HEIGHT` up) so the climb stays in view, and
   isn't pulled in at walls meanwhile — it looks through the shaft walls.
 - Both outputs are required; overlapping zones don't stack (the strongest
-  counts); teleports and respawns drop the melon out of every zone, like
-  heal zones.
+  counts); teleports and respawns keep the melon in its zones, like heal
+  zones.
 
 ### 4.8 Camera zones
 
@@ -300,8 +301,8 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → camera_enter
 - Overlapping camera zones don't add up: the one entered last counts;
   moving from one into another eases straight to the new zoom. A lift
   zone's own zoom (4.7) does add on top.
-- Both outputs are required; teleports and respawns drop the melon out of
-  every zone, like heal zones.
+- Both outputs are required; teleports and respawns keep the melon in its
+  zones, like heal zones — respawning inside a camera zone keeps its zoom.
 
 ## 5. Limits
 

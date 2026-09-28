@@ -12,7 +12,6 @@ import {
     TELEPORT_UP_OFFSET,
 } from "./constants/index.js";
 import { GetHubSpawnPoint, GetIntroSpawnPoint, Lifted, FacePlayerView } from "./spawn-points.js";
-import { LeaveZones } from "./physics/index.js";
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
 // See GAMEPLAY.md's "Hub -> race -> next-track flow" for the full design.
@@ -161,7 +160,6 @@ export function BeginHeat(trackId) {
         kart.settled = false;
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
         kart.pendingBounce = undefined;
-        LeaveZones(kart);
         // trackId is set directly instead of waiting for the physical
         // checkpoint_<trackId>_1 trigger touch to report it, so the
         // checkpoint/lap panel is already visible ("0/N", lap "1/M") the
@@ -274,7 +272,6 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.settled = false;
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
         kart.pendingBounce = undefined;
-        LeaveZones(kart);
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot === undefined) {
             return;
