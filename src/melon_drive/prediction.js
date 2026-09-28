@@ -125,12 +125,29 @@ function PointsAlong(a, b, count) {
     return points;
 }
 
+/**
+ * Whether this kart's player has the line switched on (user menu toggle,
+ * off by default — see UpdatePredictionHud in hud.js).
+ * @param {import("./kart-registry.js").Kart} kart
+ */
+export function IsPredictionOn(kart) {
+    return Boolean(kart.predictionLine);
+}
+
+/** Turns the line on/off for this kart's player. @param {import("./kart-registry.js").Kart} kart @param {boolean} on */
+export function SetPrediction(kart, on) {
+    kart.predictionLine = on;
+    if (!on) {
+        HidePrediction(kart);
+    }
+}
+
 /** @param {import("./kart-registry.js").Kart} kart @param {number} dt */
 export function UpdatePrediction(kart, dt) {
     if (PREDICTION_RENDER_MODE !== "dots") {
         HidePrediction(kart); // switched away from dots at runtime (hot reload) — don't leave them standing
     }
-    if (!PREDICTION_ENABLED || kart.locked || kart.breaking || !kart.melon.IsValid()) {
+    if (!PREDICTION_ENABLED || !IsPredictionOn(kart) || kart.locked || kart.breaking || !kart.melon.IsValid()) {
         HidePrediction(kart);
         return;
     }

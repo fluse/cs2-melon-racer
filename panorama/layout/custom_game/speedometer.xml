@@ -195,6 +195,20 @@
 					</Panel>
 				</Panel>
 
+				<!-- Per-player wall-bounce guide line: where the melon hits the
+				     next wall and at what rating (prediction.js). Off by
+				     default; in the default render mode it only shows in
+				     tools mode. -->
+				<Panel class="UserMenuSection">
+					<Panel class="UserMenuSectionHeader">
+						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/guide-line.png" />
+						<Label class="UserMenuSectionLabel" text="GUIDE LINE" />
+					</Panel>
+					<Button id="usermenu_prediction_button" class="UserMenuOutlineButton">
+						<Label class="UserMenuOutlineLabel" text="GUIDE LINE: {s:prediction_state}" />
+					</Button>
+				</Panel>
+
 				<!-- Per-player debug view of how ground/wall contact and jump
 				     presses are judged (physics/jump-debug.js). Its drawing only
 				     shows in tools mode. -->

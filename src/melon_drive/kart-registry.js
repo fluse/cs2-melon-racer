@@ -25,6 +25,7 @@ import { predictionDotSet } from "./trace.js";
  *   jumpDebug?: boolean, // this player's jump debug view is on (user menu toggle) — see physics/jump-debug.js
  *   contactDebug?: import("./physics/jump-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
+ *   predictionLine?: boolean, // this player's prediction line is on (user menu toggle, off by default) — see prediction.js
  *   predictionDots?: any[], // this kart's prediction-line dot entities, see prediction.js
  *   pendingBounce?: { time: number, impactSpeed: number, impactDir: { x: number, y: number, z: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number }, // damage not yet charged — waits out the jump window, see SettleWallBounceDamage
  *   healZones?: Map<any, number>, // heal triggers the melon is inside -> their rate (health/s), see physics/heal.js

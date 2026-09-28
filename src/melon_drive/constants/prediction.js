@@ -12,6 +12,8 @@
 // falls back to DebugLine anyway, for testing in tools mode.
 // Note: the dots are ordinary networked entities, so every player sees every
 // kart's prediction line, not just their own.
+// Master switch for the whole map. Each player also turns their own line
+// on in the user menu ("GUIDE LINE") — off by default.
 export const PREDICTION_ENABLED = true;
 // "debug": Instance.DebugLine — a clean continuous line, but only visible in
 //          dev environments (tools mode), never to real players.

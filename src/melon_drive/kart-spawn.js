@@ -119,6 +119,7 @@ function NewKartRecord(pawn, melon, spawnPoint) {
         userMenuOpen: false,
         hubModalOpen: false,
         jumpDebug: false,
+        predictionLine: false,
         pawnAnchor: pawn.GetAbsOrigin(),
         lastKnownPosition: undefined,
         lastKnownAngles: undefined,

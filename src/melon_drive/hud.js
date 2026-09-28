@@ -4,6 +4,7 @@ import { Debug } from "./debug.js";
 // which the physics files import — going through the index would make a cycle.
 import { GetJumpChargeFraction } from "./physics/jump.js";
 import { IsJumpDebugOn } from "./physics/jump-debug.js";
+import { IsPredictionOn } from "./prediction.js";
 import { GetBounceRating } from "./logic/wall-bounce.js";
 import { HealthBarState } from "./logic/health.js";
 import { GetTrackConfig } from "./track-config.js";
@@ -216,9 +217,25 @@ export function SetUserMenuOpen(slot, kart, open) {
     if (open) {
         // Refreshed on every open: a layout or script reload in tools mode
         // wipes what was set when the kart spawned.
+        UpdatePredictionHud(slot, kart);
         UpdateJumpDebugHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
+}
+
+/**
+ * The user menu's guide line (prediction line) toggle button: its ON/OFF
+ * text and highlight.
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+export function UpdatePredictionHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const on = IsPredictionOn(kart);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_prediction_button", "prediction_state", on ? "ON" : "OFF");
+    hud.SetHasClassForPlayer(slot, "usermenu_prediction_button", "ToggleOn", on);
 }
 
 /**

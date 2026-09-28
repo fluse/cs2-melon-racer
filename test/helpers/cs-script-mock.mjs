@@ -116,9 +116,11 @@ export const world = {
     /** Optional overrides for what traces hit: (config) => TraceResult. Default: nothing is ever hit. */
     traceLine: undefined,
     traceSphere: undefined,
+    /** Every Instance.DebugLine call's argument. @type {any[]} */
+    debugLines: [],
     /** @template {Entity} T @param {T} e @returns {T} */
     add(e) { this.entities.push(e); return e; },
-    reset() { this.time = 0; this.entities = []; this.playerPawns = []; this.messages = []; this.fired = []; this.delays = []; this.traceLine = undefined; this.traceSphere = undefined; },
+    reset() { this.time = 0; this.entities = []; this.playerPawns = []; this.messages = []; this.fired = []; this.delays = []; this.traceLine = undefined; this.traceSphere = undefined; this.debugLines = []; },
 };
 
 const noHit = (config) => ({ didHit: false, startedInSolid: false, end: clone(config.end), normal: { x: 0, y: 0, z: 1 }, fraction: 1 });
@@ -136,7 +138,7 @@ const instanceMethods = {
     Delay: (seconds) => { world.delays.push(seconds); return Promise.resolve(); },
     EntFireAtTarget: (args) => { world.fired.push(args); },
     EntFireAtName: (args) => { world.fired.push(args); },
-    DebugLine: () => {},
+    DebugLine: (args) => { world.debugLines.push(args); },
     DebugSphere: () => {},
     DebugBox: () => {},
     DebugScreenText: () => {},

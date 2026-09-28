@@ -120,6 +120,12 @@ const ICONS = {
         cut(circle(32, 32, 26), circle(46, 45, 8)),
         union(circle(19, 26, 5), circle(31, 16, 5), circle(44, 21, 5), circle(18, 40, 5)),
     ),
+    // Dotted line running into a wall and bouncing off it — GUIDE LINE.
+    "guide-line": union(
+        rect(50, 6, 58, 58, 1),
+        ...[0, 1, 2, 3].map((i) => circle(8 + i * 10, 52 - i * 10, 3.5)),
+        ...[1, 2, 3].map((i) => circle(46 - i * 10, 20 - i * 5, 3.5)),
+    ),
     // Bug — JUMP DEBUG.
     debug: union(
         cut(ellipse(32, 40, 12, 15), line(32, 29, 32, 56, 1.3)),

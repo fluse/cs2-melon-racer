@@ -218,6 +218,10 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   rating that hit would get at the current angle (`BOUNCE_RATINGS[].color`,
   same colors as the HUD panel; white = no wall in range). Uses the same
   angle math as the bounce, so steer until it turns yellow (PERFECT).
+  **Off by default**, switched on/off per player in the user menu's
+  "GUIDE LINE" section (above "JUMP DEBUG"; `kart.predictionLine`) — only
+  that player's own melon gets a line. `PREDICTION_ENABLED` stays the
+  map-wide master switch.
   **Decided: a dev/training aid only** — `PREDICTION_RENDER_MODE =
   "debug"` draws it with `Instance.DebugLine`, which only shows in dev
   environments (tools mode), never to real players on a Workshop server;

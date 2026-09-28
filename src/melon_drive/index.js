@@ -27,7 +27,8 @@ import { SetUpPlayerKart, ForgetIntroLogo } from "./kart-spawn.js";
 import { Lifted, LevelAngles } from "./spawn-points.js";
 import { ParseTeleportTrigger, TeleportExitVelocity } from "./logic/teleport.js";
 import { RespawnKartAtCheckpoint, SetKartPaintColor, TeleportKartTo, IsJumpDebugOn, SetJumpDebug } from "./physics/index.js";
-import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen, UpdateJumpDebugHud } from "./hud.js";
+import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen, UpdateJumpDebugHud, UpdatePredictionHud } from "./hud.js";
+import { IsPredictionOn, SetPrediction } from "./prediction.js";
 import { phase, activeTrackId, phaseEndTime, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, RestoreRaceFlowSnapshot } from "./race-flow.js";
 import { RegisterCheckpointAndFinishInputs } from "./checkpoints.js";
 import { RegisterZoneInputs } from "./zone-inputs.js";
@@ -271,6 +272,15 @@ Instance.OnCustomHudClicked((event) => {
         Debug(`usermenu_tutorial_button: slot ${slot} going to the tutorial (racing=${kart.racing}, phase=${phase})`);
         SetUserMenuOpen(slot, kart, false);
         SendKartToTutorial(kart);
+    } else if (event.buttonId === "usermenu_prediction_button") {
+        // Per player: only this player's melon gets the line (drawn with
+        // DebugLine in the default render mode, so tools mode only).
+        const slot = event.player.GetPlayerSlot();
+        const kart = karts.get(slot);
+        if (kart) {
+            SetPrediction(kart, !IsPredictionOn(kart));
+            UpdatePredictionHud(slot, kart);
+        }
     } else if (event.buttonId === "usermenu_jumpdebug_button") {
         // Per player: only this player's melon is drawn/logged (debug
         // draws themselves only show in tools mode).
