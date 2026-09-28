@@ -44,6 +44,7 @@ Melon Racer turns Counter-Strike 2 into a kart racer. Each player gets their own
 [*][b]Physics melons[/b] — your melon rolls, bounces and flies for real. It's not a car.
 [*][b]Melon health[/b] — hard crashes and big landings damage your melon. At zero it [b]breaks apart[/b] and you respawn at your last checkpoint.
 [*][b]Wall bounces[/b] — hit a wall at the right angle (about 45°) for a [b]PERFECT[/b] bounce: more speed and no damage. Time a jump on the hit for even more speed. Bounces stack, so there's no top speed.
+[*][b]Boost — if you dare[/b] — hold the left mouse button for extra speed and a glowing boost trail. It costs your melon health while you hold it. Hold it too long and your melon breaks!
 [*][b]Wall jumps[/b] — push off walls in mid-air to reach shortcuts and save a bad line.
 [*][b]Heal zones & teleporters[/b] — patch up your melon and take the fast way around.
 [*][b]Paint your melon[/b] — drive over a paint pad in the hub or choose a color in the menu.
@@ -57,6 +58,7 @@ Melon Racer turns Counter-Strike 2 into a kart racer. Each player gets their own
 [tr][td]Mouse[/td][td]Steer (the melon goes where you look)[/td][/tr]
 [tr][td]W / S[/td][td]Accelerate / brake[/td][/tr]
 [tr][td]A / D[/td][td]Strafe left / right[/td][/tr]
+[tr][td]Left mouse button (hold)[/td][td]Boost — costs health, too long and the melon breaks[/td][/tr]
 [tr][td]Space[/td][td]Jump / wall jump / time a wall bounce[/td][/tr]
 [tr][td]E[/td][td]Menu: respawn at checkpoint, back to hub, tutorial, melon color[/td][/tr]
 [/table]
@@ -118,6 +120,7 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [*][b]Physik-Melonen[/b] — deine Melone rollt, springt und fliegt wirklich. Sie ist kein Auto.
 [*][b]Melonen-Leben[/b] — harte Crashs und hohe Landungen beschädigen die Melone. Bei null [b]zerplatzt[/b] sie und du startest am letzten Checkpoint neu.
 [*][b]Wand-Abpraller[/b] — triff eine Wand im richtigen Winkel (etwa 45°) für einen [b]PERFECT[/b]-Abpraller: mehr Tempo und kein Schaden. Springst du genau im richtigen Moment, wirst du noch schneller. Abpraller addieren sich, es gibt also keine Höchstgeschwindigkeit.
+[*][b]Boost — wenn du dich traust[/b] — halte die linke Maustaste für mehr Tempo und eine leuchtende Boost-Spur. Solange du sie hältst, verliert deine Melone Leben. Hältst du zu lange, zerplatzt sie!
 [*][b]Wandsprünge[/b] — stoß dich in der Luft von Wänden ab, um Abkürzungen zu erreichen oder eine schlechte Linie zu retten.
 [*][b]Heilzonen & Teleporter[/b] — flick deine Melone und nimm den schnellen Weg.
 [*][b]Melone anmalen[/b] — fahr im Hub über ein Farbfeld oder wähl eine Farbe im Menü.
@@ -131,6 +134,7 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [tr][td]Maus[/td][td]Lenken (die Melone fährt, wohin du schaust)[/td][/tr]
 [tr][td]W / S[/td][td]Gas / Bremse[/td][/tr]
 [tr][td]A / D[/td][td]Seitlich nach links / rechts[/td][/tr]
+[tr][td]Linke Maustaste (halten)[/td][td]Boost — kostet Leben, zu lange und die Melone zerplatzt[/td][/tr]
 [tr][td]Leertaste[/td][td]Springen / Wandsprung / Timing für den Abpraller[/td][/tr]
 [tr][td]E[/td][td]Menü: am Checkpoint neu starten, zurück zum Hub, Tutorial, Farbe[/td][/tr]
 [/table]
@@ -174,6 +178,28 @@ this, so keep it short and write it from the player's point of view.
 [*]New: …
 [*]Changed: …
 [*]Fixed: …
+[/list]
+```
+
+For the boost update (EN, then DE for the German page):
+
+```
+[b]Update — Boost![/b]
+[list]
+[*]New: hold the left mouse button to boost. It's fast, it leaves a glowing trail, and it eats your melon's health. Hold it too long and your melon breaks!
+[*]Changed: a PERFECT wall bounce now shows only its spark, no boost trail
+[*]Changed: smaller boost trail, with juice droplets flying off the melon
+[*]Fixed: clicking no longer pushed your melon forward for free
+[/list]
+```
+
+```
+[b]Update — Boost![/b]
+[list]
+[*]Neu: halte die linke Maustaste zum Boosten. Das ist schnell, hinterlässt eine leuchtende Spur und frisst das Leben deiner Melone. Hältst du zu lange, zerplatzt sie!
+[*]Geändert: ein PERFECT-Abpraller zeigt jetzt nur noch seinen Funken, keine Boost-Spur
+[*]Geändert: kleinere Boost-Spur, mit Safttropfen, die von der Melone fliegen
+[*]Behoben: Klicken hat die Melone nicht mehr umsonst nach vorn geschubst
 [/list]
 ```
 
