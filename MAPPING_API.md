@@ -77,6 +77,7 @@ The script works without these, with the fallback shown.
 | `melon_break_template` | `point_template` | Main break burst: an `info_particle_system` with a `.vpcf` effect. Moved onto the crash site and started. | No burst on break. |
 | `melon_break_chunks_template` | `point_template` | Chunk flecks: an `info_particle_system`, plus up to 9 `prop_physics` break pieces (`models/cs_italy/italy_food_melon/italy_food_melon/piece.vmdl`, `piece1.vmdl` … `piece8.vmdl`) arranged roughly melon-shaped. Pieces are tinted, flung outward and left lying for a while. | No chunks on break. |
 | `perfect_hit_particle_template` | `point_template` | Perfect spark: an `info_particle_system` with a `.vpcf` effect. A fresh copy is spawned at the melon on every PERFECT wall bounce (so several karts' sparks can play at once) and removed after `PERFECT_SPARK_LIFETIME`. | No spark. |
+| `particle_health_template` | `point_template` | Heal effect: its **own** `info_particle_system` with a `.vpcf` effect (not one another template already uses). A fresh copy is played on the melon, riding along, every time it enters a heal zone (4.6), and removed after `HEAL_PARTICLE_LIFETIME`. | No heal effect. |
 | `prediction_dot_template` | `point_template` | Only used when `PREDICTION_RENDER_MODE = "dots"` (default is `"debug"`): one small dot entity, e.g. a "Never Solid" `func_brush`. | Falls back to the debug line. |
 
 There are exactly **two** break templates — don't add other
@@ -96,7 +97,7 @@ follows the general conventions in section 1.
 | `hub_teleport` | any trigger | — | Sends the melon to `hub_spawn`, takes it out of a running heat, resets its track progress. |
 | `melon_paint` | `paint_trigger_<r>_<g>_<b>` | name (color) | Paints the melon. See 4.4. |
 | `melon_teleport` | `teleport_[stop_\|keep_]to_<destination>` | name (mode, destination) | Teleports the melon. See 4.5. |
-| `heal_enter` | any heal trigger | name (optional rate) | Melon starts healing over time. See 4.6. |
+| `heal_enter` | any heal trigger | name (optional rate, or `heal_zone_full`) | Melon starts healing over time (or is refilled to full). See 4.6. |
 | `heal_leave` | the same heal trigger, **`OnEndTouch`** | — | Stops healing from that trigger. |
 | `lift_enter` | any lift trigger | name (optional kick) | Wall bounces kick the melon higher up. See 4.7. |
 | `lift_leave` | the same lift trigger, **`OnEndTouch`** | — | Back to the normal bounce kick. |
@@ -212,6 +213,7 @@ output:      OnStartTouch → melon_drive_script → RunScriptInput → melon_te
 
 ```
 name:    anything, or heal_zone_<rate>   e.g. heal_zone_25 (25 health/s)
+         or heal_zone_full                 (refills to full health at once)
 outputs: OnStartTouch → melon_drive_script → RunScriptInput → heal_enter
          OnEndTouch   → melon_drive_script → RunScriptInput → heal_leave
 ```
@@ -220,12 +222,18 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → heal_enter
   Rate: parsed from a name matching `^heal_zone_(\d+(?:\.\d+)?)$`
   (health per second, decimals allowed), any other name uses
   `HEAL_ZONE_RATE` (10/s; full health is `MELON_MAX_HEALTH` = 70).
+- **Full-heal zone:** name the trigger exactly `heal_zone_full`
+  (`HEAL_ZONE_FULL_NAME`, same two outputs). The melon is back at full
+  health on its first tick inside and stays full while it's there; it beats
+  any other heal zone it overlaps. Several triggers may share that name.
 - Both outputs are required — without `heal_leave` the melon keeps healing
   after leaving (until its next teleport/respawn).
 - Overlapping zones don't stack; the fastest one counts. Damage still
   applies inside a zone.
 - Teleports and respawns drop the melon out of every zone; a zone it lands
   in picks it up again on its next `OnStartTouch`.
+- Every entry into a heal zone (any kind) plays `particle_health_template`
+  on the melon (not for broken or race-locked melons).
 
 ### 4.7 Lift zones
 
@@ -277,7 +285,7 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → camera_enter
          OnEndTouch   → melon_drive_script → RunScriptInput → camera_leave
 ```
 
-- `<distance>`: units further back than the player's own camera setting,
+- `<distance>`: units further back than the normal chase camera,
   negative = closer. `<height>`: units higher, negative = lower (default 0).
   Decimals allowed. Parsed from a name matching
   `^camera_zone_(noclip_)?(-?\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?$`,
@@ -320,8 +328,10 @@ Script inputs are pre-registered up to these limits; raise them in
 - a trigger feeding the script without "Physics Objects" ticked,
 - `melon_template` without a `prop_physics`, a break template without a
   `.vpcf` particle system, any extra `melon_break_*` template,
-- a missing or duplicated `perfect_hit_particle_template`, or one without a
-  `.vpcf` particle system,
+- a missing or duplicated `perfect_hit_particle_template` or
+  `particle_health_template`, or one without a `.vpcf` particle system,
+- two particle templates pointing at the same `info_particle_system`
+  (a template copied in Hammer still playing the other one's effect),
 - entity names with leading/trailing whitespace.
 
 In game, with `DEBUG` on (`src/melon_drive/debug.js`), the console logs
@@ -338,6 +348,6 @@ output is missing, mistargeted, or its filter/spawnflags keep the melon out.
 - [ ] `point_template` `melon_template` with the melon `prop_physics`
 - [ ] `hub_spawn` near the hub floor, `hub_start_trigger` with `hub_enter` + `hub_leave`
 - [ ] per track: `track_start_<id>_cp<N>_laps<M>`, `checkpoint_<id>_1` … `_<N>`, a `finish_<id>` output
-- [ ] optional: `intro_spawn`, `hub_spawn_facing`, both break templates, `perfect_hit_particle_template`, paint triggers, teleporters
+- [ ] optional: `intro_spawn`, `hub_spawn_facing`, both break templates, `perfect_hit_particle_template`, `particle_health_template`, paint triggers, teleporters
 - [ ] every melon trigger: `trigger_multiple`, "Physics Objects", filtered to `prop_physics`
 - [ ] `npm test` passes

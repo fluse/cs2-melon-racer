@@ -1,5 +1,5 @@
 // Trigger zones the melon can be inside — heal zones (heal_enter/heal_leave,
-// HEAL_ZONE_RATE), lift zones (lift_enter/lift_leave, constants/lift.js) and
+// read by ../heal/), lift zones (lift_enter/lift_leave, constants/lift.js) and
 // camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in constants/camera.js):
 // entering/leaving them (registered in ../zone-inputs.js), what they add up
 // to right now, and leaving them all at once on a teleport/respawn.
@@ -42,7 +42,7 @@ export function LeaveZones(kart) {
  * longer exist are dropped.
  * @param {import("../kart-registry.js").Kart} kart @param {ZoneKind} kind
  */
-function StrongestZone(kart, kind) {
+export function StrongestZone(kart, kind) {
     const zones = kart[kind];
     let strongest = undefined;
     for (const [zone, value] of zones ?? []) {
@@ -53,11 +53,6 @@ function StrongestZone(kart, kind) {
         strongest = strongest === undefined ? value : Math.max(strongest, value);
     }
     return strongest;
-}
-
-/** Health per second the melon heals right now (0 outside heal zones). @param {import("../kart-registry.js").Kart} kart */
-export function CurrentHealRate(kart) {
-    return StrongestZone(kart, "healZones") ?? 0;
 }
 
 /** Whether the melon is inside a lift zone. @param {import("../kart-registry.js").Kart} kart */

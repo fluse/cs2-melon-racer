@@ -30,7 +30,7 @@ import { DrawJumpDebug } from "./jump-debug.js";
 import { ApplyImpactDamage } from "./damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage } from "./wall-bounce.js";
 import { BreakMelon } from "./breaking.js";
-import { ApplyHealing } from "./heal.js";
+import { ApplyHealing } from "../heal/index.js";
 import { CurrentWallRules } from "./zones.js";
 
 /** @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} dt */

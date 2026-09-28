@@ -120,10 +120,6 @@ const ICONS = {
         cut(circle(32, 32, 26), circle(46, 45, 8)),
         union(circle(19, 26, 5), circle(31, 16, 5), circle(44, 21, 5), circle(18, 40, 5)),
     ),
-    // Video camera — CAMERA DISTANCE.
-    camera: union(rect(5, 19, 42, 47, 5), polygon([40, 33], [59, 20], [59, 46])),
-    // Vertical "I" beam — CAMERA HEIGHT.
-    height: union(line(32, 11, 32, 53, 3.5), line(21, 11, 43, 11, 3.5), line(21, 53, 43, 53, 3.5)),
     // Bug — JUMP DEBUG.
     debug: union(
         cut(ellipse(32, 40, 12, 15), line(32, 29, 32, 56, 1.3)),

@@ -58,7 +58,7 @@ Melon Racer turns Counter-Strike 2 into a kart racer. Each player gets their own
 [tr][td]W / S[/td][td]Accelerate / brake[/td][/tr]
 [tr][td]A / D[/td][td]Strafe left / right[/td][/tr]
 [tr][td]Space[/td][td]Jump / wall jump / time a wall bounce[/td][/tr]
-[tr][td]E[/td][td]Menu: respawn at checkpoint, back to hub, tutorial, melon color, camera distance & height[/td][/tr]
+[tr][td]E[/td][td]Menu: respawn at checkpoint, back to hub, tutorial, melon color[/td][/tr]
 [/table]
 
 [h2]▶ How to play[/h2]
@@ -132,7 +132,7 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [tr][td]W / S[/td][td]Gas / Bremse[/td][/tr]
 [tr][td]A / D[/td][td]Seitlich nach links / rechts[/td][/tr]
 [tr][td]Leertaste[/td][td]Springen / Wandsprung / Timing für den Abpraller[/td][/tr]
-[tr][td]E[/td][td]Menü: am Checkpoint neu starten, zurück zum Hub, Tutorial, Farbe, Kamera-Abstand & -Höhe[/td][/tr]
+[tr][td]E[/td][td]Menü: am Checkpoint neu starten, zurück zum Hub, Tutorial, Farbe[/td][/tr]
 [/table]
 
 [h2]▶ So spielst du[/h2]

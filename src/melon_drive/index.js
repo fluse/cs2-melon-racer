@@ -21,14 +21,13 @@ import { Instance } from "cs_script/point_script";
 // think.js for the per-tick driver.
 
 import { Debug } from "./debug.js";
-import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, CAMERA_DISTANCE_STEPS, CAMERA_HEIGHT_STEPS, HUB_TRIGGER_NAME, TELEPORT_UP_OFFSET } from "./constants/index.js";
+import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, HUB_TRIGGER_NAME, TELEPORT_UP_OFFSET } from "./constants/index.js";
 import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, SetModeratorSlot, DropKart } from "./kart-registry.js";
 import { SetUpPlayerKart, ForgetIntroLogo } from "./kart-spawn.js";
 import { Lifted, LevelAngles } from "./spawn-points.js";
 import { ParseTeleportTrigger, TeleportExitVelocity } from "./logic/teleport.js";
 import { RespawnKartAtCheckpoint, SetKartPaintColor, TeleportKartTo, IsJumpDebugOn, SetJumpDebug } from "./physics/index.js";
 import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen, UpdateJumpDebugHud } from "./hud.js";
-import { SetCameraDistance, SetCameraHeight } from "./camera/index.js";
 import { phase, activeTrackId, phaseEndTime, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, RestoreRaceFlowSnapshot } from "./race-flow.js";
 import { RegisterCheckpointAndFinishInputs } from "./checkpoints.js";
 import { RegisterZoneInputs } from "./zone-inputs.js";
@@ -291,26 +290,6 @@ Instance.OnCustomHudClicked((event) => {
         const kart = karts.get(event.player.GetPlayerSlot());
         if (kart) {
             SetKartPaintColor(kart, preset);
-        }
-    } else if (event.buttonId.startsWith("camdist_seg_")) {
-        const step = Number(event.buttonId.slice("camdist_seg_".length));
-        if (!Number.isInteger(step) || step < 0 || step >= CAMERA_DISTANCE_STEPS) {
-            Debug(`camdist_seg_${step}: not a valid distance step, ignoring`);
-            return;
-        }
-        const kart = karts.get(event.player.GetPlayerSlot());
-        if (kart) {
-            SetCameraDistance(kart, step);
-        }
-    } else if (event.buttonId.startsWith("camheight_seg_")) {
-        const step = Number(event.buttonId.slice("camheight_seg_".length));
-        if (!Number.isInteger(step) || step < 0 || step >= CAMERA_HEIGHT_STEPS) {
-            Debug(`camheight_seg_${step}: not a valid height step, ignoring`);
-            return;
-        }
-        const kart = karts.get(event.player.GetPlayerSlot());
-        if (kart) {
-            SetCameraHeight(kart, step);
         }
     }
 });

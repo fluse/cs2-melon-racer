@@ -1,7 +1,7 @@
 import { Instance, PointTemplate, CSMoveType, CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { karts, moderatorSlot, SetModeratorSlot } from "./kart-registry.js";
-import { ApplyCameraFollow, UpdateCameraDistanceHud, UpdateCameraHeightHud } from "./camera/index.js";
+import { ApplyCameraFollow } from "./camera/index.js";
 import { FacePlayerView, GetIntroSpawnPoint } from "./spawn-points.js";
 import { GetSpeedHud } from "./hud.js";
 import {
@@ -9,8 +9,6 @@ import {
     PAWN_DRIFT_TOLERANCE,
     MELON_MAX_HEALTH,
     MELON_ENGINE_HEALTH,
-    CAMERA_DISTANCE_DEFAULT,
-    CAMERA_HEIGHT_DEFAULT,
     INTRO_LOGO_SECONDS,
 } from "./constants/index.js";
 
@@ -121,8 +119,6 @@ function NewKartRecord(pawn, melon, spawnPoint) {
         userMenuOpen: false,
         hubModalOpen: false,
         jumpDebug: false,
-        cameraDistance: CAMERA_DISTANCE_DEFAULT,
-        cameraHeight: CAMERA_HEIGHT_DEFAULT,
         pawnAnchor: pawn.GetAbsOrigin(),
         lastKnownPosition: undefined,
         lastKnownAngles: undefined,
@@ -179,8 +175,6 @@ export function SetUpPlayerKart(pawn, newKartSpawnPoint) {
     if (kart.melon.IsValid()) {
         ApplyCameraFollow(kart); // a lost melon gets the camera once physics/breaking.js respawns it
     }
-    UpdateCameraDistanceHud(kart);
-    UpdateCameraHeightHud(kart);
     return kart;
 }
 

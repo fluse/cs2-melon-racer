@@ -1,7 +1,8 @@
 // Minimal in-process fake of the engine's "cs_script/point_script" module —
 // just enough for the engine-side files in src/ to load and for tests to
 // drive specific functions with fake entities. Not a simulation: traces
-// hit nothing unless a test sets world.traceLine/traceSphere, Delay() resolves on the next microtask, and every
+// hit nothing unless a test sets world.traceLine/traceSphere, Delay() resolves on the next microtask (its
+// seconds recorded in world.delays), EntFireAtTarget/EntFireAtName calls are recorded in world.fired, and every
 // Instance.OnXxx/SetXxx registration is only recorded (see `world.handlers`).
 //
 // Tests set up the world through `world` (exported below): add entities
@@ -45,6 +46,8 @@ export class Entity {
     GetHealth() { return this.health ?? 0; }
     GetMaxHealth() { return this.maxHealth ?? 0; }
     SetMoveType(t) { this.moveType = t; }
+    SetParent(parent) { this.parent = parent; }
+    GetParent() { return this.parent; }
 }
 
 /** A player pawn: its eye angles are what Teleport({ angles }) changes, like the engine's. */
@@ -76,7 +79,11 @@ export class CSPlayerPawn extends Entity {
 }
 
 export class PointTemplate extends Entity {
-    /** @param {{ name: string, spawn: () => Entity[] }} o */
+    /**
+     * Like the engine, ForceSpawn keeps each entity's offset from the
+     * template: the origin `spawn` gives an entity is that offset.
+     * @param {{ name: string, spawn: () => Entity[] }} o
+     */
     constructor({ name, spawn }) {
         super({ name, className: "point_template" });
         this.spawn = spawn;
@@ -84,7 +91,8 @@ export class PointTemplate extends Entity {
     ForceSpawn(origin, angles) {
         const spawned = this.spawn();
         for (const e of spawned) {
-            e.Teleport({ position: origin, angles });
+            const o = origin ?? { x: 0, y: 0, z: 0 };
+            e.Teleport({ position: { x: o.x + e.origin.x, y: o.y + e.origin.y, z: o.z + e.origin.z }, angles });
             world.add(e);
         }
         return spawned;
@@ -99,6 +107,10 @@ export const world = {
     handlers: {},
     /** @type {string[]} */
     messages: [],
+    /** Every EntFireAtTarget/EntFireAtName call's argument. @type {any[]} */
+    fired: [],
+    /** Seconds passed to each Instance.Delay call. @type {number[]} */
+    delays: [],
     /** What GetAllPlayerControllers returns: one fake controller per pawn listed here. @type {CSPlayerPawn[]} */
     playerPawns: [],
     /** Optional overrides for what traces hit: (config) => TraceResult. Default: nothing is ever hit. */
@@ -106,7 +118,7 @@ export const world = {
     traceSphere: undefined,
     /** @template {Entity} T @param {T} e @returns {T} */
     add(e) { this.entities.push(e); return e; },
-    reset() { this.time = 0; this.entities = []; this.playerPawns = []; this.messages = []; this.traceLine = undefined; this.traceSphere = undefined; },
+    reset() { this.time = 0; this.entities = []; this.playerPawns = []; this.messages = []; this.fired = []; this.delays = []; this.traceLine = undefined; this.traceSphere = undefined; },
 };
 
 const noHit = (config) => ({ didHit: false, startedInSolid: false, end: clone(config.end), normal: { x: 0, y: 0, z: 1 }, fraction: 1 });
@@ -121,9 +133,9 @@ const instanceMethods = {
     TraceLine: (c) => (world.traceLine ?? noHit)(c),
     TraceSphere: (c) => (world.traceSphere ?? noHit)(c),
     TraceBox: noHit,
-    Delay: () => Promise.resolve(),
-    EntFireAtTarget: () => {},
-    EntFireAtName: () => {},
+    Delay: (seconds) => { world.delays.push(seconds); return Promise.resolve(); },
+    EntFireAtTarget: (args) => { world.fired.push(args); },
+    EntFireAtName: (args) => { world.fired.push(args); },
     DebugLine: () => {},
     DebugSphere: () => {},
     DebugBox: () => {},

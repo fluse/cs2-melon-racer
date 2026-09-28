@@ -2,7 +2,7 @@
 // (traces + IsWallContact), computing the bounce, DEBUG logging, and
 // charging its damage once the jump-timing window closes. The math is in
 // ../logic/wall-bounce.js.
-import { Instance, PointTemplate } from "cs_script/point_script";
+import { PlayParticleTemplate } from "../particles.js";
 import { DEBUG, Debug } from "../debug.js";
 import { TraceLine, TraceSphere } from "../trace.js";
 import {
@@ -169,38 +169,9 @@ export function ComputeWallBounce(kart, n, now) {
  * @param {import("../kart-registry.js").Kart} kart
  */
 function PlayPerfectSpark(kart) {
-    const template = Instance.FindEntityByName(PERFECT_SPARK_TEMPLATE_NAME);
-    if (!(template instanceof PointTemplate)) {
-        Debug(`PlayPerfectSpark: no point_template named "${PERFECT_SPARK_TEMPLATE_NAME}" in the map`);
-        return;
-    }
     const position = kart.melon.GetAbsOrigin();
-    /** @type {import("cs_script/point_script").Entity[]} */
-    const spawned = [];
-    for (const followMelon of [false, true]) {
-        const copy = template.ForceSpawn(position) ?? [];
-        for (const entity of copy) {
-            // ForceSpawn keeps the entity's Hammer offset from its template — put
-            // it exactly on the melon, and start it explicitly (see
-            // SpawnParticleTemplate in break-effects.js for why).
-            entity.Teleport({ position });
-            if (followMelon) {
-                entity.SetParent(kart.melon);
-            }
-            if (entity.GetClassName() === "info_particle_system") {
-                Instance.EntFireAtTarget({ target: entity, input: "Start" });
-            }
-        }
-        spawned.push(...copy);
-    }
-    Instance.Delay(PERFECT_SPARK_LIFETIME).then(() => {
-        for (const entity of spawned) {
-            // The melon's copy goes with the melon if that's removed first.
-            if (entity.IsValid()) {
-                entity.Remove();
-            }
-        }
-    });
+    PlayParticleTemplate(PERFECT_SPARK_TEMPLATE_NAME, position, { lifetime: PERFECT_SPARK_LIFETIME });
+    PlayParticleTemplate(PERFECT_SPARK_TEMPLATE_NAME, position, { lifetime: PERFECT_SPARK_LIFETIME, parent: kart.melon });
 }
 
 /**

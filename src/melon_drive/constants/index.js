@@ -7,6 +7,7 @@
 export * from "./driving.js";
 export * from "./jump.js";
 export * from "./health.js";
+export * from "../heal/constants.js"; // heal zones live with the rest of healing in heal/
 export * from "./wall-bounce.js";
 export * from "./lift.js";
 export * from "./prediction.js";

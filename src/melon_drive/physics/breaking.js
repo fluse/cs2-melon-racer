@@ -6,7 +6,8 @@ import { karts } from "../kart-registry.js";
 import { SpawnMelonAt } from "../kart-spawn.js";
 import { FacePlayerView } from "../spawn-points.js";
 import { ApplyCameraFollow } from "../camera/index.js";
-import { MELON_MAX_HEALTH, BREAK_RESPAWN_DELAY, BREAK_TINT_FALLBACK } from "../constants/index.js";
+import { RestoreFullHealth } from "../heal/index.js";
+import { BREAK_RESPAWN_DELAY, BREAK_TINT_FALLBACK } from "../constants/index.js";
 import { DirectionToAngles, SpawnBreakParticles } from "./break-effects.js";
 import { RespawnKartAtCheckpoint } from "./teleport.js";
 import { LeaveZones } from "./zones.js";
@@ -57,7 +58,7 @@ function ScheduleRespawnAfterBreak(slot, kart) {
             // abort/the player's own "Return to hub" button). That
             // already-current teleport wins — don't stomp it a second later
             // with a now-stale checkpoint.
-            kart.health = MELON_MAX_HEALTH;
+            RestoreFullHealth(kart);
             return;
         }
         RespawnKartAtCheckpoint(kart);
@@ -76,7 +77,7 @@ function RespawnDestroyedMelon(slot, kart) {
     kart.melon = melon;
     FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
     kart.melon.SetColor(kart.paintColor);
-    kart.health = MELON_MAX_HEALTH;
+    RestoreFullHealth(kart);
     kart.lastVelocity = undefined;
     kart.settled = false;
     kart.speedCap = undefined;

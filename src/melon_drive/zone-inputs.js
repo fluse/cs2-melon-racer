@@ -6,7 +6,7 @@
 import { Instance } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { FindKartByMelon } from "./kart-registry.js";
-import { HealZoneRate } from "./logic/health.js";
+import { HealZoneRate, PlayHealEffect } from "./heal/index.js";
 import { LiftZoneUpSpeed } from "./logic/lift.js";
 import { CameraZoneFromName } from "./logic/camera-zone.js";
 import { EnterZone, LeaveZone } from "./physics/index.js";
@@ -15,8 +15,9 @@ import { EnterZone, LeaveZone } from "./physics/index.js";
  * @param {string} enterInput @param {string} leaveInput
  * @param {import("./physics/zones.js").ZoneKind} kind
  * @param {(triggerName: string) => any} valueFromName @param {string} unit for the debug log
+ * @param {(kart: import("./kart-registry.js").Kart) => void} [onEnter] e.g. an effect on entering
  */
-function RegisterZone(enterInput, leaveInput, kind, valueFromName, unit) {
+function RegisterZone(enterInput, leaveInput, kind, valueFromName, unit, onEnter) {
     Instance.OnScriptInput(enterInput, ({ caller, activator }) => {
         const kart = activator && FindKartByMelon(activator);
         if (!kart || !caller) {
@@ -25,6 +26,7 @@ function RegisterZone(enterInput, leaveInput, kind, valueFromName, unit) {
         }
         const value = valueFromName(caller.GetEntityName());
         EnterZone(kart, kind, caller, value);
+        onEnter?.(kart);
         Debug(`${enterInput}: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} in "${caller.GetEntityName()}" (${typeof value === "object" ? JSON.stringify(value) : value} ${unit})`);
     });
     Instance.OnScriptInput(leaveInput, ({ caller, activator }) => {
@@ -36,8 +38,8 @@ function RegisterZone(enterInput, leaveInput, kind, valueFromName, unit) {
 }
 
 export function RegisterZoneInputs() {
-    // Heal zones — see HEAL_ZONE_RATE. Healing: ApplyHealing (physics/heal.js).
-    RegisterZone("heal_enter", "heal_leave", "healZones", HealZoneRate, "health/s");
+    // Heal zones (incl. heal_zone_full) — everything else about healing is in heal/.
+    RegisterZone("heal_enter", "heal_leave", "healZones", HealZoneRate, "health/s", PlayHealEffect);
     // Lift zones — see constants/lift.js. Read by CurrentWallRules (every wall
     // bounce and wall jump) and the lift camera.
     RegisterZone("lift_enter", "lift_leave", "liftZones", LiftZoneUpSpeed, "u/s up per bounce");

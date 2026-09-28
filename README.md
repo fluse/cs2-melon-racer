@@ -20,7 +20,7 @@ This document is the entry point for anyone who wants to **run, understand, or e
 
 ## How the game mode works
 
-- **Movement**: each player automatically gets their own melon prop. The player's own pawn is frozen, hidden, and parked out of the way — you never see or control it directly. Steering follows the camera (mouse look): `W`/`S` accelerate/brake along the look direction, `A`/`D` strafe, `Space` jumps. A third-person chase camera follows the melon, and its distance/height are player-adjustable.
+- **Movement**: each player automatically gets their own melon prop. The player's own pawn is frozen, hidden, and parked out of the way — you never see or control it directly. Steering follows the camera (mouse look): `W`/`S` accelerate/brake along the look direction, `A`/`D` strafe, `Space` jumps. A third-person chase camera follows the melon; camera zones in the map zoom it in or out.
 - **Melon health**: hard impacts (crashing into geometry, rough landings) damage the melon based on the sudden change in velocity. At zero health the melon "breaks" and respawns at the last checkpoint after a short delay.
 - **Checkpoints & laps**: a track is a sequence of checkpoint triggers plus a finish line. Progress only ever moves forward, and a lap only counts once the last checkpoint has been reached since the previous lap. Reaching the configured lap count finishes that racer's heat.
 - **Hub → race → next track**: the map is one continuous space. Players gather in a hub area; anyone standing there can start a heat, which pulls in everyone currently in the hub trigger, counts down, and races the next track in sequence. After a track's heat ends, there's a short break before the next track starts, or everyone returns to the hub after the last one.

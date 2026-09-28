@@ -635,12 +635,20 @@ Areas where the melon regains health over time: a `trigger_multiple`
 melon heals every tick at `HEAL_ZONE_RATE` health/second (`constants/health.js`),
 or at the rate in the trigger's name if it's called `heal_zone_<rate>`
 (e.g. `heal_zone_25`) — pure Hammer edit, same name-carries-the-config
-convention as paint triggers. Capped at `MELON_MAX_HEALTH`; damage still
+convention as paint triggers. A trigger named exactly `heal_zone_full` is a
+**full-heal zone**: the melon is refilled to `MELON_MAX_HEALTH` at once and
+kept full while inside. All healing code (constants, rules, zones and the
+full refill on respawn) lives in `src/melon_drive/heal/`. Capped at `MELON_MAX_HEALTH`; damage still
 applies inside, and overlapping zones don't stack (the fastest counts).
 Broken or race-locked melons don't heal. Teleports/respawns drop the melon
 out of all zones (the trigger's `OnEndTouch` isn't guaranteed to reach the
 script after a teleport, and a respawned new melon entity never gets one),
-so a zone it lands in re-adds it on its next touch.
+so a zone it lands in re-adds it on its next touch. Every entry into a heal
+zone plays the `particle_health_template` point_template's particle effect
+on the melon, riding along with it (`HEAL_PARTICLE_LIFETIME`; not for broken
+or race-locked melons). All particle effects (break burst, PERFECT spark,
+heal) are spawned through `src/melon_drive/particles.js`
+(`test/particles.test.mjs`).
 
 ## Camera zones (implemented)
 
@@ -649,7 +657,7 @@ Areas where the chase camera zooms out or in: a `trigger_multiple`
 `camera_enter` and `OnEndTouch` → `camera_leave`. The zoom comes from the
 trigger's name, same convention as heal/lift zones:
 `camera_zone_<distance>_<height>` (units further back / higher up than the
-player's own camera preset, negative = closer / lower; e.g.
+normal chase camera, `CAMERA_DISTANCE`/`CAMERA_HEIGHT`; negative = closer / lower; e.g.
 `camera_zone_250_40`, `camera_zone_-30_0`), with a `camera_zone_noclip_…`
 variant that stops walls pulling the camera in while zoomed. Any other
 name uses `CAMERA_ZONE_EXTRA_*` (`constants/camera.js`). The camera eases

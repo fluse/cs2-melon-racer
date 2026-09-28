@@ -1,8 +1,8 @@
 // Checks the Hammer side of what the script spawns by name: every
 // point_template kart-spawn.js / physics/break-effects.js /
-// physics/wall-bounce.js (perfect spark) ForceSpawn must exist in
-// maps/melon_racer.vmap exactly once, and point at real entities (the break and
-// spark templates at info_particle_systems with an effect set) — otherwise the
+// physics/wall-bounce.js (perfect spark) / heal/effect.js ForceSpawn must exist in
+// maps/melon_racer.vmap exactly once, and point at real entities (the break,
+// spark and heal templates at info_particle_systems with an effect set) — otherwise the
 // script silently spawns nothing, e.g. no melon burst on a break.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -13,6 +13,7 @@ import {
     BREAK_PARTICLE_TEMPLATE_NAME,
     BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME,
     PERFECT_SPARK_TEMPLATE_NAME,
+    HEAL_PARTICLE_TEMPLATE_NAME,
 } from "../src/melon_drive/constants/index.js";
 
 const entities = ReadVmapEntities(fileURLToPath(new URL("../maps/melon_racer.vmap", import.meta.url)));
@@ -48,7 +49,9 @@ test(`"${MELON_TEMPLATE_NAME}" spawns a physics prop`, () => {
     assert.ok(targets.some((e) => String(e.classname).startsWith("prop_physics")));
 });
 
-for (const name of [BREAK_PARTICLE_TEMPLATE_NAME, BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, PERFECT_SPARK_TEMPLATE_NAME]) {
+const PARTICLE_TEMPLATES = [BREAK_PARTICLE_TEMPLATE_NAME, BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, PERFECT_SPARK_TEMPLATE_NAME, HEAL_PARTICLE_TEMPLATE_NAME];
+
+for (const name of PARTICLE_TEMPLATES) {
     test(`"${name}" spawns a particle system with an effect`, () => {
         const particles = TemplateTargets(name).filter((e) => e.classname === "info_particle_system");
         assert.ok(particles.length > 0, `"${name}" doesn't spawn any info_particle_system`);
@@ -57,6 +60,23 @@ for (const name of [BREAK_PARTICLE_TEMPLATE_NAME, BREAK_CHUNKS_PARTICLE_TEMPLATE
         }
     });
 }
+
+// Each effect needs its own particle system: a template copied in Hammer
+// that still points at another effect's entity plays that effect instead
+// (found: particle_health_template spawning the PERFECT spark).
+test("no two particle templates spawn the same entity", () => {
+    const owner = new Map();
+    const shared = [];
+    for (const name of PARTICLE_TEMPLATES) {
+        for (const target of TemplateTargets(name)) {
+            if (owner.has(target.targetname)) {
+                shared.push(`"${target.targetname}" is in both "${owner.get(target.targetname)}" and "${name}"`);
+            }
+            owner.set(target.targetname, name);
+        }
+    }
+    assert.deepEqual(shared, []);
+});
 
 // Decided: exactly these two break templates, no others — extra chunks go
 // into one of them as prop_physics (see GAMEPLAY.md, "Melon health & breaking").

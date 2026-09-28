@@ -1,8 +1,9 @@
 // What a break leaves at the crash site: the two break templates'
 // particles and any physics pieces in them, placed on the crash site, flung
 // out, and cleaned up after BREAK_EFFECT_LIFETIME.
-import { Instance, PointTemplate } from "cs_script/point_script";
+import { Instance } from "cs_script/point_script";
 import { Debug } from "../debug.js";
+import { SpawnFromTemplate, PlaceAll, StartParticles } from "../particles.js";
 import { PruneBreakEffects, BreakPieceVelocity, RecenterOnto } from "../logic/break-sequence.js";
 import { BREAK_EFFECT_LIFETIME, BREAK_PARTICLE_TEMPLATE_NAME, BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, BREAK_PIECE_SPIN } from "../constants/index.js";
 
@@ -38,42 +39,25 @@ function CleanUpBreakEffects() {
 }
 
 /**
- * Spawns a single named point_template's particle effect, if it's actually
- * placed in Hammer. @param {string} templateName @param {any} position @param {any} angles
+ * Spawns one break template at the crash site and starts its particles.
+ * Warns in the console (even with DEBUG off) if it's missing — silently
+ * spawning nothing on a break is the bug.
+ * @param {string} templateName @param {any} position @param {any} angles
  * @returns {any[]} the spawned entities (empty if nothing spawned)
  */
-function SpawnParticleTemplate(templateName, position, angles) {
-    const template = Instance.FindEntityByName(templateName);
-    // Msg, not Debug: a missing/broken break template must be visible in the
-    // console even with DEBUG off — silently spawning nothing is the bug.
-    if (!template) {
-        Instance.Msg(`[melon_drive] SpawnParticleTemplate: no entity named "${templateName}" found — add a point_template in Hammer with a particle system to see break effects`);
-        return [];
-    }
-    if (!(template instanceof PointTemplate)) {
-        Instance.Msg(`[melon_drive] SpawnParticleTemplate: entity "${templateName}" exists but is a ${template.GetClassName()}, not a point_template`);
-        return [];
-    }
-    const spawned = template.ForceSpawn(position, angles) ?? [];
-    if (spawned.length === 0) {
-        Instance.Msg(`[melon_drive] SpawnParticleTemplate: ForceSpawn of "${templateName}" returned nothing — check its Template01.. entries in Hammer`);
-        return [];
-    }
+function SpawnBreakTemplate(templateName, position, angles) {
+    const spawned = SpawnFromTemplate(templateName, position, angles, { warn: true });
     PlaceAtCrashSite(spawned, position);
-    for (const entity of spawned) {
-        // "Start Active" alone doesn't reliably play a particle system spawned
-        // later from a point_template — start it explicitly.
-        if (entity.GetClassName() === "info_particle_system") {
-            Instance.EntFireAtTarget({ target: entity, input: "Start" });
-        }
+    StartParticles(spawned);
+    if (spawned.length > 0) {
+        Debug(`SpawnBreakTemplate: "${templateName}" spawned ${spawned.map((e) => e.GetClassName()).join(", ")} at ${JSON.stringify(position)}`);
     }
-    Debug(`SpawnParticleTemplate: "${templateName}" spawned ${spawned.map((e) => e.GetClassName()).join(", ")} at ${JSON.stringify(position)}`);
     return spawned;
 }
 
 /**
  * ForceSpawn keeps each templated entity's Hammer offset from its
- * point_template (same as melon_template, see SpawnMelonAt) — in the map
+ * point_template (see particles.js; same as melon_template, SpawnMelonAt) — in the map
  * the break particles sit ~200 units next to their templates, so they
  * played that far away from the crash site, somewhere different on every
  * break (the offset is rotated by the impact direction). Put particle
@@ -85,11 +69,7 @@ function PlaceAtCrashSite(entities, position) {
     const pieces = entities.filter((e) => e.GetClassName().startsWith("prop_physics"));
     const placed = RecenterOnto(pieces.map((p) => p.GetAbsOrigin()), position);
     pieces.forEach((piece, i) => piece.Teleport({ position: placed[i] }));
-    for (const entity of entities) {
-        if (!entity.GetClassName().startsWith("prop_physics")) {
-            entity.Teleport({ position });
-        }
-    }
+    PlaceAll(entities.filter((e) => !pieces.includes(e)), position);
 }
 
 /**
@@ -126,8 +106,8 @@ function LaunchBreakPieces(entities, position, color) {
  */
 export function SpawnBreakParticles(position, angles, color) {
     const entities = [
-        ...SpawnParticleTemplate(BREAK_PARTICLE_TEMPLATE_NAME, position, angles),
-        ...SpawnParticleTemplate(BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, position, angles),
+        ...SpawnBreakTemplate(BREAK_PARTICLE_TEMPLATE_NAME, position, angles),
+        ...SpawnBreakTemplate(BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, position, angles),
     ];
     LaunchBreakPieces(entities, position, color);
     if (entities.length === 0) {

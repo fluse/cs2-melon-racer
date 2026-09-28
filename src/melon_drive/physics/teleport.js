@@ -1,7 +1,7 @@
 // Moving a kart's melon on purpose: checkpoint respawn, generic teleports,
 // and its paint color (kept across breaks).
 import { FacePlayerView } from "../spawn-points.js";
-import { MELON_MAX_HEALTH } from "../constants/index.js";
+import { RestoreFullHealth } from "../heal/index.js";
 import { LeaveZones } from "./zones.js";
 
 /**
@@ -19,7 +19,7 @@ export function RespawnKartAtCheckpoint(kart) {
     });
     FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
     kart.lastWallContact = undefined; // that wall is somewhere else now
-    kart.health = MELON_MAX_HEALTH;
+    RestoreFullHealth(kart);
     // Cleared, not measured against zero: this is our own intentional
     // velocity reset, not a physical impact to react to.
     kart.lastVelocity = undefined;

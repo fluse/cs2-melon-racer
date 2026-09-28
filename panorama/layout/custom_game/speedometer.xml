@@ -195,42 +195,6 @@
 					</Panel>
 				</Panel>
 
-				<!-- Camera presets: one button per step (CAMERA_*_STEPS), the
-				     current one marked "Selected", labels ("{s:label}", in
-				     meters) set from script — see UpdateCameraDistanceHud. -->
-				<Panel class="UserMenuSection">
-					<Panel class="UserMenuSectionHeader">
-						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/camera.png" />
-						<Label class="UserMenuSectionLabel" text="CAMERA DISTANCE" />
-					</Panel>
-					<Panel id="camdist_slider" class="CameraPresetRow">
-						<Button id="camdist_seg_0" class="CameraPresetButton">
-							<Label class="CameraPresetLabel" text="[ {s:label} ]" />
-						</Button>
-						<Button id="camdist_seg_1" class="CameraPresetButton">
-							<Label class="CameraPresetLabel" text="[ {s:label} ]" />
-						</Button>
-						<Button id="camdist_seg_2" class="CameraPresetButton">
-							<Label class="CameraPresetLabel" text="[ {s:label} ]" />
-						</Button>
-					</Panel>
-					<Panel class="UserMenuSectionHeader UserMenuSectionHeaderSpaced">
-						<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/height.png" />
-						<Label class="UserMenuSectionLabel" text="CAMERA HEIGHT" />
-					</Panel>
-					<Panel id="camheight_slider" class="CameraPresetRow">
-						<Button id="camheight_seg_0" class="CameraPresetButton">
-							<Label class="CameraPresetLabel" text="[ {s:label} ]" />
-						</Button>
-						<Button id="camheight_seg_1" class="CameraPresetButton">
-							<Label class="CameraPresetLabel" text="[ {s:label} ]" />
-						</Button>
-						<Button id="camheight_seg_2" class="CameraPresetButton">
-							<Label class="CameraPresetLabel" text="[ {s:label} ]" />
-						</Button>
-					</Panel>
-				</Panel>
-
 				<!-- Per-player debug view of how ground/wall contact and jump
 				     presses are judged (physics/jump-debug.js). Its drawing only
 				     shows in tools mode. -->
