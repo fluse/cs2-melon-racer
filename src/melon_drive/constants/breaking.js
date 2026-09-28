@@ -31,7 +31,7 @@ export const BREAK_CAMERA_EXTRA_DISTANCE = 260;
 //   are easier to see; in low rooms the camera may end up in the ceiling.
 // Lower: flatter view from the side; 0 = no rise (only
 //   BREAK_CAMERA_EXTRA_DISTANCE).
-export const BREAK_CAMERA_EXTRA_HEIGHT = 160;
+export const BREAK_CAMERA_EXTRA_HEIGHT = 100;
 // How long a break's spawned effect entities (both templates below) are
 // kept before being removed — long, so the chunks stay lying at the crash
 // site. Removing the info_particle_system ends its particles, so this is an
