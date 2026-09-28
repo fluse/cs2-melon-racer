@@ -46,16 +46,26 @@ function PutPlayerInRaceMode(pawn) {
 // see melon_drive.js) should be on screen. cl_drawhud is a leftover from the
 // old vgui HUD and no longer affects CS2's Panorama HUD; cl_draw_only_deathnotices
 // is the one broadcast/demo tools actually use to strip the Panorama HUD down
-// to (basically) nothing, so use that instead.
+// to (basically) nothing, so use that instead. On top of that the pawn's
+// SetHUDVisibility input (tip from the CS2 mapping Discord) turns the HUD off
+// server-side; it belongs to the pawn, so it's fired again for every new pawn
+// (OnPlayerReset).
 /** @param {number} playerSlot */
 function HideDefaultHud(playerSlot) {
     Instance.ClientCommand(playerSlot, "cl_draw_only_deathnotices 1");
 }
 
+/** @param {import("cs_script/point_script").CSPlayerPawn} pawn */
+function HidePawnHud(pawn) {
+    Instance.EntFireAtTarget({ target: pawn, input: "SetHUDVisibility", value: false });
+}
+
 Instance.OnPlayerActivate(({ player }) => {
     HideDefaultHud(player.GetPlayerSlot());
-    if (player.GetPlayerPawn()) {
-        PutPlayerInRaceMode(player.GetPlayerPawn());
+    const pawn = player.GetPlayerPawn();
+    if (pawn) {
+        PutPlayerInRaceMode(pawn);
+        HidePawnHud(pawn);
     } else if (!IsPlayingTeam(player.GetTeamNumber())) {
         player.JoinTeam(RACE_TEAM);
     }
@@ -64,6 +74,7 @@ Instance.OnPlayerActivate(({ player }) => {
 // Covers respawns and round restarts too, not just the initial join.
 Instance.OnPlayerReset(({ player }) => {
     PutPlayerInRaceMode(player);
+    HidePawnHud(player);
     const slot = player.GetPlayerController()?.GetPlayerSlot();
     if (slot !== undefined) {
         HideDefaultHud(slot);
