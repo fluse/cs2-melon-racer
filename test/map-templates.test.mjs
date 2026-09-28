@@ -14,6 +14,7 @@ import {
     BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME,
     PERFECT_SPARK_TEMPLATE_NAME,
     HEAL_PARTICLE_TEMPLATE_NAME,
+    BOOST_TRAIL_TEMPLATE_NAME,
 } from "../src/melon_drive/constants/index.js";
 
 const entities = ReadVmapEntities(fileURLToPath(new URL("../maps/melon_racer.vmap", import.meta.url)));
@@ -61,13 +62,24 @@ for (const name of PARTICLE_TEMPLATES) {
     });
 }
 
+// The boost trail is optional (no template = no trail), so this only checks
+// it once it's been placed — and then it must point at the trail's own .vpcf.
+test(`"${BOOST_TRAIL_TEMPLATE_NAME}" spawns the boost trail particle system`, { skip: ByName(BOOST_TRAIL_TEMPLATE_NAME).length === 0 && "not placed in the map yet" }, () => {
+    const particles = TemplateTargets(BOOST_TRAIL_TEMPLATE_NAME).filter((e) => e.classname === "info_particle_system");
+    assert.ok(particles.length > 0, `"${BOOST_TRAIL_TEMPLATE_NAME}" doesn't spawn any info_particle_system`);
+    for (const particle of particles) {
+        assert.equal(particle.effect_name, "particles/melon_racer/boost_trail.vpcf", `"${particle.targetname}" plays the wrong effect`);
+    }
+});
+
 // Each effect needs its own particle system: a template copied in Hammer
 // that still points at another effect's entity plays that effect instead
 // (found: particle_health_template spawning the PERFECT spark).
 test("no two particle templates spawn the same entity", () => {
     const owner = new Map();
     const shared = [];
-    for (const name of PARTICLE_TEMPLATES) {
+    const placedBoostTrail = ByName(BOOST_TRAIL_TEMPLATE_NAME).length > 0 ? [BOOST_TRAIL_TEMPLATE_NAME] : [];
+    for (const name of [...PARTICLE_TEMPLATES, ...placedBoostTrail]) {
         for (const target of TemplateTargets(name)) {
             if (owner.has(target.targetname)) {
                 shared.push(`"${target.targetname}" is in both "${owner.get(target.targetname)}" and "${name}"`);

@@ -1,6 +1,7 @@
 // Particle effects from point_templates, the one way every effect in
 // melon_drive is spawned: the break burst (physics/break-effects.js), the
-// PERFECT spark (physics/wall-bounce.js) and the heal sparkle (heal/effect.js).
+// PERFECT spark (physics/wall-bounce.js), the heal sparkle (heal/effect.js)
+// and the boost trail (boost-trail.js).
 // Tested against the fake engine in test/particles.test.mjs.
 //
 // Two engine quirks every caller would otherwise have to know about:
@@ -58,6 +59,19 @@ export function StartParticles(entities) {
     for (const entity of entities) {
         if (IsParticleSystem(entity)) {
             Instance.EntFireAtTarget({ target: entity, input: "Start" });
+        }
+    }
+}
+
+/**
+ * Stops every info_particle_system among `entities` that's still around:
+ * no new particles, the ones already out play to the end of their lifetime.
+ * @param {any[]} entities
+ */
+export function StopParticles(entities) {
+    for (const entity of entities) {
+        if (entity.IsValid() && IsParticleSystem(entity)) {
+            Instance.EntFireAtTarget({ target: entity, input: "Stop" });
         }
     }
 }

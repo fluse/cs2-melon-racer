@@ -183,6 +183,17 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   (braking and re-accelerating can't reclaim a lost boost). It's reset by
   every respawn/race-flow teleport. Very fast melons make tunneling through
   thin checkpoint triggers likelier — keep them thick.
+- **Boost trail:** while a bounce has the melon above `MAX_SPEED` +
+  `BOOST_TRAIL_START_MARGIN`, a glowing band (white-yellow, fading to
+  orange) with a few falling juice droplets follows it — the addon's own
+  `particles/melon_racer/boost_trail.vpcf` (+ `boost_trail_juice.vpcf`
+  as its child), played from the `particle_boost_trail_template` point_template,
+  riding along on the melon. It stops once the boost has decayed below
+  `MAX_SPEED` + `BOOST_TRAIL_STOP_MARGIN` (lower, so it doesn't flicker)
+  and when the melon breaks or is race-locked; the particles already out
+  fade over `BOOST_TRAIL_FADE_SECONDS`. Visible to every player, so the
+  others see who's boosting. Rule: `logic/boost-trail.js`, applied by
+  `boost-trail.js` (`test/boost-trail.test.mjs`).
 - **Upward kick:** every bounce (any rating) also lifts the melon — its
   vertical speed becomes `WALL_BOUNCE_UP_SPEED` upward (a fall is cancelled
   first; a melon already rising keeps that plus the kick), so a bounce sends

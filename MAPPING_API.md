@@ -78,6 +78,7 @@ The script works without these, with the fallback shown.
 | `melon_break_chunks_template` | `point_template` | Chunk flecks: an `info_particle_system`, plus up to 9 `prop_physics` break pieces (`models/cs_italy/italy_food_melon/italy_food_melon/piece.vmdl`, `piece1.vmdl` … `piece8.vmdl`) arranged roughly melon-shaped. Pieces are tinted, flung outward and left lying for a while. | No chunks on break. |
 | `perfect_hit_particle_template` | `point_template` | Perfect spark: an `info_particle_system` with a `.vpcf` effect. A fresh copy is spawned at the melon on every PERFECT wall bounce (so several karts' sparks can play at once) and removed after `PERFECT_SPARK_LIFETIME`. | No spark. |
 | `particle_health_template` | `point_template` | Heal effect: its **own** `info_particle_system` with a `.vpcf` effect (not one another template already uses). A fresh copy is played on the melon, riding along, every time it enters a heal zone (4.6), and removed after `HEAL_PARTICLE_LIFETIME`. | No heal effect. |
+| `particle_boost_trail_template` | `point_template` | Boost trail: its **own** `info_particle_system` with the effect `particles/melon_racer/boost_trail.vpcf` ("Start Active" off — script starts it). A fresh copy rides along on the melon while a wall-bounce boost has it above `MAX_SPEED` + `BOOST_TRAIL_START_MARGIN`, and is stopped (particles fade out) once it's back under `MAX_SPEED` + `BOOST_TRAIL_STOP_MARGIN`. | No trail. |
 | `prediction_dot_template` | `point_template` | Only used when `PREDICTION_RENDER_MODE = "dots"` (default is `"debug"`): one small dot entity, e.g. a "Never Solid" `func_brush`. | Falls back to the debug line. |
 
 There are exactly **two** break templates — don't add other
@@ -331,6 +332,8 @@ Script inputs are pre-registered up to these limits; raise them in
   `.vpcf` particle system, any extra `melon_break_*` template,
 - a missing or duplicated `perfect_hit_particle_template` or
   `particle_health_template`, or one without a `.vpcf` particle system,
+- a placed `particle_boost_trail_template` without an `info_particle_system` playing
+  `particles/melon_racer/boost_trail.vpcf`,
 - two particle templates pointing at the same `info_particle_system`
   (a template copied in Hammer still playing the other one's effect),
 - entity names with leading/trailing whitespace.

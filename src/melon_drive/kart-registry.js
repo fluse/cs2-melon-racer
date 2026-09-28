@@ -15,6 +15,7 @@ import { predictionDotSet } from "./trace.js";
  *   pawnAnchor: any, // where the frozen pawn is held — see HoldPawn
  *   teleportGen: number, // bumped by every race-flow teleport (BeginHeat/ReturnAllToHub) — see ScheduleRespawnAfterBreak
  *   speedCap?: number, // current horizontal speed limit; above MAX_SPEED only while a wall-bounce boost decays — unset means MAX_SPEED
+ *   boostTrail?: { melon: any, entities: any[] }, // the boost trail running on this melon (unset: none) — see boost-trail.js
  *   nextBounceTime?: number, lastBounceTime?: number, // wall-bounce timing, see UpdateKart
  *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
  *   lastJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // wall-bounce timing presses, see RegisterWallTimingPress
@@ -86,6 +87,11 @@ export function IsModerator(slot) {
 export function DropKart(slot, kart) {
     if (kart.melon.IsValid()) {
         kart.melon.Remove();
+    }
+    for (const entity of kart.boostTrail?.entities ?? []) {
+        if (entity.IsValid()) {
+            entity.Remove();
+        }
     }
     for (const dot of kart.predictionDots ?? []) {
         predictionDotSet.delete(dot);

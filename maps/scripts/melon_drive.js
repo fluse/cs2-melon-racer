@@ -336,6 +336,30 @@ const BOUNCE_RATINGS = [
     { minAngleFactor: 0, label: "MISS", speedMultiplier: 0.3, cssClass: "RatingMiss", color: { r: 255, g: 102, b: 102, a: 255 } },
 ];
 
+// Boost trail: a glowing band (particles/melon_racer/boost_trail.vpcf, with
+// juice droplets as its child) behind a melon while a wall-bounce boost has
+// it faster than MAX_SPEED. Started and stopped by ../boost-trail.js.
+
+// point_template placed in Hammer holding the trail's info_particle_system
+// (effect particles/melon_racer/boost_trail.vpcf). A fresh copy is spawned
+// on the melon, parented so it rides along, when the boost starts, and
+// stopped when it's over. Must match the name in Hammer. Without it there's
+// simply no trail.
+const BOOST_TRAIL_TEMPLATE_NAME = "particle_boost_trail_template";
+// The trail starts once the melon is this many units/sec above MAX_SPEED...
+// Higher: only big boosts (PERFECT, chained bounces) leave a trail.
+// Lower: even a small GOOD bounce shows it; at ~0 it flickers on every
+//   tiny overshoot of MAX_SPEED.
+const BOOST_TRAIL_START_MARGIN = 30;
+// ...and stops once it's back below MAX_SPEED + this. Lower than the start
+// margin so a speed hovering around the threshold doesn't toggle it every
+// tick.
+const BOOST_TRAIL_STOP_MARGIN = 5;
+// Seconds a stopped trail's entities are kept, so the particles already out
+// fade out instead of vanishing. Must cover the .vpcf's longest particle
+// lifetime (0.75 s for the juice droplets).
+const BOOST_TRAIL_FADE_SECONDS = 1;
+
 // Lift zones: triggers where wall bounces and wall jumps are tuned for
 // climbing a shaft or a high wall by bouncing between its walls. What
 // changes inside one is gathered in WallRules (logic/lift.js); the camera
@@ -650,7 +674,7 @@ const CAMERA_HEIGHT = 0;
 // in at walls (clipCameraOffset off) — in a shaft the wall right behind the
 // melon would undo the zoom — so it looks through the shaft walls instead.
 // Higher: more overview, the melon gets smaller on screen.
-const LIFT_CAMERA_EXTRA_DISTANCE = 300; // units further back (was 150)
+const LIFT_CAMERA_EXTRA_DISTANCE = 220; // units further back (was 150)
 const LIFT_CAMERA_EXTRA_HEIGHT = 30; // units higher up (was 120 — too high)
 const LIFT_CAMERA_EASE_SECONDS = 0.6; // seconds to zoom fully out (or back in)
 
@@ -759,6 +783,7 @@ function TraceSphere(config) {
  *   pawnAnchor: any, // where the frozen pawn is held — see HoldPawn
  *   teleportGen: number, // bumped by every race-flow teleport (BeginHeat/ReturnAllToHub) — see ScheduleRespawnAfterBreak
  *   speedCap?: number, // current horizontal speed limit; above MAX_SPEED only while a wall-bounce boost decays — unset means MAX_SPEED
+ *   boostTrail?: { melon: any, entities: any[] }, // the boost trail running on this melon (unset: none) — see boost-trail.js
  *   nextBounceTime?: number, lastBounceTime?: number, // wall-bounce timing, see UpdateKart
  *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
  *   lastJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // wall-bounce timing presses, see RegisterWallTimingPress
@@ -830,6 +855,11 @@ function IsModerator(slot) {
 function DropKart(slot, kart) {
     if (kart.melon.IsValid()) {
         kart.melon.Remove();
+    }
+    for (const entity of kart.boostTrail?.entities ?? []) {
+        if (entity.IsValid()) {
+            entity.Remove();
+        }
     }
     for (const dot of kart.predictionDots ?? []) {
         predictionDotSet.delete(dot);
@@ -3138,7 +3168,8 @@ function DamageKart(slot, kart, damage, reason) {
 
 // Particle effects from point_templates, the one way every effect in
 // melon_drive is spawned: the break burst (physics/break-effects.js), the
-// PERFECT spark (physics/wall-bounce.js) and the heal sparkle (heal/effect.js).
+// PERFECT spark (physics/wall-bounce.js), the heal sparkle (heal/effect.js)
+// and the boost trail (boost-trail.js).
 // Tested against the fake engine in test/particles.test.mjs.
 //
 // Two engine quirks every caller would otherwise have to know about:
@@ -3194,6 +3225,19 @@ function StartParticles(entities) {
     for (const entity of entities) {
         if (IsParticleSystem(entity)) {
             Instance.EntFireAtTarget({ target: entity, input: "Start" });
+        }
+    }
+}
+
+/**
+ * Stops every info_particle_system among `entities` that's still around:
+ * no new particles, the ones already out play to the end of their lifetime.
+ * @param {any[]} entities
+ */
+function StopParticles(entities) {
+    for (const entity of entities) {
+        if (entity.IsValid() && IsParticleSystem(entity)) {
+            Instance.EntFireAtTarget({ target: entity, input: "Stop" });
         }
     }
 }
@@ -4724,6 +4768,78 @@ function RegisterZoneInputs() {
     RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
 }
 
+// When the boost trail is on (see constants/boost-trail.js). Pure rule, no
+// engine import — tested in test/boost-trail.test.mjs.
+
+/**
+ * Whether the trail should show this tick. Starts above MAX_SPEED +
+ * BOOST_TRAIL_START_MARGIN, then keeps going down to MAX_SPEED +
+ * BOOST_TRAIL_STOP_MARGIN (hysteresis, so it doesn't flicker). Never while
+ * `blocked` (the melon is broken or race-locked).
+ * @param {boolean} showing whether it's on right now
+ * @param {number} horizSpeed the melon's horizontal speed, units/sec
+ * @param {boolean} blocked
+ */
+function ShouldShowBoostTrail(showing, horizSpeed, blocked) {
+    if (blocked) {
+        return false;
+    }
+    const margin = showing ? BOOST_TRAIL_STOP_MARGIN : BOOST_TRAIL_START_MARGIN;
+    return horizSpeed > MAX_SPEED + margin;
+}
+
+// The boost trail: particle_boost_trail_template's particle effect riding along on a
+// melon while ShouldShowBoostTrail (logic/boost-trail.js) says so. Unlike
+// the other effects in particles.js it isn't played for a fixed lifetime —
+// it runs as long as the boost does, then is stopped so the particles
+// already out fade instead of vanishing. Tested in test/boost-trail.test.mjs.
+
+/**
+ * Starts or stops the kart's trail to match its speed. Called every tick
+ * for a kart whose melon is valid (think.js).
+ * @param {import("./kart-registry.js").Kart} kart
+ */
+function UpdateBoostTrail(kart) {
+    if (kart.boostTrail && kart.boostTrail.melon !== kart.melon) {
+        StopBoostTrail(kart); // a new melon entity — the old trail rode on the old one
+    }
+    const velocity = kart.melon.GetAbsVelocity();
+    const show = ShouldShowBoostTrail(kart.boostTrail !== undefined, Math.hypot(velocity.x, velocity.y), kart.breaking || kart.locked);
+    if (show && !kart.boostTrail) {
+        StartBoostTrail(kart);
+    } else if (!show && kart.boostTrail) {
+        StopBoostTrail(kart);
+    }
+}
+
+/** @param {import("./kart-registry.js").Kart} kart */
+function StartBoostTrail(kart) {
+    const position = kart.melon.GetAbsOrigin();
+    // Kept even when nothing spawned (no template in the map): marks the
+    // trail as on, so the lookup isn't retried every tick of this boost.
+    const entities = SpawnFromTemplate(BOOST_TRAIL_TEMPLATE_NAME, position);
+    PlaceAll(entities, position);
+    for (const entity of entities) {
+        entity.SetParent(kart.melon);
+    }
+    StartParticles(entities);
+    kart.boostTrail = { melon: kart.melon, entities };
+}
+
+/**
+ * Stops the kart's trail, if it has one: no new particles, the ones out fade
+ * over BOOST_TRAIL_FADE_SECONDS, then its entities are removed.
+ * @param {import("./kart-registry.js").Kart} kart
+ */
+function StopBoostTrail(kart) {
+    if (!kart.boostTrail) {
+        return;
+    }
+    StopParticles(kart.boostTrail.entities);
+    RemoveAfter(kart.boostTrail.entities, BOOST_TRAIL_FADE_SECONDS);
+    kart.boostTrail = undefined;
+}
+
 let lastHeartbeatTime = 0;
 // Real elapsed time since the last Think, used for the movement math below —
 // see the SetNextThink call at index.js's Think wiring for why this isn't a
@@ -4765,6 +4881,7 @@ function Think() {
             // replaces one, so the two can't spawn it in different places.
             HandleMelonLost(slot, kart);
             HidePrediction(kart);
+            StopBoostTrail(kart);
             // Still lets USE work as an unstuck button while waiting on the
             // respawn above — it only touches kart.userMenuOpen/the pawn,
             // never the (currently missing) melon.
@@ -4785,6 +4902,7 @@ function Think() {
             UpdateLiftCamera(kart, dt);
             UpdateZoneCamera(kart, dt);
             UpdatePrediction(kart, dt);
+            UpdateBoostTrail(kart);
             UpdateSpeedHud(slot, kart);
             UpdateBounceHud(slot, kart);
             UpdateJumpHud(slot, kart);

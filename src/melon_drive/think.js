@@ -9,6 +9,7 @@ import { UpdateKart, HandleMelonLost } from "./physics/index.js";
 import { phase, UpdateRaceFlow } from "./race-flow.js";
 import { UpdatePrediction, HidePrediction } from "./prediction.js";
 import { UpdateLiftCamera, UpdateZoneCamera } from "./camera/index.js";
+import { UpdateBoostTrail, StopBoostTrail } from "./boost-trail.js";
 
 let lastHeartbeatTime = 0;
 // Real elapsed time since the last Think, used for the movement math below —
@@ -51,6 +52,7 @@ export function Think() {
             // replaces one, so the two can't spawn it in different places.
             HandleMelonLost(slot, kart);
             HidePrediction(kart);
+            StopBoostTrail(kart);
             // Still lets USE work as an unstuck button while waiting on the
             // respawn above — it only touches kart.userMenuOpen/the pawn,
             // never the (currently missing) melon.
@@ -71,6 +73,7 @@ export function Think() {
             UpdateLiftCamera(kart, dt);
             UpdateZoneCamera(kart, dt);
             UpdatePrediction(kart, dt);
+            UpdateBoostTrail(kart);
             UpdateSpeedHud(slot, kart);
             UpdateBounceHud(slot, kart);
             UpdateJumpHud(slot, kart);
