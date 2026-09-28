@@ -34,6 +34,8 @@ const DECALS = [
     { raw: "Jump.png", name: "jump_decal", keyCheckerboard: true },
     { raw: "Arrow.jpg", name: "arrow_decal", keyCheckerboard: true },
     { raw: "WallJump.jpg", name: "wall_jump_decal", keyCheckerboard: true },
+    // Yellowish checkerboard, dull grayish-teal lettering: see TintedSaturation.
+    { raw: "AttackForBoost.jpg", name: "attack_for_boost_decal", keyCheckerboard: true, keyTinted: true },
 ];
 const PADDING = 8; // px of transparent border kept around the lettering
 const ALPHA_EMPTY = 4; // alpha at or below this counts as empty when cropping
@@ -48,6 +50,11 @@ const KEY_MIN_HOLE = 12; // pure-gray px an enclosed region needs to be a hole (
 const KEY_CLOSE_PX = 6; // grayish seams up to twice this wide inside the artwork are filled...
 const KEY_SAT_PURE = 8; // ...except pixels this gray, which are always checkerboard (keeps small counters open)
 const KEY_EDGE_PX = 4; // px around the artwork where alpha may be partial (anti-aliasing)
+// keyTinted only (TintedSaturation):
+const KEY_TINT_SAMPLE_SAT = 20; // pixels at or below this raw saturation sample the checkerboard's tint...
+const KEY_TINT_LIGHT_PERCENTILE = 0.99; // ...and its light squares' brightness (this share of them is at or below it)
+const KEY_TINT_BRIGHT_MARGIN = 12; // brighter than the light squares by more than this = artwork highlight
+const KEY_TINT_SAT_GAIN = 1.6; // tint-corrected saturation is scaled by this before the usual thresholds
 
 // --- PNG read (8-bit RGB/RGBA, non-interlaced) ---
 
@@ -170,10 +177,10 @@ function WritePng(width, height, channels, pixels) {
  *   KEY_EDGE_PX of the artwork (its anti-aliased edge); farther out it's 0,
  *   so a tinted glow in the checkerboard doesn't leave a faint smudge.
  */
-function KeyCheckerboard({ width, height, px }) {
+function KeyCheckerboard({ width, height, px }, tinted = false) {
     const n = width * height;
-    const sat = new Uint8Array(n);
-    for (let i = 0; i < n; i++) {
+    const sat = tinted ? TintedSaturation(width, height, px) : new Uint8Array(n);
+    for (let i = 0; i < n && !tinted; i++) {
         const r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2];
         sat[i] = Math.max(r, g, b) - Math.min(r, g, b);
     }
@@ -256,6 +263,44 @@ function KeyCheckerboard({ width, height, px }) {
             px[i * 4 + 3] = Math.round(t * 255);
         }
     });
+}
+
+/**
+ * Saturation for a checkerboard that isn't neutral gray but has a color
+ * cast (e.g. slightly yellowish), next to artwork that is itself rather
+ * dull in places (grayish teal): measured against the checkerboard's own
+ * tint — estimated from the image's grayish pixels, nearly all of which are
+ * checkerboard — instead of against pure gray. Pixels clearly brighter than
+ * the light squares (highlights on the artwork) count as artwork whatever
+ * their hue.
+ */
+function TintedSaturation(width, height, px) {
+    const n = width * height;
+    let sr = 0, sg = 0, sb = 0;
+    const levels = new Uint32Array(256);
+    for (let i = 0; i < n; i++) {
+        const r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2];
+        const hi = Math.max(r, g, b);
+        if (hi - Math.min(r, g, b) > KEY_TINT_SAMPLE_SAT) continue;
+        sr += r; sg += g; sb += b;
+        levels[hi]++;
+    }
+    const kg = sg / sr, kb = sb / sr;
+    let total = 0, light = 255;
+    for (const count of levels) total += count;
+    for (let seen = 0, v = 0; v < 256; v++) {
+        seen += levels[v];
+        if (seen >= total * KEY_TINT_LIGHT_PERCENTILE) { light = v; break; }
+    }
+    const sat = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+        const r = px[i * 4], g = px[i * 4 + 1] / kg, b = px[i * 4 + 2] / kb;
+        const s = (Math.max(r, g, b) - Math.min(r, g, b)) * KEY_TINT_SAT_GAIN;
+        const bright = Math.max(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]) > light + KEY_TINT_BRIGHT_MARGIN;
+        sat[i] = Math.min(255, Math.round(bright ? Math.max(s, KEY_SAT_HI) : s));
+    }
+    console.log(`tinted key: checkerboard tint g/r ${kg.toFixed(3)}, b/r ${kb.toFixed(3)}; light squares up to ${light}`);
+    return sat;
 }
 
 // --- crop, bleed, split ---
@@ -360,7 +405,7 @@ for (const decal of DECALS) {
     } else sourceUrl = new URL(decal.source, import.meta.url);
     const src = ReadImage(sourceUrl);
     if (decal.keyCheckerboard) {
-        KeyCheckerboard(src);
+        KeyCheckerboard(src, decal.keyTinted);
         const keyedName = decal.raw.replace(/\.(png|jpe?g)$/i, "_transparent.png");
         mkdirSync(RAW_DONE_DIR, { recursive: true });
         writeFileSync(new URL(keyedName, RAW_DONE_DIR), WritePng(src.width, src.height, 4, src.px));
