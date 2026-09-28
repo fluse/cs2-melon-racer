@@ -121,6 +121,14 @@ Tune via `IMPACT_DAMAGE_THRESHOLD` (units/sec of sudden velocity change
 before damage starts) and `IMPACT_DAMAGE_SCALE` (health lost per unit/sec
 beyond that).
 
+**Flat landings hurt more:** landing on level ground (floor trace normal z ≥
+`FLAT_LANDING_MIN_NORMAL_Z`, and the impact mostly from above —
+`FLAT_LANDING_MIN_VERTICAL_SHARE`) multiplies that damage by
+`FLAT_LANDING_DAMAGE_MULTIPLIER` (`constants/health.js`, rule in
+`logic/health.js`). Landing on a slope, or crashing sideways, stays plain
+impact damage; the threshold is the same, so landings that were free stay
+free.
+
 ## Wall bounce — speed for health (implemented)
 
 Every wall (any surface whose normal is mostly horizontal, `|normal.z| <

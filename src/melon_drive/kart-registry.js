@@ -18,6 +18,7 @@ import { predictionDotSet } from "./trace.js";
  *   nextBounceTime?: number, lastBounceTime?: number, // wall-bounce timing, see UpdateKart
  *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
  *   lastJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // wall-bounce timing presses, see RegisterWallTimingPress
+ *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
  *   lastWallContact?: { time: number, normal: { x: number, y: number } }, // last wall touched in the air (probe or bounce) — see UpdateWallContact
  *   lastWallJump?: { time: number, normal: { x: number, y: number } }, // see CanWallJump

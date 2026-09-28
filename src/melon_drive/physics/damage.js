@@ -1,11 +1,18 @@
 // Health loss from hard impacts (landings, crashes) — see IMPACT_DAMAGE_*.
 import { Debug } from "../debug.js";
-import { IMPACT_DAMAGE_THRESHOLD, IMPACT_DAMAGE_SCALE, MELON_MAX_HEALTH } from "../constants/index.js";
+// Landing flat on level ground costs more — see FLAT_LANDING_* and
+// ../logic/health.js.
+import { MELON_MAX_HEALTH } from "../constants/index.js";
+import { ImpactDamage } from "../logic/health.js";
 
-/** @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} impactSpeed */
-export function ApplyImpactDamage(slot, kart, impactSpeed) {
-    const damage = (impactSpeed - IMPACT_DAMAGE_THRESHOLD) * IMPACT_DAMAGE_SCALE;
-    DamageKart(slot, kart, damage, `impact ${impactSpeed.toFixed(0)} u/s`);
+/**
+ * @param {number} slot @param {import("../kart-registry.js").Kart} kart
+ * @param {{ x: number, y: number, z: number }} impactDelta the velocity change physics forced this tick
+ */
+export function ApplyImpactDamage(slot, kart, impactDelta) {
+    const impactSpeed = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
+    const { damage, flatLanding } = ImpactDamage(impactDelta, kart.floorNormalZ);
+    DamageKart(slot, kart, damage, `impact ${impactSpeed.toFixed(0)} u/s${flatLanding ? " (flat landing)" : ""}`);
 }
 
 /** @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} damage @param {string} reason */

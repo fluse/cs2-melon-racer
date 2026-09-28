@@ -143,7 +143,7 @@ export function UpdateKart(slot, kart, dt) {
                 speedGain: bounce.speedGain,
             };
         } else if (!inBounceCooldown && impactSpeed > IMPACT_DAMAGE_THRESHOLD) {
-            ApplyImpactDamage(slot, kart, impactSpeed);
+            ApplyImpactDamage(slot, kart, impactDelta);
             if (kart.health <= 0) {
                 // impactDelta is the sudden change physics forced onto the
                 // velocity we commanded — i.e. roughly the direction the

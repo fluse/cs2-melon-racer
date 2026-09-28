@@ -130,6 +130,7 @@ const WALL_JUMP_SAME_WALL_DOT = 0.7; // normals closer than this (dot product, ~
 // magnitude is the "impact speed" damage is based on:
 //   damage = (impactSpeed - IMPACT_DAMAGE_THRESHOLD) * IMPACT_DAMAGE_SCALE
 // e.g. a 700 u/s impact = (700 - 450) * 0.2 = 50 of MELON_MAX_HEALTH's 70.
+// Landing flat on level ground: times FLAT_LANDING_DAMAGE_MULTIPLIER (below).
 
 // The melon's health pool (kart.health), refilled on every respawn at a
 // checkpoint (after a break or via the user menu). Shared by landing/crash damage here and wall-hit damage
@@ -165,6 +166,27 @@ const IMPACT_DAMAGE_THRESHOLD = 450;
 // Lower: damage grows slowly — even big crashes only nibble at health,
 //   breaking needs many hard hits.
 const IMPACT_DAMAGE_SCALE = 0.2;
+// Landing flat on level ground hurts more than the same impact anywhere else
+// (a slope lets the melon roll the fall off; a wall crash has its own
+// rules): the damage above is multiplied by FLAT_LANDING_DAMAGE_MULTIPLIER
+// when the floor under the melon is at least FLAT_LANDING_MIN_NORMAL_Z level
+// and the impact came mostly from above (upward share of the impact at least
+// FLAT_LANDING_MIN_VERTICAL_SHARE). The threshold itself is unchanged, so
+// landings that were free stay free.
+// Higher multiplier: big drops onto flat floors break the melon much sooner.
+// Lower (1 = off): flat landings hurt the same as any other impact.
+const FLAT_LANDING_DAMAGE_MULTIPLIER = 2; // was 1.5
+// Floor normal z from which ground counts as flat (1 = perfectly level;
+// 0.97 ≈ up to 14° of slope).
+// Higher: only really level floors count, gentle ramps don't.
+// Lower: moderate slopes count as flat too.
+const FLAT_LANDING_MIN_NORMAL_Z = 0.97;
+// How much of the impact must point straight up (the floor stopping a fall)
+// for it to be a landing rather than a crash that happens to be on flat ground.
+// Higher: only near-vertical drops count; fast landings with a lot of forward
+// speed lost in the same tick don't.
+// Lower: more mixed impacts count as flat landings.
+const FLAT_LANDING_MIN_VERTICAL_SHARE = 0.7;
 
 // Heal zones (HEAL_ZONE_*): heal/constants.js, re-exported by index.js.
 
@@ -740,6 +762,7 @@ function TraceSphere(config) {
  *   nextBounceTime?: number, lastBounceTime?: number, // wall-bounce timing, see UpdateKart
  *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
  *   lastJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // wall-bounce timing presses, see RegisterWallTimingPress
+ *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
  *   lastWallContact?: { time: number, normal: { x: number, y: number } }, // last wall touched in the air (probe or bounce) — see UpdateWallContact
  *   lastWallJump?: { time: number, normal: { x: number, y: number } }, // see CanWallJump
@@ -2393,6 +2416,35 @@ function HealthBarState(health) {
     };
 }
 
+/**
+ * Whether an impact is the melon landing on flat, level ground: the floor
+ * under it is at least FLAT_LANDING_MIN_NORMAL_Z level and the impact
+ * (the velocity change physics forced) points mostly upward.
+ * @param {{ x: number, y: number, z: number }} impactDelta
+ * @param {number | undefined} floorNormalZ this tick's floor trace, undefined if it hit nothing
+ */
+function IsFlatLanding(impactDelta, floorNormalZ) {
+    if (floorNormalZ === undefined || floorNormalZ < FLAT_LANDING_MIN_NORMAL_Z) {
+        return false;
+    }
+    const impactSpeed = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
+    return impactSpeed > 0 && impactDelta.z / impactSpeed >= FLAT_LANDING_MIN_VERTICAL_SHARE;
+}
+
+/**
+ * Health lost from a landing/crash (not a wall bounce): IMPACT_DAMAGE_* above
+ * the threshold, times FLAT_LANDING_DAMAGE_MULTIPLIER for a flat landing.
+ * @param {{ x: number, y: number, z: number }} impactDelta
+ * @param {number | undefined} floorNormalZ
+ * @returns {{ damage: number, flatLanding: boolean }}
+ */
+function ImpactDamage(impactDelta, floorNormalZ) {
+    const impactSpeed = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
+    const flatLanding = IsFlatLanding(impactDelta, floorNormalZ);
+    const base = Math.max(0, impactSpeed - IMPACT_DAMAGE_THRESHOLD) * IMPACT_DAMAGE_SCALE;
+    return { damage: flatLanding ? base * FLAT_LANDING_DAMAGE_MULTIPLIER : base, flatLanding };
+}
+
 // Healing math (HealedHealth, HealZoneRate): heal/logic.js.
 
 // Per-track checkpoint/lap config comes straight from Hammer instead of a
@@ -2987,6 +3039,7 @@ function UpdateGrounded(kart, origin, now, supported, verticalAccel) {
         ignorePlayers: true,
     });
     const floorNormalZ = trace.didHit && !trace.startedInSolid ? trace.normal.z : undefined;
+    kart.floorNormalZ = floorNormalZ; // for this tick's landing damage (FLAT_LANDING_*)
     const grounded = IsGrounded(supported, floorNormalZ) && !InLiftoff(now, kart.lastJumpTime, kart.lastWallJump?.time);
     RecordFloorProbe(kart, origin, supported, verticalAccel, trace, grounded);
     if (grounded) {
@@ -3065,10 +3118,14 @@ function UpdateWallContact(kart, origin, now, currentVelocity) {
 
 // Health loss from hard impacts (landings, crashes) — see IMPACT_DAMAGE_*.
 
-/** @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} impactSpeed */
-function ApplyImpactDamage(slot, kart, impactSpeed) {
-    const damage = (impactSpeed - IMPACT_DAMAGE_THRESHOLD) * IMPACT_DAMAGE_SCALE;
-    DamageKart(slot, kart, damage, `impact ${impactSpeed.toFixed(0)} u/s`);
+/**
+ * @param {number} slot @param {import("../kart-registry.js").Kart} kart
+ * @param {{ x: number, y: number, z: number }} impactDelta the velocity change physics forced this tick
+ */
+function ApplyImpactDamage(slot, kart, impactDelta) {
+    const impactSpeed = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
+    const { damage, flatLanding } = ImpactDamage(impactDelta, kart.floorNormalZ);
+    DamageKart(slot, kart, damage, `impact ${impactSpeed.toFixed(0)} u/s${flatLanding ? " (flat landing)" : ""}`);
 }
 
 /** @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} damage @param {string} reason */
@@ -3874,7 +3931,7 @@ function UpdateKart(slot, kart, dt) {
                 speedGain: bounce.speedGain,
             };
         } else if (!inBounceCooldown && impactSpeed > IMPACT_DAMAGE_THRESHOLD) {
-            ApplyImpactDamage(slot, kart, impactSpeed);
+            ApplyImpactDamage(slot, kart, impactDelta);
             if (kart.health <= 0) {
                 // impactDelta is the sudden change physics forced onto the
                 // velocity we commanded — i.e. roughly the direction the

@@ -34,6 +34,7 @@ export function UpdateGrounded(kart, origin, now, supported, verticalAccel) {
         ignorePlayers: true,
     });
     const floorNormalZ = trace.didHit && !trace.startedInSolid ? trace.normal.z : undefined;
+    kart.floorNormalZ = floorNormalZ; // for this tick's landing damage (FLAT_LANDING_*)
     const grounded = IsGrounded(supported, floorNormalZ) && !InLiftoff(now, kart.lastJumpTime, kart.lastWallJump?.time);
     RecordFloorProbe(kart, origin, supported, verticalAccel, trace, grounded);
     if (grounded) {

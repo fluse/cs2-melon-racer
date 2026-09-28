@@ -7,6 +7,7 @@
 // magnitude is the "impact speed" damage is based on:
 //   damage = (impactSpeed - IMPACT_DAMAGE_THRESHOLD) * IMPACT_DAMAGE_SCALE
 // e.g. a 700 u/s impact = (700 - 450) * 0.2 = 50 of MELON_MAX_HEALTH's 70.
+// Landing flat on level ground: times FLAT_LANDING_DAMAGE_MULTIPLIER (below).
 
 // The melon's health pool (kart.health), refilled on every respawn at a
 // checkpoint (after a break or via the user menu). Shared by landing/crash damage here and wall-hit damage
@@ -42,5 +43,26 @@ export const IMPACT_DAMAGE_THRESHOLD = 450;
 // Lower: damage grows slowly — even big crashes only nibble at health,
 //   breaking needs many hard hits.
 export const IMPACT_DAMAGE_SCALE = 0.2;
+// Landing flat on level ground hurts more than the same impact anywhere else
+// (a slope lets the melon roll the fall off; a wall crash has its own
+// rules): the damage above is multiplied by FLAT_LANDING_DAMAGE_MULTIPLIER
+// when the floor under the melon is at least FLAT_LANDING_MIN_NORMAL_Z level
+// and the impact came mostly from above (upward share of the impact at least
+// FLAT_LANDING_MIN_VERTICAL_SHARE). The threshold itself is unchanged, so
+// landings that were free stay free.
+// Higher multiplier: big drops onto flat floors break the melon much sooner.
+// Lower (1 = off): flat landings hurt the same as any other impact.
+export const FLAT_LANDING_DAMAGE_MULTIPLIER = 2; // was 1.5
+// Floor normal z from which ground counts as flat (1 = perfectly level;
+// 0.97 ≈ up to 14° of slope).
+// Higher: only really level floors count, gentle ramps don't.
+// Lower: moderate slopes count as flat too.
+export const FLAT_LANDING_MIN_NORMAL_Z = 0.97;
+// How much of the impact must point straight up (the floor stopping a fall)
+// for it to be a landing rather than a crash that happens to be on flat ground.
+// Higher: only near-vertical drops count; fast landings with a lot of forward
+// speed lost in the same tick don't.
+// Lower: more mixed impacts count as flat landings.
+export const FLAT_LANDING_MIN_VERTICAL_SHARE = 0.7;
 
 // Heal zones (HEAL_ZONE_*): heal/constants.js, re-exported by index.js.
