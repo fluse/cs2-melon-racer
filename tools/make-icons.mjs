@@ -120,6 +120,15 @@ const ICONS = {
         cut(circle(32, 32, 26), circle(46, 45, 8)),
         union(circle(19, 26, 5), circle(31, 16, 5), circle(44, 21, 5), circle(18, 40, 5)),
     ),
+    // Melon with a ring around it and short rays — GLOW.
+    glow: union(
+        ellipse(32, 32, 13, 11),
+        cut(circle(32, 32, 20), circle(32, 32, 17)),
+        ...[0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
+            const c = Math.cos((a * Math.PI) / 180), s = Math.sin((a * Math.PI) / 180);
+            return line(32 + c * 24, 32 + s * 24, 32 + c * 29, 32 + s * 29, 2.2);
+        }),
+    ),
     // Dotted line running into a wall and bouncing off it — GUIDE LINE.
     "guide-line": union(
         rect(50, 6, 58, 58, 1),

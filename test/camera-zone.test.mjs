@@ -7,26 +7,36 @@ import {
     ZoneCameraClips,
     ZoneCameraExtra,
     ZoneCameraOffset,
+    ZoneCameraFront,
 } from "../src/melon_drive/logic/camera-zone.js";
 import {
     CAMERA_ZONE_EXTRA_DISTANCE,
     CAMERA_ZONE_EXTRA_HEIGHT,
     CAMERA_ZONE_EASE_SECONDS,
     CAMERA_ZONE_MIN_DISTANCE,
+    CAMERA_ZONE_FRONT_HEIGHT,
+    CAMERA_DISTANCE,
+    CAMERA_HEIGHT,
+    FOLLOW_OFFSET,
 } from "../src/melon_drive/constants/index.js";
 
 const base = { x: -50, y: 0, z: 10 };
+// The real normal offset, what front zones are measured against.
+const normal = { x: -CAMERA_DISTANCE, y: 0, z: CAMERA_HEIGHT };
 
 test("camera zone values come from the trigger name", () => {
-    assert.deepEqual(CameraZoneFromName("camera_zone_250_40"), { distance: 250, height: 40, clip: true });
-    assert.deepEqual(CameraZoneFromName("camera_zone_-30_-5"), { distance: -30, height: -5, clip: true });
-    assert.deepEqual(CameraZoneFromName("camera_zone_120"), { distance: 120, height: 0, clip: true });
-    assert.deepEqual(CameraZoneFromName("camera_zone_noclip_300_20"), { distance: 300, height: 20, clip: false });
+    assert.deepEqual(CameraZoneFromName("camera_zone_250_40"), { distance: 250, height: 40, clip: true, front: false });
+    assert.deepEqual(CameraZoneFromName("camera_zone_-30_-5"), { distance: -30, height: -5, clip: true, front: false });
+    assert.deepEqual(CameraZoneFromName("camera_zone_120"), { distance: 120, height: 0, clip: true, front: false });
+    assert.deepEqual(CameraZoneFromName("camera_zone_noclip_300_20"), { distance: 300, height: 20, clip: false, front: false });
     assert.deepEqual(CameraZoneFromName("some_trigger"), {
         distance: CAMERA_ZONE_EXTRA_DISTANCE,
         height: CAMERA_ZONE_EXTRA_HEIGHT,
         clip: true,
+        front: false,
     });
+    assert.equal(CameraZoneFromName("camera_zone_front_40_0").front, true);
+    assert.equal(CameraZoneFromName("camera_zone_noclip_front_40_0").clip, false);
 });
 
 test("camera zone zoom eases in over CAMERA_ZONE_EASE_SECONDS and back out after leaving", () => {
@@ -63,4 +73,27 @@ test("zone offset: back/up by the zoom, zooming in stops CAMERA_ZONE_MIN_DISTANC
     assert.deepEqual(ZoneCameraOffset(base, out), { x: base.x - 100, y: base.y, z: base.z + 30 });
     const tooClose = StepZoneCamera(undefined, { distance: -1000, height: 0, clip: true }, CAMERA_ZONE_EASE_SECONDS);
     assert.equal(ZoneCameraOffset(base, tooClose).x, -CAMERA_ZONE_MIN_DISTANCE);
+});
+
+test("front zone: camera ends up <ahead> in front of and <height> above the melon's center", () => {
+    const at = (name) => {
+        const state = StepZoneCamera(undefined, CameraZoneFromName(name), CAMERA_ZONE_EASE_SECONDS);
+        const offset = ZoneCameraOffset(normal, state);
+        return { ahead: offset.x, above: offset.z + FOLLOW_OFFSET.z };
+    };
+    assert.deepEqual(at("camera_zone_front_40_3"), { ahead: 40, above: 3 });
+    assert.deepEqual(at("camera_zone_front_40"), { ahead: 40, above: CAMERA_ZONE_FRONT_HEIGHT });
+});
+
+test("front zone: no min-distance stop while easing in or back out, so no jump", () => {
+    const zone = CameraZoneFromName("camera_zone_front_40_0");
+    let state = StepZoneCamera(undefined, zone, CAMERA_ZONE_EASE_SECONDS / 2);
+    assert.equal(ZoneCameraFront(state), true);
+    const half = ZoneCameraOffset(normal, state).x;
+    assert.equal(half, normal.x - zone.distance / 2);
+    state = StepZoneCamera(state, zone, CAMERA_ZONE_EASE_SECONDS);
+    state = StepZoneCamera(state, NO_CAMERA_ZONE, CAMERA_ZONE_EASE_SECONDS / 2);
+    assert.equal(ZoneCameraFront(state), true, "still easing back from the front");
+    assert.equal(ZoneCameraOffset(normal, state).x, half);
+    assert.equal(StepZoneCamera(state, NO_CAMERA_ZONE, CAMERA_ZONE_EASE_SECONDS), undefined);
 });

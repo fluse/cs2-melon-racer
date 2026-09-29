@@ -26,8 +26,9 @@ import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, Se
 import { SetUpPlayerKart, ForgetIntroLogo } from "./kart-spawn.js";
 import { Lifted, LevelAngles } from "./spawn-points.js";
 import { ParseTeleportTrigger, TeleportExitVelocity } from "./logic/teleport.js";
-import { RespawnKartAtCheckpoint, SetKartPaintColor, TeleportKartTo, IsJumpDebugOn, SetJumpDebug } from "./physics/index.js";
-import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen, UpdateJumpDebugHud, UpdatePredictionHud } from "./hud.js";
+import { RespawnKartAtCheckpoint, SetKartPaintColor, TeleportKartTo, BreakMelon, IsJumpDebugOn, SetJumpDebug } from "./physics/index.js";
+import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen, UpdateJumpDebugHud, UpdateMelonGlowHud, UpdatePredictionHud } from "./hud.js";
+import { IsMelonGlowOn, SetMelonGlow } from "./melon-look.js";
 import { IsPredictionOn, SetPrediction } from "./prediction.js";
 import { phase, activeTrackId, phaseEndTime, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, RestoreRaceFlowSnapshot } from "./race-flow.js";
 import { RegisterCheckpointAndFinishInputs } from "./checkpoints.js";
@@ -198,6 +199,27 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
     Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"`);
 });
 
+// Kill trigger: any trigger_multiple (filtered to prop_physics) whose
+// OnStartTouch calls RunScriptInput "melon_break" breaks the touching melon
+// on the spot — same break as running out of health (effects at the crash
+// site, respawn at the last checkpoint after BREAK_RESPAWN_DELAY).
+Instance.OnScriptInput("melon_break", ({ activator }) => {
+    const kart = activator && FindKartByMelon(activator);
+    if (!kart) {
+        Debug("melon_break: activator wasn't a tracked melon, ignoring");
+        return;
+    }
+    if (kart.breaking || kart.locked) {
+        return; // already broken, or parked by the race flow (countdown, finished)
+    }
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot() ?? -1;
+    const velocity = kart.melon.GetAbsVelocity();
+    const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
+    kart.health = 0;
+    Debug(`melon_break: slot ${slot} broken by trigger`);
+    BreakMelon(slot, kart, speed > 0 ? velocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+});
+
 // Heal and lift zones (heal_enter/heal_leave, lift_enter/lift_leave).
 RegisterZoneInputs();
 RegisterAttackDebug();
@@ -274,6 +296,15 @@ Instance.OnCustomHudClicked((event) => {
         Debug(`usermenu_tutorial_button: slot ${slot} going to the tutorial (racing=${kart.racing}, phase=${phase})`);
         SetUserMenuOpen(slot, kart, false);
         SendKartToTutorial(kart);
+    } else if (event.buttonId === "usermenu_glow_button") {
+        // Per player: only this player's own melon (everyone still sees
+        // whatever glow a melon has — the engine's Glow isn't per viewer).
+        const slot = event.player.GetPlayerSlot();
+        const kart = karts.get(slot);
+        if (kart) {
+            SetMelonGlow(kart, !IsMelonGlowOn(kart));
+            UpdateMelonGlowHud(slot, kart);
+        }
     } else if (event.buttonId === "usermenu_prediction_button") {
         // Per player: only this player's melon gets the line (drawn with
         // DebugLine in the default render mode, so tools mode only).

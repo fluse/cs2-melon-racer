@@ -21,7 +21,7 @@ function Describe(c) {
 }
 
 // Everything src/melon_drive/ registers via Instance.OnScriptInput.
-const KNOWN_INPUT = /^(checkpoint_\d+_\d+|finish_\d+|hub_enter|hub_leave|hub_teleport|melon_paint|melon_teleport|heal_enter|heal_leave|lift_enter|lift_leave|camera_enter|camera_leave)$/;
+const KNOWN_INPUT = /^(checkpoint_\d+_\d+|finish_\d+|hub_enter|hub_leave|hub_teleport|melon_paint|melon_teleport|melon_break|heal_enter|heal_leave|lift_enter|lift_leave|camera_enter|camera_leave)$/;
 
 test("every RunScriptInput names an input the script registers", () => {
     const unknown = scriptInputs.filter((c) => !KNOWN_INPUT.test(c.param)).map((c) => `${Describe(c)} -> "${c.param}"`);

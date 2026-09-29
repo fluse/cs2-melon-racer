@@ -39,7 +39,7 @@ src/melon_drive/index.js, *.js           # melon_drive entry: split into one fil
                                           #   checkpoints.js, zone-inputs.js (heal/lift zone script inputs),
                                           #   prediction.js, trace.js, think.js, particles.js (spawning/placing/starting/stopping/removing every point_template
                                           #   particle effect — break, PERFECT spark, heal, boost trail), boost-trail.js (starts/stops the boost trail
-                                          #   per tick) — index.js just wires them together
+                                          #   per tick), melon-look.js (paint color + outline glow) — index.js just wires them together
 src/melon_drive/camera/*.js              # chase camera, one file per concern: follow.js (chase camera, fixed offset,
                                           #   the only SetFollowConfig), break-zoom.js, lift-zoom.js, zone-zoom.js (camera zones) — others import from camera/index.js
 src/melon_drive/physics/*.js             # melon physics, one file per concern: drive.js (UpdateKart, the per-tick order),

@@ -11,6 +11,7 @@ import { BREAK_RESPAWN_DELAY, BREAK_TINT_FALLBACK } from "../constants/index.js"
 import { DirectionToAngles, SpawnBreakParticles } from "./break-effects.js";
 import { RespawnKartAtCheckpoint } from "./teleport.js";
 import { LeaveZones } from "./zones.js";
+import { ShowMelonPaint, HideMelonGlow } from "../melon-look.js";
 
 /**
  * Common tail end of every break, whether it was caught by our own
@@ -48,7 +49,7 @@ function ScheduleRespawnAfterBreak(slot, kart) {
             RespawnDestroyedMelon(slot, kart);
             return;
         }
-        kart.melon.SetColor(kart.paintColor);
+        ShowMelonPaint(kart);
         // Back from the pulled-out break camera (ApplyBreakCameraZoom) to the
         // player's normal chase offset.
         ApplyCameraFollow(kart);
@@ -76,7 +77,7 @@ function RespawnDestroyedMelon(slot, kart) {
     }
     kart.melon = melon;
     FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
-    kart.melon.SetColor(kart.paintColor);
+    ShowMelonPaint(kart);
     RestoreFullHealth(kart);
     kart.lastVelocity = undefined;
     kart.settled = false;
@@ -115,6 +116,7 @@ export function BreakMelon(slot, kart, impactDir, impactSpeed) {
     // ScheduleRespawnAfterBreak.
     const particlesSpawned = SpawnBreakParticles(breakPosition, breakAngles, kart.paintColor);
     kart.melon.SetColor(particlesSpawned ? { r: 255, g: 255, b: 255, a: 0 } : BREAK_TINT_FALLBACK);
+    HideMelonGlow(kart);
 
     ScheduleRespawnAfterBreak(slot, kart);
 }

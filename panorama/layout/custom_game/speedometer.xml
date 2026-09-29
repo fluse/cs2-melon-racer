@@ -243,6 +243,18 @@
 						</Panel>
 					</Panel>
 
+					<!-- Per-player outline glow around the player's own melon, in
+					     its paint color, green until painted (melon-look.js). On by default. -->
+					<Panel class="UserMenuSection">
+						<Panel class="UserMenuSectionHeader">
+							<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/glow.png" />
+							<Label class="UserMenuSectionLabel" text="GLOW" />
+						</Panel>
+						<Button id="usermenu_glow_button" class="UserMenuOutlineButton">
+							<Label class="UserMenuOutlineLabel" text="GLOW: {s:glow_state}" />
+						</Button>
+					</Panel>
+
 					<!-- Per-player wall-bounce guide line: where the melon hits the
 					     next wall and at what rating (prediction.js). Off by
 					     default; in the default render mode it only shows in

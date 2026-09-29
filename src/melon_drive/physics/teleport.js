@@ -2,6 +2,7 @@
 // and its paint color (kept across breaks).
 import { FacePlayerView } from "../spawn-points.js";
 import { RestoreFullHealth } from "../heal/index.js";
+import { ShowMelonPaint } from "../melon-look.js";
 
 /**
  * Teleports a kart's melon back to its last checkpoint and resets it to a
@@ -60,7 +61,8 @@ export function TeleportKartTo(kart, position, angles, velocity) {
  */
 export function SetKartPaintColor(kart, color) {
     kart.paintColor = color;
+    kart.painted = true; // its glow takes this color from now on, see melon-look.js
     if (!kart.breaking) {
-        kart.melon.SetColor(color);
+        ShowMelonPaint(kart);
     }
 }

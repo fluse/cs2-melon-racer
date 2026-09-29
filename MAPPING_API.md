@@ -98,6 +98,7 @@ follows the general conventions in section 1.
 | `hub_teleport` | any trigger | — | Sends the melon to `hub_spawn`, takes it out of a running heat, resets its track progress. |
 | `melon_paint` | `paint_trigger_<r>_<g>_<b>` | name (color) | Paints the melon. See 4.4. |
 | `melon_teleport` | `teleport_[stop_\|keep_]to_<destination>` | name (mode, destination) | Teleports the melon. See 4.5. |
+| `melon_break` | any trigger | — | Breaks the melon on the spot (like health running out): respawn at its last checkpoint. Ignored for broken and race-locked melons. |
 | `heal_enter` | any heal trigger | name (optional rate, or `heal_zone_full`) | Melon starts healing over time (or is refilled to full). See 4.6. |
 | `heal_leave` | the same heal trigger, **`OnEndTouch`** | — | Stops healing from that trigger. |
 | `lift_enter` | any lift trigger | name (optional kick) | Wall bounces kick the melon higher up. See 4.7. |
@@ -283,6 +284,8 @@ hall) or in (tight tunnels).
 name:    anything, or camera_zone_<distance>_<height>   e.g. camera_zone_250_40 (250 back, 40 up)
                       camera_zone_<distance>            e.g. camera_zone_-30   (30 closer)
                       camera_zone_noclip_<distance>_<height>
+                      camera_zone_front_<ahead>_<height>  e.g. camera_zone_front_40_0 (in front, low)
+                      camera_zone_noclip_front_<ahead>_<height>
 outputs: OnStartTouch → melon_drive_script → RunScriptInput → camera_enter
          OnEndTouch   → melon_drive_script → RunScriptInput → camera_leave
 ```
@@ -290,12 +293,20 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → camera_enter
 - `<distance>`: units further back than the normal chase camera,
   negative = closer. `<height>`: units higher, negative = lower (default 0).
   Decimals allowed. Parsed from a name matching
-  `^camera_zone_(noclip_)?(-?\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?$`,
+  `^camera_zone_(noclip_)?(front_)?(-?\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?$`,
   any other name uses `CAMERA_ZONE_EXTRA_DISTANCE` (150) /
   `CAMERA_ZONE_EXTRA_HEIGHT` (0).
 - The camera eases there over `CAMERA_ZONE_EASE_SECONDS` (0.6 s) and back
   the same way after leaving. Zooming in never gets closer than
-  `CAMERA_ZONE_MIN_DISTANCE` (20) behind the melon.
+  `CAMERA_ZONE_MIN_DISTANCE` (20) behind the melon — except in a front zone.
+- **Front zones** (`camera_zone_front_<ahead>_<height>`): the camera moves
+  *in front of* the melon, `<ahead>` units ahead of and `<height>` units
+  above its center (the center is ~7 units over the floor, so `0` = just
+  above the ground; without a height `CAMERA_ZONE_FRONT_HEIGHT`, 0). These
+  values are the camera's spot, not added to the normal offset. It still
+  looks where the player looks, so the melon is behind it (a low bumper
+  view); easing in/out passes through the melon. If walls or the floor
+  keep pulling it back in, use `camera_zone_noclip_front_…`.
 - Walls still pull the camera in as usual, which can cancel a zoom-out
   next to a wall. `camera_zone_noclip_…` turns that off while its zoom is
   on — the camera looks through walls instead (like in lift zones).
@@ -353,6 +364,6 @@ output is missing, mistargeted, or its filter/spawnflags keep the melon out.
 - [ ] `point_template` `melon_template` with the melon `prop_physics`
 - [ ] `hub_spawn` near the hub floor, `hub_start_trigger` with `hub_enter` + `hub_leave`
 - [ ] per track: `track_start_<id>_cp<N>_laps<M>`, `checkpoint_<id>_1` … `_<N>`, a `finish_<id>` output
-- [ ] optional: `intro_spawn`, `hub_spawn_facing`, both break templates, `perfect_hit_particle_template`, `particle_health_template`, paint triggers, teleporters
+- [ ] optional: `intro_spawn`, `hub_spawn_facing`, both break templates, `perfect_hit_particle_template`, `particle_health_template`, paint triggers, teleporters, `melon_break` kill triggers
 - [ ] every melon trigger: `trigger_multiple`, "Physics Objects", filtered to `prop_physics`
 - [ ] `npm test` passes

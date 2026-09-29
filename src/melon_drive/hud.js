@@ -5,6 +5,7 @@ import { Debug } from "./debug.js";
 import { GetJumpChargeFraction } from "./physics/jump.js";
 import { IsJumpDebugOn } from "./physics/jump-debug.js";
 import { IsPredictionOn } from "./prediction.js";
+import { IsMelonGlowOn } from "./melon-look.js";
 import { GetBounceRating } from "./logic/wall-bounce.js";
 import { HealthBarState } from "./logic/health.js";
 import { GetTrackConfig } from "./track-config.js";
@@ -217,10 +218,25 @@ export function SetUserMenuOpen(slot, kart, open) {
     if (open) {
         // Refreshed on every open: a layout or script reload in tools mode
         // wipes what was set when the kart spawned.
+        UpdateMelonGlowHud(slot, kart);
         UpdatePredictionHud(slot, kart);
         UpdateJumpDebugHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
+}
+
+/**
+ * The user menu's glow toggle button: its ON/OFF text and highlight.
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+export function UpdateMelonGlowHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const on = IsMelonGlowOn(kart);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_glow_button", "glow_state", on ? "ON" : "OFF");
+    hud.SetHasClassForPlayer(slot, "usermenu_glow_button", "ToggleOn", on);
 }
 
 /**

@@ -4,15 +4,29 @@
 // (g_vTexCoordScrollSpeed / g_vSelfIllumScrollSpeed), so the pattern only has
 // to tile seamlessly. No dependencies, like make-icons.mjs.
 //
-// - holo_zigzag_color.png: RGB, cyan→violet→magenta holo gradient;
+// - holo_zigzag_color.png: RGB, toxic green→ultraviolet holo gradient;
 // - holo_zigzag_trans.png: grayscale opacity (faint glass, bright lines);
 // - holo_zigzag_illum.png: grayscale self-illum mask (the glowing part).
 //
-// Also holo_portal_{color,trans,illum}.png for holo_portal.vmat (see below).
+// Also holo_dashes_{color,trans,illum}.png for holo_dashes.vmat and
+// holo_portal_{color,trans,illum}.png for holo_portal.vmat (see below).
+//
+// `node tools/make-holo.mjs <name>` (e.g. holo_dashes) writes only that
+// texture set and leaves the others' PNGs untouched.
 import { writeFileSync, mkdirSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
 const OUT_DIR = new URL("../materials/melon_racer/", import.meta.url);
+const ONLY = process.argv[2];
+
+/** Writes <name>_{color,trans,illum}.png, unless another name was asked for. */
+function WriteSet(name, width, height, color, trans, illum) {
+    if (ONLY && ONLY !== name) return;
+    writeFileSync(new URL(`${name}_color.png`, OUT_DIR), WritePng(width, height, 3, color));
+    writeFileSync(new URL(`${name}_trans.png`, OUT_DIR), WritePng(width, height, 1, trans));
+    writeFileSync(new URL(`${name}_illum.png`, OUT_DIR), WritePng(width, height, 1, illum));
+    console.log(`wrote ${name}_{color,trans,illum}.png (${width}x${height})`);
+}
 const NAME = "holo_zigzag";
 
 const SIZE = 512; // power of two (resourcecompiler needs it for mips)
@@ -25,12 +39,15 @@ const SECOND_LINE_SHIFT = 0.5; // a thinner line halfway between the main ones
 const SECOND_LINE_STRENGTH = 0.35;
 const GLASS_ALPHA = 0.1; // opacity of the empty area between lines
 
-// Holo gradient, stops along the diagonal (0..1, wraps).
+// Holo gradient, stops along the diagonal (0..1, wraps). Each color is held
+// for a while and the change between them kept short: halfway between green
+// and violet is a muddy grey.
 const GRADIENT = [
-    [0.0, [40, 240, 255]], // cyan
-    [0.33, [120, 110, 255]], // violet
-    [0.66, [255, 70, 220]], // magenta
-    [1.0, [40, 240, 255]],
+    [0.0, [57, 255, 20]], // toxic green
+    [0.35, [57, 255, 20]],
+    [0.5, [170, 40, 255]], // ultraviolet
+    [0.85, [170, 40, 255]],
+    [1.0, [57, 255, 20]],
 ];
 
 // --- PNG write (same as make-decal.mjs) ---
@@ -131,10 +148,59 @@ for (let y = 0; y < SIZE; y++) {
 }
 
 mkdirSync(OUT_DIR, { recursive: true });
-writeFileSync(new URL(`${NAME}_color.png`, OUT_DIR), WritePng(SIZE, SIZE, 3, color));
-writeFileSync(new URL(`${NAME}_trans.png`, OUT_DIR), WritePng(SIZE, SIZE, 1, trans));
-writeFileSync(new URL(`${NAME}_illum.png`, OUT_DIR), WritePng(SIZE, SIZE, 1, illum));
-console.log(`wrote ${NAME}_{color,trans,illum}.png (${SIZE}x${SIZE})`);
+WriteSet(NAME, SIZE, SIZE, color, trans, illum);
+
+// --- holo_dashes: staggered diagonal dashes (materials/melon_racer/holo_dashes.vmat) ---
+//
+// Short "\" dashes on dashed diagonal lines, each line's dashes shifted half
+// a period against its neighbors', so they sit in a staggered grid. Worked in
+// a = x - y (across the lines) and b = x + y (along them): both periods
+// divide 2 * SIZE's step of SIZE, and SIZE / DASH_LINE_PERIOD is even, so the
+// stagger lines up again at the tile edge — seamless. Same gradient as the
+// zigzag.
+
+const DASH_NAME = "holo_dashes";
+const DASH_LINE_PERIOD = 32; // in x - y: lines are 32 / √2 ≈ 23 px apart (must divide SIZE, SIZE / it even)
+const DASH_PERIOD = 64; // in x + y: dash to dash along a line, 64 / √2 ≈ 45 px (must divide SIZE)
+const DASH_LENGTH = 28; // px, of the dash's straight part
+const DASH_CORE_WIDTH = 1.5; // px half-width of a dash's bright core
+const DASH_GLOW_WIDTH = 7; // px falloff of the glow around it
+
+/** Distance (px) from pixel (x, y) to the nearest dash. */
+function DashDistance(x, y) {
+    const a = x - y;
+    const line = Math.round(a / DASH_LINE_PERIOD);
+    const across = (a - line * DASH_LINE_PERIOD) / Math.SQRT2;
+    const b = x + y - (line & 1) * (DASH_PERIOD / 2);
+    const along = (b - Math.round(b / DASH_PERIOD) * DASH_PERIOD) / Math.SQRT2;
+    const beyondEnd = Math.max(0, Math.abs(along) - DASH_LENGTH / 2);
+    return Math.hypot(beyondEnd, across);
+}
+
+const dashColor = Buffer.alloc(SIZE * SIZE * 3);
+const dashTrans = Buffer.alloc(SIZE * SIZE);
+const dashIllum = Buffer.alloc(SIZE * SIZE);
+for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+        // Supersampled 2x2, the dashes are thin enough to shimmer otherwise.
+        let line = 0;
+        for (const [ox, oy] of [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
+            const dist = DashDistance(x + ox, y + oy);
+            const core = Math.max(0, Math.min(1, DASH_CORE_WIDTH + 0.5 - dist));
+            const glow = Math.exp(-(dist * dist) / (2 * (DASH_GLOW_WIDTH / 2.5) ** 2));
+            line += Math.min(1, core + glow * 0.6) / 4;
+        }
+        const [r, g, b] = Gradient((x + y) / (2 * SIZE) * 2);
+        const white = Math.max(0, line - 0.85) / 0.15 * 0.6;
+        const i = y * SIZE + x;
+        dashColor[i * 3] = Math.round(r + (255 - r) * white);
+        dashColor[i * 3 + 1] = Math.round(g + (255 - g) * white);
+        dashColor[i * 3 + 2] = Math.round(b + (255 - b) * white);
+        dashTrans[i] = Math.round(255 * (GLASS_ALPHA + (1 - GLASS_ALPHA) * line));
+        dashIllum[i] = Math.round(255 * Math.max(0.15, line));
+    }
+}
+WriteSet(DASH_NAME, SIZE, SIZE, dashColor, dashTrans, dashIllum);
 
 // --- holo_portal: disc filling the ring's hole (materials/melon_racer/holo_portal.vmat) ---
 //
@@ -168,7 +234,4 @@ for (let x = 0; x < PORTAL_WIDTH; x++) {
         portalIllum[i] = Math.round(255 * (PORTAL_ILLUM[0] + (PORTAL_ILLUM[1] - PORTAL_ILLUM[0]) * k));
     }
 }
-writeFileSync(new URL(`${PORTAL_NAME}_color.png`, OUT_DIR), WritePng(PORTAL_WIDTH, PORTAL_HEIGHT, 3, portalColor));
-writeFileSync(new URL(`${PORTAL_NAME}_trans.png`, OUT_DIR), WritePng(PORTAL_WIDTH, PORTAL_HEIGHT, 1, portalTrans));
-writeFileSync(new URL(`${PORTAL_NAME}_illum.png`, OUT_DIR), WritePng(PORTAL_WIDTH, PORTAL_HEIGHT, 1, portalIllum));
-console.log(`wrote ${PORTAL_NAME}_{color,trans,illum}.png (${PORTAL_WIDTH}x${PORTAL_HEIGHT})`);
+WriteSet(PORTAL_NAME, PORTAL_WIDTH, PORTAL_HEIGHT, portalColor, portalTrans, portalIllum);

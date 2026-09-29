@@ -4,6 +4,7 @@ import { karts, moderatorSlot, SetModeratorSlot } from "./kart-registry.js";
 import { ApplyCameraFollow } from "./camera/index.js";
 import { FacePlayerView, GetIntroSpawnPoint } from "./spawn-points.js";
 import { GetSpeedHud } from "./hud.js";
+import { ShowMelonPaint } from "./melon-look.js";
 import {
     MELON_TEMPLATE_NAME,
     PAWN_DRIFT_TOLERANCE,
@@ -128,6 +129,7 @@ function NewKartRecord(pawn, melon, spawnPoint) {
         hubModalOpen: false,
         jumpDebug: false,
         predictionLine: false,
+        melonGlow: true,
         pawnAnchor: pawn.GetAbsOrigin(),
         lastKnownPosition: undefined,
         lastKnownAngles: undefined,
@@ -147,6 +149,7 @@ function CreateKart(pawn, slot, spawnPoint) {
     }
     FacePlayerView(pawn, spawnPoint.angles.yaw);
     const kart = NewKartRecord(pawn, melon, spawnPoint);
+    ShowMelonPaint(kart);
     karts.set(slot, kart);
     if (moderatorSlot === undefined) {
         SetModeratorSlot(slot);

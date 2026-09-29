@@ -117,6 +117,12 @@ templates exist and are wired up, and that no other `melon_break_*`
 template creeps in (the `npm test` failure names whatever's
 missing). There's no break sound yet.
 
+**Kill triggers:** a `trigger_multiple` (filtered to `prop_physics`) whose
+`OnStartTouch` fires `RunScriptInput` `melon_break` breaks the touching
+melon at once, whatever its health — the same break as above (effects at
+the spot, respawn at the last checkpoint). For lava, spikes, a drop the
+fall reset shouldn't forgive, … Broken or race-locked melons ignore it.
+
 Tune via `IMPACT_DAMAGE_THRESHOLD` (units/sec of sudden velocity change
 before damage starts) and `IMPACT_DAMAGE_SCALE` (health lost per unit/sec
 beyond that).
@@ -638,6 +644,18 @@ to the hub, only overwritten by touching another paint trigger. A freshly
 spawned melon (first join, or after a respawn where the old one was
 invalid) starts unpainted (the model's default color).
 
+Every whole melon also has an **outline glow** in its paint color — green
+(`MELON_GLOW_UNPAINTED_COLOR`) until it's first painted (the engine's
+`Glow()`, like CS2's teammate outline),
+switched off while it's broken so no outline floats at the crash site.
+Each player switches it on/off for **their own melon** in the user menu's
+"GLOW" section (below "COLOR"; `kart.melonGlow`, on by default). Everyone
+sees a melon's glow the same way — the engine's `Glow()` isn't per viewer,
+and the only per-viewer lever (the prop's "Glow Team") was ruled out: teams
+stay out of it (decided).
+`MELON_GLOW_ENABLED` (`constants/paint.js`) turns it off map-wide; applied
+by `melon-look.js`.
+
 ## Teleporters (implemented)
 
 Generic, same name-carries-the-config convention as paint triggers — adding
@@ -715,7 +733,9 @@ trigger's name, same convention as heal/lift zones:
 `camera_zone_<distance>_<height>` (units further back / higher up than the
 normal chase camera, `CAMERA_DISTANCE`/`CAMERA_HEIGHT`; negative = closer / lower; e.g.
 `camera_zone_250_40`, `camera_zone_-30_0`), with a `camera_zone_noclip_…`
-variant that stops walls pulling the camera in while zoomed. Any other
+variant that stops walls pulling the camera in while zoomed, and a
+`camera_zone_front_<ahead>_<height>` variant that puts the camera *in
+front of* the melon, e.g. just above the ground (`camera_zone_front_40_0`). Any other
 name uses `CAMERA_ZONE_EXTRA_*` (`constants/camera.js`). The camera eases
 over `CAMERA_ZONE_EASE_SECONDS` in and back out, never closer than
 `CAMERA_ZONE_MIN_DISTANCE`; overlapping camera zones don't stack (last

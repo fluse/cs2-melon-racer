@@ -18,6 +18,7 @@ const SCRIPT_INPUTS = [
     "hub_teleport",
     "melon_paint",
     "melon_teleport",
+    "melon_break",
     "heal_enter",
     "heal_leave",
     "lift_enter",

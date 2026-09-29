@@ -598,6 +598,12 @@ const START_TRIGGER_NAME_PATTERN = /^track_start_(\d+)_cp(\d+)_laps(\d+)$/;
 // track_start_* in GetTrackConfig().
 const PAINT_TRIGGER_NAME_PATTERN = /^paint_trigger_(\d+)_(\d+)_(\d+)$/;
 
+// Outline glow (the engine's Glow(), like CS2's teammate outline) around
+// every whole melon, in its paint color — and in this green while it hasn't
+// been painted yet — see melon-look.js.
+const MELON_GLOW_ENABLED = true;
+const MELON_GLOW_UNPAINTED_COLOR = { r: 60, g: 255, b: 60, a: 255 };
+
 // Color swatches offered by the user menu's color picker (see the
 // "usermenu_color_<key>" buttonId handling in index.js's OnCustomHudClicked)
 // — a fixed palette rather than a full picker since panorama's
@@ -718,15 +724,26 @@ const LIFT_CAMERA_EASE_SECONDS = 0.6; // seconds to zoom fully out (or back in)
 //   camera_zone_<distance>_<height>          e.g. camera_zone_250_40 (out), camera_zone_-30_0 (in)
 //   camera_zone_<distance>                   height 0
 //   camera_zone_noclip_<distance>_<height>   same, but the camera isn't pulled in at walls
+//   camera_zone_front_<ahead>_<height>       camera IN FRONT of the melon: <ahead> units ahead,
+//                                            <height> units above the melon's center (default
+//                                            CAMERA_ZONE_FRONT_HEIGHT) — e.g. camera_zone_front_40_0,
+//                                            a low view just above the ground. Looks the way the
+//                                            player looks (forward), so the melon itself is behind it.
+//                                            Combines with noclip: camera_zone_noclip_front_40_0.
 // Any other name uses CAMERA_ZONE_EXTRA_DISTANCE/_HEIGHT. Overlapping zones:
 // the one entered last counts. Adds up with the lift zoom above.
-const CAMERA_ZONE_NAME_PATTERN = /^camera_zone_(noclip_)?(-?\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?$/;
+const CAMERA_ZONE_NAME_PATTERN = /^camera_zone_(noclip_)?(front_)?(-?\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?$/;
 const CAMERA_ZONE_EXTRA_DISTANCE = 150; // units further back, for a zone without values in its name
 const CAMERA_ZONE_EXTRA_HEIGHT = 0; // units higher up, same
 const CAMERA_ZONE_EASE_SECONDS = 0.6; // seconds for a whole zoom in or out (also between two zones)
 // Zooming in never brings the camera closer than this behind the melon
-// (a negative distance past CAMERA_DISTANCE would put it in front).
-const CAMERA_ZONE_MIN_DISTANCE = 20;
+// (a negative distance past CAMERA_DISTANCE would put it in front) — only
+// camera_zone_front_… zones may go past it.
+const CAMERA_ZONE_MIN_DISTANCE = 0;
+// A front zone without a height in its name: units above the melon's center
+// (which sits ~7 units above the floor), so 0 = just above the ground.
+// Negative: lower still — below about -5 the camera ends up in the floor.
+const CAMERA_ZONE_FRONT_HEIGHT = 0;
 
 // HUD entity and the speedometer/jump/health bars in speedometer.xml.
 
@@ -831,6 +848,8 @@ function TraceSphere(config) {
  *   jumpDebug?: boolean, // this player's jump debug view is on (user menu toggle) — see physics/jump-debug.js
  *   contactDebug?: import("./physics/jump-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
+ *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see melon-look.js
+ *   melonGlow?: boolean, // this player's melon has its outline glow (user menu toggle, on by default) — see melon-look.js
  *   predictionLine?: boolean, // this player's prediction line is on (user menu toggle, off by default) — see prediction.js
  *   predictionDots?: any[], // this kart's prediction-line dot entities, see prediction.js
  *   pendingBounce?: { time: number, impactSpeed: number, impactDir: { x: number, y: number, z: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number }, // damage not yet charged — waits out the jump window, see SettleWallBounceDamage
@@ -951,7 +970,11 @@ function LiftCameraOffset(base, blend) {
 // Node (see test/camera-zone.test.mjs). camera/zone-zoom.js applies the
 // resulting offset.
 
-/** @typedef {{ distance: number, height: number, clip: boolean }} CameraZone what a zone adds to the chase camera */
+/**
+ * @typedef {{ distance: number, height: number, clip: boolean, front: boolean }} CameraZone
+ * what a zone adds to the chase camera; `front` = it may put the camera in
+ * front of the melon (no CAMERA_ZONE_MIN_DISTANCE stop)
+ */
 
 /**
  * @typedef {{
@@ -961,7 +984,7 @@ function LiftCameraOffset(base, blend) {
  */
 
 /** Outside every camera zone: nothing added, walls pull the camera in as usual. @type {CameraZone} */
-const NO_CAMERA_ZONE = { distance: 0, height: 0, clip: true };
+const NO_CAMERA_ZONE = { distance: 0, height: 0, clip: true, front: false };
 
 /**
  * What a camera trigger adds, from its name (see CAMERA_ZONE_NAME_PATTERN),
@@ -971,9 +994,23 @@ const NO_CAMERA_ZONE = { distance: 0, height: 0, clip: true };
 function CameraZoneFromName(triggerName) {
     const match = CAMERA_ZONE_NAME_PATTERN.exec(triggerName.trim());
     if (!match) {
-        return { distance: CAMERA_ZONE_EXTRA_DISTANCE, height: CAMERA_ZONE_EXTRA_HEIGHT, clip: true };
+        return { distance: CAMERA_ZONE_EXTRA_DISTANCE, height: CAMERA_ZONE_EXTRA_HEIGHT, clip: true, front: false };
     }
-    return { distance: Number(match[2]), height: match[3] === undefined ? 0 : Number(match[3]), clip: !match[1] };
+    const clip = !match[1];
+    const value = Number(match[3]);
+    if (match[2]) {
+        // Front zone: the name gives the camera's spot (ahead of / above the
+        // melon's center), stored like any zone as what it adds to the normal
+        // offset, so easing in and out works the same.
+        const above = match[4] === undefined ? CAMERA_ZONE_FRONT_HEIGHT : Number(match[4]);
+        return {
+            distance: -(CAMERA_DISTANCE + value),
+            height: above - FOLLOW_OFFSET.z - CAMERA_HEIGHT,
+            clip,
+            front: true,
+        };
+    }
+    return { distance: value, height: match[4] === undefined ? 0 : Number(match[4]), clip, front: false };
 }
 
 /** How much the zone zoom adds right now (smoothstep-eased). @param {ZoneCameraState | undefined} state */
@@ -999,6 +1036,15 @@ function ZoneCameraClips(state) {
 }
 
 /**
+ * Whether the camera may go in front of the melon: while a front zone is on,
+ * including while easing away from one (the stop would make it jump).
+ * @param {ZoneCameraState | undefined} state
+ */
+function ZoneCameraFront(state) {
+    return !!state && (state.to.front || (state.from.front && state.t < 1));
+}
+
+/**
  * The zone zoom after `dt` more seconds, easing towards `target` (the zone
  * the melon is in, or NO_CAMERA_ZONE). A new target starts a fresh ease from
  * wherever the camera is now, so switching zones mid-ease doesn't jump.
@@ -1010,9 +1056,9 @@ function StepZoneCamera(state, target, dt) {
     const current = state ?? { from: NO_CAMERA_ZONE, to: NO_CAMERA_ZONE, t: 1 };
     let next = current;
     const to = current.to;
-    if (to.distance !== target.distance || to.height !== target.height || to.clip !== target.clip) {
+    if (to.distance !== target.distance || to.height !== target.height || to.clip !== target.clip || to.front !== target.front) {
         const extra = ZoneCameraExtra(current);
-        next = { from: { ...extra, clip: ZoneCameraClips(current) }, to: target, t: 0 };
+        next = { from: { ...extra, clip: ZoneCameraClips(current), front: ZoneCameraFront(current) }, to: target, t: 0 };
     }
     if (next.t < 1) {
         const step = CAMERA_ZONE_EASE_SECONDS > 0 ? Math.max(0, dt) / CAMERA_ZONE_EASE_SECONDS : 1;
@@ -1027,11 +1073,15 @@ function StepZoneCamera(state, target, dt) {
 
 /**
  * The chase camera offset with the zone zoom applied: x is forward (negative
- * = behind), z up. Zooming in stops CAMERA_ZONE_MIN_DISTANCE behind the melon.
+ * = behind), z up. Zooming in stops CAMERA_ZONE_MIN_DISTANCE behind the melon,
+ * except in a front zone (ZoneCameraFront).
  * @param {{ x: number, y: number, z: number }} base @param {ZoneCameraState | undefined} state
  */
 function ZoneCameraOffset(base, state) {
     const extra = ZoneCameraExtra(state);
+    if (ZoneCameraFront(state)) {
+        return { x: base.x - extra.distance, y: base.y, z: base.z + extra.height };
+    }
     return {
         x: Math.min(base.x - extra.distance, Math.max(base.x, -CAMERA_ZONE_MIN_DISTANCE)),
         y: base.y,
@@ -2463,6 +2513,48 @@ function DrawDebugPrediction(start, end, drawFirstLeg, outPoints, color, dt) {
     }
 }
 
+// How a kart's melon looks while it's whole: its paint color plus an outline
+// glow in that same color — green (MELON_GLOW_UNPAINTED_COLOR) until it's
+// first painted (kart.painted) — which each player can switch
+// off for their own melon in the user menu ("GLOW", kart.melonGlow). Every path that shows the
+// melon (spawn, respawn after a break, repaint) goes through ShowMelonPaint;
+// a break turns the glow off with HideMelonGlow — the melon is hidden then,
+// and an outline of it floating at the crash site would give that away.
+
+/** @param {import("./kart-registry.js").Kart} kart */
+function ShowMelonPaint(kart) {
+    kart.melon.SetColor(kart.paintColor);
+    if (IsMelonGlowOn(kart)) {
+        kart.melon.Glow(kart.painted ? kart.paintColor : MELON_GLOW_UNPAINTED_COLOR);
+    } else {
+        kart.melon.Unglow();
+    }
+}
+
+/**
+ * Whether this kart's melon glows: on by default, unless its player switched
+ * it off in the user menu (see UpdateMelonGlowHud in hud.js).
+ * @param {import("./kart-registry.js").Kart} kart
+ */
+function IsMelonGlowOn(kart) {
+    return MELON_GLOW_ENABLED && kart.melonGlow !== false;
+}
+
+/** Switches the glow on/off for this kart's melon. @param {import("./kart-registry.js").Kart} kart @param {boolean} on */
+function SetMelonGlow(kart, on) {
+    kart.melonGlow = on;
+    if (!kart.breaking) {
+        ShowMelonPaint(kart); // a broken melon gets it back on respawn
+    }
+}
+
+/** @param {import("./kart-registry.js").Kart} kart */
+function HideMelonGlow(kart) {
+    if (kart.melon.IsValid()) {
+        kart.melon.Unglow();
+    }
+}
+
 // Pure health-bar math — no cs_script import, so it's unit-testable in
 // Node (see test/health.test.mjs). hud.js turns the result into HUD classes.
 
@@ -2765,10 +2857,25 @@ function SetUserMenuOpen(slot, kart, open) {
     if (open) {
         // Refreshed on every open: a layout or script reload in tools mode
         // wipes what was set when the kart spawned.
+        UpdateMelonGlowHud(slot, kart);
         UpdatePredictionHud(slot, kart);
         UpdateJumpDebugHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
+}
+
+/**
+ * The user menu's glow toggle button: its ON/OFF text and highlight.
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
+function UpdateMelonGlowHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const on = IsMelonGlowOn(kart);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_glow_button", "glow_state", on ? "ON" : "OFF");
+    hud.SetHasClassForPlayer(slot, "usermenu_glow_button", "ToggleOn", on);
 }
 
 /**
@@ -2923,6 +3030,7 @@ function NewKartRecord(pawn, melon, spawnPoint) {
         hubModalOpen: false,
         jumpDebug: false,
         predictionLine: false,
+        melonGlow: true,
         pawnAnchor: pawn.GetAbsOrigin(),
         lastKnownPosition: undefined,
         lastKnownAngles: undefined,
@@ -2942,6 +3050,7 @@ function CreateKart(pawn, slot, spawnPoint) {
     }
     FacePlayerView(pawn, spawnPoint.angles.yaw);
     const kart = NewKartRecord(pawn, melon, spawnPoint);
+    ShowMelonPaint(kart);
     karts.set(slot, kart);
     if (moderatorSlot === undefined) {
         SetModeratorSlot(slot);
@@ -3683,8 +3792,9 @@ function TeleportKartTo(kart, position, angles, velocity) {
  */
 function SetKartPaintColor(kart, color) {
     kart.paintColor = color;
+    kart.painted = true; // its glow takes this color from now on, see melon-look.js
     if (!kart.breaking) {
-        kart.melon.SetColor(color);
+        ShowMelonPaint(kart);
     }
 }
 
@@ -3727,7 +3837,7 @@ function ScheduleRespawnAfterBreak(slot, kart) {
             RespawnDestroyedMelon(slot, kart);
             return;
         }
-        kart.melon.SetColor(kart.paintColor);
+        ShowMelonPaint(kart);
         // Back from the pulled-out break camera (ApplyBreakCameraZoom) to the
         // player's normal chase offset.
         ApplyCameraFollow(kart);
@@ -3755,7 +3865,7 @@ function RespawnDestroyedMelon(slot, kart) {
     }
     kart.melon = melon;
     FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
-    kart.melon.SetColor(kart.paintColor);
+    ShowMelonPaint(kart);
     RestoreFullHealth(kart);
     kart.lastVelocity = undefined;
     kart.settled = false;
@@ -3794,6 +3904,7 @@ function BreakMelon(slot, kart, impactDir, impactSpeed) {
     // ScheduleRespawnAfterBreak.
     const particlesSpawned = SpawnBreakParticles(breakPosition, breakAngles, kart.paintColor);
     kart.melon.SetColor(particlesSpawned ? { r: 255, g: 255, b: 255, a: 0 } : BREAK_TINT_FALLBACK);
+    HideMelonGlow(kart);
 
     ScheduleRespawnAfterBreak(slot, kart);
 }
@@ -5331,6 +5442,27 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
     Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"`);
 });
 
+// Kill trigger: any trigger_multiple (filtered to prop_physics) whose
+// OnStartTouch calls RunScriptInput "melon_break" breaks the touching melon
+// on the spot — same break as running out of health (effects at the crash
+// site, respawn at the last checkpoint after BREAK_RESPAWN_DELAY).
+Instance.OnScriptInput("melon_break", ({ activator }) => {
+    const kart = activator && FindKartByMelon(activator);
+    if (!kart) {
+        Debug("melon_break: activator wasn't a tracked melon, ignoring");
+        return;
+    }
+    if (kart.breaking || kart.locked) {
+        return; // already broken, or parked by the race flow (countdown, finished)
+    }
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot() ?? -1;
+    const velocity = kart.melon.GetAbsVelocity();
+    const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
+    kart.health = 0;
+    Debug(`melon_break: slot ${slot} broken by trigger`);
+    BreakMelon(slot, kart, speed > 0 ? velocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+});
+
 // Heal and lift zones (heal_enter/heal_leave, lift_enter/lift_leave).
 RegisterZoneInputs();
 RegisterAttackDebug();
@@ -5407,6 +5539,15 @@ Instance.OnCustomHudClicked((event) => {
         Debug(`usermenu_tutorial_button: slot ${slot} going to the tutorial (racing=${kart.racing}, phase=${phase})`);
         SetUserMenuOpen(slot, kart, false);
         SendKartToTutorial(kart);
+    } else if (event.buttonId === "usermenu_glow_button") {
+        // Per player: only this player's own melon (everyone still sees
+        // whatever glow a melon has — the engine's Glow isn't per viewer).
+        const slot = event.player.GetPlayerSlot();
+        const kart = karts.get(slot);
+        if (kart) {
+            SetMelonGlow(kart, !IsMelonGlowOn(kart));
+            UpdateMelonGlowHud(slot, kart);
+        }
     } else if (event.buttonId === "usermenu_prediction_button") {
         // Per player: only this player's melon gets the line (drawn with
         // DebugLine in the default render mode, so tools mode only).

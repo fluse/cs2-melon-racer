@@ -10,6 +10,12 @@
 // track_start_* in GetTrackConfig().
 export const PAINT_TRIGGER_NAME_PATTERN = /^paint_trigger_(\d+)_(\d+)_(\d+)$/;
 
+// Outline glow (the engine's Glow(), like CS2's teammate outline) around
+// every whole melon, in its paint color — and in this green while it hasn't
+// been painted yet — see melon-look.js.
+export const MELON_GLOW_ENABLED = true;
+export const MELON_GLOW_UNPAINTED_COLOR = { r: 60, g: 255, b: 60, a: 255 };
+
 // Color swatches offered by the user menu's color picker (see the
 // "usermenu_color_<key>" buttonId handling in index.js's OnCustomHudClicked)
 // — a fixed palette rather than a full picker since panorama's

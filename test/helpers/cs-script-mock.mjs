@@ -41,6 +41,9 @@ export class Entity {
     Remove() { this.valid = false; }
     Kill() { this.valid = false; }
     SetColor(color) { this.color = clone(color); }
+    Glow(color) { this.glow = clone(color); }
+    Unglow() { this.glow = undefined; }
+    IsGlowing() { return this.glow !== undefined; }
     SetHealth(h) { this.health = h; }
     SetMaxHealth(h) { this.maxHealth = h; }
     GetHealth() { return this.health ?? 0; }
