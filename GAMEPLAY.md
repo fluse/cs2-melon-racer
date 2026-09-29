@@ -514,6 +514,26 @@ speed beyond what the script commanded last tick (`WithoutEnginePush`) —
 speed then only comes from driving (W, up to `MAX_SPEED` as always) and the
 paid boost.
 
+## Momentum — top speed that grows (implemented)
+
+Reaching the top speed again and again in quick succession raises that
+melon's own top speed by `MOMENTUM_STEP` (2 % of `MAX_SPEED`) per step, as
+long as it never drops below `MOMENTUM_MIN_SPEED_KMH` (30 km/h) in between —
+that ends the run and it's back to plain `MAX_SPEED`. "Reaching it again"
+means: the melon has fallen at least `MOMENTUM_REARM_DIP` below its current
+top speed (a curve, a bump, letting go of W) and accelerated back up to it;
+just holding top speed doesn't stack. A hit counts as a step only if the
+previous hit was at most `MOMENTUM_HIT_WINDOW` seconds ago — the first one
+(or one after a longer gap) only starts the chain. At most
+`MOMENTUM_MAX_STEPS` steps. **The attack boost has no effect on it**
+(decided): neither while boosting nor while the boosted speed cap decays
+back (same for a wall bounce's raised cap) does reaching the top speed
+count, and the run isn't broken either. Standing still, breaking and
+race-locking end the run. Speed earned by momentum isn't a boost: no
+`Boosted` HUD state, no boost trail. Constants: `constants/momentum.js`;
+rule: `logic/momentum.js`, applied in `physics/drive.js`
+(`test/momentum.test.mjs`).
+
 ## Jumping (implemented)
 
 - **Ground jump** needs real ground contact — **no cooldown**: touching
@@ -591,6 +611,23 @@ paid boost.
 - Tests: `test/contact.test.mjs` (rules) and `test/jump.test.mjs` (the real
   `UpdateKart` against the fake engine).
 
+## Jump pads (implemented)
+
+A `trigger_multiple` (filtered to `prop_physics`) with `OnStartTouch` →
+`RunScriptInput` `jump_pad_enter` and `OnEndTouch` → `jump_pad_leave`.
+**Jump must be pressed for the timing** (decided): pressing jump while on
+the pad — or up to `JUMP_PAD_BUFFER` before reaching it — launches the melon
+`JUMP_PAD_UP_SPEED` up and adds `JUMP_PAD_FORWARD_BOOST` horizontal speed
+along its direction of travel (the speed cap rises like after a wall bounce
+and decays at `BOOST_DECAY`); driving over it without pressing does nothing.
+Per pad the name can set both: `jump_pad_<up>_<forward>`. **No damage**
+(decided): on the pad and from the launch until `JUMP_PAD_LANDING_GRACE`
+after landing, impacts and wall hits cost nothing (`DamageKart`); the attack
+boost's cost and `melon_break` still apply. Constants:
+`constants/jump-pad.js`; rules: `logic/jump-pad.js`, applied by
+`physics/jump-pad.js` (`test/jump-pad.test.mjs`). Details for mappers:
+MAPPING_API.md 4.9.
+
 ## Spawn points (implemented)
 
 All spawn-entity lookups live in `spawn-points.js`; a melon always appears
@@ -616,6 +653,12 @@ long fall lands hard enough for the engine to destroy the melon on impact.
   `intro_spawn` (or `hub_spawn` without one) the same way its "Return to
   hub" button works: it leaves a running heat, clears track progress, and
   makes that spot the kart's respawn point.
+- **Full health on every spawn** (decided): wherever a melon is sent on
+  purpose — the user menu's hub, tutorial and respawn buttons,
+  `hub_teleport`, a heat's start and its end, a checkpoint respawn after a
+  break — it arrives with `MELON_MAX_HEALTH`. Only generic teleporters
+  (`melon_teleport`) keep the damage (see "Teleporters").
+  `test/spawn-health.test.mjs`.
 - A later `OnPlayerReset` for a player who already has a kart never spawns
   or moves a melon — it only re-freezes the pawn and re-attaches the camera.
   A lost melon is brought back solely by the break/respawn logic, at the
@@ -735,7 +778,11 @@ normal chase camera, `CAMERA_DISTANCE`/`CAMERA_HEIGHT`; negative = closer / lowe
 `camera_zone_250_40`, `camera_zone_-30_0`), with a `camera_zone_noclip_…`
 variant that stops walls pulling the camera in while zoomed, and a
 `camera_zone_front_<ahead>_<height>` variant that puts the camera *in
-front of* the melon, e.g. just above the ground (`camera_zone_front_40_0`). Any other
+front of* the melon, e.g. just above the ground (`camera_zone_front_40_0`), and a
+**close-up** `camera_zone_close[_<behind>_<height>]` for dramatic passages:
+the camera right up behind the melon (default `CAMERA_CLOSEUP_DISTANCE`/`_HEIGHT`,
+16/4 units from its center), zooming in and out slowly
+(`CAMERA_CLOSEUP_EASE_SECONDS`). Any other
 name uses `CAMERA_ZONE_EXTRA_*` (`constants/camera.js`). The camera eases
 over `CAMERA_ZONE_EASE_SECONDS` in and back out, never closer than
 `CAMERA_ZONE_MIN_DISTANCE`; overlapping camera zones don't stack (last

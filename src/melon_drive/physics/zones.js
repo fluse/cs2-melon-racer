@@ -1,6 +1,7 @@
 // Trigger zones the melon can be inside — heal zones (heal_enter/heal_leave,
 // read by ../heal/), lift zones (lift_enter/lift_leave, constants/lift.js) and
-// camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in constants/camera.js):
+// camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in constants/camera.js)
+// and jump pads (jump_pad_enter/jump_pad_leave, constants/jump-pad.js):
 // entering/leaving them (registered in ../zone-inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.
 // Each kind is a Map on the kart: trigger entity -> its value (heal rate in
@@ -8,7 +9,7 @@
 // tracked separately.
 import { WallRules } from "../logic/lift.js";
 
-/** @typedef {"healZones" | "liftZones" | "cameraZones"} ZoneKind */
+/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads"} ZoneKind */
 
 /**
  * The melon entered a zone trigger of this kind, worth `value`.
@@ -36,6 +37,7 @@ export function LeaveZones(kart) {
     kart.healZones?.clear();
     kart.liftZones?.clear();
     kart.cameraZones?.clear();
+    kart.jumpPads?.clear();
 }
 
 /**
@@ -68,13 +70,33 @@ export function CurrentWallRules(kart) {
 }
 
 /**
+ * The launch of the jump pad the melon entered last (of those it's still
+ * on), or undefined if it's on none.
+ * @param {import("../kart-registry.js").Kart} kart
+ * @returns {import("../logic/jump-pad.js").JumpPad | undefined}
+ */
+export function CurrentJumpPad(kart) {
+    return LatestZone(kart, "jumpPads");
+}
+
+/**
  * The zoom of the camera zone the melon entered last (of those it's still
  * inside), or undefined if none — overlapping camera zones don't add up.
  * @param {import("../kart-registry.js").Kart} kart
  * @returns {import("../logic/camera-zone.js").CameraZone | undefined}
  */
 export function CurrentCameraZone(kart) {
-    const zones = kart.cameraZones;
+    return LatestZone(kart, "cameraZones");
+}
+
+/**
+ * The value of the zone of this kind the melon entered last (of those it's
+ * still inside), or undefined if none. Zone entities that no longer exist
+ * are dropped.
+ * @param {import("../kart-registry.js").Kart} kart @param {ZoneKind} kind
+ */
+function LatestZone(kart, kind) {
+    const zones = kart[kind];
     let latest = undefined;
     for (const [zone, value] of zones ?? []) {
         if (!zone.IsValid()) {

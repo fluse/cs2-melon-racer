@@ -42,9 +42,16 @@ export const LIFT_CAMERA_EASE_SECONDS = 0.6; // seconds to zoom fully out (or ba
 //                                            a low view just above the ground. Looks the way the
 //                                            player looks (forward), so the melon itself is behind it.
 //                                            Combines with noclip: camera_zone_noclip_front_40_0.
+//   camera_zone_close[_<behind>[_<height>]]  CLOSE-UP for dramatic passages: camera right behind the
+//                                            melon, <behind> units behind and <height> units above its
+//                                            center (defaults CAMERA_CLOSEUP_DISTANCE/_HEIGHT), eased
+//                                            in and out slowly (CAMERA_CLOSEUP_EASE_SECONDS) — e.g.
+//                                            camera_zone_close, camera_zone_close_12_2.
+//                                            Combines with noclip: camera_zone_noclip_close_15_3.
 // Any other name uses CAMERA_ZONE_EXTRA_DISTANCE/_HEIGHT. Overlapping zones:
 // the one entered last counts. Adds up with the lift zoom above.
 export const CAMERA_ZONE_NAME_PATTERN = /^camera_zone_(noclip_)?(front_)?(-?\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?$/;
+export const CAMERA_CLOSEUP_NAME_PATTERN = /^camera_zone_(noclip_)?close(?:_(\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?)?$/;
 export const CAMERA_ZONE_EXTRA_DISTANCE = 150; // units further back, for a zone without values in its name
 export const CAMERA_ZONE_EXTRA_HEIGHT = 0; // units higher up, same
 export const CAMERA_ZONE_EASE_SECONDS = 0.6; // seconds for a whole zoom in or out (also between two zones)
@@ -56,3 +63,14 @@ export const CAMERA_ZONE_MIN_DISTANCE = 0;
 // (which sits ~7 units above the floor), so 0 = just above the ground.
 // Negative: lower still — below about -5 the camera ends up in the floor.
 export const CAMERA_ZONE_FRONT_HEIGHT = 0;
+// Close-up zones (camera_zone_close…) without values in their name: the
+// camera's spot behind / above the melon's center (the normal chase camera is
+// CAMERA_DISTANCE behind and FOLLOW_OFFSET.z + CAMERA_HEIGHT above it).
+// Lower CAMERA_CLOSEUP_DISTANCE: closer still — below the melon's own size
+//   (~10 units) the camera ends up inside it.
+export const CAMERA_CLOSEUP_DISTANCE = 16;
+export const CAMERA_CLOSEUP_HEIGHT = 4;
+// Seconds a close-up zone takes to zoom in (and back out after leaving) —
+// slower than CAMERA_ZONE_EASE_SECONDS, so it reads as a deliberate shot.
+// Higher: a slow, dramatic push-in. Lower: snaps in.
+export const CAMERA_CLOSEUP_EASE_SECONDS = 1.2;

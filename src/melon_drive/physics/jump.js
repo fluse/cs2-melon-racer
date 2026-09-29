@@ -6,7 +6,8 @@
 import { Debug } from "../debug.js";
 import { CanGroundJump, WallJumpBlockReason, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter } from "../logic/contact.js";
 import { JumpTimingFactor, JumpMultiplier } from "../logic/wall-bounce.js";
-import { JUMP_SPEED, MAX_SPEED, WALL_TIMING_SPAM_LOCKOUT } from "../constants/index.js";
+import { MomentumMaxSpeed } from "../logic/momentum.js";
+import { JUMP_SPEED, WALL_TIMING_SPAM_LOCKOUT } from "../constants/index.js";
 import { LogJumpPress, LogWallJumpVerdict } from "./jump-debug.js";
 
 /**
@@ -107,7 +108,7 @@ function UpgradePendingBounce(kart, now, v) {
     if (kart.lastBounceInfo) {
         kart.lastBounceInfo.jumpFactor = lateFactor;
     }
-    kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, after);
+    kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), after);
 }
 
 /**

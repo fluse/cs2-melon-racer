@@ -105,6 +105,8 @@ follows the general conventions in section 1.
 | `lift_leave` | the same lift trigger, **`OnEndTouch`** | — | Back to the normal bounce kick. |
 | `camera_enter` | any camera trigger | name (optional zoom) | Chase camera zooms in or out. See 4.8. |
 | `camera_leave` | the same camera trigger, **`OnEndTouch`** | — | Camera eases back to normal. |
+| `jump_pad_enter` | any jump pad trigger | name (optional launch) | Jump pressed on it launches the melon high and far, no damage. See 4.9. |
+| `jump_pad_leave` | the same jump pad trigger, **`OnEndTouch`** | — | Off the pad. |
 
 Anything else is ignored by the script, and `npm test` fails on it.
 
@@ -286,6 +288,9 @@ name:    anything, or camera_zone_<distance>_<height>   e.g. camera_zone_250_40 
                       camera_zone_noclip_<distance>_<height>
                       camera_zone_front_<ahead>_<height>  e.g. camera_zone_front_40_0 (in front, low)
                       camera_zone_noclip_front_<ahead>_<height>
+                      camera_zone_close                 close-up right behind the melon (defaults)
+                      camera_zone_close_<behind>_<height>  e.g. camera_zone_close_12_2
+                      camera_zone_noclip_close_<behind>_<height>
 outputs: OnStartTouch → melon_drive_script → RunScriptInput → camera_enter
          OnEndTouch   → melon_drive_script → RunScriptInput → camera_leave
 ```
@@ -298,7 +303,17 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → camera_enter
   `CAMERA_ZONE_EXTRA_HEIGHT` (0).
 - The camera eases there over `CAMERA_ZONE_EASE_SECONDS` (0.6 s) and back
   the same way after leaving. Zooming in never gets closer than
-  `CAMERA_ZONE_MIN_DISTANCE` (20) behind the melon — except in a front zone.
+  `CAMERA_ZONE_MIN_DISTANCE` (0) behind the melon — except in a front or
+  close-up zone.
+- **Close-up zones** (`camera_zone_close…`) — for dramatic passages: the
+  camera moves right up behind the melon, `<behind>` units behind and
+  `<height>` units above its center (without values `CAMERA_CLOSEUP_DISTANCE`
+  16 / `CAMERA_CLOSEUP_HEIGHT` 4; `<height>` may be negative, `<behind>` not).
+  Like front zones these are the camera's spot, not added to the normal
+  offset. It zooms in — and back out after leaving — slowly, over
+  `CAMERA_CLOSEUP_EASE_SECONDS` (1.2 s) instead of 0.6 s. Below ~10 units
+  behind the camera ends up inside the melon. Parsed from a name matching
+  `^camera_zone_(noclip_)?close(?:_(\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?)?$`.
 - **Front zones** (`camera_zone_front_<ahead>_<height>`): the camera moves
   *in front of* the melon, `<ahead>` units ahead of and `<height>` units
   above its center (the center is ~7 units over the floor, so `0` = just
@@ -315,6 +330,35 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → camera_enter
   zone's own zoom (4.7) does add on top.
 - Both outputs are required; teleports and respawns keep the melon in its
   zones, like heal zones — respawning inside a camera zone keeps its zoom.
+
+### 4.9 Jump pads
+
+Pads that launch a melon much higher and further than a normal jump — but
+only if its player presses jump on it: the timing is the skill.
+
+```
+name:    anything, or jump_pad_<up>_<forward>   e.g. jump_pad_1000_400
+                      jump_pad_<up>             e.g. jump_pad_1000 (default forward boost)
+outputs: OnStartTouch → melon_drive_script → RunScriptInput → jump_pad_enter
+         OnEndTouch   → melon_drive_script → RunScriptInput → jump_pad_leave
+```
+
+- `<up>`: upward launch speed (u/s), `<forward>`: horizontal speed added
+  along the way the melon is going (along the look direction if it's barely
+  moving). Parsed from a name matching
+  `^jump_pad_(\d+(?:\.\d+)?)(?:_(\d+(?:\.\d+)?))?$`, any other name uses
+  `JUMP_PAD_UP_SPEED` (850) / `JUMP_PAD_FORWARD_BOOST` (250). Height ≈
+  up² / 1600 units: 850 → ~450, 1000 → ~625 (a normal jump reaches ~85).
+- Launches when jump is pressed while the melon is on the pad, or up to
+  `JUMP_PAD_BUFFER` (0.2 s) before it gets there (jumping onto it). Driving
+  over it without pressing jump does nothing. One launch per
+  `JUMP_PAD_COOLDOWN` (0.5 s).
+- **No damage** on the pad and from the launch until
+  `JUMP_PAD_LANDING_GRACE` (0.3 s) after landing — landing, crashes and wall
+  hits are free (at most `JUMP_PAD_MAX_PROTECTED_SECONDS`, 6 s). The attack
+  boost still costs health, `melon_break` triggers still break.
+- Make the trigger a flat volume on top of the pad, tall enough (~32 units)
+  that a melon rolling over it is inside. Both outputs are required.
 
 ## 5. Limits
 

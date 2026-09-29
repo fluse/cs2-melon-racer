@@ -8,6 +8,7 @@ import { IsPredictionOn } from "./prediction.js";
 import { IsMelonGlowOn } from "./melon-look.js";
 import { GetBounceRating } from "./logic/wall-bounce.js";
 import { HealthBarState } from "./logic/health.js";
+import { MomentumMaxSpeed } from "./logic/momentum.js";
 import { GetTrackConfig } from "./track-config.js";
 import { IsModerator } from "./kart-registry.js";
 import {
@@ -15,7 +16,6 @@ import {
     UNITS_TO_KMH,
     JUMP_BAR_SEGMENTS,
     HEALTH_BAR_SEGMENTS,
-    MAX_SPEED,
     PERFECT_BOUNCE_FLASH_SECONDS,
     PERFECT_BOUNCE_ANGLE_FACTOR,
     BOUNCE_HUD_SECONDS,
@@ -47,10 +47,10 @@ export function UpdateSpeedHud(slot, kart) {
     const horizSpeed = Math.hypot(vel.x, vel.y);
     const kmh = Math.round(horizSpeed * UNITS_TO_KMH);
     hud.SetDialogVariableStringForPlayer(slot, "speed_panel", "speed", String(kmh));
-    // Wall-bounce feedback: Boosted while a bounce has the melon above the
-    // normal top speed, PerfectBounce as a short flash after a bounce that
+    // Wall-bounce feedback: Boosted while a bounce has the melon above its
+    // normal top speed (momentum included — that's earned, not a boost), PerfectBounce as a short flash after a bounce that
     // was clean enough to cost (almost) no health.
-    hud.SetHasClassForPlayer(slot, "speed_panel", "Boosted", horizSpeed > MAX_SPEED + 1);
+    hud.SetHasClassForPlayer(slot, "speed_panel", "Boosted", horizSpeed > MomentumMaxSpeed(kart.momentum) + 1);
     const info = kart.lastBounceInfo;
     const perfectFlash =
         info !== undefined &&

@@ -1,4 +1,4 @@
-// Script inputs of the zone triggers — heal, lift and camera zones. All work
+// Script inputs of the zone triggers — heal, lift and camera zones, jump pads. All work
 // the same way: OnStartTouch -> "<kind>_enter", OnEndTouch -> "<kind>_leave",
 // and the touched trigger's own name may carry its value (heal_zone_<rate>,
 // lift_zone_<speed>, camera_zone_<distance>_<height>). What the zones do is in
@@ -9,6 +9,7 @@ import { FindKartByMelon } from "./kart-registry.js";
 import { HealZoneRate, PlayHealEffect } from "./heal/index.js";
 import { LiftZoneUpSpeed } from "./logic/lift.js";
 import { CameraZoneFromName } from "./logic/camera-zone.js";
+import { JumpPadFromName } from "./logic/jump-pad.js";
 import { EnterZone, LeaveZone } from "./physics/index.js";
 
 /**
@@ -45,4 +46,6 @@ export function RegisterZoneInputs() {
     RegisterZone("lift_enter", "lift_leave", "liftZones", LiftZoneUpSpeed, "u/s up per bounce");
     // Camera zones — see CAMERA_ZONE_* in constants/camera.js. Read by the zone camera (camera/zone-zoom.js).
     RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
+    // Jump pads — see constants/jump-pad.js. Read by physics/jump-pad.js (launch, no damage).
+    RegisterZone("jump_pad_enter", "jump_pad_leave", "jumpPads", JumpPadFromName, "up/forward u/s");
 }

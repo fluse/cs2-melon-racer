@@ -6,11 +6,13 @@
 
 export * from "./driving.js";
 export * from "./jump.js";
+export * from "./jump-pad.js";
 export * from "./health.js";
 export * from "../heal/constants.js"; // heal zones live with the rest of healing in heal/
 export * from "./wall-bounce.js";
 export * from "./boost-trail.js";
 export * from "./attack-boost.js";
+export * from "./momentum.js";
 export * from "./lift.js";
 export * from "./prediction.js";
 export * from "./breaking.js";

@@ -16,8 +16,9 @@ import { BOOST_TRAIL_START_MARGIN, BOOST_TRAIL_STOP_MARGIN } from "../constants/
  * @param {boolean} blocked
  * @param {boolean} [attackBoosting] the attack boost is on this tick
  * @param {boolean} [perfectBounceBoost] the speed above MAX_SPEED is from a PERFECT bounce
+ * @param {number} [normalMax] the melon's own top speed the margins count from — above MAX_SPEED with momentum (logic/momentum.js)
  */
-export function ShouldShowBoostTrail(showing, horizSpeed, blocked, attackBoosting = false, perfectBounceBoost = false) {
+export function ShouldShowBoostTrail(showing, horizSpeed, blocked, attackBoosting = false, perfectBounceBoost = false, normalMax = MAX_SPEED) {
     if (blocked) {
         return false;
     }
@@ -28,5 +29,5 @@ export function ShouldShowBoostTrail(showing, horizSpeed, blocked, attackBoostin
         return false;
     }
     const margin = showing ? BOOST_TRAIL_STOP_MARGIN : BOOST_TRAIL_START_MARGIN;
-    return horizSpeed > MAX_SPEED + margin;
+    return horizSpeed > normalMax + margin;
 }

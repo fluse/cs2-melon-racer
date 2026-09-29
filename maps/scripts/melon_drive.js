@@ -121,6 +121,40 @@ const WALL_JUMP_UP_SPEED = 240; // units/sec upward — well below the ground ju
 const WALL_JUMP_PUSH_SPEED = 160; // units/sec at least away from the wall (more if already moving away faster) (was 250)
 const WALL_JUMP_SAME_WALL_DOT = 0.7; // normals closer than this (dot product, ~45°) count as the same wall
 
+// Jump pads: a trigger_multiple (filtered to prop_physics) with
+// OnStartTouch -> RunScriptInput "jump_pad_enter" and OnEndTouch ->
+// "jump_pad_leave". Pressing jump while the melon is on it (or just before it
+// gets there, JUMP_PAD_BUFFER) launches it much higher and further than a
+// normal jump — no press, no launch: the timing is the skill. From the pad
+// until shortly after landing the melon takes no damage (landing, crashes,
+// wall hits). Rule: ../logic/jump-pad.js, applied by ../physics/jump-pad.js.
+
+// Per pad, the name can set both values: "jump_pad_<up>_<forward>" (e.g.
+// "jump_pad_1000_400"), "jump_pad_<up>" (forward boost default); any other
+// name uses the defaults below.
+const JUMP_PAD_NAME_PATTERN = /^jump_pad_(\d+(?:\.\d+)?)(?:_(\d+(?:\.\d+)?))?$/;
+// Upward speed of the launch (units/sec). Height ≈ speed² / 1600 (gravity
+// 800): 850 -> ~450 units, 1000 -> ~625; a normal jump (JUMP_SPEED 370) is ~85.
+const JUMP_PAD_UP_SPEED = 850;
+// Horizontal speed added along the direction the melon is going (units/sec).
+// Lifts the speed cap like a wall-bounce boost, then decays at BOOST_DECAY.
+// Higher: much further. 0: only higher, not further.
+const JUMP_PAD_FORWARD_BOOST = 250;
+// Slower than this, the melon has no clear direction of its own — the boost
+// then goes along the look direction.
+const JUMP_PAD_MIN_DIRECTION_SPEED = 50; // units/sec
+// A jump pressed up to this long before touching the pad still launches on
+// the touch (e.g. jumping onto it).
+// Higher: more forgiving timing. 0: only a press while on the pad counts.
+const JUMP_PAD_BUFFER = 0.2; // seconds
+// No second launch from the same press/pad within this long.
+const JUMP_PAD_COOLDOWN = 0.5; // seconds
+// No damage from the launch until this long after touching ground again
+// (the landing often spreads over a few ticks and rolls)...
+const JUMP_PAD_LANDING_GRACE = 0.3; // seconds
+// ...and at most this long after the launch, even without landing.
+const JUMP_PAD_MAX_PROTECTED_SECONDS = 6;
+
 // Melon health and impact damage from landings/crashes (wall hits have their own rules in wall-bounce.js).
 
 // Impact damage: every tick we compare the velocity we commanded last tick
@@ -391,6 +425,57 @@ const ATTACK_BOOST_HEALTH_PER_SECOND = 20; // was 10
 //   downhill roll's speed-up for longer after letting go.
 // Lower (0): only while held — a push landing just after release gets through.
 const ATTACK_PUSH_GUARD_SECONDS = 0.3;
+
+// HUD entity and the speedometer/jump/health bars in speedometer.xml.
+
+// Name of the custom_hud_layout entity (place one in Hammer pointing at
+// panorama/layout/custom_game/speedometer.vxml) that shows the speedometer.
+const SPEED_HUD_ENTITY_NAME = "speed_hud";
+// Hammer units/sec -> km/h (1 unit = 1 inch: units/sec * 0.0254 * 3.6).
+const UNITS_TO_KMH = 0.0254 * 3.6;
+
+// Segmented wall-jump charge bar (kart.wallJumpCharge) — see JUMP_BAR_SEGMENTS panel ids
+// ("jump_seg_0" .. "jump_seg_{N-1}") in speedometer.xml.
+const JUMP_BAR_SEGMENTS = 10;
+
+// Segmented melon health bar — see HEALTH_BAR_SEGMENTS panel ids
+// ("health_seg_0" .. "health_seg_{N-1}") in speedometer.xml, filled up to
+// kart.health / MELON_MAX_HEALTH. Below these fractions the bar's fill color
+// shifts (green -> yellow -> red, see UpdateHealthHud/speedometer.css) to
+// warn that another hard impact will break the melon.
+const HEALTH_BAR_SEGMENTS = 20;
+const HEALTH_LOW_FRACTION = 0.6;
+const HEALTH_CRITICAL_FRACTION = 0.3;
+
+// Momentum: reaching the top speed again and again in quick succession
+// raises that melon's own top speed, step by step — as long as it never
+// drops below MOMENTUM_MIN_SPEED in between (that ends the "run" and resets
+// it to MAX_SPEED). The attack boost (and any other speed-cap boost, e.g. a
+// wall bounce's) neither counts as reaching the top speed nor breaks a run.
+// Rule: ../logic/momentum.js, applied in ../physics/drive.js.
+
+// Top speed gained per step, as a fraction of MAX_SPEED (0.02 = +2 %).
+// Higher: a few quick hits make the melon much faster.
+// Lower: momentum is barely noticeable.
+const MOMENTUM_STEP = 0.02;
+// Most steps a run can stack (10 × 2 % = up to MAX_SPEED × 1.2).
+// Higher / Infinity: long clean runs keep getting faster without limit.
+const MOMENTUM_MAX_STEPS = 10;
+// Reaching the top speed counts as a step only if the previous time it was
+// reached is at most this many seconds ago — the first time (or after a
+// longer gap) only starts the chain.
+// Higher: easier, even slow re-accelerations count.
+// Lower: only quick dip-and-recover driving builds momentum.
+const MOMENTUM_HIT_WINDOW = 2.5; // seconds
+// Having reached the top speed, the melon has to fall this fraction below it
+// before reaching it again counts as a new time (just holding top speed
+// doesn't stack).
+// Higher: a real slowdown (curve, bump) is needed between two hits.
+// Lower: tiny wobbles already count — easy to farm by tapping W.
+const MOMENTUM_REARM_DIP = 0.05;
+// Below this horizontal speed the run is over: back to plain MAX_SPEED.
+const MOMENTUM_MIN_SPEED_KMH = 30;
+const MOMENTUM_MIN_SPEED = MOMENTUM_MIN_SPEED_KMH / UNITS_TO_KMH; // units/sec (~328)
 
 // Lift zones: triggers where wall bounces and wall jumps are tuned for
 // climbing a shaft or a high wall by bouncing between its walls. What
@@ -730,9 +815,16 @@ const LIFT_CAMERA_EASE_SECONDS = 0.6; // seconds to zoom fully out (or back in)
 //                                            a low view just above the ground. Looks the way the
 //                                            player looks (forward), so the melon itself is behind it.
 //                                            Combines with noclip: camera_zone_noclip_front_40_0.
+//   camera_zone_close[_<behind>[_<height>]]  CLOSE-UP for dramatic passages: camera right behind the
+//                                            melon, <behind> units behind and <height> units above its
+//                                            center (defaults CAMERA_CLOSEUP_DISTANCE/_HEIGHT), eased
+//                                            in and out slowly (CAMERA_CLOSEUP_EASE_SECONDS) — e.g.
+//                                            camera_zone_close, camera_zone_close_12_2.
+//                                            Combines with noclip: camera_zone_noclip_close_15_3.
 // Any other name uses CAMERA_ZONE_EXTRA_DISTANCE/_HEIGHT. Overlapping zones:
 // the one entered last counts. Adds up with the lift zoom above.
 const CAMERA_ZONE_NAME_PATTERN = /^camera_zone_(noclip_)?(front_)?(-?\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?$/;
+const CAMERA_CLOSEUP_NAME_PATTERN = /^camera_zone_(noclip_)?close(?:_(\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?)?$/;
 const CAMERA_ZONE_EXTRA_DISTANCE = 150; // units further back, for a zone without values in its name
 const CAMERA_ZONE_EXTRA_HEIGHT = 0; // units higher up, same
 const CAMERA_ZONE_EASE_SECONDS = 0.6; // seconds for a whole zoom in or out (also between two zones)
@@ -744,27 +836,17 @@ const CAMERA_ZONE_MIN_DISTANCE = 0;
 // (which sits ~7 units above the floor), so 0 = just above the ground.
 // Negative: lower still — below about -5 the camera ends up in the floor.
 const CAMERA_ZONE_FRONT_HEIGHT = 0;
-
-// HUD entity and the speedometer/jump/health bars in speedometer.xml.
-
-// Name of the custom_hud_layout entity (place one in Hammer pointing at
-// panorama/layout/custom_game/speedometer.vxml) that shows the speedometer.
-const SPEED_HUD_ENTITY_NAME = "speed_hud";
-// Hammer units/sec -> km/h (1 unit = 1 inch: units/sec * 0.0254 * 3.6).
-const UNITS_TO_KMH = 0.0254 * 3.6;
-
-// Segmented wall-jump charge bar (kart.wallJumpCharge) — see JUMP_BAR_SEGMENTS panel ids
-// ("jump_seg_0" .. "jump_seg_{N-1}") in speedometer.xml.
-const JUMP_BAR_SEGMENTS = 10;
-
-// Segmented melon health bar — see HEALTH_BAR_SEGMENTS panel ids
-// ("health_seg_0" .. "health_seg_{N-1}") in speedometer.xml, filled up to
-// kart.health / MELON_MAX_HEALTH. Below these fractions the bar's fill color
-// shifts (green -> yellow -> red, see UpdateHealthHud/speedometer.css) to
-// warn that another hard impact will break the melon.
-const HEALTH_BAR_SEGMENTS = 20;
-const HEALTH_LOW_FRACTION = 0.6;
-const HEALTH_CRITICAL_FRACTION = 0.3;
+// Close-up zones (camera_zone_close…) without values in their name: the
+// camera's spot behind / above the melon's center (the normal chase camera is
+// CAMERA_DISTANCE behind and FOLLOW_OFFSET.z + CAMERA_HEIGHT above it).
+// Lower CAMERA_CLOSEUP_DISTANCE: closer still — below the melon's own size
+//   (~10 units) the camera ends up inside it.
+const CAMERA_CLOSEUP_DISTANCE = 16;
+const CAMERA_CLOSEUP_HEIGHT = 4;
+// Seconds a close-up zone takes to zoom in (and back out after leaving) —
+// slower than CAMERA_ZONE_EASE_SECONDS, so it reads as a deliberate shot.
+// Higher: a slow, dramatic push-in. Lower: snaps in.
+const CAMERA_CLOSEUP_EASE_SECONDS = 1.2;
 
 // Debug output timing.
 
@@ -831,7 +913,8 @@ function TraceSphere(config) {
  *   settled: boolean,
  *   pawnAnchor: any, // where the frozen pawn is held — see HoldPawn
  *   teleportGen: number, // bumped by every race-flow teleport (BeginHeat/ReturnAllToHub) — see ScheduleRespawnAfterBreak
- *   speedCap?: number, // current horizontal speed limit; above MAX_SPEED only while a wall-bounce boost decays — unset means MAX_SPEED
+ *   speedCap?: number, // current horizontal speed limit; above the momentum top speed only while a wall-bounce/attack boost decays — unset means that top speed
+ *   momentum?: import("./logic/momentum.js").MomentumState, // top-speed steps earned by repeatedly reaching it (unset: none) — see MOMENTUM_*
  *   boostTrail?: { melon: any, entities: any[] }, // the boost trail running on this melon (unset: none) — see boost-trail.js
  *   nextBounceTime?: number, lastBounceTime?: number, // wall-bounce timing, see UpdateKart
  *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
@@ -856,6 +939,9 @@ function TraceSphere(config) {
  *   healZones?: Map<any, number>, // heal triggers the melon is inside -> their rate (health/s), see physics/heal.js
  *   liftCameraBlend?: number, // 0..1, how far the camera is zoomed out for a lift zone — see UpdateLiftCamera
  *   liftZones?: Map<any, number>, // lift triggers the melon is inside -> their wall-bounce kick (u/s up), see physics/zones.js
+ *   jumpPads?: Map<any, import("./logic/jump-pad.js").JumpPad>, // jump pad triggers the melon is on -> their launch, see physics/zones.js
+ *   lastPadLaunchTime?: number, // last jump pad launch — see ShouldPadLaunch
+ *   padFlight?: import("./logic/jump-pad.js").PadFlight, // a jump pad launch's damage protection, still on — see physics/jump-pad.js
  *   cameraZones?: Map<any, import("./logic/camera-zone.js").CameraZone>, // camera triggers the melon is inside -> their zoom, see physics/zones.js
  *   zoneCamera?: import("./logic/camera-zone.js").ZoneCameraState, // the camera-zone zoom being eased in/out — see UpdateZoneCamera
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
@@ -971,15 +1057,17 @@ function LiftCameraOffset(base, blend) {
 // resulting offset.
 
 /**
- * @typedef {{ distance: number, height: number, clip: boolean, front: boolean }} CameraZone
- * what a zone adds to the chase camera; `front` = it may put the camera in
- * front of the melon (no CAMERA_ZONE_MIN_DISTANCE stop)
+ * @typedef {{ distance: number, height: number, clip: boolean, front: boolean, ease?: number }} CameraZone
+ * what a zone adds to the chase camera; `front` = no CAMERA_ZONE_MIN_DISTANCE
+ * stop (front and close-up zones); `ease` = its own seconds to zoom in and
+ * back out (close-up zones), else CAMERA_ZONE_EASE_SECONDS
  */
 
 /**
  * @typedef {{
  *   from: CameraZone, to: CameraZone, // easing from -> to
  *   t: number, // 0..1, how far along
+ *   ease?: number, // seconds for this ease, see EaseSeconds
  * }} ZoneCameraState
  */
 
@@ -992,6 +1080,21 @@ const NO_CAMERA_ZONE = { distance: 0, height: 0, clip: true, front: false };
  * @param {string} triggerName @returns {CameraZone}
  */
 function CameraZoneFromName(triggerName) {
+    const closeup = CAMERA_CLOSEUP_NAME_PATTERN.exec(triggerName.trim());
+    if (closeup) {
+        // Close-up: like a front zone, the name gives the camera's spot
+        // (behind / above the melon's center), stored as what it adds to the
+        // normal offset — and no min-distance stop, so it can get this close.
+        const behind = closeup[2] === undefined ? CAMERA_CLOSEUP_DISTANCE : Number(closeup[2]);
+        const above = closeup[3] === undefined ? CAMERA_CLOSEUP_HEIGHT : Number(closeup[3]);
+        return {
+            distance: behind - CAMERA_DISTANCE,
+            height: above - FOLLOW_OFFSET.z - CAMERA_HEIGHT,
+            clip: !closeup[1],
+            front: true,
+            ease: CAMERA_CLOSEUP_EASE_SECONDS,
+        };
+    }
     const match = CAMERA_ZONE_NAME_PATTERN.exec(triggerName.trim());
     if (!match) {
         return { distance: CAMERA_ZONE_EXTRA_DISTANCE, height: CAMERA_ZONE_EXTRA_HEIGHT, clip: true, front: false };
@@ -1056,12 +1159,24 @@ function StepZoneCamera(state, target, dt) {
     const current = state ?? { from: NO_CAMERA_ZONE, to: NO_CAMERA_ZONE, t: 1 };
     let next = current;
     const to = current.to;
-    if (to.distance !== target.distance || to.height !== target.height || to.clip !== target.clip || to.front !== target.front) {
+    if (
+        to.distance !== target.distance ||
+        to.height !== target.height ||
+        to.clip !== target.clip ||
+        to.front !== target.front ||
+        to.ease !== target.ease
+    ) {
         const extra = ZoneCameraExtra(current);
-        next = { from: { ...extra, clip: ZoneCameraClips(current), front: ZoneCameraFront(current) }, to: target, t: 0 };
+        next = {
+            from: { ...extra, clip: ZoneCameraClips(current), front: ZoneCameraFront(current) },
+            to: target,
+            t: 0,
+            ease: EaseSeconds(to, target),
+        };
     }
     if (next.t < 1) {
-        const step = CAMERA_ZONE_EASE_SECONDS > 0 ? Math.max(0, dt) / CAMERA_ZONE_EASE_SECONDS : 1;
+        const seconds = next.ease ?? CAMERA_ZONE_EASE_SECONDS;
+        const step = seconds > 0 ? Math.max(0, dt) / seconds : 1;
         next = { ...next, t: Math.min(1, next.t + step) };
     }
     if (next === current) {
@@ -1069,6 +1184,16 @@ function StepZoneCamera(state, target, dt) {
     }
     // Fully back to normal: forget the state, same as never having been in a zone.
     return next.t >= 1 && next.to === NO_CAMERA_ZONE ? undefined : next;
+}
+
+/**
+ * How long an ease from zone `from` to zone `to` takes: the zone being
+ * entered sets it, or — leaving one for no zone — the zone being left, so a
+ * close-up pulls back out as slowly as it went in.
+ * @param {CameraZone} from @param {CameraZone} to
+ */
+function EaseSeconds(from, to) {
+    return to.ease ?? (to === NO_CAMERA_ZONE ? from.ease : undefined) ?? CAMERA_ZONE_EASE_SECONDS;
 }
 
 /**
@@ -1309,14 +1434,15 @@ function LiftZoneUpSpeed(triggerName) {
 
 // Trigger zones the melon can be inside — heal zones (heal_enter/heal_leave,
 // read by ../heal/), lift zones (lift_enter/lift_leave, constants/lift.js) and
-// camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in constants/camera.js):
+// camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in constants/camera.js)
+// and jump pads (jump_pad_enter/jump_pad_leave, constants/jump-pad.js):
 // entering/leaving them (registered in ../zone-inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.
 // Each kind is a Map on the kart: trigger entity -> its value (heal rate in
 // health/s, lift kick in u/s, camera zoom), so overlapping zones and their leaves are
 // tracked separately.
 
-/** @typedef {"healZones" | "liftZones" | "cameraZones"} ZoneKind */
+/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads"} ZoneKind */
 
 /**
  * The melon entered a zone trigger of this kind, worth `value`.
@@ -1344,6 +1470,7 @@ function LeaveZones(kart) {
     kart.healZones?.clear();
     kart.liftZones?.clear();
     kart.cameraZones?.clear();
+    kart.jumpPads?.clear();
 }
 
 /**
@@ -1376,13 +1503,33 @@ function CurrentWallRules(kart) {
 }
 
 /**
+ * The launch of the jump pad the melon entered last (of those it's still
+ * on), or undefined if it's on none.
+ * @param {import("../kart-registry.js").Kart} kart
+ * @returns {import("../logic/jump-pad.js").JumpPad | undefined}
+ */
+function CurrentJumpPad(kart) {
+    return LatestZone(kart, "jumpPads");
+}
+
+/**
  * The zoom of the camera zone the melon entered last (of those it's still
  * inside), or undefined if none — overlapping camera zones don't add up.
  * @param {import("../kart-registry.js").Kart} kart
  * @returns {import("../logic/camera-zone.js").CameraZone | undefined}
  */
 function CurrentCameraZone(kart) {
-    const zones = kart.cameraZones;
+    return LatestZone(kart, "cameraZones");
+}
+
+/**
+ * The value of the zone of this kind the melon entered last (of those it's
+ * still inside), or undefined if none. Zone entities that no longer exist
+ * are dropped.
+ * @param {import("../kart-registry.js").Kart} kart @param {ZoneKind} kind
+ */
+function LatestZone(kart, kind) {
+    const zones = kart[kind];
     let latest = undefined;
     for (const [zone, value] of zones ?? []) {
         if (!zone.IsValid()) {
@@ -1908,6 +2055,64 @@ function WithMinSpeed(v, minSpeed) {
     return { x: v.x * scale, y: v.y * scale };
 }
 
+// Momentum — repeatedly reaching the top speed raises it (MOMENTUM_* in
+// constants/momentum.js). Pure rule, no cs_script import; physics/drive.js
+// applies it (test/momentum.test.mjs).
+
+// Reaching the cap exactly: the speed is clamped to it, so allow float noise.
+const REACH_TOLERANCE = 0.5; // units/sec
+
+/**
+ * @typedef {{
+ *   steps: number, // top-speed steps earned this run, 0..MOMENTUM_MAX_STEPS
+ *   armed: boolean, // reaching the top speed now would count (it dipped below since the last time)
+ *   lastHitTime?: number, // game time the top speed was last reached
+ * }} MomentumState
+ */
+
+/** @returns {MomentumState} */
+function NewMomentum() {
+    return { steps: 0, armed: true, lastHitTime: undefined };
+}
+
+/**
+ * The top speed with `momentum`'s steps (plain MAX_SPEED without any).
+ * @param {MomentumState | undefined} momentum
+ */
+function MomentumMaxSpeed(momentum) {
+    return MAX_SPEED * (1 + MOMENTUM_STEP * (momentum?.steps ?? 0));
+}
+
+/**
+ * This tick's momentum. Below MOMENTUM_MIN_SPEED the run ends (reset).
+ * While `boosted` (attack boost on, or the speed cap still raised by a
+ * boost) nothing counts: no step, and reaching the top speed during/right
+ * after a boost needs a real dip first. Otherwise reaching the top speed
+ * after dipping MOMENTUM_REARM_DIP below it is a hit, and a hit within
+ * MOMENTUM_HIT_WINDOW of the previous one adds a step.
+ * @param {MomentumState | undefined} momentum @param {number} horizSpeed the melon's horizontal speed this tick (after the cap)
+ * @param {number} now game time @param {boolean} boosted
+ * @returns {MomentumState}
+ */
+function UpdateMomentum(momentum, horizSpeed, now, boosted) {
+    if (!momentum || horizSpeed < MOMENTUM_MIN_SPEED) {
+        return NewMomentum();
+    }
+    if (boosted) {
+        return { ...momentum, armed: false };
+    }
+    const max = MomentumMaxSpeed(momentum);
+    if (horizSpeed < max * (1 - MOMENTUM_REARM_DIP)) {
+        return momentum.armed ? momentum : { ...momentum, armed: true };
+    }
+    if (!momentum.armed || horizSpeed < max - REACH_TOLERANCE) {
+        return momentum;
+    }
+    const chained = momentum.lastHitTime !== undefined && now - momentum.lastHitTime <= MOMENTUM_HIT_WINDOW;
+    const steps = chained ? Math.min(momentum.steps + 1, MOMENTUM_MAX_STEPS) : momentum.steps;
+    return { steps, armed: false, lastHitTime: now };
+}
+
 // Jump debug view: everything that shows how ground/wall contact and jump
 // presses are judged — the on-screen status line, the probes drawn into the
 // world, and the "Jump pressed" console log. Toggled per player from the
@@ -2227,7 +2432,7 @@ function UpgradePendingBounce(kart, now, v) {
     if (kart.lastBounceInfo) {
         kart.lastBounceInfo.jumpFactor = lateFactor;
     }
-    kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, after);
+    kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), after);
 }
 
 /**
@@ -2686,10 +2891,10 @@ function UpdateSpeedHud(slot, kart) {
     const horizSpeed = Math.hypot(vel.x, vel.y);
     const kmh = Math.round(horizSpeed * UNITS_TO_KMH);
     hud.SetDialogVariableStringForPlayer(slot, "speed_panel", "speed", String(kmh));
-    // Wall-bounce feedback: Boosted while a bounce has the melon above the
-    // normal top speed, PerfectBounce as a short flash after a bounce that
+    // Wall-bounce feedback: Boosted while a bounce has the melon above its
+    // normal top speed (momentum included — that's earned, not a boost), PerfectBounce as a short flash after a bounce that
     // was clean enough to cost (almost) no health.
-    hud.SetHasClassForPlayer(slot, "speed_panel", "Boosted", horizSpeed > MAX_SPEED + 1);
+    hud.SetHasClassForPlayer(slot, "speed_panel", "Boosted", horizSpeed > MomentumMaxSpeed(kart.momentum) + 1);
     const info = kart.lastBounceInfo;
     const perfectFlash =
         info !== undefined &&
@@ -3296,6 +3501,131 @@ function RegisterAttackDebug() {
     });
 }
 
+// Jump pads (JUMP_PAD_* in constants/jump-pad.js). Pure rules, no cs_script
+// import; physics/jump-pad.js applies them (test/jump-pad.test.mjs).
+
+/** @typedef {{ up: number, forward: number }} JumpPad upward launch speed, horizontal speed added (units/sec) */
+/** @typedef {{ launchTime: number, landedTime?: number }} PadFlight a launch whose damage protection is still on */
+
+/**
+ * A pad's launch, from its trigger name (see JUMP_PAD_NAME_PATTERN), else
+ * the defaults. @param {string} triggerName @returns {JumpPad}
+ */
+function JumpPadFromName(triggerName) {
+    const match = JUMP_PAD_NAME_PATTERN.exec(triggerName.trim());
+    return {
+        up: match ? Number(match[1]) : JUMP_PAD_UP_SPEED,
+        forward: match?.[2] !== undefined ? Number(match[2]) : JUMP_PAD_FORWARD_BOOST,
+    };
+}
+
+/**
+ * Whether the melon on a pad launches this tick: a jump press now, or one
+ * made at most JUMP_PAD_BUFFER ago that hasn't launched it yet — and not
+ * again within JUMP_PAD_COOLDOWN of the last launch.
+ * @param {number} now @param {boolean} jumpPressed this tick
+ * @param {number | undefined} lastPressTime last jump press @param {number | undefined} lastLaunchTime last pad launch
+ */
+function ShouldPadLaunch(now, jumpPressed, lastPressTime, lastLaunchTime) {
+    if (lastLaunchTime !== undefined && now - lastLaunchTime < JUMP_PAD_COOLDOWN) {
+        return false;
+    }
+    if (jumpPressed) {
+        return true;
+    }
+    return (
+        lastPressTime !== undefined &&
+        now - lastPressTime <= JUMP_PAD_BUFFER &&
+        (lastLaunchTime === undefined || lastPressTime > lastLaunchTime)
+    );
+}
+
+/**
+ * The velocity right after a launch: `pad.up` upward (a fall is cancelled; a
+ * melon already rising faster keeps that), and `pad.forward` more horizontal
+ * speed along where it's going — along `lookDir` if it's barely moving.
+ * @param {{ x: number, y: number, z: number }} v @param {{ x: number, y: number }} lookDir unit vector
+ * @param {JumpPad} pad
+ */
+function PadLaunchVelocity(v, lookDir, pad) {
+    const speed = Math.hypot(v.x, v.y);
+    const dir = speed > JUMP_PAD_MIN_DIRECTION_SPEED ? { x: v.x / speed, y: v.y / speed } : lookDir;
+    const launched = speed + pad.forward;
+    return { x: dir.x * launched, y: dir.y * launched, z: Math.max(v.z, pad.up) };
+}
+
+/**
+ * The launch's damage protection this tick, or undefined once it's over:
+ * JUMP_PAD_LANDING_GRACE after the first ground contact after taking off
+ * (contact within GROUND_LIFTOFF_TIME of the launch is the pad itself), or
+ * JUMP_PAD_MAX_PROTECTED_SECONDS after the launch at the latest.
+ * @param {PadFlight | undefined} flight @param {number} now @param {number | undefined} lastGroundedTime
+ * @returns {PadFlight | undefined}
+ */
+function PadFlightAfter(flight, now, lastGroundedTime) {
+    if (!flight || now - flight.launchTime > JUMP_PAD_MAX_PROTECTED_SECONDS) {
+        return undefined;
+    }
+    const landedTime =
+        flight.landedTime ??
+        (lastGroundedTime !== undefined && lastGroundedTime > flight.launchTime + GROUND_LIFTOFF_TIME ? lastGroundedTime : undefined);
+    if (landedTime !== undefined && now - landedTime > JUMP_PAD_LANDING_GRACE) {
+        return undefined;
+    }
+    return landedTime === flight.landedTime ? flight : { ...flight, landedTime };
+}
+
+// Engine side of jump pads (JUMP_PAD_*): launching a melon off the pad it's
+// on when jump is pressed, and the damage protection that follows. The rules
+// are in ../logic/jump-pad.js; which pad the melon is on, in zones.js.
+
+/**
+ * Per tick, before any damage: ends the launch's damage protection once the
+ * melon has landed (see PadFlightAfter).
+ * @param {import("../kart-registry.js").Kart} kart @param {number} now
+ */
+function UpdatePadFlight(kart, now) {
+    kart.padFlight = PadFlightAfter(kart.padFlight, now, kart.lastGroundedTime);
+}
+
+/**
+ * Whether the melon takes no damage right now: on a jump pad, or flying off
+ * one (until shortly after landing).
+ * @param {import("../kart-registry.js").Kart} kart
+ */
+function IsPadProtected(kart) {
+    return kart.padFlight !== undefined || CurrentJumpPad(kart) !== undefined;
+}
+
+/**
+ * On a jump pad with a (just) pressed jump: launches the melon — `v` (the
+ * velocity UpdateKart is about to command) is replaced in place, after the
+ * normal jump handling, so the launch wins over a ground/wall jump.
+ * @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} now
+ * @param {boolean} jumpPressed @param {{ x: number, y: number, z: number }} v
+ * @param {{ x: number, y: number }} lookDir
+ * @returns {boolean} whether it launched
+ */
+function TryPadLaunch(slot, kart, now, jumpPressed, v, lookDir) {
+    const pad = CurrentJumpPad(kart);
+    if (!pad || !ShouldPadLaunch(now, jumpPressed, kart.lastJumpPressTime, kart.lastPadLaunchTime)) {
+        return false;
+    }
+    const launched = PadLaunchVelocity(v, lookDir, pad);
+    v.x = launched.x;
+    v.y = launched.y;
+    v.z = launched.z;
+    kart.lastPadLaunchTime = now;
+    // Counts as a jump: the pad still pushing up for a tick isn't ground
+    // contact (GROUND_LIFTOFF_TIME), and the next ground jump needs a landing.
+    kart.lastJumpTime = now;
+    kart.padFlight = { launchTime: now };
+    // Faster than the top speed, like a wall-bounce boost — decays at BOOST_DECAY.
+    kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(v.x, v.y));
+    Debug(`jump pad: slot ${slot} launched (${launched.z.toFixed(0)} u/s up, ${Math.hypot(v.x, v.y).toFixed(0)} u/s horizontal)`);
+    return true;
+}
+
 // Engine side of ground/wall contact: the floor and wall probes (line
 // traces — see UpdateGrounded for why not TraceSphere). The rules are in
 // ../logic/contact.js; what the probes saw goes to jump-debug.js for the
@@ -3411,8 +3741,16 @@ function ApplyImpactDamage(slot, kart, impactDelta) {
     DamageKart(slot, kart, damage, `impact ${impactSpeed.toFixed(0)} u/s${flatLanding ? " (flat landing)" : ""}`);
 }
 
-/** @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} damage @param {string} reason */
+/**
+ * Impact and wall-bounce damage. None on a jump pad or flying off one (see
+ * IsPadProtected) — the attack boost's cost and melon_break triggers still apply.
+ * @param {number} slot @param {import("../kart-registry.js").Kart} kart @param {number} damage @param {string} reason
+ */
 function DamageKart(slot, kart, damage, reason) {
+    if (IsPadProtected(kart)) {
+        Debug(`slot ${slot}: ${reason} -> no damage (jump pad)`);
+        return;
+    }
     kart.health -= damage;
     Debug(`slot ${slot}: ${reason} -> ${damage.toFixed(0)} dmg, health ${kart.health.toFixed(0)}/${MELON_MAX_HEALTH}`);
 }
@@ -4139,8 +4477,10 @@ function UpdateKart(slot, kart, dt) {
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.speedCap = MAX_SPEED;
+        kart.momentum = undefined; // standing still — the momentum run is over
         kart.attackBoosting = false;
         kart.pendingBounce = undefined; // parked/finished — a bounce's leftover damage no longer matters
+        kart.padFlight = undefined;
         return;
     }
 
@@ -4153,6 +4493,7 @@ function UpdateKart(slot, kart, dt) {
         melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
         kart.lastVelocity = undefined;
         kart.settled = false;
+        kart.momentum = undefined;
         kart.attackBoosting = false;
         kart.pendingBounce = undefined;
         // Pull the chase camera back from the crash site so the burst is
@@ -4162,6 +4503,8 @@ function UpdateKart(slot, kart, dt) {
     }
 
     const now = Instance.GetGameTime();
+    // A jump pad launch's damage protection ends a moment after landing.
+    UpdatePadFlight(kart, now);
     // Heal zones (heal_enter/heal_leave) — before this tick's damage, so a
     // hit inside a zone still breaks the melon if it's big enough.
     ApplyHealing(kart, dt);
@@ -4223,7 +4566,7 @@ function UpdateKart(slot, kart, dt) {
             kart.lastBounceTime = now;
             // Read by UpdateBounceHud for the angle/timing feedback panel.
             kart.lastBounceInfo = { angle: bounce.angle, angleFactor: bounce.angleFactor, jumpFactor: bounce.jumpFactor };
-            kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, Math.hypot(bounceVelocity.x, bounceVelocity.y));
+            kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(bounceVelocity.x, bounceVelocity.y));
             // Damage waits until the jump-timing window has closed (see the
             // top of the non-locked path, and the late-jump case below) —
             // a jump just *after* the hit can still improve its quality.
@@ -4309,6 +4652,7 @@ function UpdateKart(slot, kart, dt) {
             kart.settled = true;
         }
         kart.lastVelocity = undefined;
+        kart.momentum = undefined;
         return;
     }
     kart.settled = false;
@@ -4367,7 +4711,7 @@ function UpdateKart(slot, kart, dt) {
     if (boost.boosting) {
         vx += forwardDir.x * ATTACK_BOOST_ACCEL * dt;
         vy += forwardDir.y * ATTACK_BOOST_ACCEL * dt;
-        kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, ATTACK_BOOST_MAX_SPEED);
+        kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), ATTACK_BOOST_MAX_SPEED);
     }
 
     // Jump press (ground jump / wall jump / wall-bounce timing) and the
@@ -4377,14 +4721,19 @@ function UpdateKart(slot, kart, dt) {
     const vzBase = bounceVelocity ? BounceUpVelocity(currentVelocity.z, wallRules.bounceUpSpeed) : currentVelocity.z;
     const v = { x: vx, y: vy, z: vzBase };
     ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v, wallRules);
+    // On a jump pad, a (just) pressed jump launches instead — see JUMP_PAD_*.
+    TryPadLaunch(slot, kart, now, jumpPressed, v, forwardDir);
     vx = v.x;
     vy = v.y;
     const vz = v.z;
 
-    // Normally MAX_SPEED, but a wall bounce can lift it (see BOOST_DECAY):
-    // decays back down every tick, and never stays above the melon's actual
-    // speed so a lost boost can't be re-earned just by accelerating again.
-    const speedCap = kart.speedCap ?? MAX_SPEED;
+    // Normally the melon's momentum top speed (MAX_SPEED plus whatever
+    // repeatedly reaching it has earned, see MOMENTUM_*), but a wall bounce
+    // or the attack boost can lift it (see BOOST_DECAY): decays back down
+    // every tick, and never stays above the melon's actual speed so a lost
+    // boost can't be re-earned just by accelerating again.
+    const momentumMax = MomentumMaxSpeed(kart.momentum);
+    const speedCap = kart.speedCap ?? momentumMax;
     let horizSpeed = Math.hypot(vx, vy);
     if (horizSpeed > speedCap) {
         const scale = speedCap / horizSpeed;
@@ -4392,7 +4741,11 @@ function UpdateKart(slot, kart, dt) {
         vy *= scale;
         horizSpeed = speedCap;
     }
-    kart.speedCap = Math.max(MAX_SPEED, Math.min(speedCap - BOOST_DECAY * dt, horizSpeed));
+    // Boosts don't count towards momentum (neither the attack boost nor a
+    // cap a bounce/boost has lifted above the momentum top speed).
+    const boosted = boost.boosting || speedCap > momentumMax + 1e-6;
+    kart.momentum = UpdateMomentum(kart.momentum, horizSpeed, now, boosted);
+    kart.speedCap = Math.max(MomentumMaxSpeed(kart.momentum), Math.min(speedCap - BOOST_DECAY * dt, horizSpeed));
 
     melon.Move({ velocity: { x: vx, y: vy, z: vz } });
     // What we commanded this tick — compared against the actual velocity
@@ -4552,6 +4905,7 @@ function BeginHeat(trackId) {
             });
         }
         kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
+        RestoreFullHealth(kart); // every heat starts on a whole melon
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
@@ -4664,6 +5018,8 @@ function SendKartsOutOfRace(returning, spawn, label) {
             }
         }
         kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
+        // Arrives whole — hub/tutorial button, hub_teleport, a heat ending.
+        RestoreFullHealth(kart);
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
@@ -5020,7 +5376,7 @@ function RegisterCheckpointAndFinishInputs() {
     }
 }
 
-// Script inputs of the zone triggers — heal, lift and camera zones. All work
+// Script inputs of the zone triggers — heal, lift and camera zones, jump pads. All work
 // the same way: OnStartTouch -> "<kind>_enter", OnEndTouch -> "<kind>_leave",
 // and the touched trigger's own name may carry its value (heal_zone_<rate>,
 // lift_zone_<speed>, camera_zone_<distance>_<height>). What the zones do is in
@@ -5060,6 +5416,8 @@ function RegisterZoneInputs() {
     RegisterZone("lift_enter", "lift_leave", "liftZones", LiftZoneUpSpeed, "u/s up per bounce");
     // Camera zones — see CAMERA_ZONE_* in constants/camera.js. Read by the zone camera (camera/zone-zoom.js).
     RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
+    // Jump pads — see constants/jump-pad.js. Read by physics/jump-pad.js (launch, no damage).
+    RegisterZone("jump_pad_enter", "jump_pad_leave", "jumpPads", JumpPadFromName, "up/forward u/s");
 }
 
 // When the boost trail is on (see constants/boost-trail.js). Pure rule, no
@@ -5078,8 +5436,9 @@ function RegisterZoneInputs() {
  * @param {boolean} blocked
  * @param {boolean} [attackBoosting] the attack boost is on this tick
  * @param {boolean} [perfectBounceBoost] the speed above MAX_SPEED is from a PERFECT bounce
+ * @param {number} [normalMax] the melon's own top speed the margins count from — above MAX_SPEED with momentum (logic/momentum.js)
  */
-function ShouldShowBoostTrail(showing, horizSpeed, blocked, attackBoosting = false, perfectBounceBoost = false) {
+function ShouldShowBoostTrail(showing, horizSpeed, blocked, attackBoosting = false, perfectBounceBoost = false, normalMax = MAX_SPEED) {
     if (blocked) {
         return false;
     }
@@ -5090,7 +5449,7 @@ function ShouldShowBoostTrail(showing, horizSpeed, blocked, attackBoosting = fal
         return false;
     }
     const margin = showing ? BOOST_TRAIL_STOP_MARGIN : BOOST_TRAIL_START_MARGIN;
-    return horizSpeed > MAX_SPEED + margin;
+    return horizSpeed > normalMax + margin;
 }
 
 // The boost trail: particle_boost_trail_template's particle effect riding along on a
@@ -5110,12 +5469,15 @@ function UpdateBoostTrail(kart) {
     }
     const velocity = kart.melon.GetAbsVelocity();
     const horizSpeed = Math.hypot(velocity.x, velocity.y);
+    // Measured against the melon's own top speed: speed earned by momentum
+    // (MOMENTUM_*) isn't a boost and shows no trail.
+    const normalMax = MomentumMaxSpeed(kart.momentum);
     // A PERFECT bounce's speed shows no trail — until that boost is used up
     // (back to normal speed) or the attack boost takes over.
-    if (kart.attackBoosting || horizSpeed <= MAX_SPEED + BOOST_TRAIL_STOP_MARGIN) {
+    if (kart.attackBoosting || horizSpeed <= normalMax + BOOST_TRAIL_STOP_MARGIN) {
         kart.perfectBounceBoost = false;
     }
-    const show = ShouldShowBoostTrail(kart.boostTrail !== undefined, horizSpeed, kart.breaking || kart.locked, kart.attackBoosting, kart.perfectBounceBoost);
+    const show = ShouldShowBoostTrail(kart.boostTrail !== undefined, horizSpeed, kart.breaking || kart.locked, kart.attackBoosting, kart.perfectBounceBoost, normalMax);
     if (show && !kart.boostTrail) {
         StartBoostTrail(kart);
     } else if (!show && kart.boostTrail) {

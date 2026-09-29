@@ -12,6 +12,7 @@ import {
     TELEPORT_UP_OFFSET,
 } from "./constants/index.js";
 import { GetHubSpawnPoint, GetIntroSpawnPoint, Lifted, FacePlayerView } from "./spawn-points.js";
+import { RestoreFullHealth } from "./heal/index.js";
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
 // See GAMEPLAY.md's "Hub -> race -> next-track flow" for the full design.
@@ -156,6 +157,7 @@ export function BeginHeat(trackId) {
             });
         }
         kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
+        RestoreFullHealth(kart); // every heat starts on a whole melon
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
@@ -268,6 +270,8 @@ function SendKartsOutOfRace(returning, spawn, label) {
             }
         }
         kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
+        // Arrives whole — hub/tutorial button, hub_teleport, a heat ending.
+        RestoreFullHealth(kart);
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport

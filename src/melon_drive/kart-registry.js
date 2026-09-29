@@ -14,7 +14,8 @@ import { predictionDotSet } from "./trace.js";
  *   settled: boolean,
  *   pawnAnchor: any, // where the frozen pawn is held — see HoldPawn
  *   teleportGen: number, // bumped by every race-flow teleport (BeginHeat/ReturnAllToHub) — see ScheduleRespawnAfterBreak
- *   speedCap?: number, // current horizontal speed limit; above MAX_SPEED only while a wall-bounce boost decays — unset means MAX_SPEED
+ *   speedCap?: number, // current horizontal speed limit; above the momentum top speed only while a wall-bounce/attack boost decays — unset means that top speed
+ *   momentum?: import("./logic/momentum.js").MomentumState, // top-speed steps earned by repeatedly reaching it (unset: none) — see MOMENTUM_*
  *   boostTrail?: { melon: any, entities: any[] }, // the boost trail running on this melon (unset: none) — see boost-trail.js
  *   nextBounceTime?: number, lastBounceTime?: number, // wall-bounce timing, see UpdateKart
  *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
@@ -39,6 +40,9 @@ import { predictionDotSet } from "./trace.js";
  *   healZones?: Map<any, number>, // heal triggers the melon is inside -> their rate (health/s), see physics/heal.js
  *   liftCameraBlend?: number, // 0..1, how far the camera is zoomed out for a lift zone — see UpdateLiftCamera
  *   liftZones?: Map<any, number>, // lift triggers the melon is inside -> their wall-bounce kick (u/s up), see physics/zones.js
+ *   jumpPads?: Map<any, import("./logic/jump-pad.js").JumpPad>, // jump pad triggers the melon is on -> their launch, see physics/zones.js
+ *   lastPadLaunchTime?: number, // last jump pad launch — see ShouldPadLaunch
+ *   padFlight?: import("./logic/jump-pad.js").PadFlight, // a jump pad launch's damage protection, still on — see physics/jump-pad.js
  *   cameraZones?: Map<any, import("./logic/camera-zone.js").CameraZone>, // camera triggers the melon is inside -> their zoom, see physics/zones.js
  *   zoneCamera?: import("./logic/camera-zone.js").ZoneCameraState, // the camera-zone zoom being eased in/out — see UpdateZoneCamera
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick

@@ -15,6 +15,9 @@ import {
     CAMERA_ZONE_EASE_SECONDS,
     CAMERA_ZONE_MIN_DISTANCE,
     CAMERA_ZONE_FRONT_HEIGHT,
+    CAMERA_CLOSEUP_DISTANCE,
+    CAMERA_CLOSEUP_HEIGHT,
+    CAMERA_CLOSEUP_EASE_SECONDS,
     CAMERA_DISTANCE,
     CAMERA_HEIGHT,
     FOLLOW_OFFSET,
@@ -96,4 +99,31 @@ test("front zone: no min-distance stop while easing in or back out, so no jump",
     assert.equal(ZoneCameraFront(state), true, "still easing back from the front");
     assert.equal(ZoneCameraOffset(normal, state).x, half);
     assert.equal(StepZoneCamera(state, NO_CAMERA_ZONE, CAMERA_ZONE_EASE_SECONDS), undefined);
+});
+
+test("close-up zone: camera ends up <behind> behind and <height> above the melon's center, defaults without values", () => {
+    const at = (name) => {
+        const zone = CameraZoneFromName(name);
+        const state = StepZoneCamera(undefined, zone, zone.ease ?? CAMERA_ZONE_EASE_SECONDS);
+        const offset = ZoneCameraOffset(normal, state);
+        return { behind: -offset.x, above: offset.z + FOLLOW_OFFSET.z };
+    };
+    assert.deepEqual(at("camera_zone_close_12_2"), { behind: 12, above: 2 });
+    assert.deepEqual(at("camera_zone_close_12"), { behind: 12, above: CAMERA_CLOSEUP_HEIGHT });
+    assert.deepEqual(at("camera_zone_close"), { behind: CAMERA_CLOSEUP_DISTANCE, above: CAMERA_CLOSEUP_HEIGHT });
+    assert.equal(CameraZoneFromName("camera_zone_noclip_close_15_3").clip, false);
+    assert.equal(CameraZoneFromName("camera_zone_close").clip, true);
+});
+
+test("close-up zone: eases in and back out over CAMERA_CLOSEUP_EASE_SECONDS", () => {
+    const zone = CameraZoneFromName("camera_zone_close");
+    let state = StepZoneCamera(undefined, zone, CAMERA_CLOSEUP_EASE_SECONDS / 2);
+    assert.ok(state && Math.abs(state.t - 0.5) < 1e-9, `halfway in (${state?.t})`);
+    state = StepZoneCamera(state, zone, CAMERA_CLOSEUP_EASE_SECONDS / 2);
+    assert.equal(state?.t, 1);
+    state = StepZoneCamera(state, NO_CAMERA_ZONE, CAMERA_CLOSEUP_EASE_SECONDS / 2);
+    assert.ok(state && Math.abs(state.t - 0.5) < 1e-9, `halfway out (${state?.t})`);
+    // ...while a plain zone keeps CAMERA_ZONE_EASE_SECONDS.
+    const plain = StepZoneCamera(undefined, CameraZoneFromName("camera_zone_-30_0"), CAMERA_ZONE_EASE_SECONDS);
+    assert.equal(plain?.t, 1);
 });

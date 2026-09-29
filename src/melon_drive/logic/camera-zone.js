@@ -3,6 +3,10 @@
 // resulting offset.
 import {
     CAMERA_ZONE_NAME_PATTERN,
+    CAMERA_CLOSEUP_NAME_PATTERN,
+    CAMERA_CLOSEUP_DISTANCE,
+    CAMERA_CLOSEUP_HEIGHT,
+    CAMERA_CLOSEUP_EASE_SECONDS,
     CAMERA_ZONE_EXTRA_DISTANCE,
     CAMERA_ZONE_EXTRA_HEIGHT,
     CAMERA_ZONE_EASE_SECONDS,
@@ -14,15 +18,17 @@ import {
 } from "../constants/index.js";
 
 /**
- * @typedef {{ distance: number, height: number, clip: boolean, front: boolean }} CameraZone
- * what a zone adds to the chase camera; `front` = it may put the camera in
- * front of the melon (no CAMERA_ZONE_MIN_DISTANCE stop)
+ * @typedef {{ distance: number, height: number, clip: boolean, front: boolean, ease?: number }} CameraZone
+ * what a zone adds to the chase camera; `front` = no CAMERA_ZONE_MIN_DISTANCE
+ * stop (front and close-up zones); `ease` = its own seconds to zoom in and
+ * back out (close-up zones), else CAMERA_ZONE_EASE_SECONDS
  */
 
 /**
  * @typedef {{
  *   from: CameraZone, to: CameraZone, // easing from -> to
  *   t: number, // 0..1, how far along
+ *   ease?: number, // seconds for this ease, see EaseSeconds
  * }} ZoneCameraState
  */
 
@@ -35,6 +41,21 @@ export const NO_CAMERA_ZONE = { distance: 0, height: 0, clip: true, front: false
  * @param {string} triggerName @returns {CameraZone}
  */
 export function CameraZoneFromName(triggerName) {
+    const closeup = CAMERA_CLOSEUP_NAME_PATTERN.exec(triggerName.trim());
+    if (closeup) {
+        // Close-up: like a front zone, the name gives the camera's spot
+        // (behind / above the melon's center), stored as what it adds to the
+        // normal offset — and no min-distance stop, so it can get this close.
+        const behind = closeup[2] === undefined ? CAMERA_CLOSEUP_DISTANCE : Number(closeup[2]);
+        const above = closeup[3] === undefined ? CAMERA_CLOSEUP_HEIGHT : Number(closeup[3]);
+        return {
+            distance: behind - CAMERA_DISTANCE,
+            height: above - FOLLOW_OFFSET.z - CAMERA_HEIGHT,
+            clip: !closeup[1],
+            front: true,
+            ease: CAMERA_CLOSEUP_EASE_SECONDS,
+        };
+    }
     const match = CAMERA_ZONE_NAME_PATTERN.exec(triggerName.trim());
     if (!match) {
         return { distance: CAMERA_ZONE_EXTRA_DISTANCE, height: CAMERA_ZONE_EXTRA_HEIGHT, clip: true, front: false };
@@ -99,12 +120,24 @@ export function StepZoneCamera(state, target, dt) {
     const current = state ?? { from: NO_CAMERA_ZONE, to: NO_CAMERA_ZONE, t: 1 };
     let next = current;
     const to = current.to;
-    if (to.distance !== target.distance || to.height !== target.height || to.clip !== target.clip || to.front !== target.front) {
+    if (
+        to.distance !== target.distance ||
+        to.height !== target.height ||
+        to.clip !== target.clip ||
+        to.front !== target.front ||
+        to.ease !== target.ease
+    ) {
         const extra = ZoneCameraExtra(current);
-        next = { from: { ...extra, clip: ZoneCameraClips(current), front: ZoneCameraFront(current) }, to: target, t: 0 };
+        next = {
+            from: { ...extra, clip: ZoneCameraClips(current), front: ZoneCameraFront(current) },
+            to: target,
+            t: 0,
+            ease: EaseSeconds(to, target),
+        };
     }
     if (next.t < 1) {
-        const step = CAMERA_ZONE_EASE_SECONDS > 0 ? Math.max(0, dt) / CAMERA_ZONE_EASE_SECONDS : 1;
+        const seconds = next.ease ?? CAMERA_ZONE_EASE_SECONDS;
+        const step = seconds > 0 ? Math.max(0, dt) / seconds : 1;
         next = { ...next, t: Math.min(1, next.t + step) };
     }
     if (next === current) {
@@ -112,6 +145,16 @@ export function StepZoneCamera(state, target, dt) {
     }
     // Fully back to normal: forget the state, same as never having been in a zone.
     return next.t >= 1 && next.to === NO_CAMERA_ZONE ? undefined : next;
+}
+
+/**
+ * How long an ease from zone `from` to zone `to` takes: the zone being
+ * entered sets it, or — leaving one for no zone — the zone being left, so a
+ * close-up pulls back out as slowly as it went in.
+ * @param {CameraZone} from @param {CameraZone} to
+ */
+export function EaseSeconds(from, to) {
+    return to.ease ?? (to === NO_CAMERA_ZONE ? from.ease : undefined) ?? CAMERA_ZONE_EASE_SECONDS;
 }
 
 /**

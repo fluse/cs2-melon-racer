@@ -28,9 +28,11 @@ import {
     ATTACK_PUSH_GUARD_SECONDS,
 } from "../constants/index.js";
 import { AttackBoost, WithoutEnginePush } from "../logic/attack-boost.js";
+import { MomentumMaxSpeed, UpdateMomentum } from "../logic/momentum.js";
 import { LogAttackHeld } from "./attack-debug.js";
 import { Debug } from "../debug.js";
 import { ApplyJump } from "./jump.js";
+import { UpdatePadFlight, TryPadLaunch } from "./jump-pad.js";
 import { UpdateGrounded, UpdateWallContact } from "./contact.js";
 import { DrawJumpDebug } from "./jump-debug.js";
 import { ApplyImpactDamage } from "./damage.js";
@@ -53,8 +55,10 @@ export function UpdateKart(slot, kart, dt) {
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.speedCap = MAX_SPEED;
+        kart.momentum = undefined; // standing still — the momentum run is over
         kart.attackBoosting = false;
         kart.pendingBounce = undefined; // parked/finished — a bounce's leftover damage no longer matters
+        kart.padFlight = undefined;
         return;
     }
 
@@ -67,6 +71,7 @@ export function UpdateKart(slot, kart, dt) {
         melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
         kart.lastVelocity = undefined;
         kart.settled = false;
+        kart.momentum = undefined;
         kart.attackBoosting = false;
         kart.pendingBounce = undefined;
         // Pull the chase camera back from the crash site so the burst is
@@ -76,6 +81,8 @@ export function UpdateKart(slot, kart, dt) {
     }
 
     const now = Instance.GetGameTime();
+    // A jump pad launch's damage protection ends a moment after landing.
+    UpdatePadFlight(kart, now);
     // Heal zones (heal_enter/heal_leave) — before this tick's damage, so a
     // hit inside a zone still breaks the melon if it's big enough.
     ApplyHealing(kart, dt);
@@ -137,7 +144,7 @@ export function UpdateKart(slot, kart, dt) {
             kart.lastBounceTime = now;
             // Read by UpdateBounceHud for the angle/timing feedback panel.
             kart.lastBounceInfo = { angle: bounce.angle, angleFactor: bounce.angleFactor, jumpFactor: bounce.jumpFactor };
-            kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, Math.hypot(bounceVelocity.x, bounceVelocity.y));
+            kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(bounceVelocity.x, bounceVelocity.y));
             // Damage waits until the jump-timing window has closed (see the
             // top of the non-locked path, and the late-jump case below) —
             // a jump just *after* the hit can still improve its quality.
@@ -223,6 +230,7 @@ export function UpdateKart(slot, kart, dt) {
             kart.settled = true;
         }
         kart.lastVelocity = undefined;
+        kart.momentum = undefined;
         return;
     }
     kart.settled = false;
@@ -281,7 +289,7 @@ export function UpdateKart(slot, kart, dt) {
     if (boost.boosting) {
         vx += forwardDir.x * ATTACK_BOOST_ACCEL * dt;
         vy += forwardDir.y * ATTACK_BOOST_ACCEL * dt;
-        kart.speedCap = Math.max(kart.speedCap ?? MAX_SPEED, ATTACK_BOOST_MAX_SPEED);
+        kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), ATTACK_BOOST_MAX_SPEED);
     }
 
     // Jump press (ground jump / wall jump / wall-bounce timing) and the
@@ -291,14 +299,19 @@ export function UpdateKart(slot, kart, dt) {
     const vzBase = bounceVelocity ? BounceUpVelocity(currentVelocity.z, wallRules.bounceUpSpeed) : currentVelocity.z;
     const v = { x: vx, y: vy, z: vzBase };
     ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v, wallRules);
+    // On a jump pad, a (just) pressed jump launches instead — see JUMP_PAD_*.
+    TryPadLaunch(slot, kart, now, jumpPressed, v, forwardDir);
     vx = v.x;
     vy = v.y;
     const vz = v.z;
 
-    // Normally MAX_SPEED, but a wall bounce can lift it (see BOOST_DECAY):
-    // decays back down every tick, and never stays above the melon's actual
-    // speed so a lost boost can't be re-earned just by accelerating again.
-    const speedCap = kart.speedCap ?? MAX_SPEED;
+    // Normally the melon's momentum top speed (MAX_SPEED plus whatever
+    // repeatedly reaching it has earned, see MOMENTUM_*), but a wall bounce
+    // or the attack boost can lift it (see BOOST_DECAY): decays back down
+    // every tick, and never stays above the melon's actual speed so a lost
+    // boost can't be re-earned just by accelerating again.
+    const momentumMax = MomentumMaxSpeed(kart.momentum);
+    const speedCap = kart.speedCap ?? momentumMax;
     let horizSpeed = Math.hypot(vx, vy);
     if (horizSpeed > speedCap) {
         const scale = speedCap / horizSpeed;
@@ -306,7 +319,11 @@ export function UpdateKart(slot, kart, dt) {
         vy *= scale;
         horizSpeed = speedCap;
     }
-    kart.speedCap = Math.max(MAX_SPEED, Math.min(speedCap - BOOST_DECAY * dt, horizSpeed));
+    // Boosts don't count towards momentum (neither the attack boost nor a
+    // cap a bounce/boost has lifted above the momentum top speed).
+    const boosted = boost.boosting || speedCap > momentumMax + 1e-6;
+    kart.momentum = UpdateMomentum(kart.momentum, horizSpeed, now, boosted);
+    kart.speedCap = Math.max(MomentumMaxSpeed(kart.momentum), Math.min(speedCap - BOOST_DECAY * dt, horizSpeed));
 
     melon.Move({ velocity: { x: vx, y: vy, z: vz } });
     // What we commanded this tick — compared against the actual velocity
