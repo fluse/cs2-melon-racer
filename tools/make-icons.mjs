@@ -113,7 +113,7 @@ const ICONS = {
     ),
     // "?" — the tutorial button.
     tutorial: questionMark(8, 1.25),
-    // "?" in a rounded box — the GO TO TUTORIAL section.
+    // "?" in a rounded box — the LEARNING & TUTORIAL section.
     "tutorial-box": union(rectOutline(6, 6, 58, 58, 8, 5), questionMark(14, 0.95)),
     // Paint palette — the COLOR section.
     palette: cut(

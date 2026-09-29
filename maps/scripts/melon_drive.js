@@ -4611,7 +4611,7 @@ function ReturnAllToHub(returning) {
 }
 
 /**
- * The user menu's "Go to Tutorial": same as the hub button (leaves a
+ * The user menu's "Play Tutorial": same as the hub button (leaves a
  * running heat, respawn point moves along), just landing at intro_spawn —
  * or the hub, if the map has no intro_spawn.
  * @param {import("./kart-registry.js").Kart} kart

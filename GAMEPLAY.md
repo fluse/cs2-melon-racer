@@ -612,7 +612,7 @@ long fall lands hard enough for the engine to destroy the melon on impact.
   first join again (the kart is dropped on disconnect).
 - Returning to the hub uses `hub_spawn` (required — there's no fallback),
   facing `hub_spawn_facing` if placed, else `hub_spawn`'s own angles.
-- The user menu's "Go to Tutorial" button sends that player back to
+- The user menu's "Play Tutorial" button ("LEARNING & TUTORIAL") sends that player back to
   `intro_spawn` (or `hub_spawn` without one) the same way its "Return to
   hub" button works: it leaves a running heat, clears track progress, and
   makes that spot the kart's respawn point.

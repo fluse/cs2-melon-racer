@@ -72,7 +72,7 @@ The script works without these, with the fallback shown.
 
 | Name | Class | Purpose | Without it |
 |---|---|---|---|
-| `intro_spawn` | `info_player_start` | A player's very first melon (tutorial area); also the "Go to Tutorial" menu target. | `hub_spawn` is used. |
+| `intro_spawn` | `info_player_start` | A player's very first melon (tutorial area); also the "Play Tutorial" menu target. | `hub_spawn` is used. |
 | `hub_spawn_facing` | `info_target` | Only its angle counts: which way a melon at `hub_spawn` faces. | `hub_spawn`'s own angle. |
 | `melon_break_template` | `point_template` | Main break burst: an `info_particle_system` with a `.vpcf` effect. Moved onto the crash site and started. | No burst on break. |
 | `melon_break_chunks_template` | `point_template` | Chunk flecks: an `info_particle_system`, plus up to 9 `prop_physics` break pieces (`models/cs_italy/italy_food_melon/italy_food_melon/piece.vmdl`, `piece1.vmdl` … `piece8.vmdl`) arranged roughly melon-shaped. Pieces are tinted, flung outward and left lying for a while. | No chunks on break. |

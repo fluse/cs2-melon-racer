@@ -216,12 +216,12 @@
 					<Panel class="UserMenuSection">
 						<Panel class="UserMenuSectionHeader">
 							<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/tutorial-box.png" />
-							<Label class="UserMenuSectionLabel" text="GO TO TUTORIAL" />
+							<Label class="UserMenuSectionLabel" text="LEARNING &amp; TUTORIAL" />
 						</Panel>
 						<Button id="usermenu_tutorial_button" class="UserMenuActionButton UserMenuButtonBlue UserMenuButtonFull">
 							<Panel class="UserMenuButtonContent">
 								<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/tutorial.png" />
-								<Label class="UserMenuButtonLabel" text="Go to Tutorial" />
+								<Label class="UserMenuButtonLabel" text="Play Tutorial" />
 							</Panel>
 						</Button>
 					</Panel>
