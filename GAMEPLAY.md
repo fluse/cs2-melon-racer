@@ -623,7 +623,9 @@ and decays at `BOOST_DECAY`); driving over it without pressing does nothing.
 Per pad the name can set both: `jump_pad_<up>_<forward>`. **No damage**
 (decided): on the pad and from the launch until `JUMP_PAD_LANDING_GRACE`
 after landing, impacts and wall hits cost nothing (`DamageKart`); the attack
-boost's cost and `melon_break` still apply. Constants:
+boost's cost and `melon_break` still apply. Marked in the map by two
+ambient particle systems (`jump_pad_rings` + `jump_pad_sparks`, lime so
+they don't look like the cyan lift updraft). Constants:
 `constants/jump-pad.js`; rules: `logic/jump-pad.js`, applied by
 `physics/jump-pad.js` (`test/jump-pad.test.mjs`). Details for mappers:
 MAPPING_API.md 4.9.

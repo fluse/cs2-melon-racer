@@ -359,6 +359,12 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → jump_pad_ent
   boost still costs health, `melon_break` triggers still break.
 - Make the trigger a flat volume on top of the pad, tall enough (~32 units)
   that a melon rolling over it is inside. Both outputs are required.
+- **Marker effect** (optional, not script-driven): two `info_particle_system`s
+  at the pad's center, just above its surface, "Start Active" on — effect
+  `particles/melon_racer/jump_pad_rings.vpcf` (flat lime rings shooting up)
+  and `particles/melon_racer/jump_pad_sparks.vpcf` (fast rising sparks).
+  Sized for a pad ~50 units across; for bigger pads raise
+  `m_flConstantRadius` (rings) and `m_fRadiusMax` (sparks) in the .vpcf.
 
 ## 5. Limits
 

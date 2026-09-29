@@ -65,7 +65,9 @@ particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3
                                           #   rising_dust (ambient, not script-driven — a map-placed info_particle_system, Start Active;
                                           #   square specks from materials/melon_racer/particle_square.vtex + .png, a 16x16 white square);
                                           #   lift_updraft + lift_updraft_streaks (ambient, same way: two info_particle_systems at the bottom of a lift shaft —
-                                          #   soft swaying glow motes + faint fast rising air streaks)
+                                          #   soft swaying glow motes + faint fast rising air streaks);
+                                          #   jump_pad_rings + jump_pad_sparks (ambient, same way: two info_particle_systems on a jump pad —
+                                          #   flat lime rings shooting up and widening + fast rising lime sparks)
                                           #   Write the editor source format, not resourceinfo's compiled dump — see the comments in boost_trail.vpcf;
                                           #   compile with resourcecompiler.exe (-f) like Panorama
 materials/melon_racer/*_decal.vmat       # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
