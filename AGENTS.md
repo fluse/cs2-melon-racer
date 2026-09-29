@@ -61,7 +61,11 @@ tools/make-decal.mjs                     # generates materials/melon_racer/<deca
                                           #   (HUD logo, rawDecals/*.png|jpg — JPG via Windows System.Drawing; can key out a baked-in checkerboard, writes <name>_transparent.png)
 rawDecals/*.png                          # new source images for decals (make-decal.mjs input); once done, the tool moves
                                           #   them (+ their _transparent.png) to rawDecals/done/ and reads them from there
-particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3, hand-written): boost_trail + boost_trail_juice (two info_particle_systems in one template, not parent/child).
+particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3, hand-written): boost_trail + boost_trail_juice (two info_particle_systems in one template, not parent/child);
+                                          #   rising_dust (ambient, not script-driven — a map-placed info_particle_system, Start Active;
+                                          #   square specks from materials/melon_racer/particle_square.vtex + .png, a 16x16 white square);
+                                          #   lift_updraft + lift_updraft_streaks (ambient, same way: two info_particle_systems at the bottom of a lift shaft —
+                                          #   soft swaying glow motes + faint fast rising air streaks)
                                           #   Write the editor source format, not resourceinfo's compiled dump — see the comments in boost_trail.vpcf;
                                           #   compile with resourcecompiler.exe (-f) like Panorama
 materials/melon_racer/*_decal.vmat       # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
