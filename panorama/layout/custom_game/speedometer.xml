@@ -274,6 +274,16 @@
 								</Panel>
 							</Button>
 						</Panel>
+						<!-- Only during a free-roaming time trial (script toggles
+						     Hidden, see CanRestartTimeTrial). -->
+						<Panel id="usermenu_restart_row" class="UserMenuButtonRow UserMenuRestartRow Hidden">
+							<Button id="usermenu_restart_button" class="UserMenuActionButton UserMenuButtonBlue UserMenuButtonFull">
+								<Panel class="UserMenuButtonContent">
+									<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/restart.png" />
+									<Label class="UserMenuButtonLabel" text="Restart Time Trial" />
+								</Panel>
+							</Button>
+						</Panel>
 					</Panel>
 
 					<!-- Same as the hub button (also leaves a running heat), but to

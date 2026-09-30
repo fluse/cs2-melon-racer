@@ -6,7 +6,10 @@ import { GetTrackConfig } from "./track-config.js";
 import { ApplyCheckpointTouch, ApplyLapCompletion, ApplyStartTouch } from "./logic/checkpoint-progress.js";
 import { MAX_TRACKS, MAX_CHECKPOINTS_PER_TRACK, TELEPORT_UP_OFFSET } from "./constants/index.js";
 import { Lifted, GetCheckpointSpawnPoint, GetStartSpawnPoint } from "./spawn-points.js";
-import { StartRun, FinishRun } from "./time-trial.js";
+import { StartRun, FinishRun, CancelRun, CanRestartTimeTrial } from "./time-trial.js";
+// Straight from teleport.js, not physics/index.js: that index pulls in the
+// whole physics tree, which imports race-flow.js — a cycle through here.
+import { RespawnKartAtCheckpoint } from "./physics/teleport.js";
 
 // Start line: a trigger_multiple named "start_<trackId>[_laps<M>]",
 // filtered to the melon (prop_physics) so the frozen/parked pawn can't
@@ -152,6 +155,40 @@ function OnFinishTouched(trackId, kart) {
 /** @param {number} trackId @param {import("./kart-registry.js").Kart} kart @param {{ lapsToWin: number } | undefined} config */
 function LogLapCompleted(trackId, kart, config) {
     Debug(`finish_${trackId}: lap ${kart.lapsCompleted}/${config?.lapsToWin ?? "?"} completed on track ${trackId}`);
+}
+
+/**
+ * The user menu's "Restart Time Trial": back to the track's start spawn,
+ * whole and standing still, clock at zero — it starts again on crossing the
+ * start line. Ignored while the melon is breaking (its respawn is already
+ * under way) or locked.
+ * @param {import("./kart-registry.js").Kart} kart
+ * @returns {boolean} whether it restarted
+ */
+export function RestartTimeTrial(kart) {
+    const trackId = kart.trackId;
+    if (!CanRestartTimeTrial(kart) || trackId === undefined || kart.breaking || kart.locked) {
+        Debug(`RestartTimeTrial: not now (trackId=${trackId}, racing=${kart.racing}, breaking=${kart.breaking}, locked=${kart.locked})`);
+        return false;
+    }
+    const config = GetTrackConfig()[trackId];
+    const trigger = config && Instance.FindEntityByName(config.startEntityName);
+    if (!trigger) {
+        Debug(`RestartTimeTrial: track ${trackId} has no start_${trackId} trigger`);
+        return false;
+    }
+    const spawn = GetStartSpawnPoint(trackId, trigger);
+    CancelRun(kart);
+    kart.lastRun = undefined;
+    kart.trackId = trackId;
+    kart.checkpointIndex = 0;
+    kart.lapsCompleted = 0;
+    kart.checkpointPosition = spawn.position;
+    kart.checkpointAngles = spawn.angles;
+    kart.teleportGen = (kart.teleportGen ?? 0) + 1;
+    RespawnKartAtCheckpoint(kart);
+    Debug(`RestartTimeTrial: back to the start of track ${trackId}`);
+    return true;
 }
 
 /** Registers the start_<trackId>, checkpoint_<trackId>_<index> and finish_<trackId> OnScriptInput handlers for every track/checkpoint slot the map is allowed to use. Called once from index.js. */

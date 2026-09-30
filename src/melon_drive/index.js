@@ -31,7 +31,7 @@ import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen, UpdateJumpDeb
 import { IsMelonGlowOn, SetMelonGlow } from "./melon-look.js";
 import { IsPredictionOn, SetPrediction } from "./prediction.js";
 import { phase, activeTrackId, phaseEndTime, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, RestoreRaceFlowSnapshot } from "./race-flow.js";
-import { RegisterCheckpointAndFinishInputs } from "./checkpoints.js";
+import { RegisterCheckpointAndFinishInputs, RestartTimeTrial } from "./checkpoints.js";
 import { RegisterZoneInputs } from "./zone-inputs.js";
 import { Think } from "./think.js";
 import { RegisterAttackDebug } from "./physics/attack-debug.js";
@@ -276,6 +276,12 @@ Instance.OnCustomHudClicked((event) => {
         }
         RespawnKartAtCheckpoint(kart);
         SetUserMenuOpen(slot, kart, false);
+    } else if (event.buttonId === "usermenu_restart_button") {
+        const slot = event.player.GetPlayerSlot();
+        const kart = karts.get(slot);
+        if (kart && RestartTimeTrial(kart)) {
+            SetUserMenuOpen(slot, kart, false);
+        }
     } else if (event.buttonId === "usermenu_hub_button") {
         const slot = event.player.GetPlayerSlot();
         const kart = karts.get(slot);

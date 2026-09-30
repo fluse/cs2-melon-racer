@@ -877,6 +877,16 @@
     width: 100%;
 }
 
+/* "Restart Time Trial", under the NAVIGATION buttons — only during a
+   free-roaming time trial. */
+.UserMenuRestartRow {
+    margin-top: 8px;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
 .UserMenuButtonGreen {
     background-color: gradient( linear, 0% 0%, 0% 100%, from( #55a83d ), to( #2f7124 ) );
 }

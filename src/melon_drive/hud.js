@@ -10,7 +10,7 @@ import { GetBounceRating } from "./logic/wall-bounce.js";
 import { HealthBarState } from "./logic/health.js";
 import { MomentumMaxSpeed } from "./logic/momentum.js";
 import { GetTrackConfig } from "./track-config.js";
-import { RunElapsed, GetBestTime } from "./time-trial.js";
+import { RunElapsed, GetBestTime, CanRestartTimeTrial } from "./time-trial.js";
 import { FormatRaceTime } from "./logic/time-trial.js";
 import { CheckpointStrip } from "./logic/checkpoint-strip.js";
 import { IsModerator } from "./kart-registry.js";
@@ -336,5 +336,10 @@ export function UpdateJumpDebugHud(slot, kart) {
 export function UpdateUserMenu(slot, kart) {
     if (kart.pawn.WasInputJustPressed(CSInputs.USE)) {
         SetUserMenuOpen(slot, kart, !kart.userMenuOpen);
+    }
+    if (kart.userMenuOpen) {
+        // Every tick while open: the time trial can start or end (finish,
+        // a heat, the hub) with the menu up.
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "usermenu_restart_row", "Hidden", !CanRestartTimeTrial(kart));
     }
 }

@@ -135,6 +135,13 @@ const ICONS = {
         ...[0, 1, 2, 3].map((i) => circle(8 + i * 10, 52 - i * 10, 3.5)),
         ...[1, 2, 3].map((i) => circle(46 - i * 10, 20 - i * 5, 3.5)),
     ),
+    // Circular arrow around a small flag — "Restart Time Trial".
+    restart: union(
+        arc(32, 33, 22, -60, respawnArcEnd, 5),
+        arrowHead(32 + 22 * Math.cos((respawnArcEnd * Math.PI) / 180) + respawnDir[0] * 9, 33 + 22 * Math.sin((respawnArcEnd * Math.PI) / 180) + respawnDir[1] * 9, respawnDir[0], respawnDir[1], 13, 10),
+        line(28, 25, 28, 44, 2.2),
+        polygon([30, 25], [43, 28.5], [30, 33]),
+    ),
     // Flag on a pole — the start of the HUD's checkpoint strip.
     "track-start": union(
         line(14, 6, 14, 60, 3),

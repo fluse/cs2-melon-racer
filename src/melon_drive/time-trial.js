@@ -81,6 +81,17 @@ export function RunElapsed(kart, now) {
     return kart.runStartTime === undefined ? 0 : now - kart.runStartTime;
 }
 
+/**
+ * Whether the user menu offers "Restart Time Trial" (RestartTimeTrial in
+ * checkpoints.js): only while the kart is on a track in a free-roaming time
+ * trial — gone once a finish takes it off the track, and never in a heat
+ * (restarting there would be a free reset mid-race).
+ * @param {import("./kart-registry.js").Kart} kart
+ */
+export function CanRestartTimeTrial(kart) {
+    return !kart.racing && kart.trackId !== undefined;
+}
+
 /** This player's best time on `trackId`, if any. @param {import("./kart-registry.js").Kart} kart @param {number} trackId */
 export function GetBestTime(kart, trackId) {
     return BestTimes()[trackId]?.[PlayerName(kart)];

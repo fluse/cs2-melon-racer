@@ -969,7 +969,6 @@ function TraceSphere(config) {
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
  *   runStartTime?: number, // game time this kart's timed run started (unset: no run) — see time-trial.js
  *   lastRun?: { trackId: number, time: number, newBest: boolean, at: number }, // last finished run, for the HUD
-
  *   breaking: boolean, breakTime?: number, // game time BreakMelon ran, for the break camera zoom
  *   paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
  *   settled: boolean,
@@ -3150,6 +3149,17 @@ function RunElapsed(kart, now) {
     return kart.runStartTime === undefined ? 0 : now - kart.runStartTime;
 }
 
+/**
+ * Whether the user menu offers "Restart Time Trial" (RestartTimeTrial in
+ * checkpoints.js): only while the kart is on a track in a free-roaming time
+ * trial — gone once a finish takes it off the track, and never in a heat
+ * (restarting there would be a free reset mid-race).
+ * @param {import("./kart-registry.js").Kart} kart
+ */
+function CanRestartTimeTrial(kart) {
+    return !kart.racing && kart.trackId !== undefined;
+}
+
 /** This player's best time on `trackId`, if any. @param {import("./kart-registry.js").Kart} kart @param {number} trackId */
 function GetBestTime(kart, trackId) {
     return BestTimes()[trackId]?.[PlayerName(kart)];
@@ -3501,6 +3511,11 @@ function UpdateJumpDebugHud(slot, kart) {
 function UpdateUserMenu(slot, kart) {
     if (kart.pawn.WasInputJustPressed(CSInputs.USE)) {
         SetUserMenuOpen(slot, kart, !kart.userMenuOpen);
+    }
+    if (kart.userMenuOpen) {
+        // Every tick while open: the time trial can start or end (finish,
+        // a heat, the hub) with the menu up.
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "usermenu_restart_row", "Hidden", !CanRestartTimeTrial(kart));
     }
 }
 
@@ -5813,6 +5828,40 @@ function LogLapCompleted(trackId, kart, config) {
     Debug(`finish_${trackId}: lap ${kart.lapsCompleted}/${config?.lapsToWin ?? "?"} completed on track ${trackId}`);
 }
 
+/**
+ * The user menu's "Restart Time Trial": back to the track's start spawn,
+ * whole and standing still, clock at zero — it starts again on crossing the
+ * start line. Ignored while the melon is breaking (its respawn is already
+ * under way) or locked.
+ * @param {import("./kart-registry.js").Kart} kart
+ * @returns {boolean} whether it restarted
+ */
+function RestartTimeTrial(kart) {
+    const trackId = kart.trackId;
+    if (!CanRestartTimeTrial(kart) || trackId === undefined || kart.breaking || kart.locked) {
+        Debug(`RestartTimeTrial: not now (trackId=${trackId}, racing=${kart.racing}, breaking=${kart.breaking}, locked=${kart.locked})`);
+        return false;
+    }
+    const config = GetTrackConfig()[trackId];
+    const trigger = config && Instance.FindEntityByName(config.startEntityName);
+    if (!trigger) {
+        Debug(`RestartTimeTrial: track ${trackId} has no start_${trackId} trigger`);
+        return false;
+    }
+    const spawn = GetStartSpawnPoint(trackId, trigger);
+    CancelRun(kart);
+    kart.lastRun = undefined;
+    kart.trackId = trackId;
+    kart.checkpointIndex = 0;
+    kart.lapsCompleted = 0;
+    kart.checkpointPosition = spawn.position;
+    kart.checkpointAngles = spawn.angles;
+    kart.teleportGen = (kart.teleportGen ?? 0) + 1;
+    RespawnKartAtCheckpoint(kart);
+    Debug(`RestartTimeTrial: back to the start of track ${trackId}`);
+    return true;
+}
+
 /** Registers the start_<trackId>, checkpoint_<trackId>_<index> and finish_<trackId> OnScriptInput handlers for every track/checkpoint slot the map is allowed to use. Called once from index.js. */
 function RegisterCheckpointAndFinishInputs() {
     for (let t = 1; t <= MAX_TRACKS; t++) {
@@ -6360,6 +6409,12 @@ Instance.OnCustomHudClicked((event) => {
         }
         RespawnKartAtCheckpoint(kart);
         SetUserMenuOpen(slot, kart, false);
+    } else if (event.buttonId === "usermenu_restart_button") {
+        const slot = event.player.GetPlayerSlot();
+        const kart = karts.get(slot);
+        if (kart && RestartTimeTrial(kart)) {
+            SetUserMenuOpen(slot, kart, false);
+        }
     } else if (event.buttonId === "usermenu_hub_button") {
         const slot = event.player.GetPlayerSlot();
         const kart = karts.get(slot);
