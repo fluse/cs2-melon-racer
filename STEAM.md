@@ -26,7 +26,7 @@ easier to find in search.)
 
 [b]No guns. No bullets. Just you, a watermelon, and the track.[/b]
 
-Melon Racer turns Counter-Strike 2 into a kart racer. Each player gets their own physics melon and races it through checkpoints, over ramps and off walls. Race in heats with your friends and see whose melon makes it to the finish line in one piece.
+Melon Racer turns Counter-Strike 2 into a kart racer. Each player gets their own physics melon and races it through checkpoints, over ramps and off walls. Race in heats with your friends and see whose melon makes it to the finish line in one piece, or drive alone against the clock and beat your best time.
 
 [hr][/hr]
 
@@ -43,6 +43,8 @@ The game mode's code (the cs_script scripts, HUD logic and build tools) was writ
 [*][b]Race[/b] — pass every checkpoint in order and finish the laps. Shortcuts that skip a checkpoint don't count!
 [*][b]Next track[/b] — a short break, then the next track starts. After the last track everyone goes back to the hub.
 [/list]
+[b]No group? No problem:[/b] drive across any track's start line on your own and the clock starts. That's a time trial.
+
 
 [h2]🍉 Features[/h2]
 [list]
@@ -56,8 +58,9 @@ The game mode's code (the cs_script scripts, HUD logic and build tools) was writ
 [*][b]Lift shafts[/b] — bounce between the walls of a shaft to climb up.
 [*][b]Heal zones & teleporters[/b] — patch up your melon and take the fast way around.
 [*][b]Paint your melon[/b] — drive over a paint pad in the hub or choose a color in the menu. Your melon glows in its color, so everyone can see who's who.
-[*][b]Multiple tracks[/b] — raced one after another, each with its own number of laps.
-[*][b]Custom HUD[/b] — speedometer, checkpoint and lap counter, bounce rating and jump timing.
+[*][b]Time trial[/b] — every run over a track is timed, alone or in a heat. Your best time on each track is saved, and beating it shows a gold [b]NEW BEST[/b]. Messed up the start? Restart the run from the menu.
+[*][b]Multiple tracks[/b] — loops with several laps or A-to-B tracks, raced one after another in a heat.
+[*][b]Custom HUD[/b] — speedometer, run clock with your best time, a checkpoint strip showing which checkpoints you've passed, lap counter, bounce rating and jump timing.
 [/list]
 
 [h2]🎮 Controls[/h2]
@@ -68,7 +71,7 @@ The game mode's code (the cs_script scripts, HUD logic and build tools) was writ
 [tr][td]A / D[/td][td]Strafe left / right[/td][/tr]
 [tr][td]Left mouse button (hold)[/td][td]Boost — costs health, too long and the melon breaks[/td][/tr]
 [tr][td]Space[/td][td]Jump / wall jump / time a wall bounce[/td][/tr]
-[tr][td]E[/td][td]Menu: respawn at checkpoint, back to hub, tutorial, melon color and glow[/td][/tr]
+[tr][td]E[/td][td]Menu: respawn at checkpoint, restart time trial, back to hub, tutorial, melon color and glow[/td][/tr]
 [/table]
 
 [h2]▶ How to play[/h2]
@@ -110,7 +113,7 @@ the German version automatically.
 
 [b]Keine Waffen. Keine Kugeln. Nur du, eine Wassermelone und die Strecke.[/b]
 
-Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt seine eigene Physik-Melone und rast damit durch Checkpoints, über Rampen und von Wänden ab. Fahrt Rennen gegen eure Freunde und schaut, wessen Melone heil im Ziel ankommt.
+Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt seine eigene Physik-Melone und rast damit durch Checkpoints, über Rampen und von Wänden ab. Fahrt Rennen gegen eure Freunde und schaut, wessen Melone heil im Ziel ankommt, oder fahr allein gegen die Uhr und knack deine Bestzeit.
 
 [hr][/hr]
 
@@ -122,6 +125,8 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [*][b]Rennen[/b] — fahrt alle Checkpoints der Reihe nach ab und schafft die Runden. Abkürzungen, die einen Checkpoint auslassen, zählen nicht!
 [*][b]Nächste Strecke[/b] — kurze Pause, dann startet die nächste Strecke. Nach der letzten geht es zurück in den Hub.
 [/list]
+[b]Keine Gruppe? Kein Problem:[/b] fahr allein über die Startlinie einer Strecke und die Uhr läuft. Das ist ein Zeitfahren.
+
 
 [h2]🍉 Features[/h2]
 [list]
@@ -135,8 +140,9 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [*][b]Aufzugschächte[/b] — spring zwischen den Wänden eines Schachts hin und her, um nach oben zu kommen.
 [*][b]Heilzonen & Teleporter[/b] — flick deine Melone und nimm den schnellen Weg.
 [*][b]Melone anmalen[/b] — fahr im Hub über ein Farbfeld oder wähl eine Farbe im Menü. Deine Melone leuchtet in ihrer Farbe, so sieht jeder, wer wer ist.
-[*][b]Mehrere Strecken[/b] — nacheinander gefahren, jede mit eigener Rundenzahl.
-[*][b]Eigenes HUD[/b] — Tacho, Checkpoint- und Rundenanzeige, Abpraller-Bewertung und Sprung-Timing.
+[*][b]Zeitfahren[/b] — jede Fahrt über eine Strecke wird gestoppt, allein oder im Rennen. Deine Bestzeit pro Strecke wird gespeichert, und schlägst du sie, erscheint ein goldenes [b]NEW BEST[/b]. Start verpatzt? Starte die Fahrt im Menü neu.
+[*][b]Mehrere Strecken[/b] — Rundkurse mit mehreren Runden oder Strecken von A nach B, im Rennen nacheinander gefahren.
+[*][b]Eigenes HUD[/b] — Tacho, Fahrzeit mit deiner Bestzeit, eine Checkpoint-Leiste, die zeigt, welche Checkpoints du schon hast, Rundenanzeige, Abpraller-Bewertung und Sprung-Timing.
 [/list]
 
 [h2]🎮 Steuerung[/h2]
@@ -147,7 +153,7 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [tr][td]A / D[/td][td]Seitlich nach links / rechts[/td][/tr]
 [tr][td]Linke Maustaste (halten)[/td][td]Boost — kostet Leben, zu lange und die Melone zerplatzt[/td][/tr]
 [tr][td]Leertaste[/td][td]Springen / Wandsprung / Timing für den Abpraller[/td][/tr]
-[tr][td]E[/td][td]Menü: am Checkpoint neu starten, zurück zum Hub, Tutorial, Farbe und Leuchten[/td][/tr]
+[tr][td]E[/td][td]Menü: am Checkpoint neu starten, Zeitfahren neu starten, zurück zum Hub, Tutorial, Farbe und Leuchten[/td][/tr]
 [/table]
 
 [h2]▶ So spielst du[/h2]
@@ -207,6 +213,32 @@ New: jump pads, a first race track, and momentum — keep hitting top speed and 
 Neu: Sprungfelder, eine erste Rennstrecke und Schwung — erreich immer wieder deine Höchstgeschwindigkeit und sie steigt weiter. Deine Melone leuchtet jetzt in ihrer Farbe, und nach jedem Respawn hast du wieder volles Leben.
 ```
 
+For the time trial update:
+
+```
+[b]Update — Time trial![/b]
+[list]
+[*]New: every run over a track is timed, alone or in a heat. The clock and your best time sit top left, and your best time on each track is saved.
+[*]New: beat your best and you get a gold NEW BEST
+[*]New: "Restart Time Trial" in the menu (E) puts you back at the start line
+[*]New: a checkpoint strip at the top shows which checkpoints you've passed and which one is next
+[*]New: tracks can now go from A to B, not just in loops
+[*]Changed: after breaking you respawn at the checkpoint's own spawn point, facing down the track
+[/list]
+```
+
+```
+[b]Update — Zeitfahren![/b]
+[list]
+[*]Neu: jede Fahrt über eine Strecke wird gestoppt, allein oder im Rennen. Uhr und Bestzeit stehen oben links, und deine Bestzeit pro Strecke wird gespeichert.
+[*]Neu: schlägst du deine Bestzeit, gibt es ein goldenes NEW BEST
+[*]Neu: „Zeitfahren neu starten“ im Menü (E) bringt dich zurück an die Startlinie
+[*]Neu: eine Checkpoint-Leiste oben zeigt, welche Checkpoints du schon hast und welcher als Nächstes kommt
+[*]Neu: Strecken können jetzt auch von A nach B gehen, nicht nur im Kreis
+[*]Geändert: nach dem Zerplatzen startest du am eigenen Spawnpunkt des Checkpoints neu, in Fahrtrichtung
+[/list]
+```
+
 For the boost update:
 
 ```
@@ -251,7 +283,7 @@ Example for the first public version:
 - **Add/edit images & videos**: add 4–6 in-game screenshots besides the
   cover art — hub with paint pads, a race start with the 3-2-1 countdown, a
   PERFECT bounce with the HUD panel, the melon breaking apart, a view down a
-  track. A short YouTube clip (30–60 s) of a heat is what sells a racing
+  track, a NEW BEST time on the HUD. A short YouTube clip (30–60 s) of a heat is what sells a racing
   mode best.
 - **Cover image**: contest rule — no AI art on the page or in the map. The
   old cover was flagged as looking AI-made, so replace it with one made by

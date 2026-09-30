@@ -365,7 +365,7 @@
 			</Panel>
 		</Panel>
 
-		<!-- Melon Racer logo over a dark backdrop, shown for INTRO_LOGO_SECONDS
+		<!-- Melon Racer logo over a solid dark green backdrop, shown for INTRO_LOGO_SECONDS
 		     once a player has picked a team, before their melon spawns (see
 		     ShowIntroLogoThenSpawn). Last, so it covers the rest of the HUD. -->
 		<Panel id="intro_logo" class="IntroLogo Hidden">
