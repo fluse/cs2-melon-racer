@@ -4,13 +4,14 @@
 import { TELEPORT_TRIGGER_NAME_PATTERN, TELEPORT_KEEP_SPEED } from "../constants/index.js";
 
 /**
- * What a teleport trigger's own name encodes (teleport_[stop_|keep_]to_<destination>):
- * the destination entity's name and whether the melon keeps its speed
- * (stop/keep, else TELEPORT_KEEP_SPEED) — or undefined if the name doesn't
- * follow that convention. Surrounding whitespace is ignored — Hammer keeps
- * stray spaces.
+ * What a teleport trigger's own name encodes
+ * (teleport_[stop_|keep_][checkpoint_]to_<destination>): the destination
+ * entity's name, whether the melon keeps its speed (stop/keep, else
+ * TELEPORT_KEEP_SPEED) and whether the destination becomes its respawn
+ * point (checkpoint_) — or undefined if the name doesn't follow that
+ * convention. Surrounding whitespace is ignored — Hammer keeps stray spaces.
  * @param {string} triggerName
- * @returns {{ destination: string, keepSpeed: boolean } | undefined}
+ * @returns {{ destination: string, keepSpeed: boolean, setsRespawn: boolean } | undefined}
  */
 export function ParseTeleportTrigger(triggerName) {
     const match = TELEPORT_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
@@ -18,7 +19,7 @@ export function ParseTeleportTrigger(triggerName) {
         return undefined;
     }
     const keepSpeed = match[1] === "stop" ? false : match[1] === "keep" ? true : TELEPORT_KEEP_SPEED;
-    return { destination: match[2], keepSpeed };
+    return { destination: match[3], keepSpeed, setsRespawn: match[2] !== undefined };
 }
 
 /**

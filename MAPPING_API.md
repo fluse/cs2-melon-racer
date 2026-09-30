@@ -91,13 +91,13 @@ follows the general conventions in section 1.
 
 | Parameter | Fired by | Reads from the trigger | Effect |
 |---|---|---|---|
-| `checkpoint_<trackId>_<index>` | the checkpoint's trigger | transform | Checkpoint progress + respawn point. See 4.1. |
+| `checkpoint_<trackId>_<index>` | the checkpoint's trigger | — (transform only as fallback) | Checkpoint progress + respawn point (`checkpoint_spawn_<trackId>_<index>`). See 4.1. |
 | `finish_<trackId>` | any trigger on the finish line | — | Counts a lap. See 4.2. |
 | `hub_enter` | **only** `hub_start_trigger` | name (checked) | Shows the hub modal (start / race running / abort). |
 | `hub_leave` | `hub_start_trigger`, **`OnEndTouch`** | — | Hides the hub modal. |
 | `hub_teleport` | any trigger | — | Sends the melon to `hub_spawn`, takes it out of a running heat, resets its track progress. |
 | `melon_paint` | `paint_trigger_<r>_<g>_<b>` | name (color) | Paints the melon. See 4.4. |
-| `melon_teleport` | `teleport_[stop_\|keep_]to_<destination>` | name (mode, destination) | Teleports the melon. See 4.5. |
+| `melon_teleport` | `teleport_[stop_\|keep_][checkpoint_]to_<destination>` | name (mode, respawn, destination) | Teleports the melon (with `checkpoint_`: also sets its respawn point). See 4.5. |
 | `melon_break` | any trigger | — | Breaks the melon on the spot (like health running out): respawn at its last checkpoint. Ignored for broken and race-locked melons. |
 | `heal_enter` | any heal trigger | name (optional rate, or `heal_zone_full`) | Melon starts healing over time (or is refilled to full). See 4.6. |
 | `heal_leave` | the same heal trigger, **`OnEndTouch`** | — | Stops healing from that trigger. |
@@ -140,8 +140,16 @@ OnStartTouch → melon_drive_script → RunScriptInput → checkpoint_<trackId>_
 
 - Name the trigger like its parameter (`checkpoint_1_3`) — only the
   parameter is functionally required, but the name keeps the map readable.
-- Its transform is the respawn point after a break once this checkpoint is
-  reached: place and turn it the way a respawning melon should face.
+- **Respawn point:** an `info_target` named
+  `checkpoint_spawn_<trackId>_<index>` (e.g. `checkpoint_spawn_1_3` for
+  `checkpoint_1_3`). Once this checkpoint is reached, a broken melon
+  respawns there — `SPAWN_UP_OFFSET` above the floor traced straight down
+  from it, facing the `info_target`'s yaw (pitch/roll ignored), and the
+  player's view turns that way too. Pattern
+  `^checkpoint_spawn_(\d+)_(\d+)$`. Without one, the trigger's own transform
+  is the respawn point (lifted `TELEPORT_UP_OFFSET`), and the touch logs
+  `no info_target "checkpoint_spawn_…"`. `npm test` fails on a
+  `checkpoint_spawn_*` whose checkpoint no trigger fires (typo).
 - `_1` picks the track; later checkpoints only count on that track and
   strictly in order (skipping one doesn't count). Progress never goes
   backwards.
@@ -196,11 +204,13 @@ destination: any named point entity, e.g. info_target "tp_dest_hub_back"
 trigger:     teleport_to_<destination>        e.g. teleport_to_tp_dest_hub_back
              teleport_stop_to_<destination>   arrives standing still
              teleport_keep_to_<destination>   keeps its speed
+             teleport_[stop_|keep_]checkpoint_to_<destination>
+                                              also makes the destination the respawn point
 output:      OnStartTouch → melon_drive_script → RunScriptInput → melon_teleport
 ```
 
-- Pattern `^teleport_(?:(stop|keep)_)?to_(.+)$`; everything after `to_` is
-  the destination's exact name.
+- Pattern `^teleport_(?:(stop|keep)_)?(checkpoint_)?to_(.+)$`; everything
+  after `to_` is the destination's exact name.
 - The melon arrives at the destination's origin (+ `TELEPORT_UP_OFFSET`),
   facing its yaw; the player's view is turned with it. Speed, per
   teleporter: `teleport_stop_to_…` arrives standing still,
@@ -209,6 +219,12 @@ output:      OnStartTouch → melon_drive_script → RunScriptInput → melon_te
   it). Vertical speed is always dropped.
 - Only moves the melon: health, respawn point and checkpoint/lap progress
   stay as they were — a teleporter can't skip checkpoints.
+- **Respawn teleporter** (`checkpoint_` after the mode, e.g.
+  `teleport_stop_checkpoint_to_tp_dest2_hub_back`): additionally, the
+  destination (origin + `TELEPORT_UP_OFFSET`, its yaw) becomes the melon's
+  respawn point after a break — for the tutorial, so a break doesn't send it
+  back to its start. Track progress still stays untouched. The next
+  checkpoint, respawn teleporter, hub or tutorial button replaces it.
 - Ignored for broken melons and melons locked by the race flow (countdown,
   finished).
 - Prefix destination names with `tp_dest_` by convention.
@@ -399,6 +415,7 @@ Script inputs are pre-registered up to these limits; raise them in
   (or with any other effect in it),
 - two particle templates pointing at the same `info_particle_system`
   (a template copied in Hammer still playing the other one's effect),
+- a `checkpoint_spawn_<t>_<i>` `info_target` whose `checkpoint_<t>_<i>` no trigger fires,
 - entity names with leading/trailing whitespace.
 
 In game, with `DEBUG` on (`src/melon_drive/debug.js`), the console logs
@@ -414,7 +431,7 @@ output is missing, mistargeted, or its filter/spawnflags keep the melon out.
 - [ ] `custom_hud_layout` `speed_hud` (one)
 - [ ] `point_template` `melon_template` with the melon `prop_physics`
 - [ ] `hub_spawn` near the hub floor, `hub_start_trigger` with `hub_enter` + `hub_leave`
-- [ ] per track: `track_start_<id>_cp<N>_laps<M>`, `checkpoint_<id>_1` … `_<N>`, a `finish_<id>` output
+- [ ] per track: `track_start_<id>_cp<N>_laps<M>`, `checkpoint_<id>_1` … `_<N>` (each with an `info_target` `checkpoint_spawn_<id>_<n>`), a `finish_<id>` output
 - [ ] optional: `intro_spawn`, `hub_spawn_facing`, both break templates, `perfect_hit_particle_template`, `particle_health_template`, paint triggers, teleporters, `melon_break` kill triggers
 - [ ] every melon trigger: `trigger_multiple`, "Physics Objects", filtered to `prop_physics`
 - [ ] `npm test` passes

@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { ReadVmapConnections, ReadVmapEntities } from "./helpers/vmap.mjs";
 import { ParseTeleportTarget } from "../src/melon_drive/logic/teleport.js";
-import { HUB_TRIGGER_NAME } from "../src/melon_drive/constants/index.js";
+import { HUB_TRIGGER_NAME, CHECKPOINT_SPAWN_NAME_PATTERN } from "../src/melon_drive/constants/index.js";
 
 const vmapPath = fileURLToPath(new URL("../maps/melon_racer.vmap", import.meta.url));
 const connections = ReadVmapConnections(vmapPath);
@@ -84,4 +84,16 @@ test('every trigger that feeds the script melon inputs has "Physics Objects" tic
         })
         .map((c) => `${Describe(c)} (${c.param}) — tick "Physics Objects" in its spawnflags`);
     assert.deepEqual([...new Set(bad)], []);
+});
+
+// Checkpoint respawn points: an info_target checkpoint_spawn_<t>_<i> is only
+// used by the checkpoint_<t>_<i> input — a typo in either name makes the
+// melon silently respawn at the trigger instead.
+test("every checkpoint_spawn_<trackId>_<index> belongs to a checkpoint the map fires", () => {
+    const fired = new Set(scriptInputs.map((c) => c.param));
+    const orphans = [...entityNames]
+        .map((name) => name.match(CHECKPOINT_SPAWN_NAME_PATTERN))
+        .filter((m) => m && !fired.has(`checkpoint_${m[1]}_${m[2]}`))
+        .map((m) => `"${m[0]}" — no trigger fires RunScriptInput checkpoint_${m[1]}_${m[2]}`);
+    assert.deepEqual(orphans, []);
 });

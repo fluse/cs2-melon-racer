@@ -178,7 +178,7 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
     const triggerName = caller.GetEntityName();
     const parsed = ParseTeleportTrigger(triggerName);
     if (!parsed) {
-        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" isn't named teleport_[stop_|keep_]to_<destination>, ignoring`);
+        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" isn't named teleport_[stop_|keep_][checkpoint_]to_<destination>, ignoring`);
         return;
     }
     const destinationName = parsed.destination;
@@ -190,13 +190,16 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
     const yaw = destination.GetAbsAngles().yaw;
     // Lifted like the race-flow teleports: a destination placed on (or
     // sunk into) the floor would otherwise embed the melon in it.
-    TeleportKartTo(
-        kart,
-        Lifted(destination.GetAbsOrigin(), TELEPORT_UP_OFFSET),
-        LevelAngles(yaw),
-        TeleportExitVelocity(kart.melon.GetAbsVelocity(), yaw, parsed.keepSpeed)
-    );
-    Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"`);
+    const position = Lifted(destination.GetAbsOrigin(), TELEPORT_UP_OFFSET);
+    const angles = LevelAngles(yaw);
+    TeleportKartTo(kart, position, angles, TeleportExitVelocity(kart.melon.GetAbsVelocity(), yaw, parsed.keepSpeed));
+    if (parsed.setsRespawn) {
+        // Only the respawn point — track progress stays untouched, so this
+        // can't skip a race checkpoint.
+        kart.checkpointPosition = position;
+        kart.checkpointAngles = angles;
+    }
+    Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"${parsed.setsRespawn ? " (new respawn point)" : ""}`);
 });
 
 // Kill trigger: any trigger_multiple (filtered to prop_physics) whose

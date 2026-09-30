@@ -34,3 +34,13 @@ export const RACE_SPAWN_LATERAL_SPACING = 120;
 // "track_start_1_cp8_laps3"). See GetTrackConfig() in track-config.js for
 // how this is parsed, cached, and used as each track's start position.
 export const START_TRIGGER_NAME_PATTERN = /^track_start_(\d+)_cp(\d+)_laps(\d+)$/;
+
+// Respawn point of a checkpoint: an info_target named
+// "checkpoint_spawn_<trackId>_<index>" (e.g. "checkpoint_spawn_1_3"). A
+// broken melon respawns there, facing the entity's yaw. Without one, the
+// checkpoint trigger's own transform is used instead.
+export const CHECKPOINT_SPAWN_NAME_PATTERN = /^checkpoint_spawn_(\d+)_(\d+)$/;
+/** @param {number} trackId @param {number} index */
+export function CheckpointSpawnName(trackId, index) {
+    return `checkpoint_spawn_${trackId}_${index}`;
+}

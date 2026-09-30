@@ -5,14 +5,15 @@ import { activeTrackId, FinishKart } from "./race-flow.js";
 import { GetTrackConfig } from "./track-config.js";
 import { ApplyCheckpointTouch, ApplyLapCompletion } from "./logic/checkpoint-progress.js";
 import { MAX_TRACKS, MAX_CHECKPOINTS_PER_TRACK, TELEPORT_UP_OFFSET } from "./constants/index.js";
-import { Lifted } from "./spawn-points.js";
+import { Lifted, GetCheckpointSpawnPoint } from "./spawn-points.js";
 
 // Checkpoints: place a trigger_multiple per checkpoint, filtered to the
 // melon (prop_physics) so the frozen/parked pawn can't trigger it, with its
 // OnStartTouch calling this point_script's RunScriptInput and a parameter of
 // "checkpoint_<trackId>_<index>" — e.g. track 2's 3rd checkpoint is
-// "checkpoint_2_3". The trigger's own position/angles become the respawn
-// point if the melon breaks after reaching it.
+// "checkpoint_2_3". If the melon breaks after reaching it, it respawns at
+// the info_target named "checkpoint_spawn_<trackId>_<index>", facing that
+// entity's yaw — or, without one, at the trigger's own position/angles.
 //
 // The progression rules themselves (which touch counts, one checkpoint at
 // a time, "_1" picks the track, lap counting on a "_1" re-touch) live in
@@ -43,14 +44,21 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
             LogLapCompleted(trackId, kart, ctx.config);
             break;
     }
-    // + TELEPORT_UP_OFFSET for the same reason BeginHeat adds
-    // it to their teleport targets: mappers commonly sink a checkpoint
-    // trigger's brush into the floor so a fast-moving melon reliably
-    // touches it, and teleporting to that exact (embedded) height would
-    // otherwise make a later respawn (e.g. after BreakMelon) tunnel the
-    // melon down through the floor instead of landing on it.
-    kart.checkpointPosition = Lifted(trigger.GetAbsOrigin(), TELEPORT_UP_OFFSET);
-    kart.checkpointAngles = trigger.GetAbsAngles();
+    const spawn = GetCheckpointSpawnPoint(trackId, index);
+    if (spawn) {
+        kart.checkpointPosition = spawn.position;
+        kart.checkpointAngles = spawn.angles;
+    } else {
+        Debug(`checkpoint_${trackId}_${index}: no info_target "checkpoint_spawn_${trackId}_${index}", respawning at the trigger itself`);
+        // + TELEPORT_UP_OFFSET for the same reason BeginHeat adds
+        // it to their teleport targets: mappers commonly sink a checkpoint
+        // trigger's brush into the floor so a fast-moving melon reliably
+        // touches it, and teleporting to that exact (embedded) height would
+        // otherwise make a later respawn (e.g. after BreakMelon) tunnel the
+        // melon down through the floor instead of landing on it.
+        kart.checkpointPosition = Lifted(trigger.GetAbsOrigin(), TELEPORT_UP_OFFSET);
+        kart.checkpointAngles = trigger.GetAbsAngles();
+    }
     Debug(`checkpoint_${trackId}_${index}: kart advanced to checkpoint ${index} on track ${trackId}`);
 }
 

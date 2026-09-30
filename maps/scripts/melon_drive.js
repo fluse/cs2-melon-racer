@@ -674,6 +674,16 @@ const RACE_SPAWN_LATERAL_SPACING = 120;
 // how this is parsed, cached, and used as each track's start position.
 const START_TRIGGER_NAME_PATTERN = /^track_start_(\d+)_cp(\d+)_laps(\d+)$/;
 
+// Respawn point of a checkpoint: an info_target named
+// "checkpoint_spawn_<trackId>_<index>" (e.g. "checkpoint_spawn_1_3"). A
+// broken melon respawns there, facing the entity's yaw. Without one, the
+// checkpoint trigger's own transform is used instead.
+const CHECKPOINT_SPAWN_NAME_PATTERN = /^checkpoint_spawn_(\d+)_(\d+)$/;
+/** @param {number} trackId @param {number} index */
+function CheckpointSpawnName(trackId, index) {
+    return `checkpoint_spawn_${trackId}_${index}`;
+}
+
 // Melon painting: paint triggers and the user menu's color swatches.
 
 // Paint triggers: place a trigger_multiple anywhere (hub is the intended
@@ -717,12 +727,17 @@ const COLOR_PRESETS = {
 // the touching melon to the entity named <destination> (e.g. an
 // info_target), facing that entity's yaw. One shared handler for every
 // teleporter — adding one is a pure Hammer edit. A teleport only moves the
-// melon; it never changes its respawn point / checkpoint progress.
+// melon; it never changes its checkpoint progress, and its respawn point
+// only with "checkpoint_" (below).
 // Optional mode between "teleport_" and "to_", per teleporter:
 //   teleport_stop_to_<destination> — arrives standing still
 //   teleport_keep_to_<destination> — keeps its speed
 //   teleport_to_<destination>      — TELEPORT_KEEP_SPEED decides
-const TELEPORT_TRIGGER_NAME_PATTERN = /^teleport_(?:(stop|keep)_)?to_(.+)$/;
+// and, after the mode, an optional "checkpoint_": the destination also
+// becomes the melon's respawn point (e.g. tutorial sections, so a break
+// doesn't send it back to the start of the tutorial):
+//   teleport_stop_checkpoint_to_<destination>, teleport_checkpoint_to_<destination>, …
+const TELEPORT_TRIGGER_NAME_PATTERN = /^teleport_(?:(stop|keep)_)?(checkpoint_)?to_(.+)$/;
 // Default for teleport_to_<destination> without a mode. true: keep the
 // melon's horizontal speed, redirected along the destination's facing;
 // false: arrive standing still.
@@ -1600,13 +1615,14 @@ function UpdateZoneCamera(kart, dt) {
 // melon_teleport handler does the entity lookups and the actual teleport.
 
 /**
- * What a teleport trigger's own name encodes (teleport_[stop_|keep_]to_<destination>):
- * the destination entity's name and whether the melon keeps its speed
- * (stop/keep, else TELEPORT_KEEP_SPEED) — or undefined if the name doesn't
- * follow that convention. Surrounding whitespace is ignored — Hammer keeps
- * stray spaces.
+ * What a teleport trigger's own name encodes
+ * (teleport_[stop_|keep_][checkpoint_]to_<destination>): the destination
+ * entity's name, whether the melon keeps its speed (stop/keep, else
+ * TELEPORT_KEEP_SPEED) and whether the destination becomes its respawn
+ * point (checkpoint_) — or undefined if the name doesn't follow that
+ * convention. Surrounding whitespace is ignored — Hammer keeps stray spaces.
  * @param {string} triggerName
- * @returns {{ destination: string, keepSpeed: boolean } | undefined}
+ * @returns {{ destination: string, keepSpeed: boolean, setsRespawn: boolean } | undefined}
  */
 function ParseTeleportTrigger(triggerName) {
     const match = TELEPORT_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
@@ -1614,7 +1630,7 @@ function ParseTeleportTrigger(triggerName) {
         return undefined;
     }
     const keepSpeed = match[1] === "stop" ? false : match[1] === "keep" ? true : TELEPORT_KEEP_SPEED;
-    return { destination: match[2], keepSpeed };
+    return { destination: match[3], keepSpeed, setsRespawn: match[2] !== undefined };
 }
 
 /**
@@ -1749,6 +1765,17 @@ function GetIntroSpawnPoint() {
         return GetHubSpawnPoint();
     }
     return spawn;
+}
+
+/**
+ * Where a melon respawns after reaching checkpoint `index` of track
+ * `trackId`: the checkpoint_spawn_<trackId>_<index> info_target, facing its
+ * yaw. Undefined if the map has none — the caller falls back to the
+ * checkpoint trigger itself.
+ * @param {number} trackId @param {number} index
+ */
+function GetCheckpointSpawnPoint(trackId, index) {
+    return FindSpawnPoint(CheckpointSpawnName(trackId, index));
 }
 
 // Pure ground/wall contact and wall-jump rules — no cs_script import, so
@@ -4108,7 +4135,8 @@ function RespawnKartAtCheckpoint(kart) {
 /**
  * Moves a kart's melon somewhere else mid-drive (a generic teleporter, see
  * the melon_teleport input) without touching its health, respawn point or
- * checkpoint progress. The tracking state that compares against last tick
+ * checkpoint progress (a checkpoint_ teleporter sets the respawn point
+ * itself, see the melon_teleport input). The tracking state that compares against last tick
  * is cleared, so the jump in position/velocity isn't read as a hard impact
  * (damage) or a wall hit. speedCap is kept, so a wall-bounce boost carried
  * through the teleport isn't clamped away.
@@ -5267,8 +5295,9 @@ function ApplyCheckpointTouch(kart, trackId, index, ctx) {
 // melon (prop_physics) so the frozen/parked pawn can't trigger it, with its
 // OnStartTouch calling this point_script's RunScriptInput and a parameter of
 // "checkpoint_<trackId>_<index>" — e.g. track 2's 3rd checkpoint is
-// "checkpoint_2_3". The trigger's own position/angles become the respawn
-// point if the melon breaks after reaching it.
+// "checkpoint_2_3". If the melon breaks after reaching it, it respawns at
+// the info_target named "checkpoint_spawn_<trackId>_<index>", facing that
+// entity's yaw — or, without one, at the trigger's own position/angles.
 //
 // The progression rules themselves (which touch counts, one checkpoint at
 // a time, "_1" picks the track, lap counting on a "_1" re-touch) live in
@@ -5299,14 +5328,21 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
             LogLapCompleted(trackId, kart, ctx.config);
             break;
     }
-    // + TELEPORT_UP_OFFSET for the same reason BeginHeat adds
-    // it to their teleport targets: mappers commonly sink a checkpoint
-    // trigger's brush into the floor so a fast-moving melon reliably
-    // touches it, and teleporting to that exact (embedded) height would
-    // otherwise make a later respawn (e.g. after BreakMelon) tunnel the
-    // melon down through the floor instead of landing on it.
-    kart.checkpointPosition = Lifted(trigger.GetAbsOrigin(), TELEPORT_UP_OFFSET);
-    kart.checkpointAngles = trigger.GetAbsAngles();
+    const spawn = GetCheckpointSpawnPoint(trackId, index);
+    if (spawn) {
+        kart.checkpointPosition = spawn.position;
+        kart.checkpointAngles = spawn.angles;
+    } else {
+        Debug(`checkpoint_${trackId}_${index}: no info_target "checkpoint_spawn_${trackId}_${index}", respawning at the trigger itself`);
+        // + TELEPORT_UP_OFFSET for the same reason BeginHeat adds
+        // it to their teleport targets: mappers commonly sink a checkpoint
+        // trigger's brush into the floor so a fast-moving melon reliably
+        // touches it, and teleporting to that exact (embedded) height would
+        // otherwise make a later respawn (e.g. after BreakMelon) tunnel the
+        // melon down through the floor instead of landing on it.
+        kart.checkpointPosition = Lifted(trigger.GetAbsOrigin(), TELEPORT_UP_OFFSET);
+        kart.checkpointAngles = trigger.GetAbsAngles();
+    }
     Debug(`checkpoint_${trackId}_${index}: kart advanced to checkpoint ${index} on track ${trackId}`);
 }
 
@@ -5793,7 +5829,7 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
     const triggerName = caller.GetEntityName();
     const parsed = ParseTeleportTrigger(triggerName);
     if (!parsed) {
-        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" isn't named teleport_[stop_|keep_]to_<destination>, ignoring`);
+        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" isn't named teleport_[stop_|keep_][checkpoint_]to_<destination>, ignoring`);
         return;
     }
     const destinationName = parsed.destination;
@@ -5805,13 +5841,16 @@ Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
     const yaw = destination.GetAbsAngles().yaw;
     // Lifted like the race-flow teleports: a destination placed on (or
     // sunk into) the floor would otherwise embed the melon in it.
-    TeleportKartTo(
-        kart,
-        Lifted(destination.GetAbsOrigin(), TELEPORT_UP_OFFSET),
-        LevelAngles(yaw),
-        TeleportExitVelocity(kart.melon.GetAbsVelocity(), yaw, parsed.keepSpeed)
-    );
-    Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"`);
+    const position = Lifted(destination.GetAbsOrigin(), TELEPORT_UP_OFFSET);
+    const angles = LevelAngles(yaw);
+    TeleportKartTo(kart, position, angles, TeleportExitVelocity(kart.melon.GetAbsVelocity(), yaw, parsed.keepSpeed));
+    if (parsed.setsRespawn) {
+        // Only the respawn point — track progress stays untouched, so this
+        // can't skip a race checkpoint.
+        kart.checkpointPosition = position;
+        kart.checkpointAngles = angles;
+    }
+    Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"${parsed.setsRespawn ? " (new respawn point)" : ""}`);
 });
 
 // Kill trigger: any trigger_multiple (filtered to prop_physics) whose

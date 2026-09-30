@@ -6,12 +6,17 @@
 // the touching melon to the entity named <destination> (e.g. an
 // info_target), facing that entity's yaw. One shared handler for every
 // teleporter — adding one is a pure Hammer edit. A teleport only moves the
-// melon; it never changes its respawn point / checkpoint progress.
+// melon; it never changes its checkpoint progress, and its respawn point
+// only with "checkpoint_" (below).
 // Optional mode between "teleport_" and "to_", per teleporter:
 //   teleport_stop_to_<destination> — arrives standing still
 //   teleport_keep_to_<destination> — keeps its speed
 //   teleport_to_<destination>      — TELEPORT_KEEP_SPEED decides
-export const TELEPORT_TRIGGER_NAME_PATTERN = /^teleport_(?:(stop|keep)_)?to_(.+)$/;
+// and, after the mode, an optional "checkpoint_": the destination also
+// becomes the melon's respawn point (e.g. tutorial sections, so a break
+// doesn't send it back to the start of the tutorial):
+//   teleport_stop_checkpoint_to_<destination>, teleport_checkpoint_to_<destination>, …
+export const TELEPORT_TRIGGER_NAME_PATTERN = /^teleport_(?:(stop|keep)_)?(checkpoint_)?to_(.+)$/;
 // Default for teleport_to_<destination> without a mode. true: keep the
 // melon's horizontal speed, redirected along the destination's facing;
 // false: arrive standing still.

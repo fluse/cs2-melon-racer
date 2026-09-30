@@ -273,8 +273,10 @@ script inputs are pre-registered as `checkpoint_<trackId>_<index>` — e.g.
 track 2's 3rd checkpoint is `checkpoint_2_3`. Hammer setup per checkpoint,
 not yet done in the map:
 
-- A `trigger_multiple` volume placed along the track, positioned/angled at
-  the spot a broken melon should respawn facing.
+- A `trigger_multiple` volume placed along the track.
+- An `info_target` named `checkpoint_spawn_<trackId>_<index>` where a
+  broken melon should respawn after reaching this checkpoint, facing its
+  yaw (without one: the trigger's own position/angles).
 - Filtered (via a `filter_activator_class` set to `prop_physics`, or by name
   if that's ever ambiguous) so only melons — not the frozen/parked player
   pawns — can trigger it.
@@ -293,8 +295,8 @@ time: touching checkpoint N only counts right after N-1, so a shortcut that
 skips checkpoints doesn't count toward the lap (a kart that misses one has
 to go back for it — keep checkpoint triggers thick enough that a fast melon
 can't tunnel through them). Progress is tracked per kart (keyed by melon
-entity). The last-touched checkpoint's position/angles are also where a
-broken melon respawns (see above). Returning to the hub (heat over, abort,
+entity). The last-touched checkpoint's `checkpoint_spawn_*` info_target
+is also where a broken melon respawns (see above). Returning to the hub (heat over, abort,
 or the user menu's hub button) clears the kart's track progress and moves
 its respawn point to the hub.
 
@@ -722,9 +724,14 @@ a teleporter is a pure Hammer edit, no script change:
    make the melon arrive standing still, or `teleport_keep_to_<destination>`
    to make it keep its speed; plain `teleport_to_` uses the
    `TELEPORT_KEEP_SPEED` default.
+5. Optional, per teleporter: `checkpoint_` after the mode
+   (`teleport_stop_checkpoint_to_<destination>`, `teleport_checkpoint_to_…`)
+   also makes the destination the melon's **respawn point** — for the
+   tutorial, so a melon that breaks further in doesn't have to run it all
+   from the start again. Track progress still stays untouched.
 
 Behavior (decided): a teleport **only moves** the melon — health, respawn
-point and checkpoint/lap progress stay as they were, so a teleporter can't
+point (unless `checkpoint_`, see 5.) and checkpoint/lap progress stay as they were, so a teleporter can't
 skip or reset a track's checkpoints. Keeping speed (`keep`, or the
 `TELEPORT_KEEP_SPEED` default), the melon
 keeps its horizontal speed, redirected along the destination's facing

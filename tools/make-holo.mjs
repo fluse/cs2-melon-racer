@@ -10,7 +10,8 @@
 //
 // Also holo_dashes_{color,trans,illum}.png for holo_dashes.vmat and
 // holo_portal_{color,trans,illum}.png for holo_portal.vmat and
-// holo_heal_{color,trans,illum}.png for holo_heal.vmat (see below).
+// holo_heal_{color,trans,illum}.png for holo_heal.vmat and
+// holo_checkpoint_{color,trans,illum}.png for holo_checkpoint.vmat (see below).
 //
 // `node tools/make-holo.mjs <name>` (e.g. holo_dashes) writes only that
 // texture set and leaves the others' PNGs untouched.
@@ -381,3 +382,153 @@ if (!ONLY || ONLY === SPRITE_NAME) {
     writeFileSync(new URL(`${SPRITE_NAME}.png`, OUT_DIR), WritePng(SPRITE_SIZE, SPRITE_SIZE, 4, sprite));
     console.log(`wrote ${SPRITE_NAME}.png (${SPRITE_SIZE}x${SPRITE_SIZE})`);
 }
+
+// --- holo_checkpoint: respawn signs for checkpoint gates (materials/melon_racer/holo_checkpoint.vmat) ---
+//
+// "You respawn from here": a staggered grid of the usual respawn/restart sign
+// — a circular arrow (ring with a gap and an arrowhead, turning
+// counterclockwise, "back to here") around a filled spawn dot — in gold
+// shading to amber, so a checkpoint gate reads differently from heal (green),
+// lift (cyan) and jump pad (lime) markers. Outline and glow like holo_heal's
+// crosses. The material drifts the signs slowly sideways; the self-illum mask
+// is holo_heal's scan band, turned to run across, so a bright sweep passes
+// over the gate. CHECKPOINT_CELL divides SIZE and SIZE / CHECKPOINT_CELL is
+// even — seamless, like the heal grid.
+
+const CHECKPOINT_NAME = "holo_checkpoint";
+const CHECKPOINT_CELL = 128; // px between signs in a row, and between rows (must divide SIZE, SIZE / it even)
+const CHECKPOINT_RING_RADIUS = 30; // px, center of the ring's stroke
+const CHECKPOINT_RING_WIDTH = 5; // px half-width of the ring's stroke
+const CHECKPOINT_GAP_START = 20; // degrees (0 = right, counterclockwise on screen): the ring is open from here…
+const CHECKPOINT_GAP_END = 80; // …to here; the arrowhead sits at the gap's start, pointing into it
+const CHECKPOINT_ARROW_LENGTH = 20; // px, arrowhead base to tip
+const CHECKPOINT_ARROW_HALF_WIDTH = 13; // px, half the arrowhead's base
+const CHECKPOINT_DOT_RADIUS = 9; // px, the spawn point in the middle
+const CHECKPOINT_EDGE_WIDTH = 1.5; // px half-width of the bright outline
+const CHECKPOINT_GLOW_WIDTH = 12; // px falloff of the glow around the outline
+const CHECKPOINT_FILL = 0.55; // brightness of a sign's inside
+const CHECKPOINT_GLASS_ALPHA = 0.08;
+const CHECKPOINT_BAND_WIDTH = 70; // px, the illum scan band's softness (one band per tile)
+const CHECKPOINT_SCANLINE_PERIOD = 16; // px (must divide SIZE)
+const CHECKPOINT_SCANLINE_DEPTH = 0.25; // how much darker between scanlines
+const CHECKPOINT_ILLUM_MIN = 0.35; // illum outside the band
+const CHECKPOINT_GRADIENT = [
+    [0.0, [255, 200, 40]], // gold
+    [0.4, [255, 200, 40]],
+    [0.55, [255, 140, 20]], // amber
+    [0.9, [255, 140, 20]],
+    [1.0, [255, 200, 40]],
+];
+
+/** Signed distance (px) from (x, y) to a convex polygon (counterclockwise points); < 0 inside. */
+function PolygonDistance(x, y, points) {
+    let best = Infinity;
+    let inside = true;
+    for (let i = 0; i < points.length; i++) {
+        const [ax, ay] = points[i];
+        const [bx, by] = points[(i + 1) % points.length];
+        const ex = bx - ax;
+        const ey = by - ay;
+        const t = Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / (ex * ex + ey * ey)));
+        best = Math.min(best, Math.hypot(x - ax - ex * t, y - ay - ey * t));
+        if (ex * (y - ay) - ey * (x - ax) < 0) inside = false;
+    }
+    return inside ? -best : best;
+}
+
+// The arrowhead, the same for every sign: base centered on the ring at the
+// gap's start, tip further along the circle (counterclockwise) into the gap.
+const CHECKPOINT_ARROW = (() => {
+    const a = (CHECKPOINT_GAP_START * Math.PI) / 180;
+    const [px, py] = [Math.cos(a) * CHECKPOINT_RING_RADIUS, Math.sin(a) * CHECKPOINT_RING_RADIUS];
+    const [tx, ty] = [-Math.sin(a), Math.cos(a)]; // counterclockwise tangent
+    const [nx, ny] = [Math.cos(a), Math.sin(a)]; // outward
+    const tip = [px + tx * CHECKPOINT_ARROW_LENGTH, py + ty * CHECKPOINT_ARROW_LENGTH];
+    const outer = [px + nx * CHECKPOINT_ARROW_HALF_WIDTH, py + ny * CHECKPOINT_ARROW_HALF_WIDTH];
+    const inner = [px - nx * CHECKPOINT_ARROW_HALF_WIDTH, py - ny * CHECKPOINT_ARROW_HALF_WIDTH];
+    return [inner, outer, tip]; // counterclockwise
+})();
+
+/** Signed distance (px) from (x, y) to one respawn sign centered at the origin; < 0 inside. */
+function RespawnSignDistance(x, y) {
+    y = -y; // image y runs down; flipped, "counterclockwise" is as seen on screen
+    const r = Math.hypot(x, y);
+    let deg = (Math.atan2(y, x) * 180) / Math.PI;
+    if (deg < 0) deg += 360;
+    let ring;
+    if (deg > CHECKPOINT_GAP_START && deg < CHECKPOINT_GAP_END) {
+        // In the gap: distance to the nearer (round) end of the stroke.
+        ring = Infinity;
+        for (const endDeg of [CHECKPOINT_GAP_START, CHECKPOINT_GAP_END]) {
+            const a = (endDeg * Math.PI) / 180;
+            const d = Math.hypot(x - Math.cos(a) * CHECKPOINT_RING_RADIUS, y - Math.sin(a) * CHECKPOINT_RING_RADIUS);
+            ring = Math.min(ring, d - CHECKPOINT_RING_WIDTH);
+        }
+    } else {
+        ring = Math.abs(r - CHECKPOINT_RING_RADIUS) - CHECKPOINT_RING_WIDTH;
+    }
+    return Math.min(ring, PolygonDistance(x, y, CHECKPOINT_ARROW), r - CHECKPOINT_DOT_RADIUS);
+}
+
+/** Signed distance (px) from pixel (x, y) to the nearest sign of the staggered grid. */
+function CheckpointDistance(x, y) {
+    const row = Math.round(y / CHECKPOINT_CELL);
+    let best = Infinity;
+    for (const dr of [-1, 0, 1]) {
+        const r = row + dr;
+        const s = (((r % 2) + 2) % 2) * (CHECKPOINT_CELL / 2);
+        const cx = Math.round((x - s) / CHECKPOINT_CELL) * CHECKPOINT_CELL + s;
+        for (const dc of [-CHECKPOINT_CELL, 0, CHECKPOINT_CELL]) {
+            best = Math.min(best, RespawnSignDistance(x - (cx + dc), y - r * CHECKPOINT_CELL));
+        }
+    }
+    return best;
+}
+
+function CheckpointGradient(t) {
+    t -= Math.floor(t);
+    for (let i = 1; i < CHECKPOINT_GRADIENT.length; i++) {
+        const [t1, c1] = CHECKPOINT_GRADIENT[i];
+        const [t0, c0] = CHECKPOINT_GRADIENT[i - 1];
+        if (t <= t1) {
+            const k = (t - t0) / (t1 - t0);
+            const s = k * k * (3 - 2 * k);
+            return c0.map((v, j) => v + (c1[j] - v) * s);
+        }
+    }
+    return CHECKPOINT_GRADIENT[0][1];
+}
+
+const checkpointColor = Buffer.alloc(SIZE * SIZE * 3);
+const checkpointTrans = Buffer.alloc(SIZE * SIZE);
+const checkpointIllum = Buffer.alloc(SIZE * SIZE);
+for (let y = 0; y < SIZE; y++) {
+    const scan = 1 - CHECKPOINT_SCANLINE_DEPTH * (0.5 - 0.5 * Math.cos((2 * Math.PI * y) / CHECKPOINT_SCANLINE_PERIOD));
+    for (let x = 0; x < SIZE; x++) {
+        // Illum: one soft band per tile along U (centered on the tile edge, wraps) times scanlines.
+        const bandDist = Math.abs(((x + SIZE / 2) % SIZE) - SIZE / 2);
+        const band = Math.exp(-(bandDist * bandDist) / (2 * CHECKPOINT_BAND_WIDTH ** 2));
+        // Supersampled 2x2, like the heal crosses.
+        let edge = 0;
+        let inside = 0;
+        for (const [ox, oy] of [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
+            const d = CheckpointDistance(x + ox, y + oy);
+            const dist = Math.abs(d);
+            const core = Math.max(0, Math.min(1, CHECKPOINT_EDGE_WIDTH + 0.5 - dist));
+            const glow = d > 0 ? Math.exp(-(dist * dist) / (2 * (CHECKPOINT_GLOW_WIDTH / 2.5) ** 2)) : 0;
+            edge += Math.min(1, core + glow * 0.6) / 4;
+            inside += (d < 0 ? 1 : 0) / 4;
+        }
+        const line = Math.min(1, edge + inside * CHECKPOINT_FILL);
+        // Horizontal gradient that wraps once across the tile, so it drifts with the signs.
+        const [r, g, b] = CheckpointGradient(x / SIZE);
+        const white = Math.max(0, edge - 0.85) / 0.15 * 0.6;
+        const i = y * SIZE + x;
+        checkpointColor[i * 3] = Math.round(r + (255 - r) * white);
+        checkpointColor[i * 3 + 1] = Math.round(g + (255 - g) * white);
+        checkpointColor[i * 3 + 2] = Math.round(b + (255 - b) * white);
+        checkpointTrans[i] = Math.round(255 * (CHECKPOINT_GLASS_ALPHA + (1 - CHECKPOINT_GLASS_ALPHA) * line));
+        checkpointIllum[i] = Math.round(255 * (CHECKPOINT_ILLUM_MIN + (1 - CHECKPOINT_ILLUM_MIN) * band) * scan);
+    }
+}
+WriteSet(CHECKPOINT_NAME, SIZE, SIZE, checkpointColor, checkpointTrans, checkpointIllum);

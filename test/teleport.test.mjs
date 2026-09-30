@@ -20,12 +20,23 @@ test("names that don't follow teleport_to_<destination> are rejected", () => {
 });
 
 test("the trigger name picks per teleporter whether the melon keeps its speed", () => {
-    assert.deepEqual(ParseTeleportTrigger("teleport_stop_to_tp_dest_hub_back"), { destination: "tp_dest_hub_back", keepSpeed: false });
-    assert.deepEqual(ParseTeleportTrigger("teleport_keep_to_tp_dest_hub_back"), { destination: "tp_dest_hub_back", keepSpeed: true });
-    assert.deepEqual(ParseTeleportTrigger("teleport_to_tp_dest_hub_back"), { destination: "tp_dest_hub_back", keepSpeed: TELEPORT_KEEP_SPEED });
+    assert.deepEqual(ParseTeleportTrigger("teleport_stop_to_tp_dest_hub_back"), { destination: "tp_dest_hub_back", keepSpeed: false, setsRespawn: false });
+    assert.deepEqual(ParseTeleportTrigger("teleport_keep_to_tp_dest_hub_back"), { destination: "tp_dest_hub_back", keepSpeed: true, setsRespawn: false });
+    assert.deepEqual(ParseTeleportTrigger("teleport_to_tp_dest_hub_back"), { destination: "tp_dest_hub_back", keepSpeed: TELEPORT_KEEP_SPEED, setsRespawn: false });
     // A destination whose own name looks like a mode stays the destination.
-    assert.deepEqual(ParseTeleportTrigger("teleport_to_stop_to_x"), { destination: "stop_to_x", keepSpeed: TELEPORT_KEEP_SPEED });
+    assert.deepEqual(ParseTeleportTrigger("teleport_to_stop_to_x"), { destination: "stop_to_x", keepSpeed: TELEPORT_KEEP_SPEED, setsRespawn: false });
     for (const name of ["teleport_stop_to_", "teleport_fast_to_dest", "teleport_stop_dest"]) {
+        assert.equal(ParseTeleportTrigger(name), undefined, JSON.stringify(name));
+    }
+});
+
+test("checkpoint_ after the mode makes the destination the respawn point", () => {
+    assert.deepEqual(ParseTeleportTrigger("teleport_stop_checkpoint_to_tp_dest2_hub_back"), { destination: "tp_dest2_hub_back", keepSpeed: false, setsRespawn: true });
+    assert.deepEqual(ParseTeleportTrigger("teleport_keep_checkpoint_to_x"), { destination: "x", keepSpeed: true, setsRespawn: true });
+    assert.deepEqual(ParseTeleportTrigger("teleport_checkpoint_to_x"), { destination: "x", keepSpeed: TELEPORT_KEEP_SPEED, setsRespawn: true });
+    // Only in that spot: a destination whose own name starts with checkpoint_ stays the destination.
+    assert.deepEqual(ParseTeleportTrigger("teleport_to_checkpoint_to_x"), { destination: "checkpoint_to_x", keepSpeed: TELEPORT_KEEP_SPEED, setsRespawn: false });
+    for (const name of ["teleport_checkpoint_stop_to_x", "teleport_checkpoint_to_"]) {
         assert.equal(ParseTeleportTrigger(name), undefined, JSON.stringify(name));
     }
 });

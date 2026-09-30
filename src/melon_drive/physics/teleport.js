@@ -33,7 +33,8 @@ export function RespawnKartAtCheckpoint(kart) {
 /**
  * Moves a kart's melon somewhere else mid-drive (a generic teleporter, see
  * the melon_teleport input) without touching its health, respawn point or
- * checkpoint progress. The tracking state that compares against last tick
+ * checkpoint progress (a checkpoint_ teleporter sets the respawn point
+ * itself, see the melon_teleport input). The tracking state that compares against last tick
  * is cleared, so the jump in position/velocity isn't read as a hard impact
  * (damage) or a wall hit. speedCap is kept, so a wall-bounce boost carried
  * through the teleport isn't clamped away.
