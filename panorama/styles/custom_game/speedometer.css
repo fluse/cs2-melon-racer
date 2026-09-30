@@ -3,19 +3,16 @@
     height: 100%;
 }
 
-/* Only shown while the kart is on a track (script toggles "Hidden" via
-   SetHasClassForPlayer once kart.trackId is set). */
-.CheckpointPanel {
-    horizontal-align: center;
+/* Time trial, top left: big run clock, the player's best below it, and
+   the finish time for a few seconds after a run (see time-trial.js). Shown
+   while the kart is on a track (script toggles "Hidden"). */
+.RunPanel {
+    horizontal-align: left;
     vertical-align: top;
-    margin-top: 18%;
+    margin-top: 32px;
+    margin-left: 40px;
 
     flow-children: down;
-
-    padding: 8px 20px;
-    background-color: #000000aa;
-    border: 2px solid #ffffff55;
-    border-radius: 8px;
 
     transition-property: opacity;
     transition-duration: .15s;
@@ -26,60 +23,205 @@
     }
 }
 
-.CheckpointLabel {
-    font-size: 14px;
+.RunTime {
+    font-size: 56px;
+    font-weight: bold;
     letter-spacing: 1px;
-    color: #ffffffaa;
-    horizontal-align: center;
+    color: white;
+    text-shadow: 3px 3px 4px #000000cc;
 }
 
-.CheckpointRow {
+.RunBestRow {
+    flow-children: right;
+    margin-top: -4px;
+}
+
+.RunBestUnit {
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #ffffff88;
+    margin-right: 8px;
+    vertical-align: center;
+}
+
+.RunBest {
+    font-size: 24px;
+    font-weight: bold;
+    color: #9fe8ff;
+    text-shadow: 2px 2px 3px #000000cc;
+}
+
+.RunResult {
+    margin-top: 6px;
+    font-size: 20px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: white;
+    text-shadow: 2px 2px 3px #000000cc;
+
+    &.NewBest {
+        color: #ffe066;
+    }
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+/* Checkpoint strip, top center: start flag -> numbered checkpoints ->
+   finish flag, joined by lines. Reached = gold, Next = white and a bit
+   bigger, pending (no class) = dim. Slots the track doesn't need are
+   Unused (collapsed, with their line). Shown while the kart is on a track. */
+.CheckpointStrip {
+    horizontal-align: center;
+    vertical-align: top;
+    margin-top: 32px;
+
+    flow-children: down;
+
+    padding: 10px 18px;
+    background-color: #00000088;
+    border-radius: 24px;
+
+    transition-property: opacity;
+    transition-duration: .15s;
+    opacity: 1;
+
+    &.Hidden {
+        opacity: 0;
+    }
+}
+
+.StripRow {
     flow-children: right;
     horizontal-align: center;
 }
 
-.CheckpointCurrent {
-    font-size: 32px;
+.StripFlag {
+    width: 32px;
+    height: 32px;
+    vertical-align: center;
+    opacity: .4;
+
+    &.Next {
+        opacity: 1;
+    }
+
+    &.Reached {
+        opacity: 1;
+        wash-color: #ffe066;
+    }
+}
+
+.StripLink {
+    width: 18px;
+    height: 3px;
+    vertical-align: center;
+    background-color: #ffffff40;
+
+    &.Reached {
+        background-color: #ffe066;
+    }
+
+    &.Unused {
+        visibility: collapse;
+    }
+}
+
+.StripCheckpoint {
+    width: 24px;
+    height: 24px;
+    vertical-align: center;
+    border-radius: 12px;
+    border: 2px solid #ffffff55;
+    background-color: #00000066;
+
+    transition-property: background-color, border;
+    transition-duration: .2s;
+
+    &.Next {
+        width: 30px;
+        height: 30px;
+        border-radius: 15px;
+        border: 3px solid white;
+        background-color: #ffffff22;
+    }
+
+    &.Reached {
+        border: 2px solid #ffe066;
+        background-color: #ffe066;
+    }
+
+    &.Unused {
+        visibility: collapse;
+    }
+}
+
+.StripNumber {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: 13px;
     font-weight: bold;
+    color: #ffffffaa;
+}
+
+.StripCheckpoint.Next .StripNumber {
+    font-size: 15px;
     color: white;
-    text-shadow: 2px 2px 2px black;
 }
 
-.CheckpointSlash {
-    font-size: 32px;
-    color: #ffffff77;
-    margin-left: 4px;
-    margin-right: 4px;
+.StripCheckpoint.Reached .StripNumber {
+    color: #3a2c00;
 }
 
-.CheckpointTotal {
-    font-size: 32px;
-    color: #ffffffcc;
+.StripMore {
+    vertical-align: center;
+    margin-left: 6px;
+    margin-right: 6px;
+    font-size: 18px;
+    color: #ffffff88;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.StripLapRow {
+    flow-children: right;
+    horizontal-align: center;
+    margin-top: 6px;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.LapUnit {
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #ffffff88;
+    margin-right: 6px;
+    vertical-align: center;
 }
 
 .LapCurrent {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: bold;
     color: #ffe066;
 }
 
 .LapSlash {
-    font-size: 20px;
+    font-size: 18px;
     color: #ffffff77;
     margin-left: 2px;
     margin-right: 2px;
 }
 
 .LapTotal {
-    font-size: 20px;
+    font-size: 18px;
     color: #ffe066cc;
-}
-
-.LapUnit {
-    font-size: 12px;
-    letter-spacing: 1px;
-    color: #ffffff88;
-    margin-left: 6px;
 }
 
 /* Hub "ready to start" prompt — shown while a kart stands in

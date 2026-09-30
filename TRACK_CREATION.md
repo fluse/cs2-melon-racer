@@ -18,10 +18,15 @@ connections you set up in Hammer**. There is no separate config file and
 nothing to touch in the script. Every track needs exactly three kinds of
 trigger:
 
-1. One **start trigger** (`track_start_...`) — marks the track's spawn point
-   and encodes checkpoint/lap count in its name.
-2. One **checkpoint trigger per checkpoint** (`checkpoint_<trackId>_<index>`).
+1. One **start trigger** (`start_<trackId>`, optionally `_laps<M>`) — the
+   start line: marks the track's spawn point and its lap count.
+2. One **checkpoint trigger per checkpoint** (`checkpoint_<trackId>_<index>`)
+   along the way — the script counts them.
 3. One **finish signal** (`finish_<trackId>`) — counts a completed lap.
+
+A track can be a **loop** (start and finish on the same line, one or more
+laps) or **point-to-point** (the finish is somewhere else, usually the
+other end; one lap).
 
 Tracks are numbered (`trackId`) starting at 1, and heats run in ascending
 `trackId` order — track 1 first, then track 2, and so on, until the last
@@ -30,48 +35,65 @@ track also decides where it falls in that sequence.
 
 ## 1. The start trigger
 
-Place a `trigger_multiple` at the spot racers should spawn/teleport to when
-this track's heat begins. Its own transform (position **and** facing angle)
-is used directly for that teleport, so orient it facing down the track.
-
-Name it:
+Place a `trigger_multiple` on the start line, plus an `info_target` just
+behind it where racers line up when this track's heat begins:
 
 ```
-track_start_<trackId>_cp<checkpointCount>_laps<lapsToWin>
+trigger_multiple  start_<trackId>[_laps<M>]   e.g. start_1_laps3
+info_target       start_spawn_<trackId>       e.g. start_spawn_1
+```
+
+The racers appear just above the floor below the `info_target`, facing its
+yaw (turn it in Hammer; pitch/roll don't matter), side by side across that
+direction, 120 units apart (`RACE_SPAWN_LATERAL_SPACING`) — make the start
+wide enough (4 racers ≈ 360 units). A melon that breaks before checkpoint 1
+respawns there too. Without the `info_target` the trigger's own origin and
+angles are used instead — no floor trace, and Hammer doesn't always turn a
+brush entity's angles along with its geometry, so the `info_target` is the
+reliable way.
+
+Name the trigger:
+
+```
+start_<trackId>                  e.g. start_2        (1 lap)
+start_<trackId>_laps<lapsToWin>  e.g. start_1_laps3  (3 laps)
 ```
 
 - `trackId` — this track's number (1, 2, 3, …). Must be unique per track.
-- `checkpointCount` — how many `checkpoint_<trackId>_N` triggers this track
-  will have (see below).
 - `lapsToWin` — how many laps a racer must complete to finish this track's
-  heat.
+  heat. Leave `_laps…` off for 1 lap (point-to-point tracks).
 
-Example: a track with 8 checkpoints that takes 3 laps to win, as track 1:
+**Output** (always without the `_laps` part):
 
-```
-track_start_1_cp8_laps3
-```
+| Output | Target entity | Via this input | Parameter |
+|---|---|---|---|
+| `OnStartTouch` | the map's `point_script` entity | `RunScriptInput` | `start_<trackId>` |
 
-This trigger does **not** need any Outputs wired at all — the script finds
-it purely by parsing its name once at map start. (You *can* also use it to
-carry the finish signal — see step 3.)
+Crossing it is what makes a kart "pick" this track (outside a heat; in a
+heat, racers are put on their track the moment it starts) and makes
+`start_spawn_<trackId>` its respawn point until checkpoint 1.
 
 ## 2. Checkpoint triggers
 
-For each checkpoint along the track (numbered 1 through `checkpointCount`,
-in the order racers should reach them), place a `trigger_multiple` where
-racers should pass it, plus an `info_target` where a broken melon should
-respawn after reaching this checkpoint:
+For each checkpoint after the start line (numbered 1 through N, in the order
+racers should reach them), place a `trigger_multiple` where racers should
+pass it, plus an `info_target` where a broken melon should respawn after
+reaching this checkpoint:
 
 ```
 trigger_multiple  checkpoint_<trackId>_<index>         e.g. checkpoint_1_3
 info_target       checkpoint_spawn_<trackId>_<index>   e.g. checkpoint_spawn_1_3
 ```
 
+**The trigger's name must be exactly its parameter** — the script can't see
+which parameter an output fires, so it counts a track's checkpoints from
+these names (the highest index). Number them without gaps; `npm test` fails
+on a misnamed checkpoint trigger or a gap.
+
 The melon respawns just above the floor below the `info_target`, facing the
 `info_target`'s yaw (turn it in Hammer; pitch/roll don't matter). It can sit
 anywhere — in front of, behind or beside the trigger. Without one, the
-trigger's own position/angles are the respawn point (as before).
+trigger's own position/angles are the respawn point.
 
 **Outputs** (on each checkpoint trigger):
 
@@ -85,11 +107,10 @@ Example for track 1's 3rd checkpoint:
 OnStartTouch → melon_drive_script → RunScriptInput → checkpoint_1_3
 ```
 
-Checkpoint `_1` is special: touching it is what makes a kart "pick" this
-track in the first place (this is also what happens automatically the
-instant a heat starts — racers spawn right on top of it). Checkpoints past
-`_1` only count while the kart is already on that same track, and only ever
-move progress forward — touching an earlier checkpoint again does nothing.
+Checkpoints only count once the kart crossed this track's start line, one
+at a time in order, and only ever move progress forward — touching an
+earlier checkpoint again does nothing. A loop track needs at least one
+checkpoint; a point-to-point track may have none.
 
 **Filter every checkpoint trigger to `prop_physics`** (the melon prop), the
 same way as all other race triggers in this map — a player's own pawn is
@@ -114,23 +135,19 @@ crosses this track's finish line:
 | `OnStartTouch` | the map's `point_script` entity | `RunScriptInput` | `finish_<trackId>` |
 
 This is what actually counts a completed lap and, once the required number
-of laps is reached, ends that racer's heat. It's a script input in its own
-right — it doesn't matter which trigger fires it, only that *some* trigger
-on the finish line does. In practice you have two options:
+of laps is reached, ends that racer's heat. It doesn't matter which trigger
+fires it, only that *some* trigger on the finish line does:
 
-- **Start/finish line are the same spot** (the common case): add the
-  `finish_<trackId>` output as a **second** Output on the **start trigger**
-  from step 1, or on the `checkpoint_<trackId>_1` trigger from step 2 —
-  whichever one physically sits on that line. Either works; it makes no
-  difference which entity fires it or in what order, if both outputs happen
-  to live on the same trigger.
-- **Separate finish line**: place its own `trigger_multiple` wherever the
-  track actually ends, filtered to `prop_physics` like the others, with just
+- **Loop track** (start = finish line): add `finish_<trackId>` as a
+  **second** Output on the **start trigger** from step 1. Whichever of the
+  two outputs Hammer fires first, the lap counts exactly once.
+- **Point-to-point track**: place its own `trigger_multiple` where the track
+  ends (any name), filtered to `prop_physics` like the others, with just
   this one Output.
 
-A lap only counts if the racer already reached checkpoint `checkpointCount`
-(the last one) since their last lap started — crossing the finish line
-early (e.g. cutting the course) is ignored, not counted.
+A lap only counts if the racer already reached the last checkpoint since
+their last lap started — crossing the finish line early (e.g. cutting the
+course) is ignored, not counted.
 
 ## Filtering triggers to the melon
 
@@ -139,30 +156,42 @@ Set the trigger's activator filter (`filter_activator_class` pointing at a
 filter entity configured for `prop_physics`, or an equivalent filter) so
 only melons — never player pawns or other props — can fire it.
 
-## Putting it together: a minimal 2-checkpoint, 3-lap track
+## Putting it together
 
-1. `trigger_multiple` **"track_start_1_cp2_laps3"** at the spawn point,
-   facing down the track. No Outputs required (or see the finish-signal
-   shortcut below).
-2. `trigger_multiple` **"checkpoint_1_1"** at the start/finish line.
-   Outputs:
-   - `OnStartTouch → point_script → RunScriptInput → checkpoint_1_1`
-   - `OnStartTouch → point_script → RunScriptInput → finish_1` (the
-     finish signal — start and finish share this same line here)
-3. `trigger_multiple` **"checkpoint_1_2"** at the far end of the loop.
-   Output: `OnStartTouch → point_script → RunScriptInput → checkpoint_1_2`
+**A loop track with 2 checkpoints and 3 laps (track 1):**
 
-Driving flow: spawn on the line → touch `checkpoint_1_1` (picks track 1) →
-drive to `checkpoint_1_2` → loop back and touch `checkpoint_1_1`/`finish_1`
-again → lap 1/3 done → repeat two more times → heat ends once
-`lapsCompleted` reaches 3.
+1. `trigger_multiple` **"start_1_laps3"** on the start/finish line, and an
+   `info_target` **"start_spawn_1"** just behind it, facing down the track.
+   Outputs on the trigger:
+   - `OnStartTouch → melon_drive_script → RunScriptInput → start_1`
+   - `OnStartTouch → melon_drive_script → RunScriptInput → finish_1`
+2. `trigger_multiple` **"checkpoint_1_1"** partway round.
+   Output: `OnStartTouch → melon_drive_script → RunScriptInput → checkpoint_1_1`
+3. `trigger_multiple` **"checkpoint_1_2"** further round.
+   Output: `OnStartTouch → melon_drive_script → RunScriptInput → checkpoint_1_2`
+
+Driving flow: spawn on the line → `checkpoint_1_1` → `checkpoint_1_2` →
+back across the start line → lap 1/3 done → repeat two more times → heat
+ends once `lapsCompleted` reaches 3.
+
+**A point-to-point track with 2 checkpoints (track 2):**
+
+1. `trigger_multiple` **"start_2"** at the beginning, `info_target`
+   **"start_spawn_2"** just behind it.
+   Output: `OnStartTouch → melon_drive_script → RunScriptInput → start_2`
+2. **"checkpoint_2_1"**, **"checkpoint_2_2"** along the way, as above.
+3. A `trigger_multiple` at the end (e.g. **"finish_2"**).
+   Output: `OnStartTouch → melon_drive_script → RunScriptInput → finish_2`
+
+Driving flow: spawn at the start → `checkpoint_2_1` → `checkpoint_2_2` →
+finish → done.
 
 ## Adding a second (or third, …) track
 
 Just repeat the whole process above with the next `trackId`:
 
 ```
-track_start_2_cp<N>_laps<M>
+start_2[_laps<M>]
 checkpoint_2_1 .. checkpoint_2_<N>
 finish_2
 ```
@@ -171,16 +200,18 @@ No script changes, no registration step — the moment these entities exist
 with the right names, the track is picked up automatically and slotted into
 the race sequence after track 1 (by ascending `trackId`). There's room for
 up to 8 tracks and 32 checkpoints per track (`MAX_TRACKS` /
-`MAX_CHECKPOINTS_PER_TRACK` in `melon_drive.js` — raise these constants if
-you ever need more).
+`MAX_CHECKPOINTS_PER_TRACK` in `constants/race.js` — raise these constants
+if you ever need more).
 
 ## Testing your track
 
 `melon_drive.js` currently runs with `DEBUG = true`, which logs every
-checkpoint/finish touch and race-flow transition to the console
+start/checkpoint/finish touch and race-flow transition to the console
 (`[melon_drive] ...`). While testing a new track, watch for lines like:
 
 ```
+[melon_drive] GetTrackConfig: found track(s) {"1":{"checkpoints":2,"lapsToWin":3,...}}
+[melon_drive] start_1: kart is now on track 1
 [melon_drive] checkpoint_1_2: kart advanced to checkpoint 2 on track 1
 [melon_drive] finish_1: lap 2/3 completed on track 1
 [melon_drive] UpdateRaceFlow: heat on track 1 complete, break started
@@ -189,15 +220,20 @@ checkpoint/finish touch and race-flow transition to the console
 If a checkpoint or finish line doesn't seem to register when you drive
 through it, the corresponding debug line simply won't appear — that means
 the Output on that trigger is missing, mistargeted, or using the wrong
-parameter name, not a script problem.
+parameter name, not a script problem. Run `npm test` too: it checks the
+.vmap for most naming/wiring mistakes.
 
 ## Checklist
 
-- [ ] Start trigger named `track_start_<trackId>_cp<N>_laps<M>`, positioned
-      and facing correctly.
+- [ ] Start trigger named `start_<trackId>` or `start_<trackId>_laps<M>`,
+      firing `start_<trackId>`.
+- [ ] `info_target` `start_spawn_<trackId>` behind the start line, facing
+      down the track, with room for the racers side by side.
 - [ ] One `checkpoint_<trackId>_<index>` trigger per checkpoint, `1..N`, each
-      firing `RunScriptInput` with that exact parameter.
-- [ ] A `finish_<trackId>` output wired somewhere on the finish line.
+      named exactly like the parameter it fires.
+- [ ] A `finish_<trackId>` output — on the start trigger (loop) or on a
+      trigger at the end (point-to-point).
 - [ ] Every trigger above filtered to `prop_physics`.
+- [ ] `npm test` passes.
 - [ ] Tested in-game with the console open, watching for the debug lines
       above.

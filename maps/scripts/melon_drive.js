@@ -450,6 +450,13 @@ const HEALTH_BAR_SEGMENTS = 20;
 const HEALTH_LOW_FRACTION = 0.6;
 const HEALTH_CRITICAL_FRACTION = 0.3;
 
+// Checkpoint strip at the top of the screen (start flag -> numbered
+// checkpoints -> finish flag) — see CHECKPOINT_HUD_SLOTS panel ids
+// ("cp_slot_0" .. "cp_slot_{N-1}", each with a "cp_link_<i>" line before
+// it) in speedometer.xml. A track with more checkpoints shows a window of
+// this many that moves along with the kart (see logic/checkpoint-strip.js).
+const CHECKPOINT_HUD_SLOTS = 12;
+
 // Momentum: reaching the top speed again and again in quick succession
 // raises that melon's own top speed, step by step — as long as it never
 // drops below MOMENTUM_MIN_SPEED in between (that ends the "run" and resets
@@ -668,11 +675,33 @@ const BREAK_SECONDS = 10; // fixed by the original request
 // so they don't spawn stacked on top of each other.
 const RACE_SPAWN_LATERAL_SPACING = 120;
 
-// Track start/finish trigger naming convention:
-// "track_start_<trackId>_cp<checkpointCount>_laps<lapsToWin>" (e.g.
-// "track_start_1_cp8_laps3"). See GetTrackConfig() in track-config.js for
-// how this is parsed, cached, and used as each track's start position.
-const START_TRIGGER_NAME_PATTERN = /^track_start_(\d+)_cp(\d+)_laps(\d+)$/;
+// Start trigger of a track: a trigger_multiple named "start_<trackId>",
+// optionally "start_<trackId>_laps<lapsToWin>" (e.g. "start_1_laps3";
+// without _laps it's DEFAULT_LAPS_TO_WIN). Its OnStartTouch fires
+// RunScriptInput "start_<trackId>" (always without the _laps part), which
+// puts a free-roaming melon on that track; its transform is where racers
+// line up when a heat starts. The finish is the separate "finish_<trackId>"
+// input — on the same trigger for a loop track, at the end of the track
+// for a point-to-point one. See GetTrackConfig() in track-config.js.
+const START_TRIGGER_NAME_PATTERN = /^start_(\d+)(?:_laps(\d+))?$/;
+const DEFAULT_LAPS_TO_WIN = 1;
+
+// Spawn point of a track's start: an info_target named
+// "start_spawn_<trackId>" (e.g. "start_spawn_1"). Racers line up there when
+// a heat starts (on the floor under it, facing its yaw), and a melon that
+// breaks before checkpoint 1 respawns there. Without one, the start
+// trigger's own transform is used instead.
+const START_SPAWN_NAME_PATTERN = /^start_spawn_(\d+)$/;
+/** @param {number} trackId */
+function StartSpawnName(trackId) {
+    return `start_spawn_${trackId}`;
+}
+
+// Checkpoint triggers are named like their script input,
+// "checkpoint_<trackId>_<index>" — GetTrackConfig() counts a track's
+// checkpoints from these names (the script can't see which parameter a
+// trigger's output fires), so the name is required, not just tidy.
+const CHECKPOINT_TRIGGER_NAME_PATTERN = /^checkpoint_(\d+)_(\d+)$/;
 
 // Respawn point of a checkpoint: an info_target named
 // "checkpoint_spawn_<trackId>_<index>" (e.g. "checkpoint_spawn_1_3"). A
@@ -684,6 +713,18 @@ function CheckpointSpawnName(trackId, index) {
     return `checkpoint_spawn_${trackId}_${index}`;
 }
 
+// Time trial: every run over a track is timed (start line -> finish of the
+// last lap), and each player's best time per track is saved to disk. See
+// "Time trial" in GAMEPLAY.md.
+
+// How long the finish time ("NEW BEST!" or not) stays on the HUD after a run.
+const RUN_RESULT_SECONDS = 5;
+
+// Key of the best times inside the addon's save data (Instance.SetSaveData
+// holds one string for the whole addon — a JSON object, so other systems can
+// keep their own keys next to this one).
+const SAVE_DATA_BEST_TIMES_KEY = "bestTimes";
+
 // Melon painting: paint triggers and the user menu's color swatches.
 
 // Paint triggers: place a trigger_multiple anywhere (hub is the intended
@@ -693,7 +734,7 @@ function CheckpointSpawnName(trackId, index) {
 // this point_script — the color itself is read back off the trigger's own
 // name (regex below), not the script input parameter, so adding/changing a
 // paint trigger's color is a pure Hammer edit, same convention as
-// track_start_* in GetTrackConfig().
+// start_<trackId> in GetTrackConfig().
 const PAINT_TRIGGER_NAME_PATTERN = /^paint_trigger_(\d+)_(\d+)_(\d+)$/;
 
 // Outline glow (the engine's Glow(), like CS2's teammate outline) around
@@ -926,6 +967,9 @@ function TraceSphere(config) {
  *   health: number, lastVelocity: { x: number, y: number, z: number } | undefined,
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
+ *   runStartTime?: number, // game time this kart's timed run started (unset: no run) — see time-trial.js
+ *   lastRun?: { trackId: number, time: number, newBest: boolean, at: number }, // last finished run, for the HUD
+
  *   breaking: boolean, breakTime?: number, // game time BreakMelon ran, for the break camera zoom
  *   paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
  *   settled: boolean,
@@ -1776,6 +1820,25 @@ function GetIntroSpawnPoint() {
  */
 function GetCheckpointSpawnPoint(trackId, index) {
     return FindSpawnPoint(CheckpointSpawnName(trackId, index));
+}
+
+/**
+ * Where track `trackId` starts: the start_spawn_<trackId> info_target,
+ * facing its yaw — or, without one, the start trigger `trigger` itself
+ * (lifted TELEPORT_UP_OFFSET, since its brush may be sunk into the floor).
+ * @param {number} trackId @param {any} trigger
+ * @returns {SpawnPoint}
+ */
+function GetStartSpawnPoint(trackId, trigger) {
+    const spawn = FindSpawnPoint(StartSpawnName(trackId));
+    if (spawn) {
+        return spawn;
+    }
+    Debug(`GetStartSpawnPoint: no info_target "${StartSpawnName(trackId)}", starting at the start trigger itself`);
+    return {
+        position: Lifted(trigger.GetAbsOrigin(), TELEPORT_UP_OFFSET),
+        angles: LevelAngles(trigger.GetAbsAngles().yaw),
+    };
 }
 
 // Pure ground/wall contact and wall-jump rules — no cs_script import, so
@@ -2845,16 +2908,20 @@ function ImpactDamage(impactDelta, floorNormalZ) {
 
 // Healing math (HealedHealth, HealZoneRate): heal/logic.js.
 
-// Per-track checkpoint/lap config comes straight from Hammer instead of a
-// hand-maintained lookup: each track has one trigger_multiple named
-// "track_start_<trackId>_cp<checkpointCount>_laps<lapsToWin>" (e.g.
-// "track_start_1_cp8_laps3"). Its transform also doubles as where racers are
-// teleported to start that track. Parsed once and cached — the geometry
-// can't change without a full map reload anyway. Only the entity *name* is
-// kept, not the entity handle itself: unlike Instance.FindEntityByName's
-// handles, the ones yielded by FindEntitiesByClass's iterator below don't
-// stay valid once the loop moves on, so resolving to a live entity happens
-// at each point of use instead (see BeginHeat in race-flow.js).
+// Per-track config comes straight from Hammer instead of a hand-maintained
+// lookup: each track has one trigger_multiple named "start_<trackId>" or
+// "start_<trackId>_laps<lapsToWin>" (e.g. "start_1_laps3"; without _laps
+// it's DEFAULT_LAPS_TO_WIN), and its checkpoint count is however many
+// "checkpoint_<trackId>_<index>" triggers the map has (the highest index —
+// they must run 1..N without gaps, or finish_<trackId> can never be
+// reached; a gap is logged). The start trigger's transform also doubles as
+// where racers are teleported to start that track. Parsed once and cached —
+// the geometry can't change without a full map reload anyway. Only the
+// entity *name* is kept, not the entity handle itself: unlike
+// Instance.FindEntityByName's handles, the ones yielded by
+// FindEntitiesByClass's iterator below don't stay valid once the loop moves
+// on, so resolving to a live entity happens at each point of use instead
+// (see BeginHeat in race-flow.js).
 /** @typedef {{ checkpoints: number, lapsToWin: number, startEntityName: string }} TrackConfig */
 /** @type {Record<number, TrackConfig> | null} */
 let trackConfigCache = null;
@@ -2875,31 +2942,257 @@ function GetTrackConfig() {
     }
     /** @type {Record<number, TrackConfig>} */
     const config = {};
+    /** @type {Map<number, Set<number>>} checkpoint indices found per track */
+    const checkpointIndices = new Map();
     for (const trigger of Instance.FindEntitiesByClass("trigger_multiple")) {
-        const match = START_TRIGGER_NAME_PATTERN.exec(trigger.GetEntityName());
-        if (!match) {
+        const name = trigger.GetEntityName();
+        const start = START_TRIGGER_NAME_PATTERN.exec(name);
+        if (start) {
+            config[Number(start[1])] = {
+                checkpoints: 0, // counted below
+                lapsToWin: start[2] !== undefined ? Number(start[2]) : DEFAULT_LAPS_TO_WIN,
+                startEntityName: name,
+            };
             continue;
         }
-        config[Number(match[1])] = {
-            checkpoints: Number(match[2]),
-            lapsToWin: Number(match[3]),
-            startEntityName: trigger.GetEntityName(),
-        };
+        const checkpoint = CHECKPOINT_TRIGGER_NAME_PATTERN.exec(name);
+        if (checkpoint) {
+            const trackId = Number(checkpoint[1]);
+            if (!checkpointIndices.has(trackId)) {
+                checkpointIndices.set(trackId, new Set());
+            }
+            checkpointIndices.get(trackId)?.add(Number(checkpoint[2]));
+        }
     }
     if (Object.keys(config).length === 0) {
         // Don't cache an empty result — entities may not have spawned yet.
         lastEmptyScanTime = now;
-        Debug("GetTrackConfig: no track_start_<id>_cp<N>_laps<M> triggers found yet");
+        Debug("GetTrackConfig: no start_<id> triggers found yet");
         return config;
     }
+    for (const [trackId, track] of Object.entries(config)) {
+        const indices = checkpointIndices.get(Number(trackId)) ?? new Set();
+        track.checkpoints = indices.size > 0 ? Math.max(...indices) : 0;
+        for (let i = 1; i <= track.checkpoints; i++) {
+            if (!indices.has(i)) {
+                Debug(`GetTrackConfig: track ${trackId} has checkpoint_${trackId}_${track.checkpoints} but no checkpoint_${trackId}_${i} — its finish can never be reached`);
+            }
+        }
+    }
     trackConfigCache = config;
-    Debug(`GetTrackConfig: found track(s) ${JSON.stringify(Object.keys(config))}`);
+    Debug(`GetTrackConfig: found track(s) ${JSON.stringify(config)}`);
     return config;
 }
 
 /** Track ids in race order (ascending), derived from whatever start triggers exist. */
 function GetTrackOrder() {
     return Object.keys(GetTrackConfig()).map(Number).sort((a, b) => a - b);
+}
+
+// Pure time-trial rules — no cs_script import, so they're unit-testable in
+// Node (see test/time-trial.test.mjs). time-trial.js applies them: starts
+// and stops a kart's run clock, and reads/writes the best times through
+// Instance.GetSaveData/SetSaveData.
+
+/**
+ * Best time (seconds) per track id per player name.
+ * @typedef {Record<string, Record<string, number>>} BestTimes
+ */
+
+/**
+ * "m:ss.cc", e.g. 83.456 -> "1:23.45". Truncated, not rounded, like a
+ * stopwatch — a run is never shown faster than it was.
+ * @param {number} seconds
+ */
+function FormatRaceTime(seconds) {
+    const centis = Math.floor(Math.max(0, seconds) * 100 + 1e-6);
+    const minutes = Math.floor(centis / 6000);
+    const secs = Math.floor(centis / 100) % 60;
+    const rest = centis % 100;
+    return `${minutes}:${String(secs).padStart(2, "0")}.${String(rest).padStart(2, "0")}`;
+}
+
+/**
+ * The addon's whole save data as an object — anything unreadable (empty on
+ * first run, or written by something else) counts as empty rather than
+ * throwing, so a broken file can't stop the script.
+ * @param {string} raw
+ * @returns {Record<string, any>}
+ */
+function ParseSaveData(raw) {
+    if (!raw) {
+        return {};
+    }
+    try {
+        const data = JSON.parse(raw);
+        return data && typeof data === "object" && !Array.isArray(data) ? data : {};
+    } catch {
+        return {};
+    }
+}
+
+/**
+ * The best times inside parsed save data (a fresh object if there are none).
+ * Drops entries that aren't positive numbers.
+ * @param {Record<string, any>} saveData
+ * @returns {BestTimes}
+ */
+function GetBestTimes(saveData) {
+    const raw = saveData[SAVE_DATA_BEST_TIMES_KEY];
+    /** @type {BestTimes} */
+    const best = {};
+    if (!raw || typeof raw !== "object") {
+        return best;
+    }
+    for (const [trackId, players] of Object.entries(raw)) {
+        if (!players || typeof players !== "object") {
+            continue;
+        }
+        for (const [name, time] of Object.entries(players)) {
+            if (typeof time === "number" && time > 0 && Number.isFinite(time)) {
+                (best[trackId] ??= {})[name] = time;
+            }
+        }
+    }
+    return best;
+}
+
+/**
+ * Records a finished run. Only a faster time than the player's best on
+ * that track replaces it.
+ * @param {BestTimes} best @param {number} trackId @param {string} playerName @param {number} time
+ * @returns {boolean} whether it's a new best
+ */
+function RecordRunTime(best, trackId, playerName, time) {
+    const previous = best[trackId]?.[playerName];
+    if (previous !== undefined && previous <= time) {
+        return false;
+    }
+    (best[trackId] ??= {})[playerName] = time;
+    return true;
+}
+
+// Time trial: every run over a track is timed, for every player on their
+// own — from crossing the start line (outside a heat) or GO (in a heat) to
+// the finish of the last lap. Breaking doesn't stop the clock (the lost time
+// is the penalty); leaving the track (hub, tutorial, a new heat) cancels the
+// run. Each player's best time per track is kept in the addon's save data,
+// keyed by player name — the API has no stable player id. The rules are in
+// logic/time-trial.js; checkpoints.js and race-flow.js call in here.
+
+// Parsed from the save data, re-parsed only when that string changes (the
+// HUD asks for the best time every tick; the engine itself reads the file
+// from disk only once).
+/** @type {import("./logic/time-trial.js").BestTimes} */
+let bestTimes = {};
+/** @type {string | undefined} */
+let bestTimesSource = undefined;
+
+function BestTimes() {
+    const raw = Instance.GetSaveData();
+    if (raw !== bestTimesSource) {
+        bestTimes = GetBestTimes(ParseSaveData(raw));
+        bestTimesSource = raw;
+    }
+    return bestTimes;
+}
+
+function SaveBestTimes() {
+    // Re-read so keys other systems may keep in the save data survive.
+    const data = ParseSaveData(Instance.GetSaveData());
+    data[SAVE_DATA_BEST_TIMES_KEY] = bestTimes;
+    const raw = JSON.stringify(data);
+    Instance.SetSaveData(raw);
+    bestTimesSource = raw; // already what bestTimes holds — no re-parse
+}
+
+/** @param {import("./kart-registry.js").Kart} kart */
+function PlayerName(kart) {
+    return kart.pawn.GetPlayerController()?.GetPlayerName() ?? "";
+}
+
+/** Starts (or restarts) the kart's run clock. @param {import("./kart-registry.js").Kart} kart @param {number} [now] */
+function StartRun(kart, now = Instance.GetGameTime()) {
+    kart.runStartTime = now;
+}
+
+/** Stops the clock without a result — the kart left the track. @param {import("./kart-registry.js").Kart} kart */
+function CancelRun(kart) {
+    kart.runStartTime = undefined;
+}
+
+/**
+ * The run is complete: stops the clock, records the time as the player's
+ * best if it is one, and keeps it in kart.lastRun for the HUD. No-op without
+ * a running clock.
+ * @param {import("./kart-registry.js").Kart} kart @param {number} trackId
+ */
+function FinishRun(kart, trackId) {
+    if (kart.runStartTime === undefined) {
+        return;
+    }
+    const now = Instance.GetGameTime();
+    const time = now - kart.runStartTime;
+    kart.runStartTime = undefined;
+    const name = PlayerName(kart);
+    // RecordRunTime updates the cached object in place; SaveBestTimes then
+    // writes exactly that object back.
+    const newBest = name !== "" && RecordRunTime(BestTimes(), trackId, name, time);
+    if (newBest) {
+        SaveBestTimes();
+    }
+    kart.lastRun = { trackId, time, newBest, at: now };
+    Debug(`FinishRun: "${name}" ran track ${trackId} in ${FormatRaceTime(time)}${newBest ? " — new best" : ""}`);
+}
+
+/** Seconds on the kart's clock right now (0 if it isn't running). @param {import("./kart-registry.js").Kart} kart @param {number} now */
+function RunElapsed(kart, now) {
+    return kart.runStartTime === undefined ? 0 : now - kart.runStartTime;
+}
+
+/** This player's best time on `trackId`, if any. @param {import("./kart-registry.js").Kart} kart @param {number} trackId */
+function GetBestTime(kart, trackId) {
+    return BestTimes()[trackId]?.[PlayerName(kart)];
+}
+
+// What the HUD's checkpoint strip shows (start flag -> numbered checkpoints
+// -> finish flag) for a kart's progress — pure, see
+// test/checkpoint-strip.test.mjs; hud.js applies it to the panels.
+
+/**
+ * @typedef {"reached" | "next" | "pending"} StripState
+ * @typedef {{
+ *   slots: { number: number, state: StripState }[], // the visible checkpoints, in order
+ *   finish: StripState,
+ *   moreBefore: boolean, moreAfter: boolean, // checkpoints left out of the window on either side
+ * }} Strip
+ */
+
+/**
+ * @param {number} total the track's checkpoint count
+ * @param {number} reached checkpoints reached this lap (kart.checkpointIndex)
+ * @param {number} maxSlots how many checkpoints fit (CHECKPOINT_HUD_SLOTS)
+ * @param {boolean} [done] the run is over — everything, finish included, reached
+ * @returns {Strip}
+ */
+function CheckpointStrip(total, reached, maxSlots, done = false) {
+    const visible = Math.min(total, maxSlots);
+    if (done) {
+        reached = total;
+    }
+    // Keep the next checkpoint in view, about in the middle of the window.
+    const offset = Math.max(0, Math.min(total - visible, reached - Math.floor(visible / 2)));
+    const slots = [];
+    for (let i = 0; i < visible; i++) {
+        const number = offset + i + 1;
+        slots.push({ number, state: number <= reached ? "reached" : number === reached + 1 ? "next" : "pending" });
+    }
+    return {
+        slots,
+        finish: done ? "reached" : reached >= total ? "next" : "pending",
+        moreBefore: offset > 0,
+        moreAfter: offset + visible < total,
+    };
 }
 
 /** @type {any} */
@@ -3005,23 +3298,82 @@ function UpdateHealthHud(slot, kart) {
     hud.SetHasClassForPlayer(slot, "health_bar", "Critical", bar.critical);
 }
 
-/** @param {number} slot @param {import("./kart-registry.js").Kart} kart */
+/**
+ * The track HUD: the time trial panel top left (see time-trial.js) — run
+ * clock, the player's best on the track, and for RUN_RESULT_SECONDS after a
+ * finish (in a heat: until it's over) the finish time — and the checkpoint
+ * strip top center (start -> checkpoints -> finish, see
+ * logic/checkpoint-strip.js) with the lap below it on multi-lap tracks. Shown
+ * while the kart is on a track — or, right after a free-roaming finish took
+ * it off the track, while that result is up.
+ * @param {number} slot @param {import("./kart-registry.js").Kart} kart
+ */
 function UpdateCheckpointHud(slot, kart) {
     const hud = GetSpeedHud();
     if (!hud) {
         return;
     }
-    const trackId = kart.trackId;
+    const now = Instance.GetGameTime();
+    const result = kart.lastRun && (kart.finished || now - kart.lastRun.at < RUN_RESULT_SECONDS) ? kart.lastRun : undefined;
+    const trackId = kart.trackId ?? result?.trackId;
+    hud.SetHasClassForPlayer(slot, "run_panel", "Hidden", trackId === undefined);
     hud.SetHasClassForPlayer(slot, "checkpoint_panel", "Hidden", trackId === undefined);
     if (trackId === undefined) {
         return;
     }
     const config = GetTrackConfig()[trackId];
-    hud.SetDialogVariableStringForPlayer(slot, "checkpoint_panel", "current", String(kart.checkpointIndex));
-    hud.SetDialogVariableStringForPlayer(slot, "checkpoint_panel", "total", config ? String(config.checkpoints) : "?");
-    const currentLap = config ? Math.min(kart.lapsCompleted + 1, config.lapsToWin) : kart.lapsCompleted + 1;
-    hud.SetDialogVariableStringForPlayer(slot, "checkpoint_panel", "lap_current", String(currentLap));
-    hud.SetDialogVariableStringForPlayer(slot, "checkpoint_panel", "lap_total", config ? String(config.lapsToWin) : "?");
+    // Taken off the track by its finish (or parked after a heat's): show the
+    // track as complete.
+    const done = kart.trackId === undefined || kart.finished;
+    UpdateRunPanel(hud, slot, kart, trackId, now, result);
+    UpdateCheckpointStrip(hud, slot, config?.checkpoints ?? 0, kart.checkpointIndex, done);
+
+    const laps = config?.lapsToWin ?? 1;
+    hud.SetHasClassForPlayer(slot, "lap_row", "Hidden", laps <= 1);
+    hud.SetDialogVariableStringForPlayer(slot, "lap_row", "lap_current", String(done ? laps : Math.min(kart.lapsCompleted + 1, laps)));
+    hud.SetDialogVariableStringForPlayer(slot, "lap_row", "lap_total", String(laps));
+}
+
+/**
+ * @param {any} hud @param {number} slot @param {import("./kart-registry.js").Kart} kart @param {number} trackId @param {number} now
+ * @param {import("./kart-registry.js").Kart["lastRun"]} result the finish time to show, if any
+ */
+function UpdateRunPanel(hud, slot, kart, trackId, now, result) {
+    const clock = kart.runStartTime !== undefined ? RunElapsed(kart, now) : result ? result.time : 0;
+    hud.SetDialogVariableStringForPlayer(slot, "run_panel", "time", FormatRaceTime(clock));
+    const best = GetBestTime(kart, trackId);
+    hud.SetDialogVariableStringForPlayer(slot, "run_panel", "best", best !== undefined ? FormatRaceTime(best) : "-:--.--");
+    hud.SetHasClassForPlayer(slot, "run_result", "Hidden", !result);
+    if (result) {
+        hud.SetHasClassForPlayer(slot, "run_result", "NewBest", result.newBest);
+        hud.SetDialogVariableStringForPlayer(slot, "run_result", "result", `${result.newBest ? "NEW BEST" : "FINISH"} ${FormatRaceTime(result.time)}`);
+    }
+}
+
+/**
+ * Sets the strip's CHECKPOINT_HUD_SLOTS circles ("cp_slot_<i>", each with the
+ * line "cp_link_<i>" before it), the "…" markers and the finish flag.
+ * @param {any} hud @param {number} slot @param {number} total @param {number} reached @param {boolean} done
+ */
+function UpdateCheckpointStrip(hud, slot, total, reached, done) {
+    const strip = CheckpointStrip(total, reached, CHECKPOINT_HUD_SLOTS, done);
+    for (let i = 0; i < CHECKPOINT_HUD_SLOTS; i++) {
+        const shown = strip.slots[i];
+        const state = shown?.state;
+        for (const id of [`cp_slot_${i}`, `cp_link_${i}`]) {
+            hud.SetHasClassForPlayer(slot, id, "Unused", !shown);
+            hud.SetHasClassForPlayer(slot, id, "Reached", state === "reached");
+        }
+        hud.SetHasClassForPlayer(slot, `cp_slot_${i}`, "Next", state === "next");
+        if (shown) {
+            hud.SetDialogVariableStringForPlayer(slot, `cp_slot_${i}`, "n", String(shown.number));
+        }
+    }
+    hud.SetHasClassForPlayer(slot, "cp_more_before", "Hidden", !strip.moreBefore);
+    hud.SetHasClassForPlayer(slot, "cp_more_after", "Hidden", !strip.moreAfter);
+    hud.SetHasClassForPlayer(slot, "cp_link_finish", "Reached", strip.finish === "reached");
+    hud.SetHasClassForPlayer(slot, "cp_finish", "Next", strip.finish === "next");
+    hud.SetHasClassForPlayer(slot, "cp_finish", "Reached", strip.finish === "reached");
 }
 
 // Kept in sync every tick (see Think in think.js) as well as on hub_enter,
@@ -4859,7 +5211,7 @@ function TryStartRace() {
     }
     const order = GetTrackOrder();
     if (order.length === 0) {
-        Debug("TryStartRace: no track_start_* triggers found, ignoring");
+        Debug("TryStartRace: no start_<id> triggers found, ignoring");
         return;
     }
     const racers = [...karts.values()].filter((kart) => kart.inHub && kart.melon.IsValid());
@@ -4913,7 +5265,7 @@ function BeginHeat(trackId) {
     const config = GetTrackConfig()[trackId];
     const start = config && Instance.FindEntityByName(config.startEntityName);
     if (!start) {
-        Debug(`BeginHeat: track ${trackId} has no track_start_* trigger, aborting heat back to HUB`);
+        Debug(`BeginHeat: track ${trackId} has no start_${trackId} trigger, aborting heat back to HUB`);
         // Route through ReturnAllToHub, not a bare phase reset: callers
         // (TryStartRace, or the BREAK->next-heat transition) may already
         // have marked these karts racing/hidden their hub modal before
@@ -4925,9 +5277,8 @@ function BeginHeat(trackId) {
         return;
     }
     activeTrackId = trackId;
-    // TELEPORT_UP_OFFSET: the start trigger's brush may be sunk into the floor.
-    const center = Lifted(start.GetAbsOrigin(), TELEPORT_UP_OFFSET);
-    const angles = start.GetAbsAngles();
+    // start_spawn_<trackId> if placed, else the start trigger itself.
+    const { position: center, angles } = GetStartSpawnPoint(trackId, start);
 
     const racers = CurrentRacers();
     racers.forEach((kart, i) => {
@@ -4949,16 +5300,15 @@ function BeginHeat(trackId) {
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
         kart.pendingBounce = undefined;
         // trackId is set directly instead of waiting for the physical
-        // checkpoint_<trackId>_1 trigger touch to report it, so the
+        // start_<trackId> trigger touch to report it, so the
         // checkpoint/lap panel is already visible ("0/N", lap "1/M") the
-        // moment the countdown starts instead of popping in a tick later.
-        // checkpointIndex stays at 0 though — the racer hasn't actually
-        // reached checkpoint 1 yet, just spawned at/behind it — and only
-        // ticks up to 1 once OnCheckpointTouched sees them cross it for
-        // real.
+        // moment the countdown starts instead of popping in a tick later —
+        // and crossing the start line after GO then changes nothing (see
+        // ApplyStartTouch).
         kart.trackId = trackId;
         kart.checkpointIndex = 0;
         kart.lapsCompleted = 0;
+        CancelRun(kart); // a free-roaming run doesn't carry into the heat — its clock starts at GO
         kart.finished = false;
         kart.locked = true;
         // Its own lined-up spot, not the start line's center — a respawn
@@ -5039,6 +5389,7 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.trackId = undefined;
         kart.checkpointIndex = 0;
         kart.lapsCompleted = 0;
+        CancelRun(kart);
         if (spawn) {
             const spawnAngles = spawn.angles;
             const spawnPosition = LineUpPosition(spawn.position, spawnAngles, i, returning.length);
@@ -5108,6 +5459,7 @@ function UpdateRaceFlow(now) {
         if (remaining <= 0) {
             for (const kart of racers) {
                 kart.locked = false;
+                StartRun(kart, now); // the heat's time trial clock
             }
             // The "GO" image just shown above stays up for GO_DISPLAY_SECONDS —
             // hiding it in this same tick meant it was never actually seen.
@@ -5181,30 +5533,33 @@ function UpdateRaceFlow(now) {
 
 // Pure checkpoint/lap progression rules — no cs_script import, so they're
 // unit-testable in Node (see test/checkpoint-progress.test.mjs).
-// checkpoints.js wires these to the checkpoint_<trackId>_<index> /
-// finish_<trackId> script inputs and handles the engine side (respawn
-// position, FinishKart, debug logging). See "Multiple tracks & checkpoints"
-// in GAMEPLAY.md for the design.
+// checkpoints.js wires these to the start_<trackId> /
+// checkpoint_<trackId>_<index> / finish_<trackId> script inputs and handles
+// the engine side (respawn position, FinishKart, debug logging). See
+// "Multiple tracks & checkpoints" in GAMEPLAY.md for the design.
 //
-// Both functions mutate the kart's progress fields in place and return what
-// happened, so the caller can log it and react (e.g. call FinishKart).
+// All three functions mutate the kart's progress fields in place and return
+// what happened, so the caller can log it and react (e.g. call FinishKart).
 
 /**
  * @typedef {{ trackId: number | undefined, checkpointIndex: number, lapsCompleted: number, racing: boolean, finished: boolean }} KartProgress
  * @typedef {{ checkpoints: number, lapsToWin: number }} TrackRules
  * @typedef {{ activeTrackId: number | undefined, config: TrackRules | undefined }} ProgressContext
  *   config is the touched track's own config (undefined if the map has no
- *   track_start_* trigger for it)
+ *   start_* trigger for it)
  */
 
 /**
- * @typedef {"ignored-finished" | "ignored-not-racing" | "ignored-incomplete" | "lap" | "finished"} LapResult
- *   "finished" = that lap was the kart's last one — the caller must FinishKart it.
+ * @typedef {"ignored-finished" | "ignored-other-track" | "ignored-incomplete" | "lap" | "finished"} LapResult
+ *   "finished" = that lap was the kart's last one — the run is over: the
+ *   caller stops its clock and, in a heat, must FinishKart it.
  */
 
 /**
- * finish_<trackId>: counts a completed lap if the kart is actively racing
- * this track and has reached its last checkpoint since the previous lap.
+ * finish_<trackId>: counts a completed lap if the kart is on this track (in
+ * a heat: racing the heat's track) and has reached its last checkpoint
+ * since the previous lap. Counts outside a heat too — a free-roaming run is
+ * a time trial (see time-trial.js).
  * @param {KartProgress} kart @param {number} trackId @param {ProgressContext} ctx
  * @returns {LapResult}
  */
@@ -5212,8 +5567,8 @@ function ApplyLapCompletion(kart, trackId, ctx) {
     if (kart.finished) {
         return "ignored-finished"; // already parked after finishing this heat
     }
-    if (!kart.racing || trackId !== ctx.activeTrackId || kart.trackId !== trackId) {
-        return "ignored-not-racing";
+    if (kart.trackId !== trackId || (kart.racing && trackId !== ctx.activeTrackId)) {
+        return "ignored-other-track";
     }
     if (!ctx.config || kart.checkpointIndex < ctx.config.checkpoints) {
         return "ignored-incomplete";
@@ -5222,63 +5577,84 @@ function ApplyLapCompletion(kart, trackId, ctx) {
     if (kart.lapsCompleted >= ctx.config.lapsToWin) {
         return "finished";
     }
-    // Not done yet — back to "no checkpoints reached" for the next lap
-    // (not 1: crossing the finish line itself isn't checkpoint 1 again,
-    // it's the boundary between laps).
+    // Not done yet — back to "no checkpoints reached" for the next lap.
     kart.checkpointIndex = 0;
     return "lap";
 }
 
 /**
- * @typedef {"ignored-finished" | "ignored-foreign-start" | "ignored-other-track" | "ignored-skipped" | "ignored-behind" | "advanced" | "lap-advanced" | "finished"} CheckpointResult
- *   "lap-advanced" = crossing checkpoint 1 also completed a lap (see below);
- *   "finished" = ...and that lap was the kart's last one — the caller must
- *   FinishKart it. Only "advanced"/"lap-advanced" moved checkpointIndex
- *   forward, i.e. the touched checkpoint is the kart's new respawn point.
+ * @typedef {"ignored-finished" | "ignored-foreign-start" | "ignored-mid-lap" | "picked" | "lap" | "finished"} StartResult
+ *   "picked" = a new run on this track starts here, no checkpoints reached
+ *   (the caller starts its clock); "lap" = a lap counted, next one started;
+ *   "finished" = ...and it was the kart's last one — the run is over (see
+ *   LapResult). "picked"/"lap" make the start the kart's respawn point.
+ */
+
+/**
+ * start_<trackId>: the start line.
+ *
+ * A kart isn't on any track until it crosses a start line, which picks
+ * (starts its progress on) that track. Outside a heat, crossing it again
+ * before checkpoint 1 starts the run over (e.g. after respawning behind the
+ * line). A racing kart can't pick a
+ * *different* track's start mid-heat — that would silently overwrite
+ * kart.trackId to the wrong track and then reject the racer's own further
+ * progress on their actual active track. (A heat puts its racers on the
+ * track itself, see BeginHeat, so crossing the line right after the
+ * countdown changes nothing.)
+ *
+ * On a loop track start_ and finish_ sit on the same trigger, and Hammer
+ * doesn't guarantee which fires first — so crossing the start with the whole
+ * lap already run counts the lap right here (via ApplyLapCompletion);
+ * finish_<trackId> firing afterwards then sees no checkpoints reached and is
+ * ignored. A track without checkpoints never counts a lap here (it would
+ * count the very first crossing) — only finish_ does, so a point-to-point
+ * track needs none.
+ * @param {KartProgress} kart @param {number} trackId @param {ProgressContext} ctx
+ * @returns {StartResult}
+ */
+function ApplyStartTouch(kart, trackId, ctx) {
+    if (kart.finished) {
+        return "ignored-finished"; // parked after finishing this heat
+    }
+    if (kart.racing && trackId !== ctx.activeTrackId) {
+        return "ignored-foreign-start";
+    }
+    const freshStart = !kart.racing && kart.checkpointIndex === 0 && kart.lapsCompleted === 0;
+    if (kart.trackId !== trackId || freshStart) {
+        kart.trackId = trackId;
+        kart.checkpointIndex = 0;
+        kart.lapsCompleted = 0;
+        return "picked";
+    }
+    if (!ctx.config || ctx.config.checkpoints === 0 || kart.checkpointIndex < ctx.config.checkpoints) {
+        return "ignored-mid-lap"; // doubling back over the line must not reset progress
+    }
+    // Can only be "lap" or "finished" here: the kart is on this track (a
+    // racing one on the heat's, see above) with the whole lap run.
+    return ApplyLapCompletion(kart, trackId, ctx) === "finished" ? "finished" : "lap";
+}
+
+/**
+ * @typedef {"ignored-finished" | "ignored-other-track" | "ignored-skipped" | "ignored-behind" | "advanced"} CheckpointResult
+ *   Only "advanced" moved checkpointIndex forward, i.e. the touched
+ *   checkpoint is the kart's new respawn point.
  */
 
 /**
  * checkpoint_<trackId>_<index>.
  *
- * A kart isn't on any track until it touches a "_1" checkpoint, which picks
- * (starts its progress on) that track. Checkpoints past index 1 only count
- * while the kart is already on that same track, and only ever move progress
- * forward, one checkpoint at a time (no skipping ahead). A racing kart can't
- * pick a *different* track's checkpoint 1 mid-heat either — that would
- * silently overwrite kart.trackId to the wrong track and then reject the
- * racer's own further progress on their actual active track.
- *
- * Re-touching "_1" with the whole lap already run counts the lap right here
- * (via ApplyLapCompletion), so it doesn't matter whether Hammer fires this
- * or finish_<trackId> first when both sit on the same trigger —
- * finish_<trackId> firing afterwards then sees checkpointIndex 1 and is
- * ignored. Outside a heat nothing is counted, but progress still resets, or
- * a free-roaming kart could never start a second lap.
- * @param {KartProgress} kart @param {number} trackId @param {number} index @param {ProgressContext} ctx
+ * Only counts while the kart is on that same track (picked by its start
+ * line, start_<trackId>), and only ever moves progress forward, one
+ * checkpoint at a time (no skipping ahead).
+ * @param {KartProgress} kart @param {number} trackId @param {number} index
  * @returns {CheckpointResult}
  */
-function ApplyCheckpointTouch(kart, trackId, index, ctx) {
+function ApplyCheckpointTouch(kart, trackId, index) {
     if (kart.finished) {
         return "ignored-finished"; // parked after finishing this heat
     }
-    let lapCounted = false;
-    if (index === 1) {
-        if (kart.racing && trackId !== ctx.activeTrackId) {
-            return "ignored-foreign-start";
-        }
-        if (kart.trackId !== trackId) {
-            kart.trackId = trackId;
-            kart.checkpointIndex = 0;
-        } else if (ctx.config && kart.checkpointIndex >= ctx.config.checkpoints) {
-            // Crossing the start line with the whole lap already run.
-            const lap = ApplyLapCompletion(kart, trackId, ctx);
-            if (lap === "finished") {
-                return "finished";
-            }
-            lapCounted = lap === "lap";
-            kart.checkpointIndex = 0;
-        }
-    } else if (kart.trackId !== trackId) {
+    if (kart.trackId !== trackId) {
         return "ignored-other-track";
     }
     // Strictly the next checkpoint in sequence — skipping ahead (e.g. 1 -> 5
@@ -5288,45 +5664,42 @@ function ApplyCheckpointTouch(kart, trackId, index, ctx) {
         return index > kart.checkpointIndex ? "ignored-skipped" : "ignored-behind";
     }
     kart.checkpointIndex = index;
-    return lapCounted ? "lap-advanced" : "advanced";
+    return "advanced";
 }
 
-// Checkpoints: place a trigger_multiple per checkpoint, filtered to the
-// melon (prop_physics) so the frozen/parked pawn can't trigger it, with its
-// OnStartTouch calling this point_script's RunScriptInput and a parameter of
+// Start line: a trigger_multiple named "start_<trackId>[_laps<M>]",
+// filtered to the melon (prop_physics) so the frozen/parked pawn can't
+// trigger it, with its OnStartTouch calling this point_script's
+// RunScriptInput with parameter "start_<trackId>" — puts the melon on that
+// track and makes the start its respawn point: the info_target named
+// "start_spawn_<trackId>" (also where a heat lines racers up), or, without
+// one, the trigger's own position/angles.
+//
+// Checkpoints: a trigger_multiple per checkpoint along the track, named
+// like its parameter, OnStartTouch -> RunScriptInput
 // "checkpoint_<trackId>_<index>" — e.g. track 2's 3rd checkpoint is
-// "checkpoint_2_3". If the melon breaks after reaching it, it respawns at
-// the info_target named "checkpoint_spawn_<trackId>_<index>", facing that
-// entity's yaw — or, without one, at the trigger's own position/angles.
+// "checkpoint_2_3", counted from 1 after the start line. If the melon breaks
+// after reaching it, it respawns at the info_target named
+// "checkpoint_spawn_<trackId>_<index>", facing that entity's yaw — or,
+// without one, at the trigger's own position/angles.
 //
 // The progression rules themselves (which touch counts, one checkpoint at
-// a time, "_1" picks the track, lap counting on a "_1" re-touch) live in
-// logic/checkpoint-progress.js so they can be unit-tested without the
+// a time, the start picks the track, lap counting on a start re-touch) live
+// in logic/checkpoint-progress.js so they can be unit-tested without the
 // engine — this is just the engine side around them.
 /** @param {number} trackId @param {number} index @param {import("./kart-registry.js").Kart} kart @param {any} trigger */
 function OnCheckpointTouched(trackId, index, kart, trigger) {
-    const ctx = { activeTrackId, config: GetTrackConfig()[trackId] };
-    const result = ApplyCheckpointTouch(kart, trackId, index, ctx);
+    const result = ApplyCheckpointTouch(kart, trackId, index);
     switch (result) {
         case "ignored-finished":
         case "ignored-behind":
             return;
-        case "ignored-foreign-start":
-            Debug(`checkpoint_${trackId}_1: kart is racing active track ${activeTrackId}, ignoring foreign track's start`);
-            return;
         case "ignored-other-track":
-            Debug(`checkpoint_${trackId}_${index}: kart is on track ${kart.trackId}, ignoring`);
+            Debug(`checkpoint_${trackId}_${index}: kart is on track ${kart.trackId}, ignoring (start_${trackId} not crossed)`);
             return;
         case "ignored-skipped":
             Debug(`checkpoint_${trackId}_${index}: kart is at checkpoint ${kart.checkpointIndex}, skipped one — ignoring`);
             return;
-        case "finished":
-            LogLapCompleted(trackId, kart, ctx.config);
-            FinishKart(kart);
-            return;
-        case "lap-advanced":
-            LogLapCompleted(trackId, kart, ctx.config);
-            break;
     }
     const spawn = GetCheckpointSpawnPoint(trackId, index);
     if (spawn) {
@@ -5346,21 +5719,69 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
     Debug(`checkpoint_${trackId}_${index}: kart advanced to checkpoint ${index} on track ${trackId}`);
 }
 
+/** @param {number} trackId @param {import("./kart-registry.js").Kart} kart @param {any} trigger */
+function OnStartTouched(trackId, kart, trigger) {
+    const config = GetTrackConfig()[trackId];
+    const result = ApplyStartTouch(kart, trackId, { activeTrackId, config });
+    switch (result) {
+        case "ignored-finished":
+        case "ignored-mid-lap":
+            return;
+        case "ignored-foreign-start":
+            Debug(`start_${trackId}: kart is racing active track ${activeTrackId}, ignoring foreign track's start`);
+            return;
+        case "finished":
+            LogLapCompleted(trackId, kart, config);
+            CompleteRun(trackId, kart);
+            if (!kart.racing) {
+                // A loop's finish line is its start line: the next attempt
+                // starts right here — same as when finish_ fires first.
+                OnStartTouched(trackId, kart, trigger);
+            }
+            return;
+        case "lap":
+            LogLapCompleted(trackId, kart, config);
+            break;
+        case "picked":
+            if (!kart.racing) {
+                StartRun(kart); // a heat's clock starts at GO instead
+            }
+            break;
+    }
+    // Respawn at the start (start_spawn_<trackId>, else the trigger) until
+    // the first checkpoint.
+    const spawn = GetStartSpawnPoint(trackId, trigger);
+    kart.checkpointPosition = spawn.position;
+    kart.checkpointAngles = spawn.angles;
+    Debug(`start_${trackId}: kart ${result === "picked" ? "is now on" : "starts a new lap on"} track ${trackId}`);
+}
+
+/**
+ * The kart's last lap is done: stops its run clock (recording a best time),
+ * then parks it if it's in a heat — or, free-roaming, takes it off the track
+ * until it crosses a start line again.
+ * @param {number} trackId @param {import("./kart-registry.js").Kart} kart
+ */
+function CompleteRun(trackId, kart) {
+    FinishRun(kart, trackId);
+    if (kart.racing) {
+        FinishKart(kart);
+        return;
+    }
+    kart.trackId = undefined;
+    kart.checkpointIndex = 0;
+    kart.lapsCompleted = 0;
+}
+
 // Finish: add an OnStartTouch output, RunScriptInput with parameter
 // "finish_<trackId>", to whichever trigger_multiple physically sits on that
-// track's finish line — often that's the same trigger as the
-// track_start_<trackId>_cp<N>_laps<M> entity itself (start and finish are
-// normally the same line), but it can equally be checkpoint_<trackId>_1's
-// trigger, or its own separate volume; only the activator (the melon) is
-// read here, not which entity fired it, so it doesn't matter which one you
-// pick, or whether more than one of them also fires it. Filtered to
-// prop_physics like the checkpoints. Deliberately a separate input from
-// checkpoint_<trackId>_1 rather than folded into it: this is the one and
-// only place that counts a completed lap/finished heat, so it doesn't
-// depend on whatever order Hammer fires a trigger's multiple outputs in, and
-// gives lap/finish completion its own dedicated debug line to check against
-// when a heat won't end. See "Hub -> race -> next-track flow" in
-// GAMEPLAY.md.
+// track's finish line — on a loop track that's the start_<trackId> trigger
+// itself (start and finish are the same line), on a point-to-point track its
+// own trigger at the end; only the activator (the melon) is read here, not
+// which entity fired it. Filtered to prop_physics like the checkpoints.
+// Kept a separate input from start_<trackId> so a track can end somewhere
+// else than it starts; on a shared trigger either one may fire first (see
+// ApplyStartTouch). See "Hub -> race -> next-track flow" in GAMEPLAY.md.
 /** @param {number} trackId @param {import("./kart-registry.js").Kart} kart */
 function OnFinishTouched(trackId, kart) {
     const config = GetTrackConfig()[trackId];
@@ -5368,9 +5789,9 @@ function OnFinishTouched(trackId, kart) {
     switch (result) {
         case "ignored-finished":
             return;
-        case "ignored-not-racing":
+        case "ignored-other-track":
             Debug(
-                `finish_${trackId}: kart isn't actively racing this track ` +
+                `finish_${trackId}: kart isn't on this track ` +
                 `(racing=${kart.racing}, trackId=${kart.trackId}, activeTrackId=${activeTrackId}), ignoring`
             );
             return;
@@ -5382,7 +5803,7 @@ function OnFinishTouched(trackId, kart) {
             return;
         case "finished":
             LogLapCompleted(trackId, kart, config);
-            FinishKart(kart);
+            CompleteRun(trackId, kart);
             return;
     }
 }
@@ -5392,8 +5813,20 @@ function LogLapCompleted(trackId, kart, config) {
     Debug(`finish_${trackId}: lap ${kart.lapsCompleted}/${config?.lapsToWin ?? "?"} completed on track ${trackId}`);
 }
 
-/** Registers the checkpoint_<trackId>_<index> and finish_<trackId> OnScriptInput handlers for every track/checkpoint slot the map is allowed to use. Called once from index.js. */
+/** Registers the start_<trackId>, checkpoint_<trackId>_<index> and finish_<trackId> OnScriptInput handlers for every track/checkpoint slot the map is allowed to use. Called once from index.js. */
 function RegisterCheckpointAndFinishInputs() {
+    for (let t = 1; t <= MAX_TRACKS; t++) {
+        const trackId = t;
+        Instance.OnScriptInput(`start_${trackId}`, ({ caller, activator }) => {
+            const kart = activator && FindKartByMelon(activator);
+            if (!kart || !caller) {
+                Debug(`start_${trackId}: activator wasn't a tracked melon, ignoring`);
+                return;
+            }
+            OnStartTouched(trackId, kart, caller);
+        });
+    }
+
     for (let t = 1; t <= MAX_TRACKS; t++) {
         for (let i = 1; i <= MAX_CHECKPOINTS_PER_TRACK; i++) {
             const trackId = t;

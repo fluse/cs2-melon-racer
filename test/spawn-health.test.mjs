@@ -24,7 +24,7 @@ beforeEach(() => {
     world.add(new PointTemplate({ name: MELON_TEMPLATE_NAME, spawn: () => [new Entity({ className: "prop_physics_multiplayer" })] }));
     world.add(new Entity({ name: INTRO_SPAWN_NAME, className: "info_player_start", origin: { x: -2000, y: -900, z: 24 } }));
     world.add(new Entity({ name: HUB_SPAWN_NAME, className: "info_player_start", origin: { x: 250, y: -520, z: 16 } }));
-    world.add(new Entity({ name: "track_start_1_cp2_laps3", className: "trigger_multiple", origin: { x: 2400, y: 1088, z: 128 } }));
+    world.add(new Entity({ name: "start_1_laps3", className: "trigger_multiple", origin: { x: 2400, y: 1088, z: 128 } }));
     kart = SetUpPlayerKart(world.add(new CSPlayerPawn({ slot: 0 })), GetIntroSpawnPoint());
     assert.equal(kart.health, MELON_MAX_HEALTH, "setup: a new melon is whole");
     kart.health = 12;

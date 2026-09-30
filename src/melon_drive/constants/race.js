@@ -29,11 +29,33 @@ export const BREAK_SECONDS = 10; // fixed by the original request
 // so they don't spawn stacked on top of each other.
 export const RACE_SPAWN_LATERAL_SPACING = 120;
 
-// Track start/finish trigger naming convention:
-// "track_start_<trackId>_cp<checkpointCount>_laps<lapsToWin>" (e.g.
-// "track_start_1_cp8_laps3"). See GetTrackConfig() in track-config.js for
-// how this is parsed, cached, and used as each track's start position.
-export const START_TRIGGER_NAME_PATTERN = /^track_start_(\d+)_cp(\d+)_laps(\d+)$/;
+// Start trigger of a track: a trigger_multiple named "start_<trackId>",
+// optionally "start_<trackId>_laps<lapsToWin>" (e.g. "start_1_laps3";
+// without _laps it's DEFAULT_LAPS_TO_WIN). Its OnStartTouch fires
+// RunScriptInput "start_<trackId>" (always without the _laps part), which
+// puts a free-roaming melon on that track; its transform is where racers
+// line up when a heat starts. The finish is the separate "finish_<trackId>"
+// input — on the same trigger for a loop track, at the end of the track
+// for a point-to-point one. See GetTrackConfig() in track-config.js.
+export const START_TRIGGER_NAME_PATTERN = /^start_(\d+)(?:_laps(\d+))?$/;
+export const DEFAULT_LAPS_TO_WIN = 1;
+
+// Spawn point of a track's start: an info_target named
+// "start_spawn_<trackId>" (e.g. "start_spawn_1"). Racers line up there when
+// a heat starts (on the floor under it, facing its yaw), and a melon that
+// breaks before checkpoint 1 respawns there. Without one, the start
+// trigger's own transform is used instead.
+export const START_SPAWN_NAME_PATTERN = /^start_spawn_(\d+)$/;
+/** @param {number} trackId */
+export function StartSpawnName(trackId) {
+    return `start_spawn_${trackId}`;
+}
+
+// Checkpoint triggers are named like their script input,
+// "checkpoint_<trackId>_<index>" — GetTrackConfig() counts a track's
+// checkpoints from these names (the script can't see which parameter a
+// trigger's output fires), so the name is required, not just tidy.
+export const CHECKPOINT_TRIGGER_NAME_PATTERN = /^checkpoint_(\d+)_(\d+)$/;
 
 // Respawn point of a checkpoint: an info_target named
 // "checkpoint_spawn_<trackId>_<index>" (e.g. "checkpoint_spawn_1_3"). A

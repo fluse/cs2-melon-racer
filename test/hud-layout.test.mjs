@@ -41,3 +41,17 @@ test("every button in speedometer.xml has a click handler in the script", () => 
     const unhandled = buttonIds.filter((id) => !exact.has(id) && !prefixes.some((p) => id.startsWith(p)));
     assert.deepEqual(unhandled, []);
 });
+
+// Numbered panels the script addresses by a template ("cp_slot_<i>") aren't
+// caught by the literal-id check above.
+test("the checkpoint strip has CHECKPOINT_HUD_SLOTS slots, each with its line", async () => {
+    const { CHECKPOINT_HUD_SLOTS } = await import("../src/melon_drive/constants/index.js");
+    const missing = [];
+    for (let i = 0; i < CHECKPOINT_HUD_SLOTS; i++) {
+        for (const id of [`cp_slot_${i}`, `cp_link_${i}`]) {
+            if (!layoutIds.has(id)) missing.push(id);
+        }
+    }
+    assert.deepEqual(missing, []);
+    assert.ok(!layoutIds.has(`cp_slot_${CHECKPOINT_HUD_SLOTS}`), "no slot the script never updates");
+});

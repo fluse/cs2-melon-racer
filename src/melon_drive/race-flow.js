@@ -9,10 +9,10 @@ import {
     BREAK_SECONDS,
     GO_DISPLAY_SECONDS,
     RACE_SPAWN_LATERAL_SPACING,
-    TELEPORT_UP_OFFSET,
 } from "./constants/index.js";
-import { GetHubSpawnPoint, GetIntroSpawnPoint, Lifted, FacePlayerView } from "./spawn-points.js";
+import { GetHubSpawnPoint, GetIntroSpawnPoint, GetStartSpawnPoint, FacePlayerView } from "./spawn-points.js";
 import { RestoreFullHealth } from "./heal/index.js";
+import { StartRun, CancelRun } from "./time-trial.js";
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
 // See GAMEPLAY.md's "Hub -> race -> next-track flow" for the full design.
@@ -73,7 +73,7 @@ export function TryStartRace() {
     }
     const order = GetTrackOrder();
     if (order.length === 0) {
-        Debug("TryStartRace: no track_start_* triggers found, ignoring");
+        Debug("TryStartRace: no start_<id> triggers found, ignoring");
         return;
     }
     const racers = [...karts.values()].filter((kart) => kart.inHub && kart.melon.IsValid());
@@ -127,7 +127,7 @@ export function BeginHeat(trackId) {
     const config = GetTrackConfig()[trackId];
     const start = config && Instance.FindEntityByName(config.startEntityName);
     if (!start) {
-        Debug(`BeginHeat: track ${trackId} has no track_start_* trigger, aborting heat back to HUB`);
+        Debug(`BeginHeat: track ${trackId} has no start_${trackId} trigger, aborting heat back to HUB`);
         // Route through ReturnAllToHub, not a bare phase reset: callers
         // (TryStartRace, or the BREAK->next-heat transition) may already
         // have marked these karts racing/hidden their hub modal before
@@ -139,9 +139,8 @@ export function BeginHeat(trackId) {
         return;
     }
     activeTrackId = trackId;
-    // TELEPORT_UP_OFFSET: the start trigger's brush may be sunk into the floor.
-    const center = Lifted(start.GetAbsOrigin(), TELEPORT_UP_OFFSET);
-    const angles = start.GetAbsAngles();
+    // start_spawn_<trackId> if placed, else the start trigger itself.
+    const { position: center, angles } = GetStartSpawnPoint(trackId, start);
 
     const racers = CurrentRacers();
     racers.forEach((kart, i) => {
@@ -163,16 +162,15 @@ export function BeginHeat(trackId) {
         kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
         kart.pendingBounce = undefined;
         // trackId is set directly instead of waiting for the physical
-        // checkpoint_<trackId>_1 trigger touch to report it, so the
+        // start_<trackId> trigger touch to report it, so the
         // checkpoint/lap panel is already visible ("0/N", lap "1/M") the
-        // moment the countdown starts instead of popping in a tick later.
-        // checkpointIndex stays at 0 though — the racer hasn't actually
-        // reached checkpoint 1 yet, just spawned at/behind it — and only
-        // ticks up to 1 once OnCheckpointTouched sees them cross it for
-        // real.
+        // moment the countdown starts instead of popping in a tick later —
+        // and crossing the start line after GO then changes nothing (see
+        // ApplyStartTouch).
         kart.trackId = trackId;
         kart.checkpointIndex = 0;
         kart.lapsCompleted = 0;
+        CancelRun(kart); // a free-roaming run doesn't carry into the heat — its clock starts at GO
         kart.finished = false;
         kart.locked = true;
         // Its own lined-up spot, not the start line's center — a respawn
@@ -253,6 +251,7 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.trackId = undefined;
         kart.checkpointIndex = 0;
         kart.lapsCompleted = 0;
+        CancelRun(kart);
         if (spawn) {
             const spawnAngles = spawn.angles;
             const spawnPosition = LineUpPosition(spawn.position, spawnAngles, i, returning.length);
@@ -322,6 +321,7 @@ export function UpdateRaceFlow(now) {
         if (remaining <= 0) {
             for (const kart of racers) {
                 kart.locked = false;
+                StartRun(kart, now); // the heat's time trial clock
             }
             // The "GO" image just shown above stays up for GO_DISPLAY_SECONDS —
             // hiding it in this same tick meant it was never actually seen.

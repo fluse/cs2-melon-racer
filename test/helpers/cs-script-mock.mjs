@@ -55,10 +55,11 @@ export class Entity {
 
 /** A player pawn: its eye angles are what Teleport({ angles }) changes, like the engine's. */
 export class CSPlayerPawn extends Entity {
-    /** @param {{ slot: number, eyeAngles?: any }} o */
-    constructor({ slot, eyeAngles = { pitch: 0, yaw: 0, roll: 0 }, team = 3 }) {
+    /** @param {{ slot: number, eyeAngles?: any, team?: number, playerName?: string }} o */
+    constructor({ slot, eyeAngles = { pitch: 0, yaw: 0, roll: 0 }, team = 3, playerName = `Player${slot}` }) {
         super({ className: "player" });
         this.slot = slot;
+        this.playerName = playerName;
         this.team = team;
         this.alive = true;
         this.eyeAngles = clone(eyeAngles);
@@ -75,7 +76,7 @@ export class CSPlayerPawn extends Entity {
         if (values.angles) this.eyeAngles = clone(values.angles);
     }
     GetEyeAngles() { return clone(this.eyeAngles); }
-    GetPlayerController() { return { GetPlayerSlot: () => this.slot }; }
+    GetPlayerController() { return { GetPlayerSlot: () => this.slot, GetPlayerName: () => this.playerName }; }
     GetTeamNumber() { return this.team; }
     IsAlive() { return this.alive; }
     GetCustomCamera() { return this.camera; }
@@ -125,9 +126,11 @@ export const world = {
     traceSphere: undefined,
     /** Every Instance.DebugLine call's argument. @type {any[]} */
     debugLines: [],
+    /** The addon's save data, as Instance.GetSaveData/SetSaveData see it. */
+    saveData: "",
     /** @template {Entity} T @param {T} e @returns {T} */
     add(e) { this.entities.push(e); return e; },
-    reset() { this.time = 0; this.entities = []; this.playerPawns = []; this.messages = []; this.fired = []; this.delays = []; this.traceLine = undefined; this.traceSphere = undefined; this.debugLines = []; },
+    reset() { this.time = 0; this.entities = []; this.playerPawns = []; this.messages = []; this.fired = []; this.delays = []; this.traceLine = undefined; this.traceSphere = undefined; this.debugLines = []; this.saveData = ""; },
 };
 
 const noHit = (config) => ({ didHit: false, startedInSolid: false, end: clone(config.end), normal: { x: 0, y: 0, z: 1 }, fraction: 1 });
@@ -150,6 +153,8 @@ const instanceMethods = {
     DebugBox: () => {},
     DebugScreenText: () => {},
     GetPlayerController: () => undefined,
+    GetSaveData: () => world.saveData,
+    SetSaveData: (data) => { world.saveData = String(data); },
     GetAllPlayerControllers: () => world.playerPawns.map((pawn) => ({
         IsConnected: () => true,
         GetPlayerSlot: () => pawn.slot,

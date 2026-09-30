@@ -53,16 +53,38 @@ transitions once the layout exists in Hammer.
 - Respawn/reset position = the *last checkpoint's* stored position/angle,
   not the map's start line, once past checkpoint 1.
 
-## Timing & HUD
+## Time trial (decided, implemented)
 
-- Per-player start/finish times captured via `Instance.GetGameTime()`, not
-  wall-clock or per-tick accumulation.
-- Live timer + checkpoint counter surfaced through a `custom_hud_layout`
-  entity, driven by `SetDialogVariableStringForPlayer` — see AGENTS.md's
-  "Custom HUD" section for the mechanism.
-- Best-time persistence (e.g. per-player best lap) can use
-  `Instance.SetSaveData`/`GetSaveData` — decide scope (per map, global
-  across melon_racer versions) before relying on it long-term.
+Every run over a track is timed, for every player on their own, whether
+they're alone on the server or not (decided) — so driving a track alone is
+racing against the clock:
+
+- **Outside a heat** the clock starts when the melon crosses the track's
+  start line (`start_<trackId>`); crossing it again before checkpoint 1
+  (e.g. after breaking and respawning behind the line) starts the attempt
+  over. **In a heat** it starts at GO, for every racer at once, and a
+  free-roaming run already going is dropped when the heat begins.
+- It stops at the finish of the **last lap** (`lapsToWin`) — one total time,
+  no separate lap times (decided). Breaking doesn't stop it: the respawn
+  costs time, that's the penalty. Leaving the track (hub, tutorial, a new
+  heat) cancels the run without a time.
+- Outside a heat, finishing takes the melon off the track until it crosses
+  a start line again — except on a loop, where the finish line *is* the
+  start line: the next attempt starts right there.
+- Each player's **best time per track** is saved with
+  `Instance.SetSaveData` (one JSON object for the addon, best times under
+  `SAVE_DATA_BEST_TIMES_KEY`), so it survives map restarts. Keyed by
+  player name: the API has no stable player id, so renaming starts from
+  scratch and two players with the same name share one entry.
+- HUD, **top left** (decided): the running clock (`m:ss.cc`) big, the
+  player's best on this track below it, and after the finish "FINISH <time>"
+  or, in gold, "NEW BEST <time>" for `RUN_RESULT_SECONDS` (in a heat, until
+  it's over).
+
+Times are `Instance.GetGameTime()` differences, not wall-clock or per-tick
+accumulation. Constants: `constants/time-trial.js`; rules:
+`logic/time-trial.js` (`test/time-trial.test.mjs`), applied by
+`time-trial.js` (`test/time-trial-run.test.mjs`).
 
 ## Melon props & boost pads
 
@@ -270,10 +292,16 @@ index)`, not just an index. Checkpoint tracking lives in `melon_drive.js`
 per independent subsystem; checkpoints are tightly coupled to kart/melon
 state, so they stay together). `MAX_TRACKS` × `MAX_CHECKPOINTS_PER_TRACK`
 script inputs are pre-registered as `checkpoint_<trackId>_<index>` — e.g.
-track 2's 3rd checkpoint is `checkpoint_2_3`. Hammer setup per checkpoint,
-not yet done in the map:
+track 2's 3rd checkpoint is `checkpoint_2_3` — plus one `start_<trackId>`
+and one `finish_<trackId>` per track. A track is **start line →
+checkpoints → finish line**, and can be a loop (start and finish on the same
+line, several laps) or point-to-point (finish somewhere else, one lap)
+(decided). Hammer setup per checkpoint:
 
-- A `trigger_multiple` volume placed along the track.
+- A `trigger_multiple` volume placed along the track, **named exactly like
+  its parameter** (`checkpoint_2_3`): the script counts a track's
+  checkpoints from these names (see the next section), since it can't see
+  which parameter an output fires.
 - An `info_target` named `checkpoint_spawn_<trackId>_<index>` where a
   broken melon should respawn after reaching this checkpoint, facing its
   yaw (without one: the trigger's own position/angles).
@@ -283,41 +311,49 @@ not yet done in the map:
 - Its `OnStartTouch` output fires `RunScriptInput` on this map's
   `point_script` entity, with the parameter set to `checkpoint_<trackId>_N`
   matching that track's id and this checkpoint's position along it (starting
-  at 1).
+  at 1 for the first checkpoint *after* the start line).
 
-A kart isn't considered "on" any track until it touches that track's `_1`
-checkpoint — that's what picks a track (a racer can drive into whichever
-track's start they want). Checkpoints past `_1` only advance progress if the
-kart is already on that same track, so cutting across into a different
-track's later checkpoints doesn't skip anything — and, as before, progress
-only ever moves forward, never backward, and strictly one checkpoint at a
-time: touching checkpoint N only counts right after N-1, so a shortcut that
-skips checkpoints doesn't count toward the lap (a kart that misses one has
-to go back for it — keep checkpoint triggers thick enough that a fast melon
-can't tunnel through them). Progress is tracked per kart (keyed by melon
-entity). The last-touched checkpoint's `checkpoint_spawn_*` info_target
-is also where a broken melon respawns (see above). Returning to the hub (heat over, abort,
+A kart isn't considered "on" any track until it crosses that track's start
+line (`start_<trackId>`) — that's what picks a track (a racer can drive
+into whichever track's start they want), and the track's start spawn (see
+below) is its respawn point until checkpoint 1. Checkpoints only advance progress if the kart is
+already on that same track, so cutting across into a different track's
+checkpoints doesn't skip anything — and progress only ever moves forward,
+never backward, and strictly one checkpoint at a time: touching checkpoint N
+only counts right after N-1, so a shortcut that skips checkpoints doesn't
+count toward the lap (a kart that misses one has to go back for it — keep
+checkpoint triggers thick enough that a fast melon can't tunnel through
+them). Progress is tracked per kart (keyed by melon entity). The
+last-touched checkpoint's `checkpoint_spawn_*` info_target is also where a
+broken melon respawns (see above). Returning to the hub (heat over, abort,
 or the user menu's hub button) clears the kart's track progress and moves
 its respawn point to the hub.
 
-Re-touching `_1` while already on that same track does **not** by itself
-restart/complete a lap — that's a separate `finish_<trackId>` input, see
-"Hub → race → next-track flow" below. Splitting "pick a track" from "count a
-completed lap" into two independent script inputs means they can be wired on
-different triggers entirely (e.g. `finish_<trackId>` on the track's own
-`track_start_*` trigger, since that's already sitting on the finish line)
-without caring which one Hammer fires first, or even whether they're the
-same physical trigger at all. It does still move `checkpointIndex` from `0`
-to `1` on that re-touch, same as any other forward progress — `finish_<trackId>`
-is what resets it to `0` when a lap completes, so this is what makes the next
-lap's first leg register at all instead of the HUD sitting at "0" until
-checkpoint 2.
+Picking a track (`start_<trackId>`) and counting a lap (`finish_<trackId>`)
+are two separate inputs, so a track can end somewhere other than where it
+starts. On a loop track both are outputs on the same start trigger, and
+Hammer doesn't guarantee which fires first — so crossing the start line with
+the whole lap already run counts the lap right there too, and
+`finish_<trackId>` then sees no checkpoints reached and is ignored (and the
+other way round): either order counts the lap exactly once. Crossing it
+mid-lap (doubling back) changes nothing. Laps count outside a heat too —
+a free-roaming run is a time trial (see "Time trial"). A loop track
+needs at least one checkpoint, or the finish would count the very first
+crossing; a point-to-point track may have none.
 
-While on a track, the HUD shows `<checkpoints reached> / <total on this
-track>` (hidden entirely otherwise). The total (and the laps-to-win count
-used by the flow below) comes from parsing that track's `track_start_*`
-trigger name — see "Hub → race → next-track flow" — so a track missing that
-trigger (or missing from the map) shows "?" instead of guessing.
+While on a track, a **checkpoint strip** sits top center (hidden entirely
+otherwise) — icons, not a "2/5" counter (decided): a start flag, one
+numbered circle per checkpoint, a checkered finish flag, joined by lines.
+Reached checkpoints are gold, the next one is white and bigger, the rest
+dim; the finish flag lights up once it's next. It has
+`CHECKPOINT_HUD_SLOTS` (12) circles; a track with more shows a window that
+moves along so the next checkpoint stays in view, with "…" at the cut-off
+ends. Below it "LAP 1/3", only on tracks with more than one lap. The
+checkpoint count (and the laps-to-win count used by the flow below) comes
+from that track's trigger names — see "Hub → race → next-track flow".
+Flag icons: `tools/make-icons.mjs` (`track-start`, `track-finish`); rule:
+`logic/checkpoint-strip.js` (`test/checkpoint-strip.test.mjs`), applied
+in `hud.js`.
 
 **Open question this raises**: should different tracks be mutually
 exclusive lap-wise (finishing/leaving one clears `trackId` back to
@@ -341,20 +377,23 @@ map. All of this lives in `melon_drive.js` alongside the kart/checkpoint
 state it's tightly coupled to, not a separate `point_script` — same
 reasoning as checkpoints living there instead of their own file.
 
-**Track config lives entirely in the Hammer-authored start trigger**, not in
-a hand-maintained JS lookup: each track has one `trigger_multiple` named
-`track_start_<trackId>_cp<checkpointCount>_laps<lapsToWin>` (e.g.
-`track_start_1_cp8_laps3` = track 1, 8 checkpoints, 3 laps to win). Script
-finds every `trigger_multiple` in the map on first use, parses that name
-pattern, and builds the track list from it — adding/removing a track or
+**Track config lives entirely in Hammer trigger names**, not in a
+hand-maintained JS lookup: each track has one start trigger, a
+`trigger_multiple` named `start_<trackId>` or
+`start_<trackId>_laps<lapsToWin>` (e.g. `start_1_laps3` = track 1, 3 laps to
+win; without `_laps`, `DEFAULT_LAPS_TO_WIN` = 1), and its checkpoint count
+is the highest `checkpoint_<trackId>_<index>` trigger name in the map.
+Custom keyvalues on the trigger were considered instead (e.g. a `laps`
+key) — `cs_script` has no API to read them, so names it is (decided).
+Script finds every `trigger_multiple` in the map on first use, parses those
+names, and builds the track list from them — adding/removing a track or
 changing its checkpoint/lap count is a pure Hammer edit, no script change
-needed. This trigger's transform is also where racers are teleported to
-spawn on that track; it does **not** replace the existing
-`checkpoint_<trackId>_1` trigger, which still does the actual
-lap/progress-tracking job every time a kart crosses the start line (first
-lap and every lap after) — the start trigger only supplies the spawn point
-and metadata, so it should be placed at/just behind that track's first
-checkpoint.
+needed. Racers are teleported to spawn on that track at an `info_target`
+named `start_spawn_<trackId>` (on the floor under it, facing its yaw, lined
+up side by side) — without one at the start trigger's own origin/angles,
+which is unreliable (no floor trace; Hammer may not turn a brush entity's
+angles with its geometry), hence the separate entity (decided). The start
+trigger fires `start_<trackId>` itself (see above).
 
 Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
 
@@ -377,11 +416,10 @@ Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
    progress resets and they're teleported to the lowest-`trackId` track's
    start trigger (small per-racer lateral offset so they don't spawn
    stacked on each other). `trackId` is set to that track right there,
-   rather than waiting for the physical `checkpoint_<trackId>_1` touch to
+   rather than waiting for the physical `start_<trackId>` touch to
    report it, so the checkpoint/lap HUD is already visible ("0/N", lap "1/M")
    the instant the countdown starts instead of staying hidden until that
-   trigger fires; `checkpointIndex` itself stays `0` until the racer
-   actually crosses checkpoint 1, same as any other checkpoint.
+   trigger fires — crossing the start line after GO then changes nothing.
 3. **COUNTDOWN** — every racing kart is `locked`: `UpdateKart` skips all
    input/friction handling for a locked kart and just holds its horizontal
    velocity at zero every tick (vertical velocity is left alone so gravity
@@ -399,11 +437,9 @@ Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
    output, `RunScriptInput` with parameter `finish_<trackId>` (e.g. track 2
    gets `finish_2`), on whichever trigger sits on that track's finish line —
    the handler only reads *who* touched it (the melon), not *which entity*
-   fired the input, so this can be the track's own
-   `track_start_<trackId>_cp<N>_laps<M>` trigger (a natural fit, since start
-   and finish are normally the same line and that trigger already marks that
-   spot), the `checkpoint_<trackId>_1` trigger, or its own separate volume —
-   whichever matches the map's actual layout. On touch, if the kart is
+   fired the input, so on a loop track it's a second output on the track's
+   own `start_<trackId>` trigger, on a point-to-point track its own trigger
+   at the end. On touch, if the kart is
    actively racing this active track and has already reached its *last*
    checkpoint since the previous lap started, that's a completed lap
    (`kart.lapsCompleted += 1`, `checkpointIndex` reset to `0` — "no
@@ -414,16 +450,8 @@ Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
    that player immediately sees the big `word-finish.png` image
    (`finish_image`) until the next heat or the hub, with the "next track /
    back to hub in 10s" line under it once BREAK starts — it
-   does **not** end the heat by itself; see next. Kept as a separate input
-   from `checkpoint_<trackId>_1` (which only ever *picks* a track and never
-   touches `lapsCompleted`) specifically so both can be wired as outputs on
-   the same trigger, if that's how a track's laid out, without depending on
-   which one Hammer fires first — see "Multiple tracks & checkpoints" above.
-   `checkpoint_<trackId>_1` *does* still bump `checkpointIndex` from `0` back
-   to `1` on that re-touch, though, since this input is also what crosses the
-   start/finish line for every lap after the first — without that the HUD's
-   checkpoint counter would sit at `0` through the whole first leg of each
-   later lap and then jump straight to `2`.
+   does **not** end the heat by itself; see next. See "Multiple tracks &
+   checkpoints" above for how it and `start_<trackId>` share a trigger.
 5. **BREAK** — once every kart that started this heat is either `finished`
    or has disconnected (the latter already drops its kart entry via
    `OnPlayerDisconnect`, so it can't block the group), the heat is over.
@@ -678,7 +706,7 @@ long fall lands hard enough for the engine to destroy the melon on impact.
 Driving over a paint trigger recolors that player's melon — intended for the
 hub, so players can pick a color while gathering before a heat, but nothing
 restricts placement to there. Color config lives in the trigger's own name
-(same convention as `track_start_*`, see above), not a hand-maintained
+(same convention as `start_<trackId>`, see above), not a hand-maintained
 lookup: a `trigger_multiple` named `paint_trigger_<r>_<g>_<b>` (e.g.
 `paint_trigger_255_0_0` for red), filtered to `prop_physics` like the other
 triggers, with its `OnStartTouch` firing `RunScriptInput` `melon_paint` on

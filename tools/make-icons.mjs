@@ -135,6 +135,19 @@ const ICONS = {
         ...[0, 1, 2, 3].map((i) => circle(8 + i * 10, 52 - i * 10, 3.5)),
         ...[1, 2, 3].map((i) => circle(46 - i * 10, 20 - i * 5, 3.5)),
     ),
+    // Flag on a pole — the start of the HUD's checkpoint strip.
+    "track-start": union(
+        line(14, 6, 14, 60, 3),
+        polygon([17, 8], [54, 14], [44, 22], [54, 30], [17, 34]),
+    ),
+    // Checkered flag on a pole — the finish of the HUD's checkpoint strip.
+    "track-finish": union(
+        line(14, 6, 14, 60, 3),
+        cut(
+            rect(17, 8, 55, 36, 1),
+            union(...[0, 1, 2, 3].flatMap((row) => [0, 1, 2, 3, 4].filter((col) => (row + col) % 2 === 1).map((col) => rect(18.5 + col * 7.2, 9.5 + row * 6.5, 18.5 + (col + 1) * 7.2, 9.5 + (row + 1) * 6.5)))),
+        ),
+    ),
     // Bug — JUMP DEBUG.
     debug: union(
         cut(ellipse(32, 40, 12, 15), line(32, 29, 32, 56, 1.3)),

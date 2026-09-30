@@ -95,7 +95,7 @@ melon_racer/
         ├── camera.js         # third-person chase camera + distance/height controls
         ├── hud.js            # drives the custom_hud_layout (speedometer, menus, banners)
         ├── checkpoints.js    # checkpoint/finish script-input handlers, lap counting
-        ├── track-config.js   # parses track_start_* trigger names into track configs
+        ├── track-config.js   # parses start_* / checkpoint_* trigger names into track configs
         ├── race-flow.js      # HUB / COUNTDOWN / RACING / BREAK state machine
         ├── think.js          # per-tick driver calling into all the above
         └── debug.js          # DEBUG flag + logging helper
@@ -125,7 +125,7 @@ src/melon_drive/*.js          (source of truth — edit these)
 panorama/.../speedometer.xml + .css   (custom_hud_layout — speedometer, menus, banners)
 ```
 
-- **Hammer → script**: trigger volumes fire `RunScriptInput` with a specific parameter string. Track layout itself is config-free — a track's checkpoint count, lap count, and spawn point are parsed straight out of a trigger's *name* (`track_start_<id>_cp<N>_laps<M>`) and its transform, and checkpoints/finish lines follow the same naming convention (`checkpoint_<id>_<index>`, `finish_<id>`). See [TRACK_CREATION.md](TRACK_CREATION.md) for the exact entity/output wiring and [MAPPING_API.md](MAPPING_API.md) for the complete list of names and inputs.
+- **Hammer → script**: trigger volumes fire `RunScriptInput` with a specific parameter string. Track layout itself is config-free — a track's lap count and spawn point are parsed straight out of its start trigger's *name* (`start_<id>_laps<M>`) and transform, its checkpoint count from how many `checkpoint_<id>_<index>` triggers it has, and the finish line is its own input (`finish_<id>`) so a track doesn't have to be a loop. See [TRACK_CREATION.md](TRACK_CREATION.md) for the exact entity/output wiring and [MAPPING_API.md](MAPPING_API.md) for the complete list of names and inputs.
 - **Build step**: Hammer's own JS compiler doesn't resolve local `import`s, so `build.mjs` (Rollup) flattens each `src/<entry>/` tree into the single file its `point_script` entity actually points at. **Always edit under `src/`, never the generated files in `maps/scripts/`** — they're overwritten on the next build and carry an `AUTO-GENERATED` banner.
 - **Script → HUD**: the custom HUD (`speed_hud` entity) is driven entirely from script via `SetDialogVariableStringForPlayer`, `SetHasClassForPlayer`, and click callbacks — the XML/CSS only define static layout and styling, with no logic of their own.
 

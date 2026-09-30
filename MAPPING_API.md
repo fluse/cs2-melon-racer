@@ -49,7 +49,7 @@ These apply to everything below unless a section says otherwise.
 6. **Keep triggers thick.** Melons can go well above `MAX_SPEED` after wall
    bounces; a thin trigger can be tunneled through in one tick.
 7. **Prefixes are reserved.** Don't give unrelated entities names starting
-   with `track_start_`, `checkpoint_`, `paint_trigger_`, `teleport_to_`, `teleport_stop_to_`,
+   with `start_`, `checkpoint_`, `paint_trigger_`, `teleport_to_`, `teleport_stop_to_`,
    `teleport_keep_to_`, `heal_zone_`, `lift_zone_`, `camera_zone_`,
    `melon_break` or `hub_` — the script or tests may pick them up.
 
@@ -91,7 +91,8 @@ follows the general conventions in section 1.
 
 | Parameter | Fired by | Reads from the trigger | Effect |
 |---|---|---|---|
-| `checkpoint_<trackId>_<index>` | the checkpoint's trigger | — (transform only as fallback) | Checkpoint progress + respawn point (`checkpoint_spawn_<trackId>_<index>`). See 4.1. |
+| `start_<trackId>` | the track's `start_<trackId>[_laps<M>]` trigger | name (laps), transform only as fallback | Start line: puts the melon on the track, respawn point until checkpoint 1 (`start_spawn_<trackId>`, where heats line up). See 4.1. |
+| `checkpoint_<trackId>_<index>` | the checkpoint's trigger, **named like the parameter** | name (counted), transform only as fallback | Checkpoint progress + respawn point (`checkpoint_spawn_<trackId>_<index>`). See 4.1. |
 | `finish_<trackId>` | any trigger on the finish line | — | Counts a lap. See 4.2. |
 | `hub_enter` | **only** `hub_start_trigger` | name (checked) | Shows the hub modal (start / race running / abort). |
 | `hub_leave` | `hub_start_trigger`, **`OnEndTouch`** | — | Hides the hub modal. |
@@ -112,34 +113,58 @@ Anything else is ignored by the script, and `npm test` fails on it.
 
 ### 4.1 Tracks and checkpoints
 
-A track is three kinds of trigger, all numbered by `trackId`
-(1 … `MAX_TRACKS` = 8). Heats run in ascending `trackId` order.
+A track is a start line, checkpoints and a finish line, all numbered by
+`trackId` (1 … `MAX_TRACKS` = 8). Heats run in ascending `trackId` order.
+It can be a **loop** (start and finish on the same line, several laps) or
+**point-to-point** (finish at the other end, one lap):
+
+```
+loop:            [start_1_laps3 + finish_1] → checkpoint_1_1 → … → checkpoint_1_N → back to the start line
+point-to-point:  [start_2] → checkpoint_2_1 → … → checkpoint_2_N → [finish_2]
+```
 
 **Start trigger** — exactly one per track:
 
 ```
-track_start_<trackId>_cp<checkpointCount>_laps<lapsToWin>     e.g. track_start_1_cp8_laps3
+name:   start_<trackId>  or  start_<trackId>_laps<lapsToWin>     e.g. start_1, start_1_laps3
+OnStartTouch → melon_drive_script → RunScriptInput → start_<trackId>     (always without _laps)
 ```
 
-- Pattern `^track_start_(\d+)_cp(\d+)_laps(\d+)$`, parsed once at map start
-  from every `trigger_multiple`.
-- Its transform is where racers are teleported when the heat starts (spread
-  sideways by `RACE_SPAWN_LATERAL_SPACING`), so place it at/just behind
-  checkpoint 1, facing down the track.
-- Needs no outputs of its own — but may carry `finish_<trackId>` (4.2).
+- Name pattern `^start_(\d+)(?:_laps(\d+))?$`, parsed once at map start
+  from every `trigger_multiple`. Without `_laps` the track has
+  `DEFAULT_LAPS_TO_WIN` (1) lap. Only this trigger may fire `start_<trackId>`
+  (`npm test` checks it).
+- **Spawn point:** an `info_target` named `start_spawn_<trackId>` (e.g.
+  `start_spawn_1`), pattern `^start_spawn_(\d+)$`. When the heat starts,
+  racers are teleported there — `SPAWN_UP_OFFSET` above the floor traced
+  straight down from it, facing its yaw (pitch/roll ignored), lined up side
+  by side across that direction, `RACE_SPAWN_LATERAL_SPACING` (120 units)
+  apart, centered on it. Leave room: 4 racers need ~360 units of width. Place
+  it just behind the start line, facing down the track. Without one, the
+  start trigger's own origin (lifted `TELEPORT_UP_OFFSET`, no floor trace)
+  and yaw are used, and the heat logs `no info_target "start_spawn_…"`.
+  `npm test` fails on a `start_spawn_*` without a matching start trigger, and
+  on any other `start_*` name (typo).
+- Crossing the trigger puts a free-roaming melon on that track (a racing
+  melon is already put on its heat's track) and makes the spawn point its
+  respawn point until checkpoint 1.
+- Loop track: give it the `finish_<trackId>` output as well (4.2).
 - A track without a start trigger doesn't exist for the race flow (the HUD
   shows "?").
 
-**Checkpoint triggers** — one per checkpoint, `index` = 1 …
-`checkpointCount` (at most `MAX_CHECKPOINTS_PER_TRACK` = 32), in driving
-order:
+**Checkpoint triggers** — one per checkpoint after the start line, `index`
+= 1 … N (at most `MAX_CHECKPOINTS_PER_TRACK` = 32), in driving order:
 
 ```
+name:   checkpoint_<trackId>_<index>                              e.g. checkpoint_1_3
 OnStartTouch → melon_drive_script → RunScriptInput → checkpoint_<trackId>_<index>
 ```
 
-- Name the trigger like its parameter (`checkpoint_1_3`) — only the
-  parameter is functionally required, but the name keeps the map readable.
+- **The name must equal the parameter** — the script counts a track's
+  checkpoints from the trigger names `^checkpoint_(\d+)_(\d+)$` (the
+  highest index), since it can't see which parameter an output fires. No
+  gaps: with `_1`, `_2`, `_4` the track needs 4 and the finish is never
+  reached. `npm test` fails on either.
 - **Respawn point:** an `info_target` named
   `checkpoint_spawn_<trackId>_<index>` (e.g. `checkpoint_spawn_1_3` for
   `checkpoint_1_3`). Once this checkpoint is reached, a broken melon
@@ -150,9 +175,11 @@ OnStartTouch → melon_drive_script → RunScriptInput → checkpoint_<trackId>_
   is the respawn point (lifted `TELEPORT_UP_OFFSET`), and the touch logs
   `no info_target "checkpoint_spawn_…"`. `npm test` fails on a
   `checkpoint_spawn_*` whose checkpoint no trigger fires (typo).
-- `_1` picks the track; later checkpoints only count on that track and
-  strictly in order (skipping one doesn't count). Progress never goes
+- Checkpoints only count once the melon crossed that track's start line,
+  and strictly in order (skipping one doesn't count). Progress never goes
   backwards.
+- A point-to-point track may have none; a loop track needs at least one
+  (otherwise the finish would count the very first crossing of the line).
 
 **Finish signal** — `finish_<trackId>`, see 4.2.
 
@@ -163,10 +190,11 @@ OnStartTouch → melon_drive_script → RunScriptInput → finish_<trackId>
 ```
 
 - Counts a lap only if the melon has reached the track's last checkpoint
-  since the lap started.
-- Which trigger fires it doesn't matter. Usual choices: a second output on
-  the start trigger or on `checkpoint_<trackId>_1` (start = finish line), or
-  a separate trigger where the track ends.
+  since the lap started; the last lap finishes the melon.
+- Which trigger fires it doesn't matter (only the melon is read). Loop
+  track: a second output on the `start_<trackId>` trigger — whichever of
+  the two Hammer fires first, the lap counts exactly once.
+  Point-to-point: its own trigger where the track ends (any name).
 
 ### 4.3 Hub
 
@@ -415,6 +443,9 @@ Script inputs are pre-registered up to these limits; raise them in
   (or with any other effect in it),
 - two particle templates pointing at the same `info_particle_system`
   (a template copied in Hammer still playing the other one's effect),
+- a `start_<t>` input from a trigger not named `start_<t>[_laps<M>]`, or a `start_*` trigger without it,
+- a `start_spawn_<t>` without a `start_<t>` trigger, or any other `start_*` name,
+- a checkpoint trigger named differently from the `checkpoint_<t>_<i>` it fires, or a gap in a track's checkpoint numbers,
 - a `checkpoint_spawn_<t>_<i>` `info_target` whose `checkpoint_<t>_<i>` no trigger fires,
 - entity names with leading/trailing whitespace.
 
@@ -431,7 +462,7 @@ output is missing, mistargeted, or its filter/spawnflags keep the melon out.
 - [ ] `custom_hud_layout` `speed_hud` (one)
 - [ ] `point_template` `melon_template` with the melon `prop_physics`
 - [ ] `hub_spawn` near the hub floor, `hub_start_trigger` with `hub_enter` + `hub_leave`
-- [ ] per track: `track_start_<id>_cp<N>_laps<M>`, `checkpoint_<id>_1` … `_<N>` (each with an `info_target` `checkpoint_spawn_<id>_<n>`), a `finish_<id>` output
+- [ ] per track: `start_<id>[_laps<M>]` firing `start_<id>` (with an `info_target` `start_spawn_<id>`), `checkpoint_<id>_1` … `_<N>` (each with an `info_target` `checkpoint_spawn_<id>_<n>`), a `finish_<id>` output (on the start trigger for a loop, at the end for point-to-point)
 - [ ] optional: `intro_spawn`, `hub_spawn_facing`, both break templates, `perfect_hit_particle_template`, `particle_health_template`, paint triggers, teleporters, `melon_break` kill triggers
 - [ ] every melon trigger: `trigger_multiple`, "Physics Objects", filtered to `prop_physics`
 - [ ] `npm test` passes

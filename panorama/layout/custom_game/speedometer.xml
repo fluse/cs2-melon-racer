@@ -4,18 +4,83 @@
 	</styles>
 
 	<Panel class="Root">
-		<Panel id="checkpoint_panel" class="CheckpointPanel Hidden">
-			<Label class="CheckpointLabel" text="CHECKPOINT" />
-			<Panel class="CheckpointRow">
-				<Label id="checkpoint_current" class="CheckpointCurrent" text="{s:current}" />
-				<Label class="CheckpointSlash" text="/" />
-				<Label id="checkpoint_total" class="CheckpointTotal" text="{s:total}" />
+		<!-- Time trial, top left: the run clock, the player's best on this track,
+		     and after the finish the result (see time-trial.js). -->
+		<Panel id="run_panel" class="RunPanel Hidden">
+			<Label id="run_time" class="RunTime" text="{s:time}" />
+			<Panel class="RunBestRow">
+				<Label class="RunBestUnit" text="BEST" />
+				<Label id="run_best" class="RunBest" text="{s:best}" />
 			</Panel>
-			<Panel class="CheckpointRow">
+			<Label id="run_result" class="RunResult Hidden" text="{s:result}" />
+		</Panel>
+
+		<!-- Checkpoint strip, top center: start flag, one numbered circle per
+		     checkpoint (CHECKPOINT_HUD_SLOTS of them — unused ones get the
+		     Unused class, a longer track shows a moving window with "…" at the
+		     cut-off ends), finish flag. States: Reached / Next / pending (no
+		     class). The lap row only shows on tracks with more than one lap. -->
+		<Panel id="checkpoint_panel" class="CheckpointStrip Hidden">
+			<Panel class="StripRow">
+				<Image id="cp_start" class="StripFlag Reached" src="file://{images}/custom_game/icons/track-start.png" />
+				<Label id="cp_more_before" class="StripMore Hidden" text="…" />
+				<Panel id="cp_link_0" class="StripLink" />
+				<Panel id="cp_slot_0" class="StripCheckpoint">
+					<Label class="StripNumber" text="{s:n}" />
+				</Panel>
+				<Panel id="cp_link_1" class="StripLink" />
+				<Panel id="cp_slot_1" class="StripCheckpoint">
+					<Label class="StripNumber" text="{s:n}" />
+				</Panel>
+				<Panel id="cp_link_2" class="StripLink" />
+				<Panel id="cp_slot_2" class="StripCheckpoint">
+					<Label class="StripNumber" text="{s:n}" />
+				</Panel>
+				<Panel id="cp_link_3" class="StripLink" />
+				<Panel id="cp_slot_3" class="StripCheckpoint">
+					<Label class="StripNumber" text="{s:n}" />
+				</Panel>
+				<Panel id="cp_link_4" class="StripLink" />
+				<Panel id="cp_slot_4" class="StripCheckpoint">
+					<Label class="StripNumber" text="{s:n}" />
+				</Panel>
+				<Panel id="cp_link_5" class="StripLink" />
+				<Panel id="cp_slot_5" class="StripCheckpoint">
+					<Label class="StripNumber" text="{s:n}" />
+				</Panel>
+				<Panel id="cp_link_6" class="StripLink" />
+				<Panel id="cp_slot_6" class="StripCheckpoint">
+					<Label class="StripNumber" text="{s:n}" />
+				</Panel>
+				<Panel id="cp_link_7" class="StripLink" />
+				<Panel id="cp_slot_7" class="StripCheckpoint">
+					<Label class="StripNumber" text="{s:n}" />
+				</Panel>
+				<Panel id="cp_link_8" class="StripLink" />
+				<Panel id="cp_slot_8" class="StripCheckpoint">
+					<Label class="StripNumber" text="{s:n}" />
+				</Panel>
+				<Panel id="cp_link_9" class="StripLink" />
+				<Panel id="cp_slot_9" class="StripCheckpoint">
+					<Label class="StripNumber" text="{s:n}" />
+				</Panel>
+				<Panel id="cp_link_10" class="StripLink" />
+				<Panel id="cp_slot_10" class="StripCheckpoint">
+					<Label class="StripNumber" text="{s:n}" />
+				</Panel>
+				<Panel id="cp_link_11" class="StripLink" />
+				<Panel id="cp_slot_11" class="StripCheckpoint">
+					<Label class="StripNumber" text="{s:n}" />
+				</Panel>
+				<Label id="cp_more_after" class="StripMore Hidden" text="…" />
+				<Panel id="cp_link_finish" class="StripLink" />
+				<Image id="cp_finish" class="StripFlag" src="file://{images}/custom_game/icons/track-finish.png" />
+			</Panel>
+			<Panel id="lap_row" class="StripLapRow">
+				<Label class="LapUnit" text="LAP" />
 				<Label id="lap_current" class="LapCurrent" text="{s:lap_current}" />
 				<Label class="LapSlash" text="/" />
 				<Label id="lap_total" class="LapTotal" text="{s:lap_total}" />
-				<Label class="LapUnit" text="LAP" />
 			</Panel>
 		</Panel>
 

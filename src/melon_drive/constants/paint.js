@@ -7,7 +7,7 @@
 // this point_script — the color itself is read back off the trigger's own
 // name (regex below), not the script input parameter, so adding/changing a
 // paint trigger's color is a pure Hammer edit, same convention as
-// track_start_* in GetTrackConfig().
+// start_<trackId> in GetTrackConfig().
 export const PAINT_TRIGGER_NAME_PATTERN = /^paint_trigger_(\d+)_(\d+)_(\d+)$/;
 
 // Outline glow (the engine's Glow(), like CS2's teammate outline) around

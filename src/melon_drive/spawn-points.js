@@ -2,7 +2,7 @@ import { Instance } from "cs_script/point_script";
 import { Debug } from "./debug.js";
 import { TraceLine } from "./trace.js";
 import { ViewAnglesFacing } from "./logic/teleport.js";
-import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, FLOOR_TRACE_UP, FLOOR_TRACE_DOWN, CheckpointSpawnName } from "./constants/index.js";
+import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, TELEPORT_UP_OFFSET, FLOOR_TRACE_UP, FLOOR_TRACE_DOWN, CheckpointSpawnName, StartSpawnName } from "./constants/index.js";
 
 // The one place that turns a Hammer spawn entity into a melon position.
 // Every caller that puts a melon at the hub or the intro goes through here,
@@ -107,4 +107,23 @@ export function GetIntroSpawnPoint() {
  */
 export function GetCheckpointSpawnPoint(trackId, index) {
     return FindSpawnPoint(CheckpointSpawnName(trackId, index));
+}
+
+/**
+ * Where track `trackId` starts: the start_spawn_<trackId> info_target,
+ * facing its yaw — or, without one, the start trigger `trigger` itself
+ * (lifted TELEPORT_UP_OFFSET, since its brush may be sunk into the floor).
+ * @param {number} trackId @param {any} trigger
+ * @returns {SpawnPoint}
+ */
+export function GetStartSpawnPoint(trackId, trigger) {
+    const spawn = FindSpawnPoint(StartSpawnName(trackId));
+    if (spawn) {
+        return spawn;
+    }
+    Debug(`GetStartSpawnPoint: no info_target "${StartSpawnName(trackId)}", starting at the start trigger itself`);
+    return {
+        position: Lifted(trigger.GetAbsOrigin(), TELEPORT_UP_OFFSET),
+        angles: LevelAngles(trigger.GetAbsAngles().yaw),
+    };
 }

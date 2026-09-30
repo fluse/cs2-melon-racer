@@ -17,6 +17,7 @@ export * from "./lift.js";
 export * from "./prediction.js";
 export * from "./breaking.js";
 export * from "./race.js";
+export * from "./time-trial.js";
 export * from "./paint.js";
 export * from "./teleport.js";
 export * from "./spawn.js";

@@ -35,7 +35,7 @@ src/tsconfig.json                        # editor tooling config for src/**/*.js
 src/gamemode/index.js                    # gamemode entry: a single small file
 src/melon_drive/index.js, *.js           # melon_drive entry: split into one file per concern —
                                           #   debug.js, kart-registry.js, track-config.js,
-                                          #   hud.js, race-flow.js, spawn-points.js, kart-spawn.js,
+                                          #   hud.js, race-flow.js, time-trial.js (run clock + saved best times), spawn-points.js, kart-spawn.js,
                                           #   checkpoints.js, zone-inputs.js (heal/lift zone script inputs),
                                           #   prediction.js, trace.js, think.js, particles.js (spawning/placing/starting/stopping/removing every point_template
                                           #   particle effect — break, PERFECT spark, heal, boost trail), boost-trail.js (starts/stops the boost trail
@@ -50,13 +50,13 @@ src/melon_drive/heal/*.js                # everything that heals a melon, togeth
                                           #   heal_zone_full), logic.js (pure rules, test/heal.test.mjs), zone.js (ApplyHealing per tick,
                                           #   RestoreFullHealth on respawn), effect.js (heal particle on entering a zone) — heal_enter/heal_leave are registered in zone-inputs.js
 src/melon_drive/constants/*.js           # every tunable/Hammer name, one file per system (driving, jump, jump-pad, health, wall-bounce, boost-trail, attack-boost, momentum, lift, prediction,
-                                          #   breaking, race, paint, teleport, spawn, camera, hud, debug) — import from constants/index.js
-src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, attack boost, momentum, jump pads, lift zones, checkpoint progress, break sequence, lift/zone camera zoom, teleport, ground/wall contact) — no engine import, unit-tested
+                                          #   breaking, race, time-trial, paint, teleport, spawn, camera, hud, debug) — import from constants/index.js
+src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, attack boost, momentum, jump pads, lift zones, checkpoint progress, checkpoint strip HUD, time trial, break sequence, lift/zone camera zoom, teleport, ground/wall contact) — no engine import, unit-tested
 test/*.test.mjs                          # node:test unit tests for src/*/logic/ (`npm test`), plus checks of the .vmap/.xml the script relies on
 test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities
 test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
-tools/make-icons.mjs                     # generates panorama/images/custom_game/icons/*.png (user menu icons) — edit shapes there, re-run with node
+tools/make-icons.mjs                     # generates panorama/images/custom_game/icons/*.png (user menu icons, checkpoint strip flags) — edit shapes there, re-run with node
 tools/make-decal.mjs                     # generates materials/melon_racer/<decal>_{color,trans}.png for every decal in its DECALS list
                                           #   (HUD logo, rawDecals/*.png|jpg — JPG via Windows System.Drawing; can key out a baked-in checkerboard, writes <name>_transparent.png)
 rawDecals/*.png                          # new source images for decals (make-decal.mjs input); once done, the tool moves

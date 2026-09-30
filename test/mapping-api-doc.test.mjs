@@ -11,6 +11,7 @@ const doc = readFileSync(new URL("../MAPPING_API.md", import.meta.url), "utf8");
 
 // Same list as KNOWN_INPUT in map-io.test.mjs, in the form the doc writes them.
 const SCRIPT_INPUTS = [
+    "start_<trackId>",
     "checkpoint_<trackId>_<index>",
     "finish_<trackId>",
     "hub_enter",

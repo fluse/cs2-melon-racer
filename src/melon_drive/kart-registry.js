@@ -9,6 +9,9 @@ import { predictionDotSet } from "./trace.js";
  *   health: number, lastVelocity: { x: number, y: number, z: number } | undefined,
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
+ *   runStartTime?: number, // game time this kart's timed run started (unset: no run) — see time-trial.js
+ *   lastRun?: { trackId: number, time: number, newBest: boolean, at: number }, // last finished run, for the HUD
+
  *   breaking: boolean, breakTime?: number, // game time BreakMelon ran, for the break camera zoom
  *   paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
  *   settled: boolean,

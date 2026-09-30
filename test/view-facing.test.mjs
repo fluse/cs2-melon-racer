@@ -35,7 +35,7 @@ beforeEach(() => {
     world.add(new PointTemplate({ name: MELON_TEMPLATE_NAME, spawn: () => [new Entity({ className: "prop_physics_multiplayer" })] }));
     world.add(new Entity({ name: INTRO_SPAWN_NAME, className: "info_player_start", origin: { x: -2000, y: -900, z: 24 }, angles: { pitch: 0, yaw: INTRO_YAW, roll: 0 } }));
     world.add(new Entity({ name: HUB_SPAWN_NAME, className: "info_player_start", origin: { x: 250, y: -520, z: 16 }, angles: { pitch: 0, yaw: HUB_YAW, roll: 0 } }));
-    world.add(new Entity({ name: "track_start_1_cp2_laps3", className: "trigger_multiple", origin: { x: 2400, y: 1088, z: 128 }, angles: { pitch: 0, yaw: TRACK_START_YAW, roll: 0 } }));
+    world.add(new Entity({ name: "start_1_laps3", className: "trigger_multiple", origin: { x: 2400, y: 1088, z: 128 }, angles: { pitch: 0, yaw: TRACK_START_YAW, roll: 0 } }));
     world.add(new Entity({ name: "tp_dest", className: "info_target", origin: { x: 0, y: 0, z: 0 }, angles: { pitch: 0, yaw: TELEPORT_DEST_YAW, roll: 0 } }));
     pawn = world.add(new CSPlayerPawn({ slot: 0, eyeAngles: { pitch: START_PITCH, yaw: 0, roll: 0 } }));
     kart = SetUpPlayerKart(pawn, GetIntroSpawnPoint());

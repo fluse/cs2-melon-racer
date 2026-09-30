@@ -18,3 +18,10 @@ export const JUMP_BAR_SEGMENTS = 10;
 export const HEALTH_BAR_SEGMENTS = 20;
 export const HEALTH_LOW_FRACTION = 0.6;
 export const HEALTH_CRITICAL_FRACTION = 0.3;
+
+// Checkpoint strip at the top of the screen (start flag -> numbered
+// checkpoints -> finish flag) — see CHECKPOINT_HUD_SLOTS panel ids
+// ("cp_slot_0" .. "cp_slot_{N-1}", each with a "cp_link_<i>" line before
+// it) in speedometer.xml. A track with more checkpoints shows a window of
+// this many that moves along with the kart (see logic/checkpoint-strip.js).
+export const CHECKPOINT_HUD_SLOTS = 12;
