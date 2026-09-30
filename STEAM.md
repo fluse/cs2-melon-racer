@@ -30,6 +30,11 @@ Melon Racer turns Counter-Strike 2 into a kart racer. Each player gets their own
 
 [hr][/hr]
 
+[h2]🤖 AI disclosure[/h2]
+The game mode's code (the cs_script scripts, HUD logic and build tools) was written with the help of an AI coding assistant (Claude). The idea, map, tracks and game design are my own work.
+
+[hr][/hr]
+
 [h2]🏁 How a race works[/h2]
 [list]
 [*][b]Tutorial[/b] — new players start in a short tutorial area to learn how to drive.
@@ -45,9 +50,12 @@ Melon Racer turns Counter-Strike 2 into a kart racer. Each player gets their own
 [*][b]Melon health[/b] — hard crashes and big landings damage your melon. At zero it [b]breaks apart[/b] and you respawn at your last checkpoint.
 [*][b]Wall bounces[/b] — hit a wall at the right angle (about 45°) for a [b]PERFECT[/b] bounce: more speed and no damage. Time a jump on the hit for even more speed. Bounces stack, so there's no top speed.
 [*][b]Boost — if you dare[/b] — hold the left mouse button for extra speed and a glowing boost trail. It costs your melon health while you hold it. Hold it too long and your melon breaks!
+[*][b]Momentum[/b] — hit your top speed again and again without slowing down too much, and your top speed keeps growing.
 [*][b]Wall jumps[/b] — push off walls in mid-air to reach shortcuts and save a bad line.
+[*][b]Jump pads[/b] — press jump on a glowing pad to launch high and fast. No damage on the way down.
+[*][b]Lift shafts[/b] — bounce between the walls of a shaft to climb up.
 [*][b]Heal zones & teleporters[/b] — patch up your melon and take the fast way around.
-[*][b]Paint your melon[/b] — drive over a paint pad in the hub or choose a color in the menu.
+[*][b]Paint your melon[/b] — drive over a paint pad in the hub or choose a color in the menu. Your melon glows in its color, so everyone can see who's who.
 [*][b]Multiple tracks[/b] — raced one after another, each with its own number of laps.
 [*][b]Custom HUD[/b] — speedometer, checkpoint and lap counter, bounce rating and jump timing.
 [/list]
@@ -60,7 +68,7 @@ Melon Racer turns Counter-Strike 2 into a kart racer. Each player gets their own
 [tr][td]A / D[/td][td]Strafe left / right[/td][/tr]
 [tr][td]Left mouse button (hold)[/td][td]Boost — costs health, too long and the melon breaks[/td][/tr]
 [tr][td]Space[/td][td]Jump / wall jump / time a wall bounce[/td][/tr]
-[tr][td]E[/td][td]Menu: respawn at checkpoint, back to hub, tutorial, melon color[/td][/tr]
+[tr][td]E[/td][td]Menu: respawn at checkpoint, back to hub, tutorial, melon color and glow[/td][/tr]
 [/table]
 
 [h2]▶ How to play[/h2]
@@ -121,9 +129,12 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [*][b]Melonen-Leben[/b] — harte Crashs und hohe Landungen beschädigen die Melone. Bei null [b]zerplatzt[/b] sie und du startest am letzten Checkpoint neu.
 [*][b]Wand-Abpraller[/b] — triff eine Wand im richtigen Winkel (etwa 45°) für einen [b]PERFECT[/b]-Abpraller: mehr Tempo und kein Schaden. Springst du genau im richtigen Moment, wirst du noch schneller. Abpraller addieren sich, es gibt also keine Höchstgeschwindigkeit.
 [*][b]Boost — wenn du dich traust[/b] — halte die linke Maustaste für mehr Tempo und eine leuchtende Boost-Spur. Solange du sie hältst, verliert deine Melone Leben. Hältst du zu lange, zerplatzt sie!
+[*][b]Schwung[/b] — erreichst du deine Höchstgeschwindigkeit immer wieder, ohne zu stark abzubremsen, wird sie immer höher.
 [*][b]Wandsprünge[/b] — stoß dich in der Luft von Wänden ab, um Abkürzungen zu erreichen oder eine schlechte Linie zu retten.
+[*][b]Sprungfelder[/b] — drück auf einem leuchtenden Feld die Sprungtaste und du fliegst hoch und weit. Kein Schaden bei der Landung.
+[*][b]Aufzugschächte[/b] — spring zwischen den Wänden eines Schachts hin und her, um nach oben zu kommen.
 [*][b]Heilzonen & Teleporter[/b] — flick deine Melone und nimm den schnellen Weg.
-[*][b]Melone anmalen[/b] — fahr im Hub über ein Farbfeld oder wähl eine Farbe im Menü.
+[*][b]Melone anmalen[/b] — fahr im Hub über ein Farbfeld oder wähl eine Farbe im Menü. Deine Melone leuchtet in ihrer Farbe, so sieht jeder, wer wer ist.
 [*][b]Mehrere Strecken[/b] — nacheinander gefahren, jede mit eigener Rundenzahl.
 [*][b]Eigenes HUD[/b] — Tacho, Checkpoint- und Rundenanzeige, Abpraller-Bewertung und Sprung-Timing.
 [/list]
@@ -136,7 +147,7 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [tr][td]A / D[/td][td]Seitlich nach links / rechts[/td][/tr]
 [tr][td]Linke Maustaste (halten)[/td][td]Boost — kostet Leben, zu lange und die Melone zerplatzt[/td][/tr]
 [tr][td]Leertaste[/td][td]Springen / Wandsprung / Timing für den Abpraller[/td][/tr]
-[tr][td]E[/td][td]Menü: am Checkpoint neu starten, zurück zum Hub, Tutorial, Farbe[/td][/tr]
+[tr][td]E[/td][td]Menü: am Checkpoint neu starten, zurück zum Hub, Tutorial, Farbe und Leuchten[/td][/tr]
 [/table]
 
 [h2]▶ So spielst du[/h2]
@@ -162,6 +173,9 @@ Bug gefunden oder eine Idee? Schreib einen Kommentar oder mach ein Issue auf Git
 Der ganze Spielmodus ist Open Source: Scripts, HUD und eine Schritt-für-Schritt-Anleitung, wie du [b]eigene Strecken in Hammer[/b] baust (ohne Programmieren).
 [url=https://github.com/fluse/cs2-melon-racer]github.com/fluse/cs2-melon-racer[/url]
 
+[h2]🤖 KI-Hinweis[/h2]
+Der Code des Spielmodus (die cs_script-Scripts, die HUD-Logik und die Build-Tools) wurde mit Hilfe eines KI-Programmierassistenten (Claude) geschrieben. Karte, Strecken und Spieldesign sind meine eigene Arbeit.
+
 [i]Gefällt dir die Melone? Lass einen 👍 da — so finden andere Spieler die Karte![/i]
 ```
 
@@ -181,7 +195,19 @@ this, so keep it short and write it from the player's point of view.
 [/list]
 ```
 
-For the boost update (EN, then DE for the German page):
+For the jump pad / momentum update (EN, then DE for the German page):
+
+```
+[b]Update — Jump pads & momentum[/b]
+New: jump pads, a first race track, and momentum — keep hitting top speed and it keeps growing. Your melon now glows in its paint color, and every respawn brings you back at full health.
+```
+
+```
+[b]Update — Sprungfelder & Schwung[/b]
+Neu: Sprungfelder, eine erste Rennstrecke und Schwung — erreich immer wieder deine Höchstgeschwindigkeit und sie steigt weiter. Deine Melone leuchtet jetzt in ihrer Farbe, und nach jedem Respawn hast du wieder volles Leben.
+```
+
+For the boost update:
 
 ```
 [b]Update — Boost![/b]
@@ -227,8 +253,13 @@ Example for the first public version:
   PERFECT bounce with the HUD panel, the melon breaking apart, a view down a
   track. A short YouTube clip (30–60 s) of a heat is what sells a racing
   mode best.
-- **Cover image**: the current one is good. It should be 16:9, and the text
-  must stay readable at thumbnail size (it does).
+- **Cover image**: contest rule — no AI art on the page or in the map. The
+  old cover was flagged as looking AI-made, so replace it with one made by
+  hand (e.g. an in-game screenshot with the logo on top). It should be 16:9,
+  and the text must stay readable at thumbnail size.
+- **AI disclosure**: the contest requires the description to say clearly
+  that AI was used — keep the "AI disclosure" section in both languages and
+  update it if AI is used for anything besides the code.
 - **Tags**: CS2 and Map are set. If "Custom" / "Fun" / "Racing" are offered,
   add them.
 - **Allow comments**: keep it on, since the description asks for bug

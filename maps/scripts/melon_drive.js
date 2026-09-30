@@ -310,6 +310,9 @@ const WALL_TIMING_SPAM_LOCKOUT = 0.4; // seconds
 // Higher: bounces send it up in an arc; 0 = vertical left to physics (old).
 // Stronger inside lift zones — see constants/lift.js.
 const WALL_BOUNCE_UP_SPEED = 220; // units/sec upward
+// A bounce rated PERFECT (BOUNCE_RATINGS[0]) kicks this much harder upward —
+// applies to WALL_BOUNCE_UP_SPEED and to a lift zone's kick alike.
+const PERFECT_BOUNCE_UP_MULTIPLIER = 1.2; // ×1.2 = 20 % more upward kick
 const WALL_BOUNCE_COOLDOWN = 0.2; // seconds — stops one wall contact from bouncing (and damaging) on consecutive ticks
 // Wall hits get their own damage rules, separate from landings: a base part
 // from the impact itself (same shape as IMPACT_DAMAGE_*), plus a cost for
@@ -361,8 +364,8 @@ const BOUNCE_JUMP_SEGMENTS = 5;
 // accent for the in-world prediction line (see prediction.js) — keep the two
 // in sync with speedometer.css's .Rating* rules.
 // PERFECT counts within this many degrees either side of
-// WALL_BOUNCE_OPTIMAL_ANGLE (was 4.5°, i.e. minAngleFactor 0.9).
-const PERFECT_BOUNCE_TOLERANCE = 6.5; // degrees
+// WALL_BOUNCE_OPTIMAL_ANGLE (was 4.5°, then 6.5°).
+const PERFECT_BOUNCE_TOLERANCE = 8.5; // degrees
 const BOUNCE_RATINGS = [
     { minAngleFactor: 1 - PERFECT_BOUNCE_TOLERANCE / WALL_BOUNCE_ANGLE_FALLOFF, label: "PERFECT", speedMultiplier: 1.35, cssClass: "RatingPerfect", color: { r: 255, g: 224, b: 102, a: 255 } },
     { minAngleFactor: 0.7, label: "GOOD", speedMultiplier: 1.1, cssClass: "RatingGood", color: { r: 102, g: 221, b: 102, a: 255 } },
@@ -2036,9 +2039,12 @@ function WallBounceDamage(impactSpeed, speedGain, angleFactor) {
  * the kick is added on top (a melon already rising keeps that plus the kick).
  * @param {number} currentZ vertical velocity physics left this tick
  * @param {number} [upSpeed] the kick — WALL_BOUNCE_UP_SPEED, or a lift zone's
+ * @param {number} [angleFactor] the bounce's angle closeness — a PERFECT
+ *   rating (BOUNCE_RATINGS[0]) makes the kick PERFECT_BOUNCE_UP_MULTIPLIER stronger
  */
-function BounceUpVelocity(currentZ, upSpeed = WALL_BOUNCE_UP_SPEED) {
-    return Math.max(currentZ, 0) + upSpeed;
+function BounceUpVelocity(currentZ, upSpeed = WALL_BOUNCE_UP_SPEED, angleFactor = 0) {
+    const perfect = GetBounceRating(angleFactor) === BOUNCE_RATINGS[0];
+    return Math.max(currentZ, 0) + upSpeed * (perfect ? PERFECT_BOUNCE_UP_MULTIPLIER : 1);
 }
 
 /**
@@ -4530,6 +4536,7 @@ function UpdateKart(slot, kart, dt) {
     const wallRules = CurrentWallRules(kart);
     /** @type {{ x: number, y: number } | undefined} */
     let bounceVelocity = undefined;
+    let bounceAngleFactor = 0;
     if (kart.lastVelocity) {
         const impactDelta = {
             x: currentVelocity.x - kart.lastVelocity.x,
@@ -4559,6 +4566,7 @@ function UpdateKart(slot, kart, dt) {
             // opposite wall and bounce again (wallRules.minBounceSpeed) —
             // free: speedGain below stays what the bounce itself earned.
             bounceVelocity = WithMinSpeed(bounce.velocity, wallRules.minBounceSpeed);
+            bounceAngleFactor = bounce.angleFactor;
             // The melon leaves the wall right away after bouncing, so the
             // probes won't see it next tick — this is its wall contact.
             kart.lastWallContact = { time: now, normal: { x: wallNormal.x, y: wallNormal.y } };
@@ -4717,8 +4725,10 @@ function UpdateKart(slot, kart, dt) {
     // Jump press (ground jump / wall jump / wall-bounce timing) and the
     // wall-jump charge refill — see ApplyJump in jump.js.
     // A wall bounce also kicks it upward (WALL_BOUNCE_UP_SPEED, stronger in a
-    // lift zone).
-    const vzBase = bounceVelocity ? BounceUpVelocity(currentVelocity.z, wallRules.bounceUpSpeed) : currentVelocity.z;
+    // lift zone, and PERFECT_BOUNCE_UP_MULTIPLIER stronger for a PERFECT hit).
+    const vzBase = bounceVelocity
+        ? BounceUpVelocity(currentVelocity.z, wallRules.bounceUpSpeed, bounceAngleFactor)
+        : currentVelocity.z;
     const v = { x: vx, y: vy, z: vzBase };
     ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v, wallRules);
     // On a jump pad, a (just) pressed jump launches instead — see JUMP_PAD_*.

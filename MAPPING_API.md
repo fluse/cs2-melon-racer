@@ -254,7 +254,8 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → lift_enter
   normally, inside a lift zone its own kick instead. Parsed from a name
   matching `^lift_zone_(\d+(?:\.\d+)?)$`, any other name uses
   `LIFT_ZONE_UP_SPEED` (450 u/s). A fall is cancelled first; a melon already
-  rising keeps that plus the kick.
+  rising keeps that plus the kick. A PERFECT bounce kicks
+  `PERFECT_BOUNCE_UP_MULTIPLIER` (×1.2) harder.
 - Height gained per bounce ≈ kick² / 1600 units (gravity 800): 220 → ~30,
   450 → ~125, 600 → ~225. Size the zone to cover the whole climb, top
   included.

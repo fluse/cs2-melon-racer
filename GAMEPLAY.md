@@ -158,7 +158,7 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   `WALL_BOUNCE_OPTIMAL_ANGLE` (45° from the wall normal) and falls off
   linearly to 0 `WALL_BOUNCE_ANGLE_FALLOFF` degrees away from it; it picks
   the rating (`BOUNCE_RATINGS`; PERFECT within ±`PERFECT_BOUNCE_TOLERANCE`,
-  6.5°, of 45°), and each rating has a fixed speed
+  8.5°, of 45°), and each rating has a fixed speed
   multiplier (`speedMultiplier`, decided): PERFECT ×1.35, GOOD ×1.1,
   BAD ×0.5, MISS ×0.3 — so only PERFECT and GOOD come out faster than they
   went in, BAD and MISS cost speed.
@@ -207,7 +207,9 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
 - **Upward kick:** every bounce (any rating) also lifts the melon — its
   vertical speed becomes `WALL_BOUNCE_UP_SPEED` upward (a fall is cancelled
   first; a melon already rising keeps that plus the kick), so a bounce sends
-  it up in an arc instead of along the ground. Inside a **lift zone**
+  it up in an arc instead of along the ground. A PERFECT bounce
+  (`BOUNCE_RATINGS[0]`) kicks `PERFECT_BOUNCE_UP_MULTIPLIER` (×1.2, decided)
+  harder — the normal kick and a lift zone's alike. Inside a **lift zone**
   (`lift_enter`/`lift_leave` trigger, `LIFT_ZONE_UP_SPEED` or
   `lift_zone_<speed>` in its name — see MAPPING_API.md 4.7) the kick is
   stronger, so shafts and high walls can be climbed by bouncing between
@@ -765,7 +767,10 @@ reset after such a respawn); leaving a zone by teleport still sends its
 starts with no zones — its own `OnStartTouch` re-adds them. Every entry into a heal
 zone plays the `particle_health_template` point_template's particle effect
 on the melon, riding along with it (`HEAL_PARTICLE_LIFETIME`; not for broken
-or race-locked melons). All particle effects (break burst, PERFECT spark,
+or race-locked melons). That effect is `particles/melon_racer/heal_crosses.vpcf`:
+a burst of glowing "+" crosses rising off the melon, the same crosses and
+green/mint as the `holo_heal` gate material (`tools/make-holo.mjs`), all
+gone within the 2 s lifetime. All particle effects (break burst, PERFECT spark,
 heal) are spawned through `src/melon_drive/particles.js`
 (`test/particles.test.mjs`).
 

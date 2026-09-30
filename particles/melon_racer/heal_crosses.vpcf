@@ -1,0 +1,134 @@
+<!-- kv3 encoding:text:version{e21c7f3c-8a33-41c5-9977-a76d3a32aa0d} format:generic:version{7412167c-06e9-4698-aff2-e63eb59037e7} -->
+{
+	_class = "CParticleSystemDefinition"
+	m_nBehaviorVersion = 12
+	// Heal: a burst of glowing "+" crosses popping up around the melon and
+	// rising off it — the crosses of the holo_heal gate texture, same shape
+	// (materials/melon_racer/particle_heal_cross.vtex, from
+	// tools/make-holo.mjs) and the same green → mint colors.
+	// Script-driven: the info_particle_system in particle_health_template
+	// (heal/effect.js) is spawned on the melon, parented to it, started on
+	// entering a heal zone and removed after HEAL_PARTICLE_LIFETIME (2 s) —
+	// so every particle here is gone within ~1.5 s. PositionLock keeps the
+	// crosses moving along with the melon (it's usually driving fast), the
+	// rise itself is in world space, so a rolling melon doesn't spin them.
+	// Tuning: particles to emit = how many, velocity x lifetime = how high
+	// (~45 u/s slowed by drag ≈ 40-60 units), sphere radius = spread around
+	// the melon, radius = cross size (~1/2 the sprite is cross).
+	m_nMaxParticles = 24
+	m_flConstantRadius = 4.0
+	m_ConstantColor = [ 255, 255, 255, 255 ]
+	m_flMaxDrawDistance = 5000.0
+	m_Renderers =
+	[
+		{
+			_class = "C_OP_RenderSprites"
+			m_flDiffuseAmount = 0.0
+			m_flSelfIllumAmount = 1.0
+			m_hTexture = resource:"materials/melon_racer/particle_heal_cross.vtex"
+			m_bAdditive = true
+		},
+	]
+	m_Operators =
+	[
+		{
+			_class = "C_OP_Decay"
+		},
+		{
+			_class = "C_OP_BasicMovement"
+			m_Gravity = [ 0.0, 0.0, 0.0 ]
+			m_fDrag = 0.04
+		},
+		// ride along with the melon (translation only)
+		{
+			_class = "C_OP_PositionLock"
+		},
+		// pop in: grow from small to full size over the first quarter
+		{
+			_class = "C_OP_InterpolateRadius"
+			m_flStartTime = 0.0
+			m_flEndTime = 0.25
+			m_flStartScale = 0.2
+			m_flEndScale = 1.0
+		},
+		{
+			_class = "C_OP_FadeAndKill"
+			m_flEndFadeInTime = 0.1
+			m_flStartFadeOutTime = 0.55
+			m_flEndFadeOutTime = 1.0
+		},
+	]
+	m_Initializers =
+	[
+		// around the melon, a little more sideways than up/down
+		{
+			_class = "C_INIT_CreateWithinSphereTransform"
+			m_fRadiusMin = 6.0
+			m_fRadiusMax = 16.0
+			m_vecDistanceBias = [ 1.0, 1.0, 0.5 ]
+		},
+		// lifetime (s) — stays below HEAL_PARTICLE_LIFETIME
+		{
+			_class = "C_INIT_InitFloat"
+			m_InputValue =
+			{
+				m_nType = "PF_TYPE_RANDOM_UNIFORM"
+				m_flRandomMin = 1.0
+				m_flRandomMax = 1.5
+				m_nRandomMode = "PF_RANDOM_MODE_CONSTANT"
+			}
+			m_nOutputField = 1
+		},
+		// radius = cross size
+		{
+			_class = "C_INIT_InitFloat"
+			m_InputValue =
+			{
+				m_nType = "PF_TYPE_RANDOM_UNIFORM"
+				m_flRandomMin = 3.0
+				m_flRandomMax = 5.5
+				m_nRandomMode = "PF_RANDOM_MODE_CONSTANT"
+			}
+		},
+		// alpha
+		{
+			_class = "C_INIT_InitFloat"
+			m_InputValue =
+			{
+				m_nType = "PF_TYPE_RANDOM_UNIFORM"
+				m_flRandomMin = 0.75
+				m_flRandomMax = 1.0
+				m_nRandomMode = "PF_RANDOM_MODE_CONSTANT"
+			}
+			m_nOutputField = 7
+		},
+		// holo_heal's gradient: heal green to mint (HEAL_GRADIENT in make-holo.mjs)
+		{
+			_class = "C_INIT_RandomColor"
+			m_ColorMin = [ 40, 255, 110, 255 ]
+			m_ColorMax = [ 110, 255, 215, 255 ]
+		},
+		// rising, a little sideways drift
+		{
+			_class = "C_INIT_InitialVelocityNoise"
+			m_vecOutputMin = [ -6.0, -6.0, 35.0 ]
+			m_vecOutputMax = [ 6.0, 6.0, 60.0 ]
+			m_flNoiseScale = 1.0
+		},
+	]
+	m_Emitters =
+	[
+		// the burst on entering the zone
+		{
+			_class = "C_OP_InstantaneousEmitter"
+			// A plain number here — the { m_nType ... } form compiles to 0.
+			m_nParticlesToEmit = 10
+		},
+		// and a short trickle after it, so it reads as "healing", not a hit
+		{
+			_class = "C_OP_ContinuousEmitter"
+			m_flEmitRate = 12.0
+			m_flEmissionDuration = 0.4
+		},
+	]
+}

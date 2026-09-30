@@ -50,6 +50,9 @@ export const WALL_TIMING_SPAM_LOCKOUT = 0.4; // seconds
 // Higher: bounces send it up in an arc; 0 = vertical left to physics (old).
 // Stronger inside lift zones — see constants/lift.js.
 export const WALL_BOUNCE_UP_SPEED = 220; // units/sec upward
+// A bounce rated PERFECT (BOUNCE_RATINGS[0]) kicks this much harder upward —
+// applies to WALL_BOUNCE_UP_SPEED and to a lift zone's kick alike.
+export const PERFECT_BOUNCE_UP_MULTIPLIER = 1.2; // ×1.2 = 20 % more upward kick
 export const WALL_BOUNCE_COOLDOWN = 0.2; // seconds — stops one wall contact from bouncing (and damaging) on consecutive ticks
 // Wall hits get their own damage rules, separate from landings: a base part
 // from the impact itself (same shape as IMPACT_DAMAGE_*), plus a cost for
@@ -101,8 +104,8 @@ export const BOUNCE_JUMP_SEGMENTS = 5;
 // accent for the in-world prediction line (see prediction.js) — keep the two
 // in sync with speedometer.css's .Rating* rules.
 // PERFECT counts within this many degrees either side of
-// WALL_BOUNCE_OPTIMAL_ANGLE (was 4.5°, i.e. minAngleFactor 0.9).
-export const PERFECT_BOUNCE_TOLERANCE = 6.5; // degrees
+// WALL_BOUNCE_OPTIMAL_ANGLE (was 4.5°, then 6.5°).
+export const PERFECT_BOUNCE_TOLERANCE = 8.5; // degrees
 export const BOUNCE_RATINGS = [
     { minAngleFactor: 1 - PERFECT_BOUNCE_TOLERANCE / WALL_BOUNCE_ANGLE_FALLOFF, label: "PERFECT", speedMultiplier: 1.35, cssClass: "RatingPerfect", color: { r: 255, g: 224, b: 102, a: 255 } },
     { minAngleFactor: 0.7, label: "GOOD", speedMultiplier: 1.1, cssClass: "RatingGood", color: { r: 102, g: 221, b: 102, a: 255 } },

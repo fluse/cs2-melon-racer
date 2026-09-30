@@ -71,7 +71,7 @@ function chunk(type, data) {
     out.writeUInt32BE(crc32(out.subarray(4, 8 + data.length)), 8 + data.length);
     return out;
 }
-/** channels: 1 = grayscale, 3 = RGB. */
+/** channels: 1 = grayscale, 3 = RGB, 4 = RGBA. */
 function WritePng(width, height, channels, pixels) {
     const stride = width * channels;
     const rows = Buffer.alloc(height * (stride + 1));
@@ -80,7 +80,7 @@ function WritePng(width, height, channels, pixels) {
     header.writeUInt32BE(width, 0);
     header.writeUInt32BE(height, 4);
     header[8] = 8;
-    header[9] = { 1: 0, 3: 2 }[channels];
+    header[9] = { 1: 0, 3: 2, 4: 6 }[channels];
     return Buffer.concat([
         Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
         chunk("IHDR", header),
@@ -347,3 +347,37 @@ for (let y = 0; y < SIZE; y++) {
     }
 }
 WriteSet(HEAL_NAME, SIZE, SIZE, healColor, healTrans, healIllum);
+
+// --- particle_heal_cross: one of holo_heal's crosses as a particle sprite ---
+//
+// For particles/melon_racer/heal_crosses.vpcf (via particle_heal_cross.vtex):
+// the same cross (CrossDistance, same size), alone and centered, white — the
+// particle's color tints it, so the particle picks the heal gradient's colors.
+// Opacity in alpha: bright outline, HEAL_FILL inside, glow outwards; the
+// renderer is additive. `node tools/make-holo.mjs particle_heal_cross`.
+
+const SPRITE_NAME = "particle_heal_cross";
+const SPRITE_SIZE = 128; // power of two; the cross (60 px) + glow fits with room to spare
+
+if (!ONLY || ONLY === SPRITE_NAME) {
+    const sprite = Buffer.alloc(SPRITE_SIZE * SPRITE_SIZE * 4);
+    for (let y = 0; y < SPRITE_SIZE; y++) {
+        for (let x = 0; x < SPRITE_SIZE; x++) {
+            let edge = 0;
+            let inside = 0;
+            for (const [ox, oy] of [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
+                const d = CrossDistance(x + ox - SPRITE_SIZE / 2, y + oy - SPRITE_SIZE / 2);
+                const dist = Math.abs(d);
+                const core = Math.max(0, Math.min(1, HEAL_EDGE_WIDTH + 0.5 - dist));
+                const glow = d > 0 ? Math.exp(-(dist * dist) / (2 * (HEAL_GLOW_WIDTH / 2.5) ** 2)) : 0;
+                edge += Math.min(1, core + glow * 0.6) / 4;
+                inside += (d < 0 ? 1 : 0) / 4;
+            }
+            const i = (y * SPRITE_SIZE + x) * 4;
+            sprite.fill(255, i, i + 3);
+            sprite[i + 3] = Math.round(255 * Math.min(1, edge + inside * HEAL_FILL));
+        }
+    }
+    writeFileSync(new URL(`${SPRITE_NAME}.png`, OUT_DIR), WritePng(SPRITE_SIZE, SPRITE_SIZE, 4, sprite));
+    console.log(`wrote ${SPRITE_NAME}.png (${SPRITE_SIZE}x${SPRITE_SIZE})`);
+}

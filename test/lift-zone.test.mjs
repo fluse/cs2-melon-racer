@@ -9,6 +9,8 @@ import {
     LIFT_ZONE_MIN_BOUNCE_SPEED,
     LIFT_ZONE_WALL_JUMP_COOLDOWN,
     LIFT_ZONE_JUMP_BUFFER,
+    PERFECT_BOUNCE_UP_MULTIPLIER,
+    BOUNCE_RATINGS,
 } from "../src/melon_drive/constants/index.js";
 
 test("bounce kick cancels a fall, then adds the kick", () => {
@@ -18,6 +20,13 @@ test("bounce kick cancels a fall, then adds the kick", () => {
 
 test("bounce kick adds on top of a melon already rising", () => {
     assert.equal(BounceUpVelocity(100, LIFT_ZONE_UP_SPEED), 100 + LIFT_ZONE_UP_SPEED);
+});
+
+test("a PERFECT bounce kicks PERFECT_BOUNCE_UP_MULTIPLIER harder, other ratings don't", () => {
+    const perfect = BOUNCE_RATINGS[0].minAngleFactor;
+    assert.equal(BounceUpVelocity(-300, WALL_BOUNCE_UP_SPEED, perfect), WALL_BOUNCE_UP_SPEED * PERFECT_BOUNCE_UP_MULTIPLIER);
+    assert.equal(BounceUpVelocity(100, LIFT_ZONE_UP_SPEED, 1), 100 + LIFT_ZONE_UP_SPEED * PERFECT_BOUNCE_UP_MULTIPLIER);
+    assert.equal(BounceUpVelocity(0, WALL_BOUNCE_UP_SPEED, BOUNCE_RATINGS[1].minAngleFactor), WALL_BOUNCE_UP_SPEED);
 });
 
 test("lift zone kick comes from a lift_zone_<speed> name, else the default", () => {

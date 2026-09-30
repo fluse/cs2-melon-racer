@@ -108,6 +108,7 @@ export function UpdateKart(slot, kart, dt) {
     const wallRules = CurrentWallRules(kart);
     /** @type {{ x: number, y: number } | undefined} */
     let bounceVelocity = undefined;
+    let bounceAngleFactor = 0;
     if (kart.lastVelocity) {
         const impactDelta = {
             x: currentVelocity.x - kart.lastVelocity.x,
@@ -137,6 +138,7 @@ export function UpdateKart(slot, kart, dt) {
             // opposite wall and bounce again (wallRules.minBounceSpeed) —
             // free: speedGain below stays what the bounce itself earned.
             bounceVelocity = WithMinSpeed(bounce.velocity, wallRules.minBounceSpeed);
+            bounceAngleFactor = bounce.angleFactor;
             // The melon leaves the wall right away after bouncing, so the
             // probes won't see it next tick — this is its wall contact.
             kart.lastWallContact = { time: now, normal: { x: wallNormal.x, y: wallNormal.y } };
@@ -295,8 +297,10 @@ export function UpdateKart(slot, kart, dt) {
     // Jump press (ground jump / wall jump / wall-bounce timing) and the
     // wall-jump charge refill — see ApplyJump in jump.js.
     // A wall bounce also kicks it upward (WALL_BOUNCE_UP_SPEED, stronger in a
-    // lift zone).
-    const vzBase = bounceVelocity ? BounceUpVelocity(currentVelocity.z, wallRules.bounceUpSpeed) : currentVelocity.z;
+    // lift zone, and PERFECT_BOUNCE_UP_MULTIPLIER stronger for a PERFECT hit).
+    const vzBase = bounceVelocity
+        ? BounceUpVelocity(currentVelocity.z, wallRules.bounceUpSpeed, bounceAngleFactor)
+        : currentVelocity.z;
     const v = { x: vx, y: vy, z: vzBase };
     ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v, wallRules);
     // On a jump pad, a (just) pressed jump launches instead — see JUMP_PAD_*.

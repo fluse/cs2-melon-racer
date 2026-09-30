@@ -67,7 +67,9 @@ particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3
                                           #   lift_updraft + lift_updraft_streaks (ambient, same way: two info_particle_systems at the bottom of a lift shaft —
                                           #   soft swaying glow motes + faint fast rising air streaks);
                                           #   jump_pad_rings + jump_pad_sparks (ambient, same way: two info_particle_systems on a jump pad —
-                                          #   flat lime rings shooting up and widening + fast rising lime sparks)
+                                          #   flat lime rings shooting up and widening + fast rising lime sparks);
+                                          #   heal_crosses (script-driven, the effect in particle_health_template: a burst of
+                                          #   rising "+" crosses in holo_heal's green/mint, sprite particle_heal_cross.vtex from tools/make-holo.mjs)
                                           #   Write the editor source format, not resourceinfo's compiled dump — see the comments in boost_trail.vpcf;
                                           #   compile with resourcecompiler.exe (-f) like Panorama
 materials/melon_racer/*_decal.vmat       # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs

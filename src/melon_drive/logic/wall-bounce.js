@@ -15,6 +15,7 @@ import {
     WALL_CONTACT_DISTANCE,
     WALL_CONTACT_MIN_STOP,
     WALL_BOUNCE_UP_SPEED,
+    PERFECT_BOUNCE_UP_MULTIPLIER,
 } from "../constants/index.js";
 
 /**
@@ -150,9 +151,12 @@ export function WallBounceDamage(impactSpeed, speedGain, angleFactor) {
  * the kick is added on top (a melon already rising keeps that plus the kick).
  * @param {number} currentZ vertical velocity physics left this tick
  * @param {number} [upSpeed] the kick — WALL_BOUNCE_UP_SPEED, or a lift zone's
+ * @param {number} [angleFactor] the bounce's angle closeness — a PERFECT
+ *   rating (BOUNCE_RATINGS[0]) makes the kick PERFECT_BOUNCE_UP_MULTIPLIER stronger
  */
-export function BounceUpVelocity(currentZ, upSpeed = WALL_BOUNCE_UP_SPEED) {
-    return Math.max(currentZ, 0) + upSpeed;
+export function BounceUpVelocity(currentZ, upSpeed = WALL_BOUNCE_UP_SPEED, angleFactor = 0) {
+    const perfect = GetBounceRating(angleFactor) === BOUNCE_RATINGS[0];
+    return Math.max(currentZ, 0) + upSpeed * (perfect ? PERFECT_BOUNCE_UP_MULTIPLIER : 1);
 }
 
 /**
