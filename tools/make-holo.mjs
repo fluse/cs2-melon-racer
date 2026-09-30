@@ -9,7 +9,8 @@
 // - holo_zigzag_illum.png: grayscale self-illum mask (the glowing part).
 //
 // Also holo_dashes_{color,trans,illum}.png for holo_dashes.vmat and
-// holo_portal_{color,trans,illum}.png for holo_portal.vmat (see below).
+// holo_portal_{color,trans,illum}.png for holo_portal.vmat and
+// holo_heal_{color,trans,illum}.png for holo_heal.vmat (see below).
 //
 // `node tools/make-holo.mjs <name>` (e.g. holo_dashes) writes only that
 // texture set and leaves the others' PNGs untouched.
@@ -235,3 +236,114 @@ for (let x = 0; x < PORTAL_WIDTH; x++) {
     }
 }
 WriteSet(PORTAL_NAME, PORTAL_WIDTH, PORTAL_HEIGHT, portalColor, portalTrans, portalIllum);
+
+// --- holo_heal: rising plus crosses for heal gates (materials/melon_racer/holo_heal.vmat) ---
+//
+// Staggered grid of outlined "+" crosses (the heal sign) with a softly filled
+// inside, in the HUD health bar's green shading to mint. Color and opacity
+// hold the crosses; the material scrolls them upward. The self-illum mask is
+// its own pattern — one broad bright band per tile plus soft scanlines — and
+// scrolls faster, so a scan wave sweeps up over the rising crosses.
+// HEAL_CELL divides SIZE and SIZE / HEAL_CELL is even, so the half-cell
+// stagger of every other row lines up again at the tile edge — seamless.
+
+const HEAL_NAME = "holo_heal";
+const HEAL_CELL = 128; // px between crosses in a row, and between rows (must divide SIZE, SIZE / it even)
+const HEAL_ARM_LENGTH = 30; // px from a cross's center to the end of an arm
+const HEAL_ARM_WIDTH = 10; // px half-width of an arm
+const HEAL_EDGE_WIDTH = 1.5; // px half-width of the bright outline
+const HEAL_GLOW_WIDTH = 12; // px falloff of the glow around the outline
+const HEAL_FILL = 0.4; // brightness of a cross's inside
+const HEAL_GLASS_ALPHA = 0.08;
+const HEAL_BAND_WIDTH = 70; // px, the illum scan band's softness (one band per tile)
+const HEAL_SCANLINE_PERIOD = 16; // px (must divide SIZE)
+const HEAL_SCANLINE_DEPTH = 0.25; // how much darker between scanlines
+const HEAL_ILLUM_MIN = 0.35; // illum outside the band
+const HEAL_GRADIENT = [
+    [0.0, [40, 255, 110]], // heal green
+    [0.4, [40, 255, 110]],
+    [0.55, [110, 255, 215]], // mint
+    [0.9, [110, 255, 215]],
+    [1.0, [40, 255, 110]],
+];
+
+/** Signed distance (px) from (x, y) to a "+" centered at the origin; < 0 inside. */
+function CrossDistance(x, y) {
+    x = Math.abs(x);
+    y = Math.abs(y);
+    // Union of a horizontal and a vertical box.
+    const Box = (px, py, hx, hy) => {
+        const dx = px - hx;
+        const dy = py - hy;
+        return Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0);
+    };
+    return Math.min(Box(x, y, HEAL_ARM_LENGTH, HEAL_ARM_WIDTH), Box(x, y, HEAL_ARM_WIDTH, HEAL_ARM_LENGTH));
+}
+
+/** Signed distance (px) from pixel (x, y) to the nearest cross of the staggered grid. */
+function HealDistance(x, y) {
+    const row = Math.round(y / HEAL_CELL);
+    const shift = (((row % 2) + 2) % 2) * (HEAL_CELL / 2);
+    const cx = Math.round((x - shift) / HEAL_CELL) * HEAL_CELL + shift;
+    // A staggered neighbor row can be nearer than the own row's cross.
+    let best = Infinity;
+    for (const dr of [-1, 0, 1]) {
+        const r = row + dr;
+        const s = (((r % 2) + 2) % 2) * (HEAL_CELL / 2);
+        for (const dc of [-HEAL_CELL, 0, HEAL_CELL]) {
+            const px = Math.round((cx + dc - s) / HEAL_CELL) * HEAL_CELL + s;
+            best = Math.min(best, CrossDistance(x - px, y - r * HEAL_CELL));
+        }
+    }
+    return best;
+}
+
+function HealGradient(t) {
+    t -= Math.floor(t);
+    for (let i = 1; i < HEAL_GRADIENT.length; i++) {
+        const [t1, c1] = HEAL_GRADIENT[i];
+        const [t0, c0] = HEAL_GRADIENT[i - 1];
+        if (t <= t1) {
+            const k = (t - t0) / (t1 - t0);
+            const s = k * k * (3 - 2 * k);
+            return c0.map((v, j) => v + (c1[j] - v) * s);
+        }
+    }
+    return HEAL_GRADIENT[0][1];
+}
+
+const healColor = Buffer.alloc(SIZE * SIZE * 3);
+const healTrans = Buffer.alloc(SIZE * SIZE);
+const healIllum = Buffer.alloc(SIZE * SIZE);
+for (let y = 0; y < SIZE; y++) {
+    // Illum: one soft band per tile (centered on the tile edge, wraps) times scanlines.
+    const bandDist = Math.abs(((y + SIZE / 2) % SIZE) - SIZE / 2);
+    const band = Math.exp(-(bandDist * bandDist) / (2 * HEAL_BAND_WIDTH ** 2));
+    const scan = 1 - HEAL_SCANLINE_DEPTH * (0.5 - 0.5 * Math.cos((2 * Math.PI * y) / HEAL_SCANLINE_PERIOD));
+    const illumRow = (HEAL_ILLUM_MIN + (1 - HEAL_ILLUM_MIN) * band) * scan;
+    for (let x = 0; x < SIZE; x++) {
+        // Supersampled 2x2, like the dashes.
+        let edge = 0;
+        let inside = 0;
+        for (const [ox, oy] of [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
+            const d = HealDistance(x + ox, y + oy);
+            const dist = Math.abs(d);
+            const core = Math.max(0, Math.min(1, HEAL_EDGE_WIDTH + 0.5 - dist));
+            // Glow only outwards: inside, the fill does the job evenly.
+            const glow = d > 0 ? Math.exp(-(dist * dist) / (2 * (HEAL_GLOW_WIDTH / 2.5) ** 2)) : 0;
+            edge += Math.min(1, core + glow * 0.6) / 4;
+            inside += (d < 0 ? 1 : 0) / 4;
+        }
+        const line = Math.min(1, edge + inside * HEAL_FILL);
+        // Vertical gradient that wraps once across the tile, so it rises with the crosses.
+        const [r, g, b] = HealGradient(y / SIZE);
+        const white = Math.max(0, edge - 0.85) / 0.15 * 0.6;
+        const i = y * SIZE + x;
+        healColor[i * 3] = Math.round(r + (255 - r) * white);
+        healColor[i * 3 + 1] = Math.round(g + (255 - g) * white);
+        healColor[i * 3 + 2] = Math.round(b + (255 - b) * white);
+        healTrans[i] = Math.round(255 * (HEAL_GLASS_ALPHA + (1 - HEAL_GLASS_ALPHA) * line));
+        healIllum[i] = Math.round(255 * illumRow);
+    }
+}
+WriteSet(HEAL_NAME, SIZE, SIZE, healColor, healTrans, healIllum);
