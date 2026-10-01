@@ -1,16 +1,16 @@
 // Camera zones: zoom in or out while the melon is in a camera_enter/_leave
-// trigger (CAMERA_ZONE_* — the math is in ../logic/camera-zone.js).
-import { NO_CAMERA_ZONE, StepZoneCamera } from "../zones/camera-zone/logic.js";
-// Straight from zones.js, not ../physics/index.js: physics imports this
-// folder, and the folder index would close an import cycle.
-import { CurrentCameraZone } from "../zones/registry.js";
+// trigger (CAMERA_ZONE_* and the math are in zones/camera-zone/).
+import { NO_CAMERA_ZONE, StepZoneCamera } from "../../zones/camera-zone/logic.js";
+// Straight from zones/registry.js, not zones/index.js: that one also loads
+// zones/inputs.js, which reaches kart/ and health/ — and both import camera/.
+import { CurrentCameraZone } from "../../zones/registry.js";
 
 /**
  * Per tick: eases the chase camera towards the zoom of the camera zone the
  * melon is in, and back to normal after it leaves (UpdateFollowCamera in
  * follow.js applies the zoom right after). Left alone while the melon is
  * breaking — the break camera owns it then, and the respawn re-applies it.
- * @param {import("../core/kart-registry.js").Kart} kart @param {number} dt
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 export function UpdateZoneCamera(kart, dt) {
     if (kart.breaking) {

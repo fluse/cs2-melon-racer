@@ -1,16 +1,16 @@
 // The chase camera's wall pull-in, done by the script instead of the engine
 // (CAMERA_WALL_* in constants.js): the engine's clipCameraOffset pulls in
-// instantly, this eases both ways. The math is in wall-clip-logic.js.
-import { TraceLine } from "../core/trace.js";
-import { RotateCameraOffset, WallClipScale, StepWallClipScale } from "./wall-clip-logic.js";
-import { FOLLOW_OFFSET } from "../constants/index.js";
+// instantly, this eases both ways. The math is in logic.js.
+import { TraceLine } from "../../core/trace.js";
+import { RotateCameraOffset, WallClipScale, StepWallClipScale } from "./logic.js";
+import { FOLLOW_OFFSET } from "../../constants/index.js";
 
 /**
  * `offset` pulled in towards the melon as far as a wall in between needs it,
  * eased over `dt` (kart.cameraWallScale keeps the current pull-in). The
  * trace runs from the camera's pivot (the melon + FOLLOW_OFFSET) to where
  * the camera would be, skipping the melon itself and players.
- * @param {import("../core/kart-registry.js").Kart} kart
+ * @param {import("../../core/kart-registry.js").Kart} kart
  * @param {{ x: number, y: number, z: number }} offset @param {number} dt
  */
 export function WallClippedOffset(kart, offset, dt) {

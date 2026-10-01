@@ -101,6 +101,21 @@ test("every link in the Mapping API and the track guide resolves, anchors includ
     assert.deepEqual(broken, []);
 });
 
+// A table row "| `CONSTANT` | … | `<file>.js` |" names the file it's defined
+// in (relative to src/melon_drive/) — it must really be exported there, so
+// moving a constant can't leave the table pointing at the old file.
+test("every 'Defined in' file in a Mapping API table exports its constant", () => {
+    const wrong = [];
+    for (const [file, text] of Object.entries(pages)) {
+        for (const [, key, source] of text.matchAll(/^\| `([A-Z][A-Z0-9_]+)` \|.*\| `([\w./-]+\.js)` \|$/gm)) {
+            const url = new URL(`../../src/melon_drive/${source}`, import.meta.url);
+            const exported = existsSync(url) && new RegExp(`^export const ${key}\\b`, "m").test(readFileSync(url, "utf8"));
+            if (!exported) wrong.push(`${file}: ${key} isn't exported by ${source}`);
+        }
+    }
+    assert.deepEqual(wrong, []);
+});
+
 // A table row "| `CONSTANT` | <value> | …" must give the constant's real value
 // (units and a leading "×" are ignored), so retuning one shows up here.
 test("every constant value in a Mapping API table is current", () => {

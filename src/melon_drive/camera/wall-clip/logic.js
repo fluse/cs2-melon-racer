@@ -1,7 +1,7 @@
 // Pure rules for the script's own camera wall clipping — no cs_script import,
 // so it's unit-testable in Node (see test/camera/wall-clip.test.mjs).
-// camera/wall-clip.js does the trace and applies the result.
-import { CAMERA_WALL_PULL_IN_RATE, CAMERA_WALL_RETURN_RATE, CAMERA_WALL_MARGIN } from "../constants/index.js";
+// wall-clip.js next to it does the trace and applies the result.
+import { CAMERA_WALL_PULL_IN_RATE, CAMERA_WALL_RETURN_RATE, CAMERA_WALL_MARGIN } from "../../constants/index.js";
 
 /**
  * A camera offset (x forward, y left, z up — like

@@ -54,7 +54,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              lift/, jump-pad/ (launch + no-damage flight), camera-zone/, teleport/ (melon_teleport)
                                           #   race/      track-config.js (tracks from trigger names), checkpoints/ (progress, start_/checkpoint_/finish_ inputs),
                                           #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs)
-                                          #   camera/    follow.js (chase camera, the only SetFollowConfig), wall-clip.js (eased pull-in at walls), break-zoom.js, lift-zoom.js, zone-zoom.js
+                                          #   camera/    follow/ (chase camera, the only SetFollowConfig), wall-clip/ (eased pull-in at walls), break-zoom/, lift-zoom/, zone-zoom/
                                           #   hud/       layout.js (the custom_hud_layout), one file per panel: speedometer.js, bounce-panel.js,
                                           #              track.js (time trial + checkpoint strip), hub-modal.js, user-menu.js; inputs.js (every button click)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
@@ -109,7 +109,9 @@ package, so leave it as a bare import. A JSDoc-only type from another file
   `Register…Inputs()` for its `OnScriptInput`s, and an `index.js` for its
   public API where it has more than one consumer. A folder with several pure
   rule files names them `<topic>-logic.js` next to the engine file they
-  serve (`camera/lift-zoom.js` ↔ `camera/lift-zoom-logic.js`).
+  serve (`hud/track.js` ↔ `hud/checkpoint-strip-logic.js`) — but when a
+  domain's mechanics each get their own rules, they get their own folders
+  instead (`camera/lift-zoom/`, `camera/wall-clip/`, …).
 - **A new feature is a new folder** in the fitting domain, registered
   through that domain's `index.js` (inputs) or `core/think.js` (per-tick
   update) — nothing else central needs to change. Add its `constants.js`
@@ -271,7 +273,7 @@ every particle effect.
 `CustomPlayerCamera` — scripted camera control via
 `SetMode`/`SetFollowConfig` (modes: `DISABLED`, `CONTROLLED`,
 `CONTROLLED_POSITION`, `FOLLOW_POSITION`). The chase camera is
-`FOLLOW_POSITION` on the melon (`camera/follow.js`). `CameraFollowConfig`:
+`FOLLOW_POSITION` on the melon (`camera/follow/follow.js`). `CameraFollowConfig`:
 `followEntity`, `followOffset` (from its origin, or eyes with `followEyes`),
 `cameraOffset` (rotated by the eye angles: x forward, y left, z up),
 `clipCameraOffset` (pull the camera in at walls) and

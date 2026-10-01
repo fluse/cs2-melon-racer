@@ -1,6 +1,6 @@
 // Trigger zones the melon can be inside — heal zones (heal_enter/heal_leave,
 // read by ../heal/), lift zones (lift_enter/lift_leave, zones/lift/constants.js) and
-// camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in camera/constants.js)
+// camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in camera-zone/constants.js)
 // and jump pads (jump_pad_enter/jump_pad_leave, zones/jump-pad/constants.js):
 // entering/leaving them (registered in inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.

@@ -1,9 +1,9 @@
-// The script's own camera wall clipping (camera/wall-clip-logic.js): where the
+// The script's own camera wall clipping (camera/wall-clip/logic.js): where the
 // camera offset points in the world, how much of it fits before a wall, and
 // how the pull-in eases — fast in, slower back out.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { RotateCameraOffset, WallClipScale, StepWallClipScale } from "../../src/melon_drive/camera/wall-clip-logic.js";
+import { RotateCameraOffset, WallClipScale, StepWallClipScale } from "../../src/melon_drive/camera/wall-clip/logic.js";
 import { CAMERA_WALL_MARGIN, CAMERA_WALL_PULL_IN_RATE, CAMERA_WALL_RETURN_RATE } from "../../src/melon_drive/constants/index.js";
 
 /** @param {{ x: number, y: number, z: number }} actual @param {{ x: number, y: number, z: number }} expected */

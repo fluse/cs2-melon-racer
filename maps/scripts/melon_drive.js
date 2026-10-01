@@ -94,7 +94,7 @@ function TraceSphere(config) {
  *   pendingBounce?: { time: number, impactSpeed: number, impactDir: { x: number, y: number, z: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number }, // damage not yet charged — waits out the jump window, see SettleWallBounceDamage
  *   healZones?: Map<any, number>, // heal triggers the melon is inside -> their rate (health/s), see health/heal/zone.js
  *   liftCameraBlend?: number, // 0..1, how far the camera is zoomed out for a lift zone — see UpdateLiftCamera
- *   cameraWallScale?: number, // 0..1, how much of the camera offset is left after a wall pulled it in — see camera/wall-clip.js
+ *   cameraWallScale?: number, // 0..1, how much of the camera offset is left after a wall pulled it in — see camera/wall-clip/
  *   appliedFollowKey?: string, // the follow offset last written to the engine — see ApplyZonedFollowOffset
  *   liftZones?: Map<any, number>, // lift triggers the melon is inside -> their wall-bounce kick (u/s up), see zones/registry.js
  *   jumpPads?: Map<any, import("../zones/jump-pad/logic.js").JumpPad>, // jump pad triggers the melon is on -> their launch, see zones/registry.js
@@ -1008,28 +1008,26 @@ const COLOR_PRESETS = {
     black: { r: 40, g: 40, b: 40, a: 255 },
 };
 
-// Chase camera offsets.
+// The normal chase camera's position.
 
 // Offsets for CameraFollowConfig — behind and above the melon. cameraOffset
 // is rotated by the player's eye angles: x is forward (negative = behind),
 // z is up. The same for every player (see GetCameraOffsetFor in
-// camera/follow.js); lift and camera zones zoom out/in from there.
+// camera/follow/follow.js); lift and camera zones zoom out/in from there.
 const FOLLOW_OFFSET = { x: 0, y: 0, z: 20 };
 const CAMERA_LATERAL = 0;
-// How far behind the melon the chase camera sits (was a user-menu preset,
-// 50..400 — the closest one felt best in play).
+// How far behind the melon the chase camera sits.
 // Higher: more overview, the melon gets smaller on screen.
 // Lower: closer, more speed feel; walls and slopes block the view sooner.
 const CAMERA_DISTANCE = 50;
-// How high above FOLLOW_OFFSET it sits (was a preset too, 0..160 — the
-// lowest felt best).
+// How high above FOLLOW_OFFSET it sits.
 // Higher: looks down on the melon — a better view ahead over hills.
 // Lower: flat, close-to-the-ground view.
 const CAMERA_HEIGHT = 0;
 
 // Walls between the melon and the chase camera pull the camera in — done by
-// the script (camera/wall-clip.js), not the engine, so it eases both ways:
-// the engine's own clipping pulls in instantly, which jerks the view at every
+// the script (camera/wall-clip/wall-clip.js), not the engine, so it eases
+// both ways: the engine's own clipping is instant and jerks the view at every
 // pillar. A line trace from the melon to where the camera wants to be finds
 // the wall; the camera's distance then eases towards it.
 // The price: while it eases in, the camera is briefly behind or inside the
@@ -1043,22 +1041,25 @@ const CAMERA_WALL_RETURN_RATE = 4;
 // Units the camera stays in front of the wall it was pulled in by, so the
 // view doesn't graze the wall's surface.
 const CAMERA_WALL_MARGIN = 8;
-// The break camera (camera/break-zoom.js) still uses the engine's clipping —
-// this is how fast it returns after being pulled in there
-// (CameraFollowConfig.cameraOffsetReturnStrength; 1 = instantly, the
-// engine's default; pulling in is always instant).
-const CAMERA_OFFSET_RETURN_STRENGTH = 0.2;
 
 // Lift zones (see zones/lift/constants.js): while the melon is inside one, the
 // chase camera eases back and up by this much on top of the normal
 // CAMERA_DISTANCE/CAMERA_HEIGHT, so the climb and the opposite wall stay in view;
 // it eases back in after leaving. While zoomed out, the camera is NOT pulled
-// in at walls (clipCameraOffset off) — in a shaft the wall right behind the
-// melon would undo the zoom — so it looks through the shaft walls instead.
+// in at walls — in a shaft the wall right behind the melon would undo the
+// zoom — so it looks through the shaft walls instead.
 // Higher: more overview, the melon gets smaller on screen.
-const LIFT_CAMERA_EXTRA_DISTANCE = 220; // units further back (was 150)
-const LIFT_CAMERA_EXTRA_HEIGHT = 30; // units higher up (was 120 — too high)
+const LIFT_CAMERA_EXTRA_DISTANCE = 220; // units further back
+const LIFT_CAMERA_EXTRA_HEIGHT = 30; // units higher up
 const LIFT_CAMERA_EASE_SECONDS = 0.6; // seconds to zoom fully out (or back in)
+
+// The break camera (camera/break-zoom/break-zoom.js) uses the engine's own
+// wall clipping, unlike the normal chase camera (camera/wall-clip/) — this is
+// how fast it returns after a wall pulled it in
+// (CameraFollowConfig.cameraOffsetReturnStrength; 1 = instantly, the
+// engine's default; pulling in is always instant). How far it pulls back is
+// BREAK_CAMERA_* in health/breaking/constants.js.
+const CAMERA_OFFSET_RETURN_STRENGTH = 0.2;
 
 // Camera zones (docs/mapping-api/11-camera-zones.md): a trigger_multiple (filtered to
 // prop_physics) with OnStartTouch -> RunScriptInput "camera_enter" and
@@ -1081,7 +1082,7 @@ const LIFT_CAMERA_EASE_SECONDS = 0.6; // seconds to zoom fully out (or back in)
 //                                            camera_zone_close, camera_zone_close_12_2.
 //                                            Combines with noclip: camera_zone_noclip_close_15_3.
 // Any other name uses CAMERA_ZONE_EXTRA_DISTANCE/_HEIGHT. Overlapping zones:
-// the one entered last counts. Adds up with the lift zoom above.
+// the one entered last counts. Adds up with the lift zoom (camera/lift-zoom/).
 const CAMERA_ZONE_NAME_PATTERN = /^camera_zone_(noclip_)?(front_)?(-?\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?$/;
 const CAMERA_CLOSEUP_NAME_PATTERN = /^camera_zone_(noclip_)?close(?:_(\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?)?$/;
 const CAMERA_ZONE_EXTRA_DISTANCE = 150; // units further back, for a zone without values in its name
@@ -1119,8 +1120,8 @@ const HEARTBEAT_INTERVAL = 1; // seconds
 // core/kart-registry.js, race/heat/race-flow.js, race/track-config.js.
 
 // Pure rules for the lift-zone camera zoom — no cs_script import, so it's
-// unit-testable in Node (see test/camera/lift-camera.test.mjs). camera/ applies
-// the resulting offset.
+// unit-testable in Node (see test/camera/lift-zoom.test.mjs). lift-zoom.js
+// next to it and ../follow/follow.js apply it.
 
 /**
  * How far the lift camera is zoomed out after `dt` more seconds, 0 (normal)
@@ -1151,7 +1152,7 @@ function LiftCameraOffset(base, blend) {
 
 // Pure rules for the script's own camera wall clipping — no cs_script import,
 // so it's unit-testable in Node (see test/camera/wall-clip.test.mjs).
-// camera/wall-clip.js does the trace and applies the result.
+// wall-clip.js next to it does the trace and applies the result.
 
 /**
  * A camera offset (x forward, y left, z up — like
@@ -1203,14 +1204,14 @@ function StepWallClipScale(current, target, dt) {
 
 // The chase camera's wall pull-in, done by the script instead of the engine
 // (CAMERA_WALL_* in constants.js): the engine's clipCameraOffset pulls in
-// instantly, this eases both ways. The math is in wall-clip-logic.js.
+// instantly, this eases both ways. The math is in logic.js.
 
 /**
  * `offset` pulled in towards the melon as far as a wall in between needs it,
  * eased over `dt` (kart.cameraWallScale keeps the current pull-in). The
  * trace runs from the camera's pivot (the melon + FOLLOW_OFFSET) to where
  * the camera would be, skipping the melon itself and players.
- * @param {import("../core/kart-registry.js").Kart} kart
+ * @param {import("../../core/kart-registry.js").Kart} kart
  * @param {{ x: number, y: number, z: number }} offset @param {number} dt
  */
 function WallClippedOffset(kart, offset, dt) {
@@ -1234,7 +1235,7 @@ function WallClippedOffset(kart, offset, dt) {
 }
 
 // Pure rules for camera zones — no cs_script import, so it's unit-testable in
-// Node (see test/zones/camera-zone.test.mjs). camera/zone-zoom.js applies the
+// Node (see test/zones/camera-zone.test.mjs). camera/zone-zoom/ applies the
 // resulting offset.
 
 /**
@@ -1397,11 +1398,11 @@ function ZoneCameraOffset(base, state) {
 
 // The third-person chase camera: attaching it to the melon, its normal
 // offset (CAMERA_DISTANCE/CAMERA_HEIGHT), and the one place that writes
-// the follow config (SetFollowOffset) — the break and lift zooms in this
-// folder go through it too, and so do the lift and camera-zone zooms.
-// Walls pull the camera in through wall-clip.js (eased), not the engine.
+// the follow config (SetFollowOffset) — the break, lift and camera-zone
+// zooms (the other folders in camera/) all go through it. Walls pull the
+// camera in through ../wall-clip/ (eased), not the engine.
 
-/** The normal chase offset, before any zoom. @param {import("../core/kart-registry.js").Kart} kart */
+/** The normal chase offset, before any zoom. @param {import("../../core/kart-registry.js").Kart} kart */
 function GetCameraOffsetFor(kart) {
     return { x: -CAMERA_DISTANCE, y: CAMERA_LATERAL, z: CAMERA_HEIGHT };
 }
@@ -1413,7 +1414,7 @@ function GetCameraOffsetFor(kart) {
  * re-called every time the player gets a fresh pawn, i.e. each respawn).
  * Keeps a lift zone's or camera zone's zoom if one is on (see ApplyZonedFollowOffset);
  * the wall pull-in starts over, right at the distance that fits.
- * @param {import("../core/kart-registry.js").Kart} kart
+ * @param {import("../../core/kart-registry.js").Kart} kart
  */
 function ApplyCameraFollow(kart) {
     const camera = kart.pawn.GetCustomCamera();
@@ -1428,7 +1429,7 @@ function ApplyCameraFollow(kart) {
  * Per tick: the chase camera with every zoom and the wall pull-in eased on.
  * Left alone while the melon is breaking — the break camera owns it then,
  * and the respawn re-applies it.
- * @param {import("../core/kart-registry.js").Kart} kart @param {number} dt
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 function UpdateFollowCamera(kart, dt) {
     if (kart.breaking) {
@@ -1442,7 +1443,7 @@ function UpdateFollowCamera(kart, dt) {
  * (kart.liftCameraBlend, lift-zoom.js) and the camera-zone zoom
  * (kart.zoneCamera, zone-zoom.js); they add up. Walls pull the camera in
  * (wall-clip.js, eased over `dt`) only while neither turns that off.
- * @param {import("../core/kart-registry.js").Kart} kart @param {number} dt
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 function ApplyZonedFollowOffset(kart, dt) {
     const liftBlend = kart.liftCameraBlend ?? 0;
@@ -1463,7 +1464,7 @@ function ApplyZonedFollowOffset(kart, dt) {
 /**
  * Points the chase camera at the melon from `cameraOffset` (x forward,
  * negative = behind; z up — rotated by the player's eye angles).
- * @param {import("../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} cameraOffset
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} cameraOffset
  * @param {boolean} engineClipsToWalls let the engine pull the camera in at walls (instantly) — only the
  *   break camera does; everything else goes through ApplyZonedFollowOffset's own, eased pull-in
  */
@@ -1576,13 +1577,13 @@ function PruneBreakEffects(effects, now) {
 }
 
 // Break camera: pulls back from a broken melon so the burst is visible
-// (BREAK_CAMERA_* — the math is BreakCameraOffset in ../logic/break-sequence.js).
+// (BREAK_CAMERA_* and the math, BreakCameraOffset, are in health/breaking/).
 
 /**
  * Pulls the chase camera back from a broken melon (still frozen, hidden, at
  * the crash site) so the burst is visible — called every tick while
  * kart.breaking; ApplyCameraFollow restores the normal offset on respawn.
- * @param {import("../core/kart-registry.js").Kart} kart @param {number} elapsed seconds since the break
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} elapsed seconds since the break
  */
 function ApplyBreakCameraZoom(kart, elapsed) {
     SetFollowOffset(kart, BreakCameraOffset(GetCameraOffsetFor(kart), elapsed), true);
@@ -1647,7 +1648,7 @@ function LiftZoneUpSpeed(triggerName) {
 
 // Trigger zones the melon can be inside — heal zones (heal_enter/heal_leave,
 // read by ../heal/), lift zones (lift_enter/lift_leave, zones/lift/constants.js) and
-// camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in camera/constants.js)
+// camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in camera-zone/constants.js)
 // and jump pads (jump_pad_enter/jump_pad_leave, zones/jump-pad/constants.js):
 // entering/leaving them (registered in inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.
@@ -1754,8 +1755,8 @@ function LatestZone(kart, kind) {
     return latest;
 }
 
-// Lift camera: zooms out while the melon is in a lift zone (LIFT_CAMERA_* —
-// the math is in ../logic/lift-camera.js).
+// Lift camera: zooms out while the melon is in a lift zone (LIFT_CAMERA_* in
+// constants.js, the math in logic.js).
 
 /**
  * Per tick: eases the chase camera out while the melon is in a lift zone and
@@ -1763,7 +1764,7 @@ function LatestZone(kart, kind) {
  * zoom right after). Wall clipping is off for as long as it's zoomed out at
  * all (it looks through the shaft walls instead). Left alone while the melon
  * is breaking — the break camera owns it then, and the respawn re-applies it.
- * @param {import("../core/kart-registry.js").Kart} kart @param {number} dt
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 function UpdateLiftCamera(kart, dt) {
     if (kart.breaking) {
@@ -1773,14 +1774,14 @@ function UpdateLiftCamera(kart, dt) {
 }
 
 // Camera zones: zoom in or out while the melon is in a camera_enter/_leave
-// trigger (CAMERA_ZONE_* — the math is in ../logic/camera-zone.js).
+// trigger (CAMERA_ZONE_* and the math are in zones/camera-zone/).
 
 /**
  * Per tick: eases the chase camera towards the zoom of the camera zone the
  * melon is in, and back to normal after it leaves (UpdateFollowCamera in
  * follow.js applies the zoom right after). Left alone while the melon is
  * breaking — the break camera owns it then, and the respawn re-applies it.
- * @param {import("../core/kart-registry.js").Kart} kart @param {number} dt
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 function UpdateZoneCamera(kart, dt) {
     if (kart.breaking) {
@@ -1789,9 +1790,11 @@ function UpdateZoneCamera(kart, dt) {
     kart.zoneCamera = StepZoneCamera(kart.zoneCamera, CurrentCameraZone(kart) ?? NO_CAMERA_ZONE, dt);
 }
 
-// Chase camera — one file per concern: follow.js (the normal chase camera),
-// break-zoom.js (pull-back on a break), lift-zoom.js
-// (zoom-out in lift zones), zone-zoom.js (zoom in/out in camera zones), wall-clip.js (eased pull-in at walls). Other parts of melon_drive import from here.
+// Chase camera — one folder per feature: follow/ (the normal chase camera and
+// the one place that writes the follow config), wall-clip/ (eased pull-in at
+// walls), break-zoom/ (pull-back on a break), lift-zoom/ (zoom-out in lift
+// zones), zone-zoom/ (zoom in/out in camera zones). Other parts of
+// melon_drive import from here.
 
 // Pure rules for generic teleporters — no cs_script import, so it's
 // unit-testable in Node (see test/zones/teleport.test.mjs). zones/teleport/inputs.js's
@@ -6681,7 +6684,7 @@ function RegisterZoneInputs() {
     // Lift zones — see lift/constants.js. Read by CurrentWallRules (every wall
     // bounce and wall jump) and the lift camera.
     RegisterZone("lift_enter", "lift_leave", "liftZones", LiftZoneUpSpeed, "u/s up per bounce");
-    // Camera zones — see CAMERA_ZONE_* in camera/constants.js. Read by the zone camera (camera/zone-zoom.js).
+    // Camera zones — see CAMERA_ZONE_* in camera-zone/constants.js. Read by the zone camera (camera/zone-zoom/).
     RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
     // Jump pads — see jump-pad/constants.js. Read by jump-pad/jump-pad.js (launch, no damage).
     RegisterZone("jump_pad_enter", "jump_pad_leave", "jumpPads", JumpPadFromName, "up/forward u/s");

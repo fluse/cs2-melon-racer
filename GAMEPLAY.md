@@ -240,7 +240,7 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   and fire from a press made shortly before touching the wall
   (`LIFT_ZONE_JUMP_BUFFER`); a wall contact there also stays jumpable
   longer (`LIFT_ZONE_WALL_JUMP_WINDOW`, 0.2 s, instead of a tick or two). While in a lift zone the chase camera eases back and
-  up (`LIFT_CAMERA_*` in `camera/constants.js`) so the climb stays in view,
+  up (`LIFT_CAMERA_*` in `camera/lift-zoom/constants.js`) so the climb stays in view,
   looking through walls instead of being pulled in by them.
 - `WALL_BOUNCE_COOLDOWN` stops one wall contact from bouncing (and
   damaging) on consecutive ticks — including the plain landing/crash damage
@@ -498,7 +498,7 @@ the camera points instead of drifting; only the bounce tick itself is left
 unsteered, so a bounce starts off at its computed angle), Space jumps (only with real ground contact, or off a wall in the air — see "Jumping" below). A third-person
 `CustomPlayerCamera` in `FOLLOW_POSITION` mode chase-cams behind the melon
 directly, so it doesn't need the pawn nearby to work. A wall between melon and
-camera pulls the camera in — eased by the script (`camera/wall-clip.js`,
+camera pulls the camera in — eased by the script (`camera/wall-clip/`,
 `CAMERA_WALL_*`): quickly in, more slowly back out (decided) — the engine's own clipping
 is instant both ways and jerks the view at every pillar. While
 easing in, the camera can be inside or behind the wall for a moment. The
@@ -835,12 +835,12 @@ front of* the melon, e.g. just above the ground (`camera_zone_front_40_0`), and 
 the camera right up behind the melon (default `CAMERA_CLOSEUP_DISTANCE`/`_HEIGHT`,
 16/4 units from its center), zooming in and out slowly
 (`CAMERA_CLOSEUP_EASE_SECONDS`). Any other
-name uses `CAMERA_ZONE_EXTRA_*` (`camera/constants.js`). The camera eases
+name uses `CAMERA_ZONE_EXTRA_*` (`zones/camera-zone/constants.js`). The camera eases
 over `CAMERA_ZONE_EASE_SECONDS` in and back out, never closer than
 `CAMERA_ZONE_MIN_DISTANCE`; overlapping camera zones don't stack (last
 entered counts), but a lift zone's zoom adds on top. Rules:
 `zones/camera-zone/logic.js` (`test/zones/camera-zone.test.mjs`), applied by
-`camera/zone-zoom.js`. Details for mappers: [Mapping API: camera zones](docs/mapping-api/11-camera-zones.md).
+`camera/zone-zoom/`. Details for mappers: [Mapping API: camera zones](docs/mapping-api/11-camera-zones.md).
 
 ## Open design questions (not yet decided — ask before assuming)
 

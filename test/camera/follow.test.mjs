@@ -1,5 +1,5 @@
 // The chase camera's follow config: walls pull it in through the script's own,
-// eased clipping (camera/wall-clip.js) — never the engine's instant
+// eased clipping (camera/wall-clip/) — never the engine's instant
 // clipCameraOffset — except for the break camera, which keeps the engine's.
 // Runs against the fake engine in helpers/cs-script-mock.mjs.
 import "../helpers/register-cs-script.mjs";
@@ -7,7 +7,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn } from "../helpers/cs-script-mock.mjs";
 
-const { ApplyCameraFollow, UpdateFollowCamera, SetFollowOffset, GetCameraOffsetFor } = await import("../../src/melon_drive/camera/follow.js");
+const { ApplyCameraFollow, UpdateFollowCamera, SetFollowOffset, GetCameraOffsetFor } = await import("../../src/melon_drive/camera/follow/follow.js");
 const { CAMERA_OFFSET_RETURN_STRENGTH, CAMERA_WALL_MARGIN } = await import("../../src/melon_drive/constants/index.js");
 
 /** @type {any} */

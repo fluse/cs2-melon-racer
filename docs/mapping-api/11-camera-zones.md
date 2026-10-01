@@ -45,16 +45,16 @@ Name patterns:
 
 | Constant | Value | Meaning | Defined in |
 |---|---|---|---|
-| `CAMERA_DISTANCE` | 50 units | normal chase camera distance | `camera/constants.js` |
-| `CAMERA_HEIGHT` | 0 units | normal chase camera height | `camera/constants.js` |
-| `CAMERA_ZONE_EXTRA_DISTANCE` | 150 units | zoom for zones without numbers | `camera/constants.js` |
-| `CAMERA_ZONE_EXTRA_HEIGHT` | 0 units | height for zones without numbers | `camera/constants.js` |
-| `CAMERA_ZONE_EASE_SECONDS` | 0.6 s | ease in and out | `camera/constants.js` |
-| `CAMERA_ZONE_MIN_DISTANCE` | 0 units | zooming in never gets closer (not for front/close-up) | `camera/constants.js` |
-| `CAMERA_ZONE_FRONT_HEIGHT` | 0 units | front zone height without a number | `camera/constants.js` |
-| `CAMERA_CLOSEUP_DISTANCE` | 16 units | close-up distance without numbers | `camera/constants.js` |
-| `CAMERA_CLOSEUP_HEIGHT` | 4 units | close-up height without numbers | `camera/constants.js` |
-| `CAMERA_CLOSEUP_EASE_SECONDS` | 1.2 s | close-up ease in and out | `camera/constants.js` |
+| `CAMERA_DISTANCE` | 50 units | normal chase camera distance | `camera/follow/constants.js` |
+| `CAMERA_HEIGHT` | 0 units | normal chase camera height | `camera/follow/constants.js` |
+| `CAMERA_ZONE_EXTRA_DISTANCE` | 150 units | zoom for zones without numbers | `zones/camera-zone/constants.js` |
+| `CAMERA_ZONE_EXTRA_HEIGHT` | 0 units | height for zones without numbers | `zones/camera-zone/constants.js` |
+| `CAMERA_ZONE_EASE_SECONDS` | 0.6 s | ease in and out | `zones/camera-zone/constants.js` |
+| `CAMERA_ZONE_MIN_DISTANCE` | 0 units | zooming in never gets closer (not for front/close-up) | `zones/camera-zone/constants.js` |
+| `CAMERA_ZONE_FRONT_HEIGHT` | 0 units | front zone height without a number | `zones/camera-zone/constants.js` |
+| `CAMERA_CLOSEUP_DISTANCE` | 16 units | close-up distance without numbers | `zones/camera-zone/constants.js` |
+| `CAMERA_CLOSEUP_HEIGHT` | 4 units | close-up height without numbers | `zones/camera-zone/constants.js` |
+| `CAMERA_CLOSEUP_EASE_SECONDS` | 1.2 s | close-up ease in and out | `zones/camera-zone/constants.js` |
 
 ## Close-up zones
 

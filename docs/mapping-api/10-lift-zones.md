@@ -38,9 +38,9 @@ gained ≈ kick² / 1600 units (gravity 800).
 | `LIFT_ZONE_WALL_JUMP_COOLDOWN` | 0.1 s | between two wall jumps (normally `WALL_JUMP_COOLDOWN`, 0.45 s) | `zones/lift/constants.js` |
 | `LIFT_ZONE_JUMP_BUFFER` | 0.2 s | a jump pressed this early before touching the wall still fires | `zones/lift/constants.js` |
 | `LIFT_ZONE_WALL_JUMP_WINDOW` | 0.2 s | a wall contact stays jumpable this long | `zones/lift/constants.js` |
-| `LIFT_CAMERA_EXTRA_DISTANCE` | 220 units | chase camera eases this much further back | `camera/constants.js` |
-| `LIFT_CAMERA_EXTRA_HEIGHT` | 30 units | … and this much higher | `camera/constants.js` |
-| `LIFT_CAMERA_EASE_SECONDS` | 0.6 s | camera ease time | `camera/constants.js` |
+| `LIFT_CAMERA_EXTRA_DISTANCE` | 220 units | chase camera eases this much further back | `camera/lift-zoom/constants.js` |
+| `LIFT_CAMERA_EXTRA_HEIGHT` | 30 units | … and this much higher | `camera/lift-zoom/constants.js` |
+| `LIFT_CAMERA_EASE_SECONDS` | 0.6 s | camera ease time | `camera/lift-zoom/constants.js` |
 
 ## Rules
 

@@ -46,7 +46,7 @@ export function RegisterZoneInputs() {
     // Lift zones — see lift/constants.js. Read by CurrentWallRules (every wall
     // bounce and wall jump) and the lift camera.
     RegisterZone("lift_enter", "lift_leave", "liftZones", LiftZoneUpSpeed, "u/s up per bounce");
-    // Camera zones — see CAMERA_ZONE_* in camera/constants.js. Read by the zone camera (camera/zone-zoom.js).
+    // Camera zones — see CAMERA_ZONE_* in camera-zone/constants.js. Read by the zone camera (camera/zone-zoom/).
     RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
     // Jump pads — see jump-pad/constants.js. Read by jump-pad/jump-pad.js (launch, no damage).
     RegisterZone("jump_pad_enter", "jump_pad_leave", "jumpPads", JumpPadFromName, "up/forward u/s");

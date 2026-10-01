@@ -1,16 +1,16 @@
 // The third-person chase camera: attaching it to the melon, its normal
 // offset (CAMERA_DISTANCE/CAMERA_HEIGHT), and the one place that writes
-// the follow config (SetFollowOffset) — the break and lift zooms in this
-// folder go through it too, and so do the lift and camera-zone zooms.
-// Walls pull the camera in through wall-clip.js (eased), not the engine.
+// the follow config (SetFollowOffset) — the break, lift and camera-zone
+// zooms (the other folders in camera/) all go through it. Walls pull the
+// camera in through ../wall-clip/ (eased), not the engine.
 import { CustomCameraMode } from "cs_script/point_script";
-import { Debug } from "../core/debug.js";
-import { LiftCameraOffset } from "./lift-zoom-logic.js";
-import { WallClippedOffset } from "./wall-clip.js";
-import { ZoneCameraClips, ZoneCameraOffset } from "../zones/camera-zone/logic.js";
-import { CAMERA_LATERAL, CAMERA_DISTANCE, CAMERA_HEIGHT, CAMERA_OFFSET_RETURN_STRENGTH, FOLLOW_OFFSET } from "../constants/index.js";
+import { Debug } from "../../core/debug.js";
+import { LiftCameraOffset } from "../lift-zoom/logic.js";
+import { WallClippedOffset } from "../wall-clip/wall-clip.js";
+import { ZoneCameraClips, ZoneCameraOffset } from "../../zones/camera-zone/logic.js";
+import { CAMERA_LATERAL, CAMERA_DISTANCE, CAMERA_HEIGHT, CAMERA_OFFSET_RETURN_STRENGTH, FOLLOW_OFFSET } from "../../constants/index.js";
 
-/** The normal chase offset, before any zoom. @param {import("../core/kart-registry.js").Kart} kart */
+/** The normal chase offset, before any zoom. @param {import("../../core/kart-registry.js").Kart} kart */
 export function GetCameraOffsetFor(kart) {
     return { x: -CAMERA_DISTANCE, y: CAMERA_LATERAL, z: CAMERA_HEIGHT };
 }
@@ -22,7 +22,7 @@ export function GetCameraOffsetFor(kart) {
  * re-called every time the player gets a fresh pawn, i.e. each respawn).
  * Keeps a lift zone's or camera zone's zoom if one is on (see ApplyZonedFollowOffset);
  * the wall pull-in starts over, right at the distance that fits.
- * @param {import("../core/kart-registry.js").Kart} kart
+ * @param {import("../../core/kart-registry.js").Kart} kart
  */
 export function ApplyCameraFollow(kart) {
     const camera = kart.pawn.GetCustomCamera();
@@ -37,7 +37,7 @@ export function ApplyCameraFollow(kart) {
  * Per tick: the chase camera with every zoom and the wall pull-in eased on.
  * Left alone while the melon is breaking — the break camera owns it then,
  * and the respawn re-applies it.
- * @param {import("../core/kart-registry.js").Kart} kart @param {number} dt
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 export function UpdateFollowCamera(kart, dt) {
     if (kart.breaking) {
@@ -51,7 +51,7 @@ export function UpdateFollowCamera(kart, dt) {
  * (kart.liftCameraBlend, lift-zoom.js) and the camera-zone zoom
  * (kart.zoneCamera, zone-zoom.js); they add up. Walls pull the camera in
  * (wall-clip.js, eased over `dt`) only while neither turns that off.
- * @param {import("../core/kart-registry.js").Kart} kart @param {number} dt
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 export function ApplyZonedFollowOffset(kart, dt) {
     const liftBlend = kart.liftCameraBlend ?? 0;
@@ -72,7 +72,7 @@ export function ApplyZonedFollowOffset(kart, dt) {
 /**
  * Points the chase camera at the melon from `cameraOffset` (x forward,
  * negative = behind; z up — rotated by the player's eye angles).
- * @param {import("../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} cameraOffset
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} cameraOffset
  * @param {boolean} engineClipsToWalls let the engine pull the camera in at walls (instantly) — only the
  *   break camera does; everything else goes through ApplyZonedFollowOffset's own, eased pull-in
  */
