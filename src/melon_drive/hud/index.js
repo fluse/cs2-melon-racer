@@ -3,7 +3,7 @@
 // track.js (time trial clock + checkpoint strip), hub-modal.js, user-menu.js.
 // layout.js finds the custom_hud_layout entity; inputs.js handles every
 // button click.
-export { GetSpeedHud } from "./layout.js";
+export { GetSpeedHud, ResetHudForPlayer } from "./layout.js";
 export { UpdateSpeedHud, UpdateJumpHud, UpdateHealthHud } from "./speedometer.js";
 export { UpdateBounceHud } from "./bounce-panel.js";
 export { UpdateCheckpointHud } from "./track.js";

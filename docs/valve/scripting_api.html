@@ -1,0 +1,4292 @@
+<!DOCTYPE html>
+<!-- saved from url=(0086)https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API -->
+<html class="client-js" lang="en" dir="ltr"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<title>Scripting API - Valve Developer Community</title>
+<script>document.documentElement.className="client-js";RLCONF={"wgBreakFrames":false,"wgSeparatorTransformTable":["",""],"wgDigitTransformTable":["",""],"wgDefaultDateFormat":"dmy","wgMonthNames":["","January","February","March","April","May","June","July","August","September","October","November","December"],"wgRequestId":"f998adf717e5238fafd5d5ff","wgCSPNonce":false,"wgCanonicalNamespace":"","wgCanonicalSpecialPageName":false,"wgNamespaceNumber":0,"wgPageName":"Counter-Strike_2_Workshop_Tools/Scripting/API","wgTitle":"Counter-Strike 2 Workshop Tools/Scripting/API","wgCurRevisionId":520339,"wgRevisionId":520339,"wgArticleId":79731,"wgIsArticle":true,"wgIsRedirect":false,"wgAction":"view","wgUserName":null,"wgUserGroups":["*"],"wgCategories":["English"],"wgPageContentLanguage":"en","wgPageContentModel":"wikitext","wgRelevantPageName":"Counter-Strike_2_Workshop_Tools/Scripting/API","wgRelevantArticleId":79731,"wgIsProbablyEditable":false,"wgRelevantPageIsProbablyEditable":false,"wgRestrictionEdit":[],"wgRestrictionMove":[],"wgVector2022PreviewPages":[],"wgMediaViewerOnClick":true,"wgMediaViewerEnabledByDefault":true};
+RLSTATE={"site.styles":"ready","user.styles":"ready","user":"ready","user.options":"loading","skins.vector.styles.legacy":"ready","jquery.makeCollapsible.styles":"ready"};RLPAGEMODULES=["site","mediawiki.page.ready","jquery.makeCollapsible","mediawiki.toc","skins.vector.legacy.js","mmv.head","mmv.bootstrap.autostart"];</script>
+<script>(RLQ=window.RLQ||[]).push(function(){mw.loader.implement("user.options@12s5i",function($,jQuery,require,module){mw.user.tokens.set({"patrolToken":"+\\","watchToken":"+\\","csrfToken":"+\\"});});});</script>
+<link rel="stylesheet" href="./Scripting API - Valve Developer Community_files/load.php">
+<script async="" src="./Scripting API - Valve Developer Community_files/load(1).php"></script>
+<style>
+.mw-ui-button{background-color:#f8f9fa;color:#202122;display:inline-block;box-sizing:border-box;margin:0;border:1px solid #a2a9b1;border-radius:2px;cursor:pointer;vertical-align:middle;font-family:inherit;font-size:1em;font-weight:bold;line-height:1.28571429em;text-align:center; -webkit-appearance:none}.mw-ui-button:not(.mw-ui-icon-element){min-height:32px;min-width:4em;max-width:28.75em;padding:5px 12px}.mw-ui-button:not(:disabled){transition-property:background-color,color,border-color,box-shadow;transition-duration:100ms}.mw-ui-button:not(:disabled):visited{color:#202122}.mw-ui-button:not(:disabled):hover{background-color:#fff;color:#404244;border-color:#a2a9b1}.mw-ui-button:not(:disabled):focus{color:#202122;border-color:#36c;box-shadow:inset 0 0 0 1px #36c,inset 0 0 0 2px #fff;outline-width:0}.mw-ui-button:not(:disabled):focus::-moz-focus-inner{border-color:transparent;padding:0}.mw-ui-button:not(:disabled):active,.mw-ui-button:not(:disabled).is-on{background-color:#c8ccd1;color:#000;border-color:#72777d;box-shadow:none}.mw-ui-button:disabled{background-color:#c8ccd1;color:#fff;border-color:#c8ccd1;cursor:default}.mw-ui-button.mw-ui-icon-element:not(.mw-ui-icon-with-label-desktop){color:transparent !important}.mw-ui-button.mw-ui-icon-element:not(.mw-ui-icon-with-label-desktop) span{display:block;position:absolute !important; clip:rect(1px,1px,1px,1px);width:1px;height:1px;margin:-1px;border:0;padding:0;overflow:hidden}@media all and (max-width:1000px){.mw-ui-button.mw-ui-icon-element.mw-ui-icon-with-label-desktop{color:transparent !important}.mw-ui-button.mw-ui-icon-element span{display:block;position:absolute !important; clip:rect(1px,1px,1px,1px);width:1px;height:1px;margin:-1px;border:0;padding:0;overflow:hidden}}.mw-ui-button.mw-ui-quiet,.mw-ui-button.mw-ui-quiet.mw-ui-progressive,.mw-ui-button.mw-ui-quiet.mw-ui-destructive{background-color:transparent;color:#202122;border-color:transparent;font-weight:bold}.mw-ui-button.mw-ui-quiet:not(.mw-ui-icon-element),.mw-ui-button.mw-ui-quiet.mw-ui-progressive:not(.mw-ui-icon-element),.mw-ui-button.mw-ui-quiet.mw-ui-destructive:not(.mw-ui-icon-element){min-height:32px}input[type='checkbox']:hover + .mw-ui-button.mw-ui-quiet,input[type='checkbox']:hover + .mw-ui-button.mw-ui-quiet.mw-ui-progressive,input[type='checkbox']:hover + .mw-ui-button.mw-ui-quiet.mw-ui-destructive,.mw-ui-button.mw-ui-quiet:hover,.mw-ui-button.mw-ui-quiet.mw-ui-progressive:hover,.mw-ui-button.mw-ui-quiet.mw-ui-destructive:hover{background-color:rgba(0,24,73,0.02745098);color:#202122;border-color:transparent}input[type='checkbox']:focus + .mw-ui-button.mw-ui-quiet,input[type='checkbox']:focus + .mw-ui-button.mw-ui-quiet.mw-ui-progressive,input[type='checkbox']:focus + .mw-ui-button.mw-ui-quiet.mw-ui-destructive,.mw-ui-button.mw-ui-quiet:focus,.mw-ui-button.mw-ui-quiet.mw-ui-progressive:focus,.mw-ui-button.mw-ui-quiet.mw-ui-destructive:focus{color:#202122;border-color:#36c;box-shadow:inset 0 0 0 1px #36c,inset 0 0 0 2px #fff}input[type='checkbox']:active + .mw-ui-button.mw-ui-quiet,input[type='checkbox']:active + .mw-ui-button.mw-ui-quiet.mw-ui-progressive,input[type='checkbox']:active + .mw-ui-button.mw-ui-quiet.mw-ui-destructive,.mw-ui-button.mw-ui-quiet:active,.mw-ui-button.mw-ui-quiet.mw-ui-progressive:active,.mw-ui-button.mw-ui-quiet.mw-ui-destructive:active{background-color:rgba(0,36,73,0.08235294);color:#000;border-color:#72777d;box-shadow:none}.mw-ui-button.mw-ui-quiet:disabled,.mw-ui-button.mw-ui-quiet.mw-ui-progressive:disabled,.mw-ui-button.mw-ui-quiet.mw-ui-destructive:disabled,.mw-ui-button.mw-ui-quiet:disabled:hover,.mw-ui-button.mw-ui-quiet.mw-ui-progressive:disabled:hover,.mw-ui-button.mw-ui-quiet.mw-ui-destructive:disabled:hover,.mw-ui-button.mw-ui-quiet:disabled:active,.mw-ui-button.mw-ui-quiet.mw-ui-progressive:disabled:active,.mw-ui-button.mw-ui-quiet.mw-ui-destructive:disabled:active{background-color:transparent;color:#72777d;border-color:transparent}.mw-ui-button.mw-ui-progressive:not(:disabled){background-color:#36c;color:#fff;border-color:#36c}.mw-ui-button.mw-ui-progressive:not(:disabled):hover{background-color:#447ff5;border-color:#447ff5}.mw-ui-button.mw-ui-progressive:not(:disabled):focus{box-shadow:inset 0 0 0 1px #36c,inset 0 0 0 2px #fff}.mw-ui-button.mw-ui-progressive:not(:disabled):active,.mw-ui-button.mw-ui-progressive:not(:disabled).is-on{background-color:#2a4b8d;border-color:#2a4b8d;box-shadow:none}.mw-ui-button.mw-ui-progressive:disabled{background-color:#c8ccd1;color:#fff;border-color:#c8ccd1}.mw-ui-button.mw-ui-progressive.mw-ui-quiet{color:#36c;background-color:transparent;border-color:transparent}input[type='checkbox']:hover + .mw-ui-button.mw-ui-progressive.mw-ui-quiet,.mw-ui-button.mw-ui-progressive.mw-ui-quiet:hover{background-color:rgba(52,123,255,0.2);border-color:transparent;color:#447ff5}input[type='checkbox']:focus + .mw-ui-button.mw-ui-progressive.mw-ui-quiet,.mw-ui-button.mw-ui-progressive.mw-ui-quiet:focus{color:#36c;border-color:#36c}input[type='checkbox']:active + .mw-ui-button.mw-ui-progressive.mw-ui-quiet,.mw-ui-button.mw-ui-progressive.mw-ui-quiet:active{color:#fff;background-color:#2a4b8d;border-color:#2a4b8d}.mw-ui-button.mw-ui-destructive:not(:disabled){background-color:#d33;color:#fff;border-color:#d33}.mw-ui-button.mw-ui-destructive:not(:disabled):hover{background-color:#ff4242;border-color:#ff4242}.mw-ui-button.mw-ui-destructive:not(:disabled):focus{box-shadow:inset 0 0 0 1px #d33,inset 0 0 0 2px #fff}.mw-ui-button.mw-ui-destructive:not(:disabled):active,.mw-ui-button.mw-ui-destructive:not(:disabled).is-on{background-color:#b32424;border-color:#b32424;box-shadow:none}.mw-ui-button.mw-ui-destructive:disabled{background-color:#c8ccd1;color:#fff;border-color:#c8ccd1}.mw-ui-button.mw-ui-destructive.mw-ui-quiet{color:#d33;background-color:transparent;border-color:transparent}input[type='checkbox']:hover + .mw-ui-button.mw-ui-destructive.mw-ui-quiet,.mw-ui-button.mw-ui-destructive.mw-ui-quiet:hover{background-color:rgba(209,29,19,0.2);border-color:transparent;color:#ff4242}input[type='checkbox']:focus + .mw-ui-button.mw-ui-destructive.mw-ui-quiet,.mw-ui-button.mw-ui-destructive.mw-ui-quiet:focus{color:#d33;border-color:#d33}input[type='checkbox']:active + .mw-ui-button.mw-ui-destructive.mw-ui-quiet,.mw-ui-button.mw-ui-destructive.mw-ui-quiet:active{color:#fff;background-color:#b32424;border-color:#b32424}.mw-ui-button.mw-ui-big{font-size:1.3em}.mw-ui-button.mw-ui-block{display:block;width:100%;margin-left:auto;margin-right:auto}a.mw-ui-button{text-decoration:none}a.mw-ui-button:hover,a.mw-ui-button:focus{text-decoration:none}.mw-ui-button-group > *{min-width:48px;border-radius:0;float:left}.mw-ui-button-group > *:first-child{border-top-left-radius:2px;border-bottom-left-radius:2px}.mw-ui-button-group > *:not(:first-child){border-left:0}.mw-ui-button-group > *:last-child{border-top-right-radius:2px;border-bottom-right-radius:2px}.mw-ui-button-group .is-on .button{cursor:default}
+.mw-ui-icon{ font-size:initial;position:relative;display:inline-block;box-sizing:content-box !important;width:1.25em;height:1.25em;min-width:1.25em;min-height:1.25em;flex-basis:1.25em;vertical-align:middle;line-height:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; -moz-appearance:none; -webkit-appearance:none;background-color:transparent;margin:0;padding:0}.mw-ui-icon:not(.mw-ui-button){border:0}.mw-ui-icon:before{content:'';display:block;width:100%;height:100%;min-width:1.25em;min-height:1.25em;background-repeat:no-repeat;background-size:1.25em 1.25em;background-position:center}.mw-ui-icon + span:not(:empty){margin-left:8px} .mw-ui-icon-flush-top{margin-top:-0.75em}.mw-ui-icon-flush-left{margin-left:-0.75em}.mw-ui-icon-flush-right{margin-right:-0.75em}.mw-ui-icon-element{border-radius:2px;padding:0.75em;transition:background-color 100ms;color:transparent}.mw-ui-icon-element:focus,.mw-ui-icon-element:active,.mw-ui-icon-element:visited{color:transparent}.mw-ui-icon-element:active{background-color:rgba(0,0,0,0.03)}@media (hover:hover){.mw-ui-icon-element:not(.disabled):hover{background-color:rgba(0,0,0,0.03)}}.mw-ui-icon-small{width:1em;height:1em;min-width:1em;min-height:1em;flex-basis:1em;line-height:1em}.mw-ui-icon-small:before{content:'';display:block;width:100%;height:100%;min-width:1em;min-height:1em;background-repeat:no-repeat;background-size:1em 1em;background-position:center}.mw-ui-icon-small.mw-ui-icon-element{padding:0.5625em}.mw-ui-icon-small.mw-ui-icon-flush-left{margin-left:-0.5625em}.mw-ui-icon-small.mw-ui-icon-flush-right{margin-right:-0.5625em}.mw-ui-icon-small.mw-ui-icon-before:before{min-width:1em;min-height:1em;margin-right:0.5625em}.mw-ui-icon-before{width:auto;max-width:100%}.mw-ui-icon-before:before{display:inline-block; font-size:initial;width:auto;min-width:1.25em;min-height:1.25em;margin-right:8px;vertical-align:middle}.mw-ui-icon-before span{vertical-align:middle}@media all and (min-width:1000px){.mw-ui-icon-with-label-desktop{color:#54595d !important;width:auto;line-height:inherit;flex-basis:auto;font-weight:500 !important}.mw-ui-icon-with-label-desktop:hover,.mw-ui-icon-with-label-desktop:focus,.mw-ui-icon-with-label-desktop:active,.mw-ui-icon-with-label-desktop:visited{color:#54595d;text-decoration:none}.mw-ui-icon-with-label-desktop:before{width:auto;display:inline-block;margin-right:8px;vertical-align:text-bottom}}
+.mw-collapsible-toggle{float:right;-moz-user-select:none;-webkit-user-select:none;-ms-user-select:none;user-select:none}.mw-collapsible-toggle-default:before{content:'['}.mw-collapsible-toggle-default:after{content:']'}.mw-customtoggle,.mw-collapsible-toggle{cursor:pointer} caption .mw-collapsible-toggle,.mw-content-ltr caption .mw-collapsible-toggle,.mw-content-rtl caption .mw-collapsible-toggle,.mw-content-rtl .mw-content-ltr caption .mw-collapsible-toggle,.mw-content-ltr .mw-content-rtl caption .mw-collapsible-toggle{float:none}
+@media screen {
+	.toctoggle{-moz-user-select:none;-webkit-user-select:none;-ms-user-select:none;user-select:none;font-size:94%}}</style><style>
+.mw-mmv-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:1000;background-color:#000}body.mw-mmv-lightbox-open{overflow-y:auto}body.mw-mmv-lightbox-open > *:not(.mw-notification-area-overlay){display:none}body.mw-mmv-lightbox-open > .mw-mmv-overlay,body.mw-mmv-lightbox-open > .mw-mmv-wrapper{display:block}.mw-mmv-filepage-buttons{margin-top:5px}.mw-mmv-filepage-buttons .mw-mmv-view-expanded,.mw-mmv-filepage-buttons .mw-mmv-view-config{display:block;line-height:inherit}.mw-mmv-filepage-buttons .mw-mmv-view-expanded .mw-ui-icon:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1024 768%22%3E %3Cpath d=%22M851.2 71.6 690.7 232.1l-40.1-40.3-9.6 164.8 164.8-9.3-40.3-40.4L926 146.4l58.5 58.5L997.6 0 792.7 13.1%22/%3E %3Cpath d=%22M769.6 89.3H611.9l70.9 70.8 7.9 7.5m-47.1 234.6-51.2 3 3-51.2 9.4-164.4 5.8-100.3H26.4V768h883.1V387l-100.9 5.8-165 9.4zM813.9 678H113.6l207.2-270.2 31.5-12.9L548 599.8l105.9-63.2 159.8 140.8.2.6zm95.6-291.9V228l-79.1 78.9 7.8 7.9%22/%3E %3C/svg%3E")}.mw-mmv-filepage-buttons .mw-mmv-view-config .mw-ui-icon:before{background-image:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1024 768%22%3E %3Cpath d=%22M897 454.6V313.4L810.4 299c-6.4-23.3-16-45.7-27.3-65.8l50.5-71.4-99.4-100.2-71.4 50.5c-20.9-11.2-42.5-20.9-65.8-27.3L582.6-1H441.4L427 85.6c-23.3 6.4-45.7 16-65.8 27.3l-71.4-50.5-100.3 99.5 50.5 71.4c-11.2 20.9-20.9 42.5-27.3 66.6L127 313.4v141.2l85.8 14.4c6.4 23.3 16 45.7 27.3 66.6L189.6 607l99.5 99.5 71.4-50.5c20.9 11.2 42.5 20.9 66.6 27.3l14.4 85.8h141.2l14.4-86.6c23.3-6.4 45.7-16 65.8-27.3l71.4 50.5 99.5-99.5-50.5-71.4c11.2-20.9 20.9-42.5 27.3-66.6l86.4-13.6zm-385 77c-81.8 0-147.6-66.6-147.6-147.6 0-81.8 66.6-147.6 147.6-147.6S659.6 302.2 659.6 384 593.8 531.6 512 531.6z%22/%3E %3C/svg%3E");margin-right:0;opacity:0.75}.mw-mmv-filepage-buttons .mw-mmv-view-config .mw-ui-icon:before:hover{opacity:1}.mw-mmv-filepage-buttons .mw-mmv-view-config .mw-ui-icon span{display:none}.mw-mmv-button{background-color:transparent;min-width:0;border:0;padding:0;overflow-x:hidden;text-indent:-9999em}</style><meta name="ResourceLoaderDynamicStyles" content="">
+<link rel="stylesheet" href="./Scripting API - Valve Developer Community_files/load(2).php">
+<meta name="generator" content="MediaWiki 1.39.17">
+<meta name="format-detection" content="telephone=no">
+<meta name="viewport" content="width=1000">
+<link rel="icon" href="https://developer.valvesoftware.com/favicon.ico">
+<link rel="search" type="application/opensearchdescription+xml" href="https://developer.valvesoftware.com/w/opensearch_desc.php" title="Valve Developer Community (en)">
+<link rel="EditURI" type="application/rsd+xml" href="https://developer.valvesoftware.com/w/api.php?action=rsd">
+<link rel="alternate" type="application/atom+xml" title="Valve Developer Community Atom feed" href="https://developer.valvesoftware.com/w/index.php?title=Special:RecentChanges&amp;feed=atom">
+</head>
+<body class="mediawiki ltr sitedir-ltr mw-underline-never mw-hide-empty-elt ns-0 ns-subject page-Counter-Strike_2_Workshop_Tools_Scripting_API rootpage-Counter-Strike_2_Workshop_Tools skin-vector action-view skin-vector-legacy vector-feature-language-in-header-enabled vector-feature-language-in-main-page-header-disabled vector-feature-language-alert-in-sidebar-disabled vector-feature-sticky-header-disabled vector-feature-sticky-header-edit-disabled vector-feature-table-of-contents-disabled vector-feature-visual-enhancement-next-disabled"><div id="mw-page-base" class="noprint"></div>
+<div id="mw-head-base" class="noprint"></div>
+<div id="content" class="mw-body" role="main">
+	<a id="top"></a>
+	<div id="siteNotice"></div>
+	<div class="mw-indicators">
+	</div>
+	<h1 id="firstHeading" class="firstHeading mw-first-heading">Scripting API</h1>
+	<div id="bodyContent" class="vector-body">
+		<div id="siteSub" class="noprint">From Valve Developer Community</div>
+		<div id="contentSub"><span class="subpages">&lt; <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools" title="Counter-Strike 2 Workshop Tools">Counter-Strike 2 Workshop Tools</a>‎ | <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting" title="Counter-Strike 2 Workshop Tools/Scripting">Scripting</a></span></div>
+		<div id="contentSub2"></div>
+		
+		<div id="jump-to-nav"></div>
+		<a class="mw-jump-link" href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#mw-head">Jump to navigation</a>
+		<a class="mw-jump-link" href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#searchInput">Jump to search</a>
+		<div id="mw-content-text" class="mw-body-content mw-content-ltr" lang="en" dir="ltr"><div class="mw-parser-output"><div style="direction:; display:flex; gap:4px; width:calc(100% + 4px); user-select:none; pointer-events:none; position:absolute; z-index:100; top:calc(-17px - 9px); left:-4px"><div style="height:19px; background-color:#262626; border:1px solid #65635F; border-bottom:0;border-radius:3px 3px 0 0; pointer-events:all; margin-left:auto"><span style="background:rgb(255 255 255 / 5%); border:1px solid rgb(255 255 255 / 30%); border-radius:.15em; padding:0 1px; margin:1px"><span style="user-select:none; position:relative; top:-.1em"><img alt="English (en)" src="./Scripting API - Valve Developer Community_files/Flag-en.png" decoding="async" title="English (en)" width="16" height="11" data-file-width="16" data-file-height="11"></span></span><span class="mw-customtoggle-UntranslatedFlags mw-customtoggle" style="margin:1px; border:1px solid transparent" aria-expanded="true" tabindex="0"><span style="pointer-events:none;user-select:none; position:relative; top:-.1em"><img alt="Translate (Translate)" src="./Scripting API - Valve Developer Community_files/Flag-Translate.png" decoding="async" title="Translate (Translate)" width="16" height="11" data-file-width="16" data-file-height="11"></span></span>
+<div class="mw-collapsible mw-collapsed mw-made-collapsible" id="mw-customcollapsible-UntranslatedFlags" style="display:none; position:absolute; right:0px; top:20px; z-index:1001; width:max-content; height:20px; background-color:#262626; border:1px solid #65635F; border-top:0px; border-radius:0 0 3px 3px; pointer-events:all;"><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=De/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=Deutsch&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Deutsch (de)" rel="nofollow"><img alt="Deutsch (de)" src="./Scripting API - Valve Developer Community_files/Flag-de.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Eo/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=Esperanto&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Esperanto (eo)" rel="nofollow"><img alt="Esperanto (eo)" src="./Scripting API - Valve Developer Community_files/Flag-eo.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Es/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=espa%C3%B1ol&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Español (es)" rel="nofollow"><img alt="Español (es)" src="./Scripting API - Valve Developer Community_files/Flag-es.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Fr/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=fran%C3%A7ais&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Français (fr)" rel="nofollow"><img alt="Français (fr)" src="./Scripting API - Valve Developer Community_files/Flag-fr.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Fi/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=suomi&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Suomi (fi)" rel="nofollow"><img alt="Suomi (fi)" src="./Scripting API - Valve Developer Community_files/Flag-fi.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Hr/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=hrvatski&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Hrvatski (hr)" rel="nofollow"><img alt="Hrvatski (hr)" src="./Scripting API - Valve Developer Community_files/Flag-hr.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Hu/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=magyar&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Magyar (hu)" rel="nofollow"><img alt="Magyar (hu)" src="./Scripting API - Valve Developer Community_files/Flag-hu.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=It/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=italiano&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Italiano (it)" rel="nofollow"><img alt="Italiano (it)" src="./Scripting API - Valve Developer Community_files/Flag-it.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Ja/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=%E6%97%A5%E6%9C%AC%E8%AA%9E&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="日本語 (ja)" rel="nofollow"><img alt="日本語 (ja)" src="./Scripting API - Valve Developer Community_files/Flag-ja.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Ko/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=%ED%95%9C%EA%B5%AD%EC%96%B4&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="한국어 (ko)" rel="nofollow"><img alt="한국어 (ko)" src="./Scripting API - Valve Developer Community_files/Flag-ko.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Nl/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=Nederlands&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Nederlands (nl)" rel="nofollow"><img alt="Nederlands (nl)" src="./Scripting API - Valve Developer Community_files/Flag-nl.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Pl/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=polski&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Polski (pl)" rel="nofollow"><img alt="Polski (pl)" src="./Scripting API - Valve Developer Community_files/Flag-pl.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Pt/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=portugu%C3%AAs&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Português (pt)" rel="nofollow"><img alt="Português (pt)" src="./Scripting API - Valve Developer Community_files/Flag-pt.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Pt-br/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=portugu%C3%AAs+do+Brasil&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Português do Brasil (pt-br)" rel="nofollow"><img alt="Português do Brasil (pt-br)" src="./Scripting API - Valve Developer Community_files/16px-Flag-pt-br.png" decoding="async" width="16" height="11" srcset="/w/images/thumb/2/29/Flag-pt-br.png/24px-Flag-pt-br.png 1.5x, /w/images/thumb/2/29/Flag-pt-br.png/32px-Flag-pt-br.png 2x" data-file-width="128" data-file-height="88"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Ru/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Русский (ru)" rel="nofollow"><img alt="Русский (ru)" src="./Scripting API - Valve Developer Community_files/Flag-ru.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Sk/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=sloven%C4%8Dina&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Slovenčina (sk)" rel="nofollow"><img alt="Slovenčina (sk)" src="./Scripting API - Valve Developer Community_files/Flag-sk.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Sv/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=svenska&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Svenska (sv)" rel="nofollow"><img alt="Svenska (sv)" src="./Scripting API - Valve Developer Community_files/Flag-sv.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Tr/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=T%C3%BCrk%C3%A7e&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Türkçe (tr)" rel="nofollow"><img alt="Türkçe (tr)" src="./Scripting API - Valve Developer Community_files/Flag-tr.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Uk/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=%D1%83%D0%BA%D1%80%D0%B0%D1%97%D0%BD%D1%81%D1%8C%D0%BA%D0%B0&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Українська (uk)" rel="nofollow"><img alt="Українська (uk)" src="./Scripting API - Valve Developer Community_files/Flag-uk.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Vi/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=Ti%E1%BA%BFng+Vi%E1%BB%87t&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Tiếng Việt (vi)" rel="nofollow"><img alt="Tiếng Việt (vi)" src="./Scripting API - Valve Developer Community_files/16px-Flag-vi.png" decoding="async" width="16" height="11" srcset="/w/images/thumb/4/47/Flag-vi.png/24px-Flag-vi.png 1.5x, /w/images/thumb/4/47/Flag-vi.png/32px-Flag-vi.png 2x" data-file-width="128" data-file-height="88"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Zh/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=%E4%B8%AD%E6%96%87&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="中文 (zh)" rel="nofollow"><img alt="中文 (zh)" src="./Scripting API - Valve Developer Community_files/16px-Flag-zh.png" decoding="async" width="16" height="11" srcset="/w/images/thumb/e/e9/Flag-zh.png/24px-Flag-zh.png 1.5x, /w/images/thumb/e/e9/Flag-zh.png/32px-Flag-zh.png 2x" data-file-width="128" data-file-height="88"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-1px"><a href="https://developer.valvesoftware.com/w/index.php?title=Zh-tw/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:LanguageBar/preload&amp;preloadparams%5B%5D=%E4%B8%AD%E6%96%87%EF%BC%88%E8%87%BA%E7%81%A3%EF%BC%89&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="中文（臺灣） (zh-tw)" rel="nofollow"><img alt="中文（臺灣） (zh-tw)" src="./Scripting API - Valve Developer Community_files/Flag-zh-tw.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-.1em"><a href="https://developer.valvesoftware.com/w/index.php?title=Template:TranslationMark/Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;preload=Template:TranslationMark/preload&amp;preloadparams%5B%5D=&amp;preloadparams%5B%5D=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="Translationmark (TranslationMark)" rel="nofollow"><img alt="Translationmark (TranslationMark)" src="./Scripting API - Valve Developer Community_files/Flag-TranslationMark.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span><span style="margin:1px; border:1px solid transparent"><span style="user-select:none; position:relative; top:-.1em"><a href="https://developer.valvesoftware.com/wiki/Valve_Developer_Community:Alternative_Languages" title="Valve Developer Community:Alternative Languages"><img alt="Flag-white-i.png" src="./Scripting API - Valve Developer Community_files/Flag-white-i.png" decoding="async" width="16" height="11" data-file-width="16" data-file-height="11"></a></span></span>
+</div></div></div>
+<p>This is the cs_script API for <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2" title="Counter-Strike 2">Counter-Strike 2</a>.
+</p>
+<div id="toc" class="toc" role="navigation" aria-labelledby="mw-toc-heading"><input type="checkbox" role="button" id="toctogglecheckbox" class="toctogglecheckbox" style="display:none"><div class="toctitle" lang="en" dir="ltr"><h2 id="mw-toc-heading">Contents</h2><span class="toctogglespan"><label class="toctogglelabel" for="toctogglecheckbox"></label></span></div>
+<ul>
+<li class="toclevel-1 tocsection-1"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Classes"><span class="tocnumber">1</span> <span class="toctext">Classes</span></a>
+<ul>
+<li class="toclevel-2 tocsection-2"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Instance"><span class="tocnumber">1.1</span> <span class="toctext">Instance</span></a>
+<ul>
+<li class="toclevel-3 tocsection-3"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods"><span class="tocnumber">1.1.1</span> <span class="toctext">Methods</span></a></li>
+<li class="toclevel-3 tocsection-4"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Hooks"><span class="tocnumber">1.1.2</span> <span class="toctext">Hooks</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-5"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Entity"><span class="tocnumber">1.2</span> <span class="toctext">Entity</span></a>
+<ul>
+<li class="toclevel-3 tocsection-6"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_2"><span class="tocnumber">1.2.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-7"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#BaseModelEntity"><span class="tocnumber">1.3</span> <span class="toctext">BaseModelEntity</span></a>
+<ul>
+<li class="toclevel-3 tocsection-8"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_3"><span class="tocnumber">1.3.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-9"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#C4"><span class="tocnumber">1.4</span> <span class="toctext">C4</span></a>
+<ul>
+<li class="toclevel-3 tocsection-10"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_4"><span class="tocnumber">1.4.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-11"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSGrenadeProjectileBase"><span class="tocnumber">1.5</span> <span class="toctext">CSGrenadeProjectileBase</span></a>
+<ul>
+<li class="toclevel-3 tocsection-12"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_5"><span class="tocnumber">1.5.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-13"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSObservablePoint"><span class="tocnumber">1.6</span> <span class="toctext">CSObservablePoint</span></a>
+<ul>
+<li class="toclevel-3 tocsection-14"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_6"><span class="tocnumber">1.6.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-15"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSObserverPawn"><span class="tocnumber">1.7</span> <span class="toctext">CSObserverPawn</span></a>
+<ul>
+<li class="toclevel-3 tocsection-16"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_7"><span class="tocnumber">1.7.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-17"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSPlantedC4"><span class="tocnumber">1.8</span> <span class="toctext">CSPlantedC4</span></a>
+<ul>
+<li class="toclevel-3 tocsection-18"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_8"><span class="tocnumber">1.8.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-19"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSPlayerController"><span class="tocnumber">1.9</span> <span class="toctext">CSPlayerController</span></a>
+<ul>
+<li class="toclevel-3 tocsection-20"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_9"><span class="tocnumber">1.9.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-21"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSPlayerPawn"><span class="tocnumber">1.10</span> <span class="toctext">CSPlayerPawn</span></a>
+<ul>
+<li class="toclevel-3 tocsection-22"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_10"><span class="tocnumber">1.10.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-23"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSRadarPoint"><span class="tocnumber">1.11</span> <span class="toctext">CSRadarPoint</span></a>
+<ul>
+<li class="toclevel-3 tocsection-24"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_11"><span class="tocnumber">1.11.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-25"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSWeaponBase"><span class="tocnumber">1.12</span> <span class="toctext">CSWeaponBase</span></a>
+<ul>
+<li class="toclevel-3 tocsection-26"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_12"><span class="tocnumber">1.12.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-27"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSWeaponData"><span class="tocnumber">1.13</span> <span class="toctext">CSWeaponData</span></a>
+<ul>
+<li class="toclevel-3 tocsection-28"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_13"><span class="tocnumber">1.13.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-29"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CustomHudLayout"><span class="tocnumber">1.14</span> <span class="toctext">CustomHudLayout</span></a>
+<ul>
+<li class="toclevel-3 tocsection-30"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_14"><span class="tocnumber">1.14.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-31"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CustomPlayerCamera"><span class="tocnumber">1.15</span> <span class="toctext">CustomPlayerCamera</span></a>
+<ul>
+<li class="toclevel-3 tocsection-32"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_15"><span class="tocnumber">1.15.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+<li class="toclevel-2 tocsection-33"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#PointTemplate"><span class="tocnumber">1.16</span> <span class="toctext">PointTemplate</span></a>
+<ul>
+<li class="toclevel-3 tocsection-34"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Methods_16"><span class="tocnumber">1.16.1</span> <span class="toctext">Methods</span></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toclevel-1 tocsection-35"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Interfaces"><span class="tocnumber">2</span> <span class="toctext">Interfaces</span></a>
+<ul>
+<li class="toclevel-2 tocsection-36"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#BulletTrace"><span class="tocnumber">2.1</span> <span class="toctext">BulletTrace</span></a></li>
+<li class="toclevel-2 tocsection-37"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#BaseTraceConfig"><span class="tocnumber">2.2</span> <span class="toctext">BaseTraceConfig</span></a></li>
+<li class="toclevel-2 tocsection-38"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#BombDefuseEvent"><span class="tocnumber">2.3</span> <span class="toctext">BombDefuseEvent</span></a></li>
+<li class="toclevel-2 tocsection-39"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#BombPlantEvent"><span class="tocnumber">2.4</span> <span class="toctext">BombPlantEvent</span></a></li>
+<li class="toclevel-2 tocsection-40"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#BulletTraceResult"><span class="tocnumber">2.5</span> <span class="toctext">BulletTraceResult</span></a></li>
+<li class="toclevel-2 tocsection-41"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CameraFollowConfig"><span class="tocnumber">2.6</span> <span class="toctext">CameraFollowConfig</span></a></li>
+<li class="toclevel-2 tocsection-42"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#EntityDamage"><span class="tocnumber">2.7</span> <span class="toctext">EntityDamage</span></a></li>
+<li class="toclevel-2 tocsection-43"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#GrenadeBounceEvent"><span class="tocnumber">2.8</span> <span class="toctext">GrenadeBounceEvent</span></a></li>
+<li class="toclevel-2 tocsection-44"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#ModifyPlayerDamageEvent"><span class="tocnumber">2.9</span> <span class="toctext">ModifyPlayerDamageEvent</span></a></li>
+<li class="toclevel-2 tocsection-45"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#ModifyPlayerDamageResult"><span class="tocnumber">2.10</span> <span class="toctext">ModifyPlayerDamageResult</span></a></li>
+<li class="toclevel-2 tocsection-46"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#PlayerDamageEvent"><span class="tocnumber">2.11</span> <span class="toctext">PlayerDamageEvent</span></a></li>
+<li class="toclevel-2 tocsection-47"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#PlayerTrace"><span class="tocnumber">2.12</span> <span class="toctext">PlayerTrace</span></a></li>
+<li class="toclevel-2 tocsection-48"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#PlayerTraceResult"><span class="tocnumber">2.13</span> <span class="toctext">PlayerTraceResult</span></a></li>
+<li class="toclevel-2 tocsection-49"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#SpawnGrenadeProjectileConfigWithoutOwner"><span class="tocnumber">2.14</span> <span class="toctext">SpawnGrenadeProjectileConfigWithoutOwner</span></a></li>
+<li class="toclevel-2 tocsection-50"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#SpawnGrenadeProjectileConfigWithOwner"><span class="tocnumber">2.15</span> <span class="toctext">SpawnGrenadeProjectileConfigWithOwner</span></a></li>
+<li class="toclevel-2 tocsection-51"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#TraceResult"><span class="tocnumber">2.16</span> <span class="toctext">TraceResult</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1 tocsection-52"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Enumerations"><span class="tocnumber">3</span> <span class="toctext">Enumerations</span></a>
+<ul>
+<li class="toclevel-2 tocsection-53"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSDamageFlags"><span class="tocnumber">3.1</span> <span class="toctext">CSDamageFlags</span></a></li>
+<li class="toclevel-2 tocsection-54"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSDamageTypes"><span class="tocnumber">3.2</span> <span class="toctext">CSDamageTypes</span></a></li>
+<li class="toclevel-2 tocsection-55"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSGearSlot"><span class="tocnumber">3.3</span> <span class="toctext">CSGearSlot</span></a></li>
+<li class="toclevel-2 tocsection-56"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSGrenadeType"><span class="tocnumber">3.4</span> <span class="toctext">CSGrenadeType</span></a></li>
+<li class="toclevel-2 tocsection-57"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSHitGroup"><span class="tocnumber">3.5</span> <span class="toctext">CSHitGroup</span></a></li>
+<li class="toclevel-2 tocsection-58"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSInputs"><span class="tocnumber">3.6</span> <span class="toctext">CSInputs</span></a></li>
+<li class="toclevel-2 tocsection-59"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSLoadoutSlot"><span class="tocnumber">3.7</span> <span class="toctext">CSLoadoutSlot</span></a></li>
+<li class="toclevel-2 tocsection-60"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSMoveType"><span class="tocnumber">3.8</span> <span class="toctext">CSMoveType</span></a></li>
+<li class="toclevel-2 tocsection-61"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSObserverMode"><span class="tocnumber">3.9</span> <span class="toctext">CSObserverMode</span></a></li>
+<li class="toclevel-2 tocsection-62"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSRadarColor"><span class="tocnumber">3.10</span> <span class="toctext">CSRadarColor</span></a></li>
+<li class="toclevel-2 tocsection-63"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSRadarIcon"><span class="tocnumber">3.11</span> <span class="toctext">CSRadarIcon</span></a></li>
+<li class="toclevel-2 tocsection-64"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSRoundEndReason"><span class="tocnumber">3.12</span> <span class="toctext">CSRoundEndReason</span></a></li>
+<li class="toclevel-2 tocsection-65"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSTeamMoneyReason"><span class="tocnumber">3.13</span> <span class="toctext">CSTeamMoneyReason</span></a></li>
+<li class="toclevel-2 tocsection-66"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSWeaponAttackType"><span class="tocnumber">3.14</span> <span class="toctext">CSWeaponAttackType</span></a></li>
+<li class="toclevel-2 tocsection-67"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSWeaponType"><span class="tocnumber">3.15</span> <span class="toctext">CSWeaponType</span></a></li>
+<li class="toclevel-2 tocsection-68"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CustomCameraMode"><span class="tocnumber">3.16</span> <span class="toctext">CustomCameraMode</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1 tocsection-69"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Type_Aliases"><span class="tocnumber">4</span> <span class="toctext">Type Aliases</span></a>
+<ul>
+<li class="toclevel-2 tocsection-70"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#BeforeDamageResult"><span class="tocnumber">4.1</span> <span class="toctext">BeforeDamageResult</span></a></li>
+<li class="toclevel-2 tocsection-71"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Color"><span class="tocnumber">4.2</span> <span class="toctext">Color</span></a></li>
+<li class="toclevel-2 tocsection-72"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#ColorArg"><span class="tocnumber">4.3</span> <span class="toctext">ColorArg</span></a></li>
+<li class="toclevel-2 tocsection-73"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#InputValue"><span class="tocnumber">4.4</span> <span class="toctext">InputValue</span></a></li>
+<li class="toclevel-2 tocsection-74"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#QAngle"><span class="tocnumber">4.5</span> <span class="toctext">QAngle</span></a></li>
+<li class="toclevel-2 tocsection-75"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#RotationVector"><span class="tocnumber">4.6</span> <span class="toctext">RotationVector</span></a></li>
+<li class="toclevel-2 tocsection-76"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#SpawnGrenadeProjectileConfig"><span class="tocnumber">4.7</span> <span class="toctext">SpawnGrenadeProjectileConfig</span></a></li>
+<li class="toclevel-2 tocsection-77"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Vector"><span class="tocnumber">4.8</span> <span class="toctext">Vector</span></a></li>
+</ul>
+</li>
+</ul>
+</div>
+
+<h2><span class="mw-headline" id="Classes">Classes</span></h2>
+<h3><span class="mw-headline" id="Instance">Instance</span></h3>
+<p>The top level API provided to scripts attached to a point_script entity.
+Access these functions by importing <code>Instance</code> from "cs_script/point_script".
+</p>
+<h4><span class="mw-headline" id="Methods">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>AddTeamMoney
+</td>
+<td><code>AddTeamMoney(team: number, reason: CSTeamMoneyReason, amount?: number): void</code>
+</td>
+<td>Adds the money to all player controllers on the team, following all classic rules. If players are not eligible to receive end-of-round money, then that restriction is honored. Disconnected players will get their account balance incremented, and will have correct amount of money after they reconnect to the server. If the `amount` parameter is 0 or undefined, then the amount will be determined using server convar setting corresponding to the reason parameter.
+</td></tr>
+<tr>
+<td>ClientCommand
+</td>
+<td><code>ClientCommand(playerSlot: number, command: string): void</code>
+</td>
+<td>Issue the specified command to the specified client.
+</td></tr>
+<tr>
+<td>ConnectOutput
+</td>
+<td><code>ConnectOutput(target: Entity, output: string, callback: (inputData: { value?: InputValue, caller?: Entity, activator?: Entity }) =&gt; any): number | undefined</code>
+</td>
+<td>Connect the output of an entity to a callback. The return value is a connection id that can be used in <code>DisconnectOutput</code>
+</td></tr>
+<tr>
+<td>DebugBox
+</td>
+<td><code>DebugBox(config: { mins: Vector, maxs: Vector, duration?: number, color?: ColorArg }): void</code>
+</td>
+<td>Draw an axis aligned box in the world. Only works in dev environments.
+</td></tr>
+<tr>
+<td>DebugLine
+</td>
+<td><code>DebugLine(config: { start: Vector, end: Vector, duration?: number, color?: ColorArg }): void</code>
+</td>
+<td>Draw a line in the world. Only works in dev environments.
+</td></tr>
+<tr>
+<td>DebugScreenText
+</td>
+<td><code>DebugScreenText(config: { text: any, x: number, y: number, duration?: number, color?: ColorArg }): void</code>
+</td>
+<td>Print some text to the game window. Only works in dev environments.
+</td></tr>
+<tr>
+<td>DebugSphere
+</td>
+<td><code>DebugSphere(config: { center: Vector, radius: number, duration?: number, color?: ColorArg }): void</code>
+</td>
+<td>Draw a wire sphere in the world. Only works in dev environments.
+</td></tr>
+<tr>
+<td>Delay
+</td>
+<td><code>Delay(delay: number): Promise&lt;void&gt;</code>
+</td>
+<td>Returns a promise that resolves after <code>delay</code> number of seconds. The exact time will be on the tick nearest to the specified delay, which may be earlier or later.
+</td></tr>
+<tr>
+<td>DisconnectOutput
+</td>
+<td><code>DisconnectOutput(connectionId: number): void</code>
+</td>
+<td>Use a connection id to disconnect the output of an entity from a callback.
+</td></tr>
+<tr>
+<td>EntFireAtName
+</td>
+<td><code>EntFireAtName(config: { name: string, input: string, value?: InputValue, caller?: Entity, activator?: Entity, delay?: number }): void</code>
+</td>
+<td>Fire the input on all targets matching the specified names.
+</td></tr>
+<tr>
+<td>EntFireAtTarget
+</td>
+<td><code>EntFireAtTarget(config: { target: Entity, input: string, value?: InputValue, caller?: Entity, activator?: Entity, delay?: number }): void</code>
+</td>
+<td>Fire the input on the specified target.
+</td></tr>
+<tr>
+<td>FindEntitiesByClass
+</td>
+<td><code>FindEntitiesByClass(className: string): Entity[]</code>
+</td>
+<td>Find entities of the specified class name.
+</td></tr>
+<tr>
+<td>FindEntityByClass
+</td>
+<td><code>FindEntityByClass(className: string): Entity | undefined</code>
+</td>
+<td>Find the first entity of the specified class name.
+</td></tr>
+<tr>
+<td>FindEntitiesByName
+</td>
+<td><code>FindEntitiesByName(name: string): Entity[]</code>
+</td>
+<td>Find entities matching the specified name.
+</td></tr>
+<tr>
+<td>FindEntityByName
+</td>
+<td><code>FindEntityByName(name: string): Entity | undefined</code>
+</td>
+<td>Find the first entity matching the specified name.
+</td></tr>
+<tr>
+<td>GetAllPlayerControllers
+</td>
+<td><code>GetAllPlayerControllers(): CSPlayerController[]</code>
+</td>
+<td>Get all the player controllers. Includes disconnected players.
+</td></tr>
+<tr>
+<td>GetGameMode
+</td>
+<td><code>GetGameMode(): number</code>
+</td>
+<td>Get the current Game Mode. For a list of all game modes, see <a href="https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive/Game_Modes" title="Counter-Strike: Global Offensive/Game Modes">Counter-Strike: Global Offensive/Game Modes</a> <div style="display:flex; background:linear-gradient(90deg, rgb(230 233 190 / 2.8%) 0%, transparent 100%); border-left:.2em solid rgb(230 233 190 / 60%); border-radius:.2em; padding:.47em 0 .4em .94em; margin:.5em 0"><span style="user-select:none; margin-inline:0 .3em; margin-block:-.05em 0"><img alt="Note.png" src="./Scripting API - Valve Developer Community_files/10px-Note.png" decoding="async" width="10" height="13" srcset="/w/images/thumb/c/cc/Note.png/15px-Note.png 1.5x, /w/images/thumb/c/cc/Note.png/20px-Note.png 2x" data-file-width="500" data-file-height="650"></span><strong style="display:table-cell; color:rgb(230 233 190); white-space:nowrap; margin-inline:0 .3em">Note:</strong><span style="display:table-cell"> The information here is from CS:GO, but most of it also applies to CS2. </span></div>
+</td></tr>
+<tr>
+<td>GetGameTime
+</td>
+<td><code>GetGameTime(): number</code>
+</td>
+<td>Get the game time in seconds.
+</td></tr>
+<tr>
+<td>GetGameType
+</td>
+<td><code>GetGameType(): number</code>
+</td>
+<td>Get the current Game Type. For a list of all game types, see <a href="https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive/Game_Modes" title="Counter-Strike: Global Offensive/Game Modes">Counter-Strike: Global Offensive/Game Modes</a> <div style="display:flex; background:linear-gradient(90deg, rgb(230 233 190 / 2.8%) 0%, transparent 100%); border-left:.2em solid rgb(230 233 190 / 60%); border-radius:.2em; padding:.47em 0 .4em .94em; margin:.5em 0"><span style="user-select:none; margin-inline:0 .3em; margin-block:-.05em 0"><img alt="Note.png" src="./Scripting API - Valve Developer Community_files/10px-Note.png" decoding="async" width="10" height="13" srcset="/w/images/thumb/c/cc/Note.png/15px-Note.png 1.5x, /w/images/thumb/c/cc/Note.png/20px-Note.png 2x" data-file-width="500" data-file-height="650"></span><strong style="display:table-cell; color:rgb(230 233 190); white-space:nowrap; margin-inline:0 .3em">Note:</strong><span style="display:table-cell"> The information here is from CS:GO, but most of it also applies to CS2. </span></div>
+</td></tr>
+<tr>
+<td>GetMapName
+</td>
+<td><code>GetMapName(): string</code>
+</td>
+<td>Get the name of the current map.
+</td></tr>
+<tr>
+<td>GetPlayerController
+</td>
+<td><code>GetPlayerController(slot: number): CSPlayerController | undefined</code>
+</td>
+<td>Get the player controller in the given slot.
+</td></tr>
+<tr>
+<td>GetRoundsPlayed
+</td>
+<td><code>GetRoundsPlayed(): number</code>
+</td>
+<td>Get the number of rounds played in the current game.
+</td></tr>
+<tr>
+<td>GetRoundRemainingTime
+</td>
+<td><code>GetRoundRemainingTime(): number</code>
+</td>
+<td>Get the time remaining in the current round in seconds.
+</td></tr>
+<tr>
+<td>GetSaveData
+</td>
+<td><code>GetSaveData(): string</code>
+</td>
+<td>Retrieves the save data associated with this workshop addon. Will synchronously read from disk the first time this is called.
+</td></tr>
+<tr>
+<td>IsDedicatedServer
+</td>
+<td><code>IsDedicatedServer(): boolean</code>
+</td>
+<td>Get if the server is a dedicated server.
+</td></tr>
+<tr>
+<td>IsFreezePeriod
+</td>
+<td><code>IsFreezePeriod(): boolean</code>
+</td>
+<td>Get if the game is currently in a Freeze period.
+</td></tr>
+<tr>
+<td>IsTeamIntroPeriod
+</td>
+<td><code>IsTeamIntroPeriod(): boolean</code>
+</td>
+<td>Get if the game is currently in a Team Intro period.
+</td></tr>
+<tr>
+<td>IsWarmupPeriod
+</td>
+<td><code>IsWarmupPeriod(): boolean</code>
+</td>
+<td>Get if the game is currently in a Warmup period.
+</td></tr>
+<tr>
+<td>Msg
+</td>
+<td><code>Msg(text: any): void</code>
+</td>
+<td>Log a message to the console.
+</td></tr>
+<tr>
+<td>QueueAfterThinks
+</td>
+<td><code>QueueAfterThinks( callback: () =&gt; void ): void</code>
+</td>
+<td>Queue up a callback to be invoked once, after all entities have executed their think functions this tick (eg. player input has been handled, projectiles have moved). This can be useful for delaying until a clean moment when an entity isn't mid-computation and might ignore or misinterpret. This can be useful for delaying until the world is in a consistent state. Callbacks queued up during a post entity think callback will be invoked in the same tick.
+</td></tr>
+<tr>
+<td>RegisterCheatCommand
+</td>
+<td><code>RegisterCheatCommand(name: string, callback: (args: string) =&gt; void): void</code>
+</td>
+<td>Creates a console command that will run the specified callback. The command will only work when sv_cheats is true.
+</td></tr>
+<tr>
+<td>ServerCommand
+</td>
+<td><code>ServerCommand(command: string): void</code>
+</td>
+<td>Issue a command on the server.
+</td></tr>
+<tr>
+<td>SetNextThink
+</td>
+<td><code>SetNextThink(time: number): void</code>
+</td>
+<td>Set when the OnThink callback should next be run. The exact time will be on the tick nearest to the specified time, which may be earlier or later.
+</td></tr>
+<tr>
+<td>SetRoundRemainingTime
+</td>
+<td><code>SetRoundRemainingTime(time: number): void</code>
+</td>
+<td>Set the time remaining in the current round in seconds.
+</td></tr>
+<tr>
+<td>SetSaveData
+</td>
+<td><code>SetSaveData(data: string): void</code>
+</td>
+<td>Writes save data associated with this workshop addon. Will synchronously write to disk every time this is called.
+</td></tr>
+<tr>
+<td>SetThink
+</td>
+<td><code>SetThink(callback: () =&gt; void): void</code>
+</td>
+<td>Called per-think. Control when this is run using SetNextThink.
+</td></tr>
+<tr>
+<td>SpawnGrenadeProjectile
+</td>
+<td><code>SpawnGrenadeProjectile(config: SpawnGrenadeProjectileConfig): CSGrenadeProjectileBase</code>
+</td>
+<td>Spawns a live grenade projectile.
+</td></tr>
+<tr>
+<td>TraceBox
+</td>
+<td><code>TraceBox(trace: { mins: Vector, maxs: Vector } &amp; BaseTraceConfig): TraceResult</code>
+</td>
+<td>Trace an axis aligned bounding box along a line and detect collisions.
+</td></tr>
+<tr>
+<td>TraceBullet
+</td>
+<td><code>TraceBullet(trace: BulletTrace): BulletTraceResult[]</code>
+</td>
+<td>Trace as a bullet and detect hits and damage.
+</td></tr>
+<tr>
+<td>TraceLine
+</td>
+<td><code>TraceLine(trace: BaseTraceConfig): TraceResult</code>
+</td>
+<td>Trace a point along a line and detect collisions.
+</td></tr>
+<tr>
+<td>TracePlayer
+</td>
+<td><code>TracePlayer(trace: PlayerTrace): PlayerTraceResult</code>
+</td>
+<td>Trace as a player would collide
+</td></tr>
+<tr>
+<td>TraceSphere
+</td>
+<td><code>TraceSphere(trace: { radius: number } &amp; BaseTraceConfig): TraceResult</code>
+</td>
+<td>Trace a sphere along a line and detect collisions.
+</td></tr>
+</tbody></table>
+<h4><span class="mw-headline" id="Hooks">Hooks</span></h4>
+<p>Passing callbacks with fitting signatures into these functions causes them to be called at the appropriate times.
+</p>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>OnActivate
+</td>
+<td><code>OnActivate(callback: () =&gt; void): void</code>
+</td>
+<td>Called when the point_script entity is activated.
+</td></tr>
+<tr>
+<td>OnBeginRoundRestart
+</td>
+<td><code>OnBeginRoundRestart(callback: () =&gt; void): void</code>
+</td>
+<td>Called at the start of cleanup for a round restart.
+</td></tr>
+<tr>
+<td>OnBombDefuse
+</td>
+<td><code>OnBombDefuse(callback: (event: BombDefuseEvent) =&gt; void): void</code>
+</td>
+<td>Called when a player defuses a c4
+</td></tr>
+<tr>
+<td>OnBombDefuseAbort
+</td>
+<td><code>OnBombDefuseAbort(callback: (event: { plantedC4: CSPlantedC4 }) =&gt; void): void</code>
+</td>
+<td>Called when a player aborts defusing a c4
+</td></tr>
+<tr>
+<td>OnBombDefuseStart
+</td>
+<td><code>OnBombDefuseStart(callback: (event: { plantedC4: CSPlantedC4 }) =&gt; void): void</code>
+</td>
+<td>Called when a player starts defusing a c4
+</td></tr>
+<tr>
+<td>OnBombExplode
+</td>
+<td><code>OnBombExplode(callback: (event: { plantedC4: CSPlantedC4 }) =&gt; void): void</code>
+</td>
+<td>Called when a c4 explodes
+</td></tr>
+<tr>
+<td>OnBombPlant
+</td>
+<td><code>OnBombPlant(callback: (event: BombPlantEvent) =&gt; void): void</code>
+</td>
+<td>Called when a player plants their c4
+</td></tr>
+<tr>
+<td>OnBombPlantAbort
+</td>
+<td><code>OnBombPlantAbort(callback: (event: { planter: CSPlayerPawn }) =&gt; void): void</code>
+</td>
+<td>Called when a player aborts planting their c4
+</td></tr>
+<tr>
+<td>OnBombPlantStart
+</td>
+<td><code>OnBombPlantStart(callback: (event: { planter: CSPlayerPawn }) =&gt; void): void</code>
+</td>
+<td>Called when a player starts planting their c4
+</td></tr>
+<tr>
+<td>OnBulletImpact
+</td>
+<td><code>OnBulletImpact(callback: (event: { weapon: CSWeaponBase, position: Vector, hitEntity?: Entity }) =&gt; void): void</code>
+</td>
+<td>Called when a bullet hits a surface. Penetrations can cause a single bullet to trigger multiple impacts. This will be called for all impacts of a bullet before any player damage events are called.
+</td></tr>
+<tr>
+<td>OnCustomHudClicked
+</td>
+<td><code>OnCustomHudClicked( callback: (event: {player: CSPlayerController, layout: CustomHudLayout, buttonId: string}) =&gt; void ): void</code>
+</td>
+<td>Called when a button in a CustomHudLayout is clicked.
+</td></tr>
+<tr>
+<td>OnGrenadeBounce
+</td>
+<td><code>OnGrenadeBounce(callback: (event: GrenadeBounceEvent) =&gt; void): void</code>
+</td>
+<td>Called when a grenade bounces.
+</td></tr>
+<tr>
+<td>OnGrenadeThrow
+</td>
+<td><code>OnGrenadeThrow(callback: (event: { weapon: CSWeaponBase, projectile: CSGrenadeProjectileBase }) =&gt; void): void</code>
+</td>
+<td>Called when a grenade is thrown. `projectile` is the newly created grenade projectile.
+</td></tr>
+<tr>
+<td>OnGunFire
+</td>
+<td><code>OnGunFire(callback: (event: { weapon: CSWeaponBase }) =&gt; void): void</code>
+</td>
+<td>Called when a gun emits bullets. A shotgun will only trigger this once when emitting multiple bullets at once.
+</td></tr>
+<tr>
+<td>OnGunReload
+</td>
+<td><code>OnGunReload(callback: (event: { weapon: CSWeaponBase }) =&gt; void): void</code>
+</td>
+<td>Called when a gun is reloaded.
+</td></tr>
+<tr>
+<td>OnKnifeAttack
+</td>
+<td><code>OnKnifeAttack(callback: (event: { weapon: CSWeaponBase, attackType: CSWeaponAttackType }) =&gt; void): void</code>
+</td>
+<td>Called when a knife attacks, even if it misses.
+</td></tr>
+<tr>
+<td>OnModifyPlayerDamage
+</td>
+<td><code>OnModifyPlayerDamage(callback: (event: ModifyPlayerDamageEvent) =&gt; ModifyPlayerDamageResult | void): void</code>
+</td>
+<td>Called immediately before a CSPlayerPawn takes damage to armor and health. Called after hitgroup modifications are applied such as headshot multiplier. This won't be called if the player would take no damage, such as if they're frozen or invulnerable or if friendly fire would disable the damage.<br>
+<p>@param callback<br>
+Return `{ damage: N }` to modify the amount of damage.<br>
+Return `{ damageFlags: event.damageFlags | CSDamageFlags.IGNORE_ARMOR }` to have the damage pierce armor.<br>
+Return `{ abort: true }` to cancel the damage event.
+</p>
+</td></tr>
+<tr>
+<td>OnPlayerActivate
+</td>
+<td><code>OnPlayerActivate(callback: (event: { player: CSPlayerController }) =&gt; void): void</code>
+</td>
+<td>Called when a client finishes loading and is ready to spawn.
+</td></tr>
+<tr>
+<td>OnPlayerChat
+</td>
+<td><code>OnPlayerChat(callback: (event: { player?: CSPlayerController, text: string, team: number }) =&gt; void): void</code>
+</td>
+<td>Called when a player sends a chat message. `team` will match they player's team if the message was sent to team chat.
+</td></tr>
+<tr>
+<td>OnPlayerConnect
+</td>
+<td><code>OnPlayerConnect(callback: (event: { player: CSPlayerController }) =&gt; void): void</code>
+</td>
+<td>Called when a client finishes the initial connection handshake with the server.
+</td></tr>
+<tr>
+<td>OnPlayerDamage
+</td>
+<td><code>OnPlayerDamage(callback: (event: PlayerDamageEvent) =&gt; void): void</code>
+</td>
+<td>Called when a player has taken damage.
+</td></tr>
+<tr>
+<td>OnPlayerDisconnect
+</td>
+<td><code>OnPlayerDisconnect(callback: (event: { playerSlot: number }) =&gt; void): void</code>
+</td>
+<td>Called when a client disconnects from the server.
+</td></tr>
+<tr>
+<td>OnPlayerJump
+</td>
+<td><code>OnPlayerJump(callback: (event: { player: CSPlayerPawn }) =&gt; void): void</code>
+</td>
+<td>Called when a player jumps off the ground.
+</td></tr>
+<tr>
+<td>OnPlayerKill
+</td>
+<td><code>OnPlayerKill(callback: (event: { player: CSPlayerPawn, inflictor?: Entity, attacker?: Entity, weapon?: CSWeaponBase }) =&gt; void): void</code>
+</td>
+<td>Called when a player dies. `inflictor`, `attacker` and `weapon` will match the damage event that caused the kill.
+</td></tr>
+<tr>
+<td>OnPlayerLand
+</td>
+<td><code>OnPlayerLand(callback: (event: { player: CSPlayerPawn }) =&gt; void): void</code>
+</td>
+<td>Called when a player hits the ground while falling.
+</td></tr>
+<tr>
+<td>OnPlayerPing
+</td>
+<td><code>OnPlayerPing(callback: (event: { player: CSPlayerController, position: Vector }) =&gt; void): void</code>
+</td>
+<td>Called when a player pings a location.
+</td></tr>
+<tr>
+<td>OnPlayerReset
+</td>
+<td><code>OnPlayerReset(callback: (event: { player: CSPlayerPawn }) =&gt; void): void</code>
+</td>
+<td>Called when a player respawns, changes team, or is placed back at spawn due to a round restart.
+</td></tr>
+<tr>
+<td>OnPlayerTeamChanged
+</td>
+<td><code>OnPlayerTeamChanged(callback: (event: { player: CSPlayerPawn, oldTeam: number }) =&gt; void): void</code>
+</td>
+<td>Called when a player changes team.
+</td></tr>
+<tr>
+<td>OnRoundEnd
+</td>
+<td><code>OnRoundEnd(callback: (event: { winningTeam: number, reason: CSRoundEndReason }) =&gt; void): void</code>
+</td>
+<td>Called when a team wins a round.
+</td></tr>
+<tr>
+<td>OnRoundStart
+</td>
+<td><code>OnRoundStart(callback: () =&gt; void): void</code>
+</td>
+<td>Called when a new round begins.
+</td></tr>
+<tr>
+<td>OnScriptInput
+</td>
+<td><code>OnScriptInput(name: string, callback: (inputData: { caller?: Entity, activator?: Entity }) =&gt; void): void</code>
+</td>
+<td>Called when input RunScriptInput is triggered on the point_script entity with a parameter value that matches name.
+</td></tr>
+<tr>
+<td>OnScriptReload
+</td>
+<td><code>OnScriptReload&lt;T&gt;(config: { before?: () =&gt; T, after?: (memory: T) =&gt; void }): void</code>
+</td>
+<td>Called in Tools mode when the script is reloaded due to changes. The before callback will be invoked before pre-load teardown. The after callback will be invoked after the new script is evaluated and will be passed the return value of the before callback.
+</td></tr>
+<tr>
+<td>OnWeaponDrop
+</td>
+<td><code>OnWeaponDrop(callback: (event: { weapon: CSWeaponBase, dropper: CSPlayerPawn }) =&gt; void): void</code>
+</td>
+<td>Called when a weapon is dropped.
+</td></tr>
+<tr>
+<td>OnWeaponPickup
+</td>
+<td><code>OnWeaponPickup(callback: (event: { weapon: CSWeaponBase }) =&gt; void): void</code>
+</td>
+<td>Called when a weapon is picked up.
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="Entity">Entity</span></h3>
+<p>The base class for all entities.
+</p>
+<h4><span class="mw-headline" id="Methods_2">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>GetAbsAngles
+</td>
+<td><code>GetAbsAngles(): QAngle</code>
+</td>
+<td>The angles (pitch, yaw, and roll) of this entity relative to the world.
+</td></tr>
+<tr>
+<td>GetAbsAngularVelocity
+</td>
+<td><code>GetAbsAngularVelocity(): RotationVector</code>
+</td>
+<td>The angular velocity of this entity relative to the world.
+</td></tr>
+<tr>
+<td>GetAbsOrigin
+</td>
+<td><code>GetAbsOrigin(): Vector</code>
+</td>
+<td>The position of the origin of this entity relative to the world.
+</td></tr>
+<tr>
+<td>GetAbsVelocity
+</td>
+<td><code>GetAbsVelocity(): Vector</code>
+</td>
+<td>The velocity of this entity relative to the world.
+</td></tr>
+<tr>
+<td>GetClassName
+</td>
+<td><code>GetClassName(): string</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetEntityName
+</td>
+<td><code>GetEntityName(): string</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetEyeAngles
+</td>
+<td><code>GetEyeAngles(): QAngle</code>
+</td>
+<td>The angles of the eyes of this entity relative to the world.
+</td></tr>
+<tr>
+<td>GetEyePosition
+</td>
+<td><code>GetEyePosition(): Vector</code>
+</td>
+<td>The angles of the eyes of this entity relative to the world.
+</td></tr>
+<tr>
+<td>GetGroundEntity
+</td>
+<td><code>GetGroundEntity(): Entity | undefined</code>
+</td>
+<td>Get the entity that this entity is resting on. Will be `undefined` if in the air.
+</td></tr>
+<tr>
+<td>GetHealth
+</td>
+<td><code>GetHealth(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetLocalAngles
+</td>
+<td><code>GetLocalAngles(): QAngle</code>
+</td>
+<td>The angles (pitch, yaw, and roll) of this entity relative to its parent. Will be relative to the world if no parent.
+</td></tr>
+<tr>
+<td>GetLocalAngularVelocity
+</td>
+<td><code>GetLocalAngularVelocity(): RotationVector</code>
+</td>
+<td>The angular velocity of this entity relative to its parent. Will be relative to the world if no parent.
+</td></tr>
+<tr>
+<td>GetLocalOrigin
+</td>
+<td><code>GetLocalOrigin(): Vector</code>
+</td>
+<td>The position of the origin of this entity relative to its parent. Will be relative to the world if no parent.
+</td></tr>
+<tr>
+<td>GetLocalVelocity
+</td>
+<td><code>GetLocalVelocity(): Vector</code>
+</td>
+<td>The velocity of this entity relative to its parent. Will be relative to the world if no parent.
+</td></tr>
+<tr>
+<td>GetMaxHealth
+</td>
+<td><code>GetMaxHealth(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetMoveType
+</td>
+<td><code>GetMoveType(): CSMoveType</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetOwner
+</td>
+<td><code>GetOwner(): Entity | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetParent
+</td>
+<td><code>GetParent(): Entity | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetTeamNumber
+</td>
+<td><code>GetTeamNumber(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsAlive
+</td>
+<td><code>IsAlive(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsValid
+</td>
+<td><code>IsValid(): boolean</code>
+</td>
+<td>Returns `false` if the entity has been deleted.
+</td></tr>
+<tr>
+<td>IsWorld
+</td>
+<td><code>IsWorld(): boolean</code>
+</td>
+<td>Get if this is the world entity.
+</td></tr>
+<tr>
+<td>Kill
+</td>
+<td><code>Kill(): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>Move
+</td>
+<td><code>Move(newValues: { position?: Vector, angles?: QAngle, velocity?: Vector, angularVelocity?: RotationVector }): void</code>
+</td>
+<td>Move this entity without resetting the client's interpolation history.
+</td></tr>
+<tr>
+<td>Remove
+</td>
+<td><code>Remove(): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetEntityName
+</td>
+<td><code>SetEntityName(name: string): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetMaxHealth
+</td>
+<td><code>SetMaxHealth(health: number): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetMoveType
+</td>
+<td><code>SetMoveType(moveType: CSMoveType): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetHealth
+</td>
+<td><code>SetHealth(health: number): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetOwner
+</td>
+<td><code>SetOwner(owner: Entity | undefined): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetParent
+</td>
+<td><code>SetParent(parent: Entity | undefined): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>TakeDamage
+</td>
+<td><code>TakeDamage(takeDamage: EntityDamage): number</code>
+</td>
+<td>Apply damage to this entity. Damage value will be modified by armor and hitgroup.
+</td></tr>
+<tr>
+<td>Teleport
+</td>
+<td><code>Teleport(newValues: { position?: Vector, angles?: QAngle, velocity?: Vector, angularVelocity?: RotationVector }): void</code>
+</td>
+<td>Update the physics state of this entity.
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="BaseModelEntity">BaseModelEntity</span></h3>
+<dl><dd><dl><dd><dl><dd><dl><dd><dl><dd>extends <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Entity"> Entity</a></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl>
+<h4><span class="mw-headline" id="Methods_3">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>GetColor
+</td>
+<td><code>GetColor(): Color</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetModelName
+</td>
+<td><code>GetModelName(): string</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetModelScale
+</td>
+<td><code>GetModelScale(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>Glow
+</td>
+<td><code>Glow(color?: ColorArg): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsGlowing
+</td>
+<td><code>IsGlowing(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetColor
+</td>
+<td><code>SetColor(color: ColorArg): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetModel
+</td>
+<td><code>SetModel(modelName: string): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetModelScale
+</td>
+<td><code>SetModelScale(scale: number): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>Unglow
+</td>
+<td><code>Unglow(): void</code>
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="C4">C4</span></h3>
+<dl><dd><dl><dd><dl><dd><dl><dd><dl><dd>extends <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#CSWeaponBase"> CSWeaponBase</a></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl>
+<h4><span class="mw-headline" id="Methods_4">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>AbortPlant
+</td>
+<td><code>AbortPlant(): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetPlantFinishTime
+</td>
+<td><code>GetPlantFinishTime(): number | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetPlantStartTime
+</td>
+<td><code>GetPlantStartTime(): number | undefined</code>
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSGrenadeProjectileBase">CSGrenadeProjectileBase</span></h3>
+<dl><dd><dl><dd><dl><dd><dl><dd><dl><dd>extends <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#BaseModelEntity"> BaseModelEntity</a></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl>
+<h4><span class="mw-headline" id="Methods_5">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>Detonate
+</td>
+<td><code>Detonate(): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetGrenadeType
+</td>
+<td><code>GetGrenadeType(): CSGrenadeType</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetThrower
+</td>
+<td><code>GetThrower(): CSPlayerPawn</code>
+</td>
+<td>
+</td></tr></tbody></table>
+<h3><span class="mw-headline" id="CSObservablePoint">CSObservablePoint</span></h3>
+<dl><dd><dl><dd><dl><dd><dl><dd><dl><dd>extends <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Entity"> Entity</a></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl>
+<p>An entity that can be observed when no alive teammates remain.
+</p>
+<h4><span class="mw-headline" id="Methods_6">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>IsObservableForTeam
+</td>
+<td><code>IsObservableForTeam( team: number ): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetObservableForTeam
+</td>
+<td><code>SetObservableForTeam( team: number, observable: boolean ): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetObservableModelEntity
+</td>
+<td>undefined, index?: number): void
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSObserverPawn">CSObserverPawn</span></h3>
+<dl><dd><dl><dd><dl><dd><dl><dd><dl><dd>extends <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#BaseModelEntity"> BaseModelEntity</a></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl>
+<h4><span class="mw-headline" id="Methods_7">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>GetObserverMode
+</td>
+<td><code>GetObserverMode(): CSObserverMode</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetObserverTarget
+</td>
+<td><code>GetObserverTarget(): Entity | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetOriginalPlayerController
+</td>
+<td><code>GetOriginalPlayerController(): CSPlayerController</code>
+</td>
+<td>Gets the controller that this player pawn was originally spawned for.
+</td></tr>
+<tr>
+<td>GetPlayerController
+</td>
+<td><code>GetPlayerController(): CSPlayerController | undefined</code>
+</td>
+<td>Gets the controller currently controlling this player pawn.
+</td></tr>
+<tr>
+<td>SetEyeAngles
+</td>
+<td><code>SetEyeAngles(angle: QAngle): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetObserverMode
+</td>
+<td><code>SetObserverMode(mode: CSObserverMode): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetObserverTarget
+</td>
+<td>undefined): boolean
+</td>
+<td>@returns <code>false</code> if <code>target</code> is an invalid value.
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSPlantedC4">CSPlantedC4</span></h3>
+<dl><dd><dl><dd><dl><dd><dl><dd><dl><dd>extends <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#BaseModelEntity"> BaseModelEntity</a></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl>
+<h4><span class="mw-headline" id="Methods_8">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>GetDefuseFinishTime
+</td>
+<td><code>GetDefuseFinishTime(): number | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetDefuser
+</td>
+<td><code>GetDefuser(): CSPlayerPawn | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetDefuseStartTime
+</td>
+<td><code>GetDefuseStartTime(): number | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetExplodeTime
+</td>
+<td><code>GetExplodeTime(): number | undefined</code>
+</td>
+<td>undefined if not active
+</td></tr>
+<tr>
+<td>GetPlanter
+</td>
+<td><code>GetPlanter(): CSPlayerPawn | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetPlantTime
+</td>
+<td><code>GetPlantTime(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsActive
+</td>
+<td><code>IsActive(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsBombsiteA
+</td>
+<td><code>IsBombsiteA(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsBombsiteB
+</td>
+<td><code>IsBombsiteB(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsDefused
+</td>
+<td><code>IsDefused(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsExploded
+</td>
+<td><code>IsExploded(): boolean</code>
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSPlayerController">CSPlayerController</span></h3>
+<dl><dd><dl><dd><dl><dd><dl><dd><dl><dd>extends <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Entity"> Entity</a></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl>
+<h4><span class="mw-headline" id="Methods_9">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>AddMoneyEarnedForNextRound
+</td>
+<td><code>AddMoneyEarnedForNextRound(amount: number): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>AddMoneySpendableNow
+</td>
+<td><code>AddMoneySpendableNow(amount: number): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>AddScore
+</td>
+<td><code>AddScore(points: number): void</code>
+</td>
+<td>Add to the player's score. Negative values are allowed but the score will not go below zero.
+</td></tr>
+<tr>
+<td>GetMoneyEarnedForNextRound
+</td>
+<td><code>GetMoneyEarnedForNextRound(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetMoneySpendableNow
+</td>
+<td><code>GetMoneySpendableNow(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetObserverPawn
+</td>
+<td><code>GetObserverPawn(): CSObserverPawn | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetPlayerName
+</td>
+<td><code>GetPlayerName(): string</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetPlayerPawn
+</td>
+<td><code>GetPlayerPawn(): CSPlayerPawn | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetPlayerSlot
+</td>
+<td><code>GetPlayerSlot(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetScore
+</td>
+<td><code>GetScore(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetWeaponDataForLoadoutSlot
+</td>
+<td><code>GetWeaponDataForLoadoutSlot(slot: number, team?: number): CSWeaponData | undefined</code>
+</td>
+<td>Leave team as the default to use the player's current team.
+</td></tr>
+<tr>
+<td>IsBot
+</td>
+<td><code>IsBot(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsConnected
+</td>
+<td><code>IsConnected(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsObserving
+</td>
+<td><code>IsObserving(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>JoinTeam
+</td>
+<td><code>JoinTeam(team: number): void</code>
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSPlayerPawn">CSPlayerPawn</span></h3>
+<dl><dd><dl><dd><dl><dd><dl><dd><dl><dd>extends <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#BaseModelEntity"> BaseModelEntity</a></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl>
+<h4><span class="mw-headline" id="Methods_10">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>DestroyWeapon
+</td>
+<td><code>DestroyWeapon(target: CSWeaponBase): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>DestroyWeapons
+</td>
+<td><code>DestroyWeapons(): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>DropWeapon
+</td>
+<td><code>DropWeapon(target: CSWeaponBase): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>FindWeapon
+</td>
+<td><code>FindWeapon(name: string): CSWeaponBase | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>FindWeaponBySlot
+</td>
+<td><code>FindWeaponBySlot(slot: CSGearSlot): CSWeaponBase | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetActiveWeapon
+</td>
+<td><code>GetActiveWeapon(): CSWeaponBase | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetArmor
+</td>
+<td><code>GetArmor(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetCustomCamera
+</td>
+<td><code>GetCustomCamera(): CustomPlayerCamera</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetC4
+</td>
+<td><code>GetC4(): C4 | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetDefuseTarget
+</td>
+<td><code>GetDefuseTarget(): CSPlantedC4 | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetOriginalPlayerController
+</td>
+<td><code>GetOriginalPlayerController(): CSPlayerController</code>
+</td>
+<td>Gets the controller that this player pawn was originally spawned for.
+</td></tr>
+<tr>
+<td>GetPlayerController
+</td>
+<td><code>GetPlayerController(): CSPlayerController | undefined</code>
+</td>
+<td>Gets the controller currently controlling this player pawn.
+</td></tr>
+<tr>
+<td>GiveNamedItem
+</td>
+<td><code>GiveNamedItem(name: string, autoDeploy?: boolean): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>HasDefuser
+</td>
+<td><code>HasDefuser(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>HasHelmet
+</td>
+<td><code>HasHelmet(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsBuyMenuOpen
+</td>
+<td><code>IsBuyMenuOpen(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsDucked
+</td>
+<td><code>IsDucked(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsDucking
+</td>
+<td><code>IsDucking(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsInputPressed
+</td>
+<td><code>IsInputPressed(inputs: CSInputs): boolean</code>
+</td>
+<td>@returns `true` if specified inputs are pressed at the end of the current tick.
+</td></tr>
+<tr>
+<td>IsNoclipping
+</td>
+<td><code>IsNoclipping(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsScoped
+</td>
+<td><code>IsScoped(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetArmor
+</td>
+<td><code>SetArmor(value: number): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetEyeAngles
+</td>
+<td><code>SetEyeAngles(angle: QAngle): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetHasDefuser
+</td>
+<td><code>SetHasDefuser(hasDefuser: boolean): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetHasHelmet
+</td>
+<td><code>SetHasHelmet(hasHelmet: boolean): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SwitchToWeapon
+</td>
+<td><code>SwitchToWeapon(target: CSWeaponBase): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>WasInputJustPressed
+</td>
+<td><code>WasInputJustPressed(inputs: CSInputs): boolean</code>
+</td>
+<td>@returns `true` if specified inputs went from released to pressed at some point during the current tick.
+</td></tr>
+<tr>
+<td>WasInputJustReleased
+</td>
+<td><code>WasInputJustReleased(inputs: CSInputs): boolean</code>
+</td>
+<td>@returns `true` if specified inputs went from pressed to released at some point during the current tick.
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSRadarPoint">CSRadarPoint</span></h3>
+<dl><dd><dl><dd><dl><dd><dl><dd><dl><dd>extends <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Entity"> Entity</a></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl>
+<p>An entity that displays an icon on radar and overview map.
+</p>
+<h4><span class="mw-headline" id="Methods_11">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>IsVisibleToTeam
+</td>
+<td><code>IsVisibleToTeam( team: number ): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetColor
+</td>
+<td><code>SetColor( color: CSRadarColor ): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetIcon
+</td>
+<td><code>SetIcon( icon: CSRadarIcon ): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetVisibleToTeam
+</td>
+<td><code>SetVisibleToTeam( team: number, visible: boolean ): void</code>
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSWeaponBase">CSWeaponBase</span></h3>
+<dl><dd><dl><dd><dl><dd><dl><dd><dl><dd>extends <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#BaseModelEntity"> BaseModelEntity</a></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl>
+<h4><span class="mw-headline" id="Methods_12">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>GetClipAmmo
+</td>
+<td><code>GetClipAmmo(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetData
+</td>
+<td><code>GetData(): CSWeaponData</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetOriginalOwner
+</td>
+<td><code>GetOriginalOwner(): CSPlayerPawn | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetOwner
+</td>
+<td><code>GetOwner(): CSPlayerPawn | undefined</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetReserveAmmo
+</td>
+<td><code>GetReserveAmmo(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IsSilencerOn
+</td>
+<td><code>IsSilencerOn(): boolean</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetClipAmmo
+</td>
+<td><code>SetClipAmmo(ammo: number): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetReserveAmmo
+</td>
+<td><code>SetReserveAmmo(ammo: number): void</code>
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSWeaponData">CSWeaponData</span></h3>
+<h4><span class="mw-headline" id="Methods_13">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>GetDamage
+</td>
+<td><code>GetDamage(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetGearSlot
+</td>
+<td><code>GetGearSlot(): CSGearSlot</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetMaxClipAmmo
+</td>
+<td><code>GetMaxClipAmmo(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetMaxReserveAmmo
+</td>
+<td><code>GetMaxReserveAmmo(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetName
+</td>
+<td><code>GetName(): string</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetPenetration
+</td>
+<td><code>GetPenetration(): number</code>
+</td>
+<td>Power to maintain damage during penetration.
+</td></tr>
+<tr>
+<td>GetPrice
+</td>
+<td><code>GetPrice(): number</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetRange
+</td>
+<td><code>GetRange(): number</code>
+</td>
+<td>Maximum distance bullets will travel.
+</td></tr>
+<tr>
+<td>GetRangeModifier
+</td>
+<td><code>GetRangeModifier(): number</code>
+</td>
+<td>Exponential damage drop off from traveling through air. nextDamage = currentDamage * rangeModifier ^ (distance / 500).
+</td></tr>
+<tr>
+<td>GetType
+</td>
+<td><code>GetType(): CSWeaponType</code>
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CustomHudLayout">CustomHudLayout</span></h3>
+<dl><dd><dl><dd><dl><dd><dl><dd><dl><dd>extends <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Entity"> Entity</a></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl>
+<p>CustomHudLayouts (custom_hud_layout) are the entry point for scripted maps to provide custom UI.
+Supported panel types and attributes are:
+</p>
+<ul><li>&lt;Panel&gt; with attributes id, class and hittest</li>
+<li>&lt;Label&gt; with attributes id, class, hittest, and text</li>
+<li>&lt;Image&gt; with attributes id, class, hittest, src, texturewidth, and textureheight</li>
+<li>&lt;Button&gt; with attributes id and class</li></ul>
+<p>Styling with css is supported.
+The following css classes will be set on an ancestor panel when appropriate:
+</p>
+<ul><li><code>HUD_TEAMINTRO_VISIBLE</code></li>
+<li><code>HUD_BUYMENU_VISIBLE</code></li>
+<li><code>HUD_SCOREBOARD_VISIBLE</code></li>
+<li><code>HUD_WINPANEL_VISIBLE</code></li>
+<li><code>HUD_ENDOFMATCH_VISIBLE</code></li></ul>
+<p>Events and client side scripting are not supported.
+</p><p>To use
+</p>
+<ul><li>Add a panorama layout .xml file under "panorama/layout/custom_game" in your addon</li>
+<li>Add a custom_hud_layout point entity to your map and point its `layout` property at your .vxml asset.</li>
+<li>See example addon cs_script_demo
+<ul><li>There is a custom_hud_layout entity in the cs_script_demo.vmap named "welcome_layout" that displays "panorama/layouts/custom_game/welcome.vxml".</li>
+<li>It also references css file <code>panorama/styles/custom_game/welcome.css</code>. (vcss is the asset extension)</li>
+<li>The layout begins with a "Dismissed" class on the Panel with id "dialog" which is then removed in cs_script file "maps/scripts/setup.js".</li></ul></li></ul>
+<h4><span class="mw-headline" id="Methods_14">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>IsInputCaptureEnabled
+</td>
+<td><code>IsInputCaptureEnabled(playerSlot: number): boolean</code>
+</td>
+<td>Get if this CustomHudLayout is capturing input for a player
+</td></tr>
+<tr>
+<td>Reset
+</td>
+<td><code>Reset(): void</code>
+</td>
+<td>Reset to original state for all players.
+</td></tr>
+<tr>
+<td>ResetForPlayer
+</td>
+<td><code>ResetForPlayer(playerSlot: number): void</code>
+</td>
+<td>Reset a single player's overrides to their original state.
+</td></tr>
+<tr>
+<td>SetDialogVariableString
+</td>
+<td><code>SetDialogVariableString(panelId: string, variableName: string, value: string): void</code>
+</td>
+<td>Set the value of a dialog variable. Applies to all players.
+</td></tr>
+<tr>
+<td>SetDialogVariableStringForPlayer
+</td>
+<td><code>SetDialogVariableStringForPlayer(playerSlot: number, panelId: string, variableName: string, value?: string): void</code>
+</td>
+<td>Set the value of a dialog variable for a single player. Will override the all player value. Omit <code>value</code> to defer to the all player value. If no all player value has been set, the value will be an empty string.
+</td></tr>
+<tr>
+<td>SetHasClass
+</td>
+<td><code>SetHasClass(panelId: string, className: string, hasClass?: boolean): void</code>
+</td>
+<td>Set if a panel has a class. Applies to all players. Omit <code>hasClass</code> to revert to the original value.
+</td></tr>
+<tr>
+<td>SetHasClassForPlayer
+</td>
+<td><code>SetHasClassForPlayer(playerSlot: number, panelId: string, className: string, hasClass?: boolean): void</code>
+</td>
+<td>Set if a panel has a class for a single player. Will override the all player value. Omit <code>hasClass</code> to defer to the all player value.
+</td></tr>
+<tr>
+<td>SetInputCaptureEnabled
+</td>
+<td><code>SetInputCaptureEnabled(playerSlot: number, enabled: boolean): void</code>
+</td>
+<td>Set to true to force a player into cursor mode and enable click detection on the panels of this layout. Set a callback with Instance.OnCustomHudClicked to listen for clicks. Multiple CustomHudLayouts can have input captured at a time. Players will get movement control back once all CustomHudLayouts have disabled input capture.
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CustomPlayerCamera">CustomPlayerCamera</span></h3>
+<dl><dd><dl><dd><dl><dd><dl><dd><dl><dd>extends <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Entity"> Entity</a></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl>
+<p>Configuration of a player's view position and angles.
+There is at most one of these per <code>CSPlayerPawn</code>, created on demand when <code>CSPlayerPawn.GetCustomCamera</code> is called.
+</p>
+<h4><span class="mw-headline" id="Methods_15">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>GetMode
+</td>
+<td><code>GetMode(): CustomCameraMode</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GetPlayer
+</td>
+<td><code>GetPlayer(): CSPlayerPawn</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetFollowConfig
+</td>
+<td><code>SetFollowConfig(followConfig: CameraFollowConfig): void</code>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SetMode
+</td>
+<td><code>SetMode(mode: CustomCameraMode): void</code>
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="PointTemplate">PointTemplate</span></h3>
+<dl><dd><dl><dd><dl><dd><dl><dd><dl><dd>extends <a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API#Entity"> Entity</a></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl>
+<h4><span class="mw-headline" id="Methods_16">Methods</span></h4>
+<table class="standard-table" style="width: 100%;">
+<tbody><tr>
+<th>Function
+</th>
+<th>Signature
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>ForceSpawn
+</td>
+<td><code>ForceSpawn(origin?: Vector, angle?: QAngle): Entity[] | undefined</code>
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h2><span class="mw-headline" id="Interfaces">Interfaces</span></h2>
+<h3><span class="mw-headline" id="BulletTrace">BulletTrace</span></h3>
+<p>Examples:
+</p>
+<ul><li><code>{damage:30, rangeModifer:.85, penetration:1} // Glock</code></li>
+<li><code>{damage:30, rangeModifer:.45, penetration:1} // Mag-7</code></li>
+<li><code>{damage:36, rangeModifier:.98, penetration:2} // AK47</code></li>
+<li><code>{damage:115, rangeModifier:.99, penetration:2.5} // AWP</code></li></ul>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>damage
+</td>
+<td><code>number</code>
+</td>
+<td>yes
+</td>
+<td>The starting damage value of the bullet. This will reduce as it travels through the air and penetrates solids. @default 100
+</td></tr>
+<tr>
+<td>end
+</td>
+<td><code>Vector</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>penetration
+</td>
+<td><code>number</code>
+</td>
+<td>yes
+</td>
+<td>The power to maintain damage during penetration. Will default to 1 if left undefined. @default 1
+</td></tr>
+<tr>
+<td>rangeModifier
+</td>
+<td><code>number</code>
+</td>
+<td>yes
+</td>
+<td>The exponential damage drop off constant from traveling through air. @default .85
+</td></tr>
+<tr>
+<td>shooter
+</td>
+<td><code>CSPlayerPawn</code>
+</td>
+<td>no
+</td>
+<td>The player shooting the bullet. Acts as `ignoreEnt` for traces.
+</td></tr>
+<tr>
+<td>start
+</td>
+<td><code>Vector</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="BaseTraceConfig">BaseTraceConfig</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>end
+</td>
+<td><code>Vector</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>ignoreEntity
+</td>
+<td><code>Entity | Entity[]</code>
+</td>
+<td>yes
+</td>
+<td>Specify entities to not trace against. 0, 1 or 2 entities is equally fast. 3 or more is equally slower
+</td></tr>
+<tr>
+<td>ignorePlayers
+</td>
+<td><code>boolean</code>
+</td>
+<td>yes
+</td>
+<td>
+</td></tr>
+<tr>
+<td>start
+</td>
+<td><code>Vector</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>traceHitboxes
+</td>
+<td><code>boolean</code>
+</td>
+<td>yes
+</td>
+<td>Trace against hitboxes instead of the larger collision shape for entities with hitboxes (eg. players).
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="BombDefuseEvent">BombDefuseEvent</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>plantedC4
+</td>
+<td><code>CSPlantedC4</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="BombPlantEvent">BombPlantEvent</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>plantedC4
+</td>
+<td><code>CSPlantedC4</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="BulletTraceResult">BulletTraceResult</span></h3>
+<p>Result entry for <code>Instance.TraceBullet</code>
+</p>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>damage
+</td>
+<td><code>number</code>
+</td>
+<td>no
+</td>
+<td>Damage value reduced by travel, before damage modification (body armor, headshots, etc)
+</td></tr>
+<tr>
+<td>hitEntity
+</td>
+<td><code>Entity</code>
+</td>
+<td>no
+</td>
+<td>The entity hit by the bullet. This is not limited to players.
+</td></tr>
+<tr>
+<td>hitGroup
+</td>
+<td><code>CSHitGroup</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>position
+</td>
+<td><code>Vector</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CameraFollowConfig">CameraFollowConfig</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>cameraOffset
+</td>
+<td><code>Vector</code>
+</td>
+<td>yes
+</td>
+<td>An offset from the followed position rotated by player's eye angles. x is forward, y is left, z is up.
+</td></tr>
+<tr>
+<td>cameraOffsetReturnStrength
+</td>
+<td><code>number</code>
+</td>
+<td>yes
+</td>
+<td>Strength of returning the camera to cameraOffset after being pushed in by clipping. Defaults to 1; instant.
+</td></tr>
+<tr>
+<td>clipCameraOffset
+</td>
+<td><code>boolean</code>
+</td>
+<td>yes
+</td>
+<td>Should cameraOffset be pulled in to not clip into solids.
+</td></tr>
+<tr>
+<td>followEntity
+</td>
+<td><code>Entity</code>
+</td>
+<td>no
+</td>
+<td>The entity to follow
+</td></tr>
+<tr>
+<td>followEyes
+</td>
+<td><code>boolean</code>
+</td>
+<td>yes
+</td>
+<td>Should followOffset be an offset from the eyes instead of the origin
+</td></tr>
+<tr>
+<td>followOffset
+</td>
+<td><code>Vector</code>
+</td>
+<td>yes
+</td>
+<td>An offset from the origin (or eyes) of followEntity to follow
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="EntityDamage">EntityDamage</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>attacker
+</td>
+<td><code>Entity</code>
+</td>
+<td>yes
+</td>
+<td>The entity credited with causing the damage. For bullets this is the shooter. For grenades this is the thrower.
+</td></tr>
+<tr>
+<td>damage
+</td>
+<td><code>number</code>
+</td>
+<td>no
+</td>
+<td>The amount of damage being applied, before armor and hitgroup modifications.
+</td></tr>
+<tr>
+<td>damageFlags
+</td>
+<td><code>CSDamageFlags</code>
+</td>
+<td>yes
+</td>
+<td>The flags configuring how to interpret the damage.
+</td></tr>
+<tr>
+<td>damageTypes
+</td>
+<td><code>CSDamageTypes</code>
+</td>
+<td>yes
+</td>
+<td>The type or types of damage.
+</td></tr>
+<tr>
+<td>inflictor
+</td>
+<td><code>Entity</code>
+</td>
+<td>yes
+</td>
+<td>The entity applying the damage. For bullets this is the owner of the gun. For grenades this is the exploding projectile.
+</td></tr>
+<tr>
+<td>weapon
+</td>
+<td><code>CSWeaponBase</code>
+</td>
+<td>yes
+</td>
+<td>The weapon used. For grenades this will not be present because the weapon is often removed before the projectile explodes.
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="GrenadeBounceEvent">GrenadeBounceEvent</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>hitEntity
+</td>
+<td><code>Entity</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>normal
+</td>
+<td><code>Vector</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>projectile
+</td>
+<td><code>CSGrenadeProjectileBase</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="ModifyPlayerDamageEvent">ModifyPlayerDamageEvent</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>attacker
+</td>
+<td><code>Entity</code>
+</td>
+<td>yes
+</td>
+<td>The entity credited with causing the damage. For bullets this is the shooter. For grenades this is the thrower.
+</td></tr>
+<tr>
+<td>damage
+</td>
+<td><code>number</code>
+</td>
+<td>no
+</td>
+<td>The amount of damage being applied, before armor and hitgroup modifications.
+</td></tr>
+<tr>
+<td>damageFlags
+</td>
+<td><code>CSDamageFlags</code>
+</td>
+<td>no
+</td>
+<td>The flags configuring how to interpret the damage.
+</td></tr>
+<tr>
+<td>damageTypes
+</td>
+<td><code>CSDamageTypes</code>
+</td>
+<td>no
+</td>
+<td>The type or types of damage.
+</td></tr>
+<tr>
+<td>hitgroup
+</td>
+<td><code>CSHitGroup</code>
+</td>
+<td>no
+</td>
+<td>The hit group where the damage occured.
+</td></tr>
+<tr>
+<td>inflictor
+</td>
+<td><code>Entity</code>
+</td>
+<td>yes
+</td>
+<td>The entity applying the damage. For bullets this is the owner of the gun. For grenades this is the exploding projectile.
+</td></tr>
+<tr>
+<td>player
+</td>
+<td><code>CSPlayerPawn</code>
+</td>
+<td>no
+</td>
+<td>The victim that is taking damage.
+</td></tr>
+<tr>
+<td>weapon
+</td>
+<td><code>CSWeaponBase</code>
+</td>
+<td>yes
+</td>
+<td>The weapon used. For grenades this will not be present because the weapon is often removed before the projectile explodes.
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="ModifyPlayerDamageResult">ModifyPlayerDamageResult</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>abort
+</td>
+<td><code>boolean</code>
+</td>
+<td>yes
+</td>
+<td>If true, stop processing this damage
+</td></tr>
+<tr>
+<td>damage
+</td>
+<td><code>number</code>
+</td>
+<td>yes
+</td>
+<td>The amount of damage being applied, before armor and hitgroup modifications.
+</td></tr>
+<tr>
+<td>damageFlags
+</td>
+<td><code>CSDamageFlags</code>
+</td>
+<td>yes
+</td>
+<td>The flags configuring how to interpret the damage.
+</td></tr>
+<tr>
+<td>damageTypes
+</td>
+<td><code>CSDamageTypes</code>
+</td>
+<td>yes
+</td>
+<td>The type or types of damage.
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="PlayerDamageEvent">PlayerDamageEvent</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>attacker
+</td>
+<td><code>Entity</code>
+</td>
+<td>yes
+</td>
+<td>The entity credited with causing the damage. For bullets this is the shooter. For grenades this is the thrower.
+</td></tr>
+<tr>
+<td>damage
+</td>
+<td><code>number</code>
+</td>
+<td>no
+</td>
+<td>The actual health lost after armor and hitgroup modifications.
+</td></tr>
+<tr>
+<td>damageFlags
+</td>
+<td><code>CSDamageFlags</code>
+</td>
+<td>no
+</td>
+<td>The flags configuring how to interpret the damage.
+</td></tr>
+<tr>
+<td>damageTypes
+</td>
+<td><code>CSDamageTypes</code>
+</td>
+<td>no
+</td>
+<td>The type or types of damage.
+</td></tr>
+<tr>
+<td>hitgroup
+</td>
+<td><code>CSHitGroup</code>
+</td>
+<td>no
+</td>
+<td>The hit group where the damage occured.
+</td></tr>
+<tr>
+<td>inflictor
+</td>
+<td><code>Entity</code>
+</td>
+<td>yes
+</td>
+<td>The entity applying the damage. For bullets this is the owner of the gun. For grenades this is the exploding projectile.
+</td></tr>
+<tr>
+<td>player
+</td>
+<td><code>CSPlayerPawn</code>
+</td>
+<td>no
+</td>
+<td>The victim that has taken damage.
+</td></tr>
+<tr>
+<td>weapon
+</td>
+<td><code>CSWeaponBase</code>
+</td>
+<td>yes
+</td>
+<td>The weapon used. For grenades this will not be present because the weapon is often removed before the projectile explodes.
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="PlayerTrace">PlayerTrace</span></h3>
+<p>Configuration object for <code>Instance.TracePlayer</code>
+</p>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>end
+</td>
+<td><code>Vector</code>
+</td>
+<td>yes
+</td>
+<td>Leave undefined to just test if <code>start</code> is a valid position for the player.
+</td></tr>
+<tr>
+<td>isDucked
+</td>
+<td><code>boolean</code>
+</td>
+<td>yes
+</td>
+<td>Configure tracing as a ducked player, effecting the size of the traced Box. Defaults to the player's <code>IsDucked()</code> value.
+</td></tr>
+<tr>
+<td>player
+</td>
+<td><code>CSPlayerPawn</code>
+</td>
+<td>no
+</td>
+<td>The player moving. Affects hull size and player collision.
+</td></tr>
+<tr>
+<td>start
+</td>
+<td><code>Vector</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="PlayerTraceResult">PlayerTraceResult</span></h3>
+<p>Result entry for <code>Instance.TracePlayer</code>
+</p>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>didHit
+</td>
+<td><code>boolean</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>end
+</td>
+<td><code>Vector</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>fraction
+</td>
+<td><code>number</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>hitEntity
+</td>
+<td><code>Entity</code>
+</td>
+<td>yes
+</td>
+<td>
+</td></tr>
+<tr>
+<td>normal
+</td>
+<td><code>Vector</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>startedInSolid
+</td>
+<td><code>boolean</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="SpawnGrenadeProjectileConfigWithoutOwner">SpawnGrenadeProjectileConfigWithoutOwner</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>angles
+</td>
+<td><code>QAngle</code>
+</td>
+<td>yes
+</td>
+<td>defaults to {0,0,0}
+</td></tr>
+<tr>
+<td>angularVelocity
+</td>
+<td><code>RotationVector</code>
+</td>
+<td>yes
+</td>
+<td>defaults to {0,0,0}
+</td></tr>
+<tr>
+<td>position
+</td>
+<td><code>Vector</code>
+</td>
+<td>no
+</td>
+<td>position is required if no thrower is specified
+</td></tr>
+<tr>
+<td>type
+</td>
+<td><code>CSGrenadeType</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>velocity
+</td>
+<td><code>Vector</code>
+</td>
+<td>yes
+</td>
+<td>defaults to {0,0,0}
+</td></tr></tbody></table>
+<h3><span class="mw-headline" id="SpawnGrenadeProjectileConfigWithOwner">SpawnGrenadeProjectileConfigWithOwner</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>angles
+</td>
+<td><code>QAngle</code>
+</td>
+<td>yes
+</td>
+<td>defaults to {0,0,0}
+</td></tr>
+<tr>
+<td>angularVelocity
+</td>
+<td><code>RotationVector</code>
+</td>
+<td>yes
+</td>
+<td>defaults to a {600,rand(-1200,1200),0}
+</td></tr>
+<tr>
+<td>position
+</td>
+<td><code>Vector</code>
+</td>
+<td>yes
+</td>
+<td>defaults to thrower's throw position
+</td></tr>
+<tr>
+<td>thrower
+</td>
+<td><code>CSPlayerPawn</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>throwStrength
+</td>
+<td><code>number</code>
+</td>
+<td>yes
+</td>
+<td>defaults to 1, full strength.
+</td></tr>
+<tr>
+<td>type
+</td>
+<td><code>CSGrenadeType</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>velocity
+</td>
+<td><code>Vector</code>
+</td>
+<td>yes
+</td>
+<td>defaults to thrower's throw velocity
+</td></tr></tbody></table>
+<h3><span class="mw-headline" id="TraceResult">TraceResult</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Property
+</th>
+<th>Type
+</th>
+<th>Optional
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>didHit
+</td>
+<td><code>boolean</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>end
+</td>
+<td><code>Vector</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>fraction
+</td>
+<td><code>number</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>hitEntity
+</td>
+<td><code>Entity</code>
+</td>
+<td>yes
+</td>
+<td>
+</td></tr>
+<tr>
+<td>hitGroup
+</td>
+<td><code>CSHitGroup</code>
+</td>
+<td>yes
+</td>
+<td>
+</td></tr>
+<tr>
+<td>normal
+</td>
+<td><code>Vector</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+<tr>
+<td>startedInSolid
+</td>
+<td><code>boolean</code>
+</td>
+<td>no
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<p><br>
+</p>
+<h2><span class="mw-headline" id="Enumerations">Enumerations</span></h2>
+<h3><span class="mw-headline" id="CSDamageFlags">CSDamageFlags</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>NONE
+</td>
+<td>0
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SUPPRESS_HEALTH_CHANGES
+</td>
+<td>1 &lt;&lt; 0
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SUPPRESS_PHYSICS_FORCE
+</td>
+<td>1 &lt;&lt; 1
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SUPPRESS_EFFECTS
+</td>
+<td>1 &lt;&lt; 2
+</td>
+<td>
+</td></tr>
+<tr>
+<td>PREVENT_DEATH
+</td>
+<td>1 &lt;&lt; 3
+</td>
+<td>
+</td></tr>
+<tr>
+<td>FORCE_DEATH
+</td>
+<td>1 &lt;&lt; 4
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SUPPRESS_DAMAGE_MODIFICATION
+</td>
+<td>1 &lt;&lt; 5
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IGNORE_ARMOR
+</td>
+<td>1 &lt;&lt; 6
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSDamageTypes">CSDamageTypes</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>GENERIC
+</td>
+<td>0
+</td>
+<td>
+</td></tr>
+<tr>
+<td>CRUSH
+</td>
+<td>1 &lt;&lt; 0
+</td>
+<td>
+</td></tr>
+<tr>
+<td>BULLET
+</td>
+<td>1 &lt;&lt; 1
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SLASH
+</td>
+<td>1 &lt;&lt; 2
+</td>
+<td>
+</td></tr>
+<tr>
+<td>BURN
+</td>
+<td>1 &lt;&lt; 3
+</td>
+<td>
+</td></tr>
+<tr>
+<td>VEHICLE
+</td>
+<td>1 &lt;&lt; 4
+</td>
+<td>
+</td></tr>
+<tr>
+<td>FALL
+</td>
+<td>1 &lt;&lt; 5
+</td>
+<td>
+</td></tr>
+<tr>
+<td>BLAST
+</td>
+<td>1 &lt;&lt; 6
+</td>
+<td>
+</td></tr>
+<tr>
+<td>CLUB
+</td>
+<td>1 &lt;&lt; 7
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SHOCK
+</td>
+<td>1 &lt;&lt; 8
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SONIC
+</td>
+<td>1 &lt;&lt; 9
+</td>
+<td>
+</td></tr>
+<tr>
+<td>BUCKSHOT
+</td>
+<td>1 &lt;&lt; 10
+</td>
+<td>
+</td></tr>
+<tr>
+<td>DROWN
+</td>
+<td>1 &lt;&lt; 11
+</td>
+<td>
+</td></tr>
+<tr>
+<td>POISON
+</td>
+<td>1 &lt;&lt; 12
+</td>
+<td>
+</td></tr>
+<tr>
+<td>HEADSHOT
+</td>
+<td>1 &lt;&lt; 13
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSGearSlot">CSGearSlot</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>INVALID
+</td>
+<td>-1
+</td>
+<td>
+</td></tr>
+<tr>
+<td>RIFLE
+</td>
+<td>0
+</td>
+<td>
+</td></tr>
+<tr>
+<td>PISTOL
+</td>
+<td>1
+</td>
+<td>
+</td></tr>
+<tr>
+<td>KNIFE
+</td>
+<td>2
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GRENADES
+</td>
+<td>3
+</td>
+<td>
+</td></tr>
+<tr>
+<td>C4
+</td>
+<td>4
+</td>
+<td>
+</td></tr>
+<tr>
+<td>BOOSTS
+</td>
+<td>5
+</td>
+<td>Gear slot for healthshots.
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSGrenadeType">CSGrenadeType</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>HE
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>FLASHBANG
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>MOLOTOV
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>INCENDIARY
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>DECOY
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SMOKE
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSHitGroup">CSHitGroup</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>INVALID
+</td>
+<td>-1
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GENERIC
+</td>
+<td>0
+</td>
+<td>
+</td></tr>
+<tr>
+<td>HEAD
+</td>
+<td>1
+</td>
+<td>
+</td></tr>
+<tr>
+<td>CHEST
+</td>
+<td>2
+</td>
+<td>
+</td></tr>
+<tr>
+<td>STOMACH
+</td>
+<td>3
+</td>
+<td>
+</td></tr>
+<tr>
+<td>LEFTARM
+</td>
+<td>4
+</td>
+<td>
+</td></tr>
+<tr>
+<td>RIGHTARM
+</td>
+<td>5
+</td>
+<td>
+</td></tr>
+<tr>
+<td>LEFTLEG
+</td>
+<td>6
+</td>
+<td>
+</td></tr>
+<tr>
+<td>RIGHTLEG
+</td>
+<td>7
+</td>
+<td>
+</td></tr>
+<tr>
+<td>NECK
+</td>
+<td>8
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSInputs">CSInputs</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th></tr>
+<tr>
+<td>NONE
+</td>
+<td>0
+</td></tr>
+<tr>
+<td>FORWARD
+</td>
+<td>1 &lt;&lt; 0
+</td></tr>
+<tr>
+<td>BACK
+</td>
+<td>1 &lt;&lt; 1
+</td></tr>
+<tr>
+<td>LEFT
+</td>
+<td>1 &lt;&lt; 2
+</td></tr>
+<tr>
+<td>RIGHT
+</td>
+<td>1 &lt;&lt; 3
+</td></tr>
+<tr>
+<td>WALK
+</td>
+<td>1 &lt;&lt; 4
+</td></tr>
+<tr>
+<td>DUCK
+</td>
+<td>1 &lt;&lt; 5
+</td></tr>
+<tr>
+<td>JUMP
+</td>
+<td>1 &lt;&lt; 6
+</td></tr>
+<tr>
+<td>USE
+</td>
+<td>1 &lt;&lt; 7
+</td></tr>
+<tr>
+<td>ATTACK
+</td>
+<td>1 &lt;&lt; 8
+</td></tr>
+<tr>
+<td>ATTACK2
+</td>
+<td>1 &lt;&lt; 9
+</td></tr>
+<tr>
+<td>RELOAD
+</td>
+<td>1 &lt;&lt; 10
+</td></tr>
+<tr>
+<td>SHOW_SCORES
+</td>
+<td>1 &lt;&lt; 11
+</td></tr>
+<tr>
+<td>LOOK_AT_WEAPON
+</td>
+<td>1 &lt;&lt; 12
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSLoadoutSlot">CSLoadoutSlot</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th></tr>
+<tr>
+<td>INVALID
+</td></tr>
+<tr>
+<td>MELEE
+</td></tr>
+<tr>
+<td>SECONDARY0
+</td></tr>
+<tr>
+<td>SECONDARY1
+</td></tr>
+<tr>
+<td>SECONDARY2
+</td></tr>
+<tr>
+<td>SECONDARY3
+</td></tr>
+<tr>
+<td>SECONDARY4
+</td></tr>
+<tr>
+<td>SMG0
+</td></tr>
+<tr>
+<td>SMG1
+</td></tr>
+<tr>
+<td>SMG2
+</td></tr>
+<tr>
+<td>SMG3
+</td></tr>
+<tr>
+<td>SMG4
+</td></tr>
+<tr>
+<td>RIFLE0
+</td></tr>
+<tr>
+<td>RIFLE1
+</td></tr>
+<tr>
+<td>RIFLE2
+</td></tr>
+<tr>
+<td>RIFLE3
+</td></tr>
+<tr>
+<td>RIFLE4
+</td></tr>
+<tr>
+<td>EQUIPMENT2
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSMoveType">CSMoveType</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>INVALID
+</td>
+<td>-1
+</td>
+<td>
+</td></tr>
+<tr>
+<td>NONE
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>WALK
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>FLYGRAVITY
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>C4
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>VPHYSICS
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>NOCLIP
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>OBSERVER
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>LADDER
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>CUSTOM
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSObserverMode">CSObserverMode</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>NONE
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>FIXED
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IN_EYE
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>CHASE
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>ROAMING
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSRadarColor">CSRadarColor</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>PLAYERHUD
+</td>
+<td>0
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GRAY
+</td>
+<td>1
+</td>
+<td>
+</td></tr>
+<tr>
+<td>WHITE
+</td>
+<td>2
+</td>
+<td>
+</td></tr>
+<tr>
+<td>CT
+</td>
+<td>3
+</td>
+<td>
+</td></tr>
+<tr>
+<td>T
+</td>
+<td>4
+</td>
+<td>
+</td></tr>
+<tr>
+<td>RED
+</td>
+<td>5
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GREEN
+</td>
+<td>6
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSRadarIcon">CSRadarIcon</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>TOWER
+</td>
+<td>0
+</td>
+<td>
+</td></tr>
+<tr>
+<td>C4
+</td>
+<td>1
+</td>
+<td>
+</td></tr>
+<tr>
+<td>HOSTAGE
+</td>
+<td>2
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSRoundEndReason">CSRoundEndReason</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>UNKNOWN
+</td>
+<td>-1
+</td>
+<td>
+</td></tr>
+<tr>
+<td>IN_PROGRESS
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GAME_COMMENCING
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>DRAW
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>TARGET_BOMBED
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>TARGET_SAVED
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>BOMB_DEFUSED
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>HOSTAGES_RESCUED
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>HOSTAGES_NOT_RESCUED
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>CTS_WIN
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>TERRORISTS_WIN
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>CTS_SURRENDER
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+<tr>
+<td>TERRORISTS_SURRENDER
+</td>
+<td>
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSTeamMoneyReason">CSTeamMoneyReason</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>NONE
+</td>
+<td>
+</td>
+<td>$0
+</td></tr>
+<tr>
+<td>TERRORIST_WIN_BOMB
+</td>
+<td>
+</td>
+<td>cash_team_terrorist_win_bomb
+</td></tr>
+<tr>
+<td>ELIMINATION_HOSTAGE_MAP_T
+</td>
+<td>
+</td>
+<td>cash_team_elimination_hostage_map_t
+</td></tr>
+<tr>
+<td>ELIMINATION_HOSTAGE_MAP_CT
+</td>
+<td>
+</td>
+<td>cash_team_elimination_hostage_map_ct
+</td></tr>
+<tr>
+<td>ELIMINATION_BOMB_MAP
+</td>
+<td>
+</td>
+<td>cash_team_elimination_bomb_map
+</td></tr>
+<tr>
+<td>WIN_BY_TIME_RUNNING_OUT_HOSTAGE
+</td>
+<td>
+</td>
+<td>cash_team_win_by_time_running_out_hostage
+</td></tr>
+<tr>
+<td>WIN_BY_TIME_RUNNING_OUT_BOMB
+</td>
+<td>
+</td>
+<td>cash_team_win_by_time_running_out_bomb
+</td></tr>
+<tr>
+<td>WIN_BY_DEFUSING_BOMB
+</td>
+<td>
+</td>
+<td>cash_team_win_by_defusing_bomb
+</td></tr>
+<tr>
+<td>WIN_BY_HOSTAGE_RESCUE
+</td>
+<td>
+</td>
+<td>cash_team_win_by_hostage_rescue
+</td></tr>
+<tr>
+<td>LOSER_BONUS
+</td>
+<td>
+</td>
+<td>cash_team_loser_bonus
+</td></tr>
+<tr>
+<td>RESCUED_HOSTAGE
+</td>
+<td>
+</td>
+<td>cash_team_rescued_hostage
+</td></tr>
+<tr>
+<td>HOSTAGE_ALIVE
+</td>
+<td>
+</td>
+<td>cash_team_hostage_alive
+</td></tr>
+<tr>
+<td>PLANTED_BOMB_BUT_DEFUSED
+</td>
+<td>
+</td>
+<td>cash_team_planted_bomb_but_defused
+</td></tr>
+<tr>
+<td>HOSTAGE_INTERACTION
+</td>
+<td>
+</td>
+<td>cash_team_hostage_interaction
+</td></tr>
+<tr>
+<td>BONUS_SHORTHANDED
+</td>
+<td>
+</td>
+<td>cash_team_bonus_shorthanded
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSWeaponAttackType">CSWeaponAttackType</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>INVALID
+</td>
+<td>-1
+</td>
+<td>
+</td></tr>
+<tr>
+<td>PRIMARY
+</td>
+<td>0
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SECONDARY
+</td>
+<td>1
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CSWeaponType">CSWeaponType</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>KNIFE
+</td>
+<td>0
+</td>
+<td>
+</td></tr>
+<tr>
+<td>PISTOL
+</td>
+<td>1
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SUBMACHINEGUN
+</td>
+<td>2
+</td>
+<td>
+</td></tr>
+<tr>
+<td>RIFLE
+</td>
+<td>3
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SHOTGUN
+</td>
+<td>4
+</td>
+<td>
+</td></tr>
+<tr>
+<td>SNIPER_RIFLE
+</td>
+<td>5
+</td>
+<td>
+</td></tr>
+<tr>
+<td>MACHINEGUN
+</td>
+<td>6
+</td>
+<td>
+</td></tr>
+<tr>
+<td>C4
+</td>
+<td>7
+</td>
+<td>
+</td></tr>
+<tr>
+<td>TASER
+</td>
+<td>8
+</td>
+<td>
+</td></tr>
+<tr>
+<td>GRENADE
+</td>
+<td>9
+</td>
+<td>
+</td></tr>
+<tr>
+<td>EQUIPMENT
+</td>
+<td>10
+</td>
+<td>
+</td></tr>
+<tr>
+<td>STACKABLEITEM
+</td>
+<td>11
+</td>
+<td>Healthshot
+</td></tr>
+<tr>
+<td>UNKNOWN
+</td>
+<td>12
+</td>
+<td>
+</td></tr>
+</tbody></table>
+<h3><span class="mw-headline" id="CustomCameraMode">CustomCameraMode</span></h3>
+<table class="standard-table">
+<tbody><tr>
+<th>Name
+</th>
+<th>Value
+</th>
+<th>Description
+</th></tr>
+<tr>
+<td>DISABLED
+</td>
+<td>0
+</td>
+<td>Position and angles come from the eye position and angles of the player.
+</td></tr>
+<tr>
+<td>CONTROLLED
+</td>
+<td>1
+</td>
+<td>Position and angles come from the origin and angles of the camera entity.
+</td></tr>
+<tr>
+<td>CONTROLLED_POSITION
+</td>
+<td>2
+</td>
+<td>Position comes from the origin of camera entity. Angles are player controlled.
+</td></tr>
+<tr>
+<td>FOLLOW_POSITION
+</td>
+<td>3
+</td>
+<td>Position comes from an offset around a followed position. Angles are player controlled.
+</td></tr>
+</tbody></table>
+<p><br>
+</p>
+<h2><span class="mw-headline" id="Type_Aliases">Type Aliases</span></h2>
+<p>cs_script pre-defines a few type aliases.
+</p>
+<h3><span class="mw-headline" id="BeforeDamageResult">BeforeDamageResult</span></h3>
+<p>Signature: <code>type BeforeDamageResult = { damage?: number, abort?: boolean } | void</code>
+</p>
+<h3><span class="mw-headline" id="Color">Color</span></h3>
+<p>Signature: <code>type Color = { r: number, g: number, b: number, a?: number }</code>
+</p><p>Values will be clamped to a maximum of 255.
+</p>
+<h3><span class="mw-headline" id="ColorArg">ColorArg</span></h3>
+<p>Signature: <code>type ColorArg = { r: number, g: number, b: number, a?: number }</code>
+</p>
+<h3><span class="mw-headline" id="InputValue">InputValue</span></h3>
+<p>Signature: <code>type InputValue = boolean | number | string | Vector | Color | undefined</code>
+</p>
+<h3><span class="mw-headline" id="QAngle"><a href="https://developer.valvesoftware.com/wiki/QAngle" title="QAngle">QAngle</a></span></h3>
+<p>Signature: <code>type QAngle = { pitch: number, yaw: number, roll: number }</code>
+</p>
+<h3><span class="mw-headline" id="RotationVector">RotationVector</span></h3>
+<p>Signature: <code>type RotationVector = { x: number, y: number, z: number }</code>
+</p>
+<h3><span class="mw-headline" id="SpawnGrenadeProjectileConfig">SpawnGrenadeProjectileConfig</span></h3>
+<p>Signature: <code>type SpawnGrenadeProjectileConfig = SpawnGrenadeProjectileConfigWithOwner | SpawnGrenadeProjectileConfigWithoutOwner</code>
+</p>
+<h3><span class="mw-headline" id="Vector">Vector</span></h3>
+<p>Signature: <code>type Vector = { x: number, y: number, z: number }</code>
+</p>
+<!-- 
+NewPP limit report
+Cached time: 20260930180016
+Cache expiry: 86400
+Reduced expiry: false
+Complications: [show‐toc]
+CPU time usage: 0.186 seconds
+Real time usage: 0.194 seconds
+Preprocessor visited node count: 2674/1000000
+Post‐expand include size: 88112/2097152 bytes
+Template argument size: 19620/2097152 bytes
+Highest expansion depth: 19/100
+Expensive parser function count: 23/100
+Unstrip recursion depth: 0/20
+Unstrip post‐expand size: 0/5000000 bytes
+-->
+<!--
+Transclusion expansion time report (%,ms,calls,template)
+100.00%   50.318      1 -total
+ 90.91%   45.745      1 Template:LanguageBar
+ 73.10%   36.785      2 Template:LanguageBar/foreach
+ 43.30%   21.788     23 Template:LanguageBar/flagline
+ 22.04%   11.092     23 Template:LanguageBar/flaglineinvert
+ 14.91%    7.505     26 Template:Flag
+  9.27%    4.665      1 Template:Language_name
+  8.81%    4.434      2 Template:Note
+  7.92%    3.983      1 Template:Yesno
+  7.47%    3.758      2 Template:Callout_core
+-->
+
+<!-- Saved in parser cache with key developerwiki-mw_:pcache:idhash:79731-0!canonical and timestamp 20260930180016 and revision id 520339.
+ -->
+</div>
+<div class="printfooter" data-nosnippet="">Retrieved from "<a dir="ltr" href="https://developer.valvesoftware.com/w/index.php?title=Counter-Strike_2_Workshop_Tools/Scripting/API&amp;oldid=520339">https://developer.valvesoftware.com/w/index.php?title=Counter-Strike_2_Workshop_Tools/Scripting/API&amp;oldid=520339</a>"</div></div>
+		<div id="catlinks" class="catlinks catlinks-allhidden" data-mw="interface"><div id="mw-hidden-catlinks" class="mw-hidden-catlinks mw-hidden-cats-hidden">Hidden category: <ul><li><a href="https://developer.valvesoftware.com/wiki/Category:English" title="Category:English">English</a></li></ul></div></div>
+	</div>
+</div>
+
+<div id="mw-navigation">
+	<h2>Navigation menu</h2>
+	<div id="mw-head">
+		
+
+<nav id="p-personal" class="vector-menu mw-portlet mw-portlet-personal vector-user-menu-legacy" aria-labelledby="p-personal-label" role="navigation">
+	<h3 id="p-personal-label" class="vector-menu-heading ">
+		<span class="vector-menu-heading-label">Personal tools</span>
+	</h3>
+	<div class="vector-menu-content">
+		
+		<ul class="vector-menu-content-list"><li id="pt-createaccount" class="mw-list-item"><a href="https://developer.valvesoftware.com/w/index.php?title=Special:CreateAccount&amp;returnto=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="You are encouraged to create an account and log in; however, it is not mandatory"><span>Create account</span></a></li><li id="pt-login" class="mw-list-item"><a href="https://developer.valvesoftware.com/w/index.php?title=Special:UserLogin&amp;returnto=Counter-Strike+2+Workshop+Tools%2FScripting%2FAPI" title="You are encouraged to log in; however, it is not mandatory [alt-shift-o]" accesskey="o"><span>Log in</span></a></li></ul>
+		
+	</div>
+</nav>
+
+		<div id="left-navigation">
+			
+
+<nav id="p-namespaces" class="vector-menu mw-portlet mw-portlet-namespaces vector-menu-tabs vector-menu-tabs-legacy" aria-labelledby="p-namespaces-label" role="navigation">
+	<h3 id="p-namespaces-label" class="vector-menu-heading ">
+		<span class="vector-menu-heading-label">Namespaces</span>
+	</h3>
+	<div class="vector-menu-content">
+		
+		<ul class="vector-menu-content-list"><li id="ca-nstab-main" class="selected mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API" title="View the content page [alt-shift-c]" accesskey="c"><span>Page</span></a></li><li id="ca-talk" class="new mw-list-item"><a href="https://developer.valvesoftware.com/w/index.php?title=Talk:Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit&amp;redlink=1" rel="discussion" title="Discussion about the content page (page does not exist) [alt-shift-t]" accesskey="t"><span>Discussion</span></a></li></ul>
+		
+	</div>
+</nav>
+
+			
+
+<nav id="p-variants" class="vector-menu mw-portlet mw-portlet-variants emptyPortlet vector-menu-dropdown" aria-labelledby="p-variants-label" role="navigation">
+	<input type="checkbox" id="p-variants-checkbox" role="button" aria-haspopup="true" data-event-name="ui.dropdown-p-variants" class="vector-menu-checkbox" aria-labelledby="p-variants-label">
+	<label id="p-variants-label" aria-label="Change language variant" class="vector-menu-heading ">
+		<span class="vector-menu-heading-label">English</span>
+	</label>
+	<div class="vector-menu-content">
+		
+		<ul class="vector-menu-content-list"></ul>
+		
+	</div>
+</nav>
+
+		</div>
+		<div id="right-navigation">
+			
+
+<nav id="p-views" class="vector-menu mw-portlet mw-portlet-views vector-menu-tabs vector-menu-tabs-legacy" aria-labelledby="p-views-label" role="navigation">
+	<h3 id="p-views-label" class="vector-menu-heading ">
+		<span class="vector-menu-heading-label">Views</span>
+	</h3>
+	<div class="vector-menu-content">
+		
+		<ul class="vector-menu-content-list"><li id="ca-view" class="selected mw-list-item collapsible"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API"><span>Read</span></a></li><li id="ca-viewsource" class="mw-list-item collapsible"><a href="https://developer.valvesoftware.com/w/index.php?title=Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=edit" title="This page is protected.
+You can view its source [alt-shift-e]" accesskey="e"><span>View source</span></a></li><li id="ca-history" class="mw-list-item collapsible"><a href="https://developer.valvesoftware.com/w/index.php?title=Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=history" title="Past revisions of this page [alt-shift-h]" accesskey="h"><span>View history</span></a></li></ul>
+		
+	</div>
+</nav>
+
+			
+
+<nav id="p-cactions" class="vector-menu mw-portlet mw-portlet-cactions vector-menu-dropdown" aria-labelledby="p-cactions-label" role="navigation" title="More options">
+	<input type="checkbox" id="p-cactions-checkbox" role="button" aria-haspopup="true" data-event-name="ui.dropdown-p-cactions" class="vector-menu-checkbox" aria-labelledby="p-cactions-label">
+	<label id="p-cactions-label" class="vector-menu-heading ">
+		<span class="vector-menu-heading-label">More</span>
+	</label>
+	<div class="vector-menu-content">
+		
+		<ul class="vector-menu-content-list"><li class="mw-list-item mw-list-item-js" id="ca-purge"><a href="https://developer.valvesoftware.com/w/index.php?title=Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=purge" title="Purge the server cache of this page [alt-shift-*]" accesskey="*"><span>Purge</span></a></li></ul>
+		
+	</div>
+</nav>
+
+			
+<div id="p-search" role="search" class="vector-search-box-vue  vector-search-box-show-thumbnail vector-search-box-auto-expand-width vector-search-box">
+	<div>
+			<h3>
+				<label for="searchInput">Search</label>
+			</h3>
+		<form action="https://developer.valvesoftware.com/w/index.php" id="searchform" class="vector-search-box-form">
+			<div id="simpleSearch" class="vector-search-box-inner" data-search-loc="header-navigation">
+				<input class="vector-search-box-input" type="search" name="search" placeholder="Search Valve Developer Community" aria-label="Search Valve Developer Community" autocapitalize="sentences" title="Search Valve Developer Community [alt-shift-f]" accesskey="f" id="searchInput">
+				<input type="hidden" name="title" value="Special:Search">
+				<input id="mw-searchButton" class="searchButton mw-fallbackSearchButton" type="submit" name="fulltext" title="Search the pages for this text" value="Search">
+				<input id="searchButton" class="searchButton" type="submit" name="go" title="Go to a page with this exact name if it exists" value="Go">
+			</div>
+		</form>
+	</div>
+</div>
+
+		</div>
+	</div>
+	
+
+<div id="mw-panel">
+	<div id="p-logo" role="banner">
+		<a class="mw-wiki-logo" href="https://developer.valvesoftware.com/wiki/Main_Page" title="Visit the main page"></a>
+	</div>
+	
+
+<nav id="p-navigation" class="vector-menu mw-portlet mw-portlet-navigation vector-menu-portal portal" aria-labelledby="p-navigation-label" role="navigation">
+	<h3 id="p-navigation-label" class="vector-menu-heading ">
+		<span class="vector-menu-heading-label">Navigation</span>
+	</h3>
+	<div class="vector-menu-content">
+		
+		<ul class="vector-menu-content-list"><li id="n-mainpage" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Main_Page" title="Visit the main page [alt-shift-z]" accesskey="z"><span>Main Page</span></a></li><li id="n-index" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/SDK_Docs"><span>Source SDK index</span></a></li><li id="n-recentchanges" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Special:RecentChanges" title="A list of recent changes in the wiki [alt-shift-r]" accesskey="r"><span>Recent changes</span></a></li><li id="n-randompage" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Special:RandomRootpage" title="Load a random page [alt-shift-x]" accesskey="x"><span>Random page</span></a></li></ul>
+		
+	</div>
+</nav>
+
+	
+
+<nav id="p-workshop" class="vector-menu mw-portlet mw-portlet-workshop vector-menu-portal portal" aria-labelledby="p-workshop-label" role="navigation">
+	<h3 id="p-workshop-label" class="vector-menu-heading ">
+		<span class="vector-menu-heading-label">Workshop</span>
+	</h3>
+	<div class="vector-menu-content">
+		
+		<ul class="vector-menu-content-list"><li id="n-hlsdk" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Half-Life_SDK"><span>Half-Life SDK</span></a></li><li id="n-hlatools" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Half-Life:_Alyx_Workshop_Tools"><span>Half-Life: Alyx Tools</span></a></li><li id="n-dota2tools" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Dota_2_Workshop_Tools"><span>Dota 2 Tools</span></a></li><li id="n-vrtools" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/SteamVR/Environments"><span>SteamVR Tools</span></a></li><li id="n-cs2tools" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools"><span>Counter-Strike 2 Tools</span></a></li></ul>
+		
+	</div>
+</nav>
+
+
+<nav id="p-support" class="vector-menu mw-portlet mw-portlet-support vector-menu-portal portal" aria-labelledby="p-support-label" role="navigation">
+	<h3 id="p-support-label" class="vector-menu-heading ">
+		<span class="vector-menu-heading-label">Support</span>
+	</h3>
+	<div class="vector-menu-content">
+		
+		<ul class="vector-menu-content-list"><li id="n-communityportal" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Valve_Developer_Community:Community_portal"><span>Community portal</span></a></li><li id="n-gettinghelp" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Help:Contents"><span>Getting help</span></a></li><li id="n-sdkfaq" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Category:Source_SDK_FAQ"><span>Source SDK FAQ</span></a></li><li id="n-ldfaq" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Category:Level_Design_FAQ"><span>Level Design FAQ</span></a></li></ul>
+		
+	</div>
+</nav>
+
+
+<nav id="p-steamcommunity" class="vector-menu mw-portlet mw-portlet-steamcommunity vector-menu-portal portal" aria-labelledby="p-steamcommunity-label" role="navigation">
+	<h3 id="p-steamcommunity-label" class="vector-menu-heading ">
+		<span class="vector-menu-heading-label">Steam Community</span>
+	</h3>
+	<div class="vector-menu-content">
+		
+		<ul class="vector-menu-content-list"><li id="n-sdkhub" class="mw-list-item"><a href="http://steamcommunity.com/app/211" rel="nofollow"><span>Source SDK Hub</span></a></li><li id="n-sdkdiscuss" class="mw-list-item"><a href="https://steamcommunity.com/app/211/discussions" rel="nofollow"><span>Source SDK Discussion</span></a></li><li id="n-steam" class="mw-list-item"><a href="http://www.steampowered.com/" rel="nofollow"><span>Steam</span></a></li></ul>
+		
+	</div>
+</nav>
+
+
+<nav id="p-tb" class="vector-menu mw-portlet mw-portlet-tb vector-menu-portal portal" aria-labelledby="p-tb-label" role="navigation">
+	<h3 id="p-tb-label" class="vector-menu-heading ">
+		<span class="vector-menu-heading-label">Tools</span>
+	</h3>
+	<div class="vector-menu-content">
+		
+		<ul class="vector-menu-content-list"><li id="t-whatlinkshere" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Special:WhatLinksHere/Counter-Strike_2_Workshop_Tools/Scripting/API" title="A list of all wiki pages that link here [alt-shift-j]" accesskey="j"><span>What links here</span></a></li><li id="t-recentchangeslinked" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Special:RecentChangesLinked/Counter-Strike_2_Workshop_Tools/Scripting/API" rel="nofollow" title="Recent changes in pages linked from this page [alt-shift-k]" accesskey="k"><span>Related changes</span></a></li><li id="t-specialpages" class="mw-list-item"><a href="https://developer.valvesoftware.com/wiki/Special:SpecialPages" title="A list of all special pages [alt-shift-q]" accesskey="q"><span>Special pages</span></a></li><li id="t-print" class="mw-list-item"><a href="javascript:print();" rel="alternate" title="Printable version of this page [alt-shift-p]" accesskey="p"><span>Printable version</span></a></li><li id="t-permalink" class="mw-list-item"><a href="https://developer.valvesoftware.com/w/index.php?title=Counter-Strike_2_Workshop_Tools/Scripting/API&amp;oldid=520339" title="Permanent link to this revision of this page"><span>Permanent link</span></a></li><li id="t-info" class="mw-list-item"><a href="https://developer.valvesoftware.com/w/index.php?title=Counter-Strike_2_Workshop_Tools/Scripting/API&amp;action=info" title="More information about this page"><span>Page information</span></a></li></ul>
+		
+	</div>
+</nav>
+
+	
+</div>
+
+</div>
+
+<footer id="footer" class="mw-footer" role="contentinfo">
+	<ul id="footer-info">
+	<li id="footer-info-lastmod"> This page was last edited on 23 September 2026, at 05:01.</li>
+</ul>
+
+	<ul id="footer-places">
+	<li id="footer-places-about"><a href="https://developer.valvesoftware.com/wiki/Valve_Developer_Community:About">About Valve Developer Community</a></li>
+	<li id="footer-places-disclaimer"><a href="https://developer.valvesoftware.com/wiki/Valve_Developer_Community:Terms_of_use">Terms of Use</a></li>
+	<li id="footer-places-legalnotices"><a href="https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/Valve%20Developer%20Community:Third%20Party%20Legal%20Notices">Third Party Legal Notices</a></li>
+</ul>
+
+	<ul id="footer-icons" class="noprint">
+	<li id="footer-poweredbyico"><a href="https://www.mediawiki.org/"><img src="./Scripting API - Valve Developer Community_files/poweredby_mediawiki_88x31.png" alt="Powered by MediaWiki" srcset="/w/resources/assets/poweredby_mediawiki_132x47.png 1.5x, /w/resources/assets/poweredby_mediawiki_176x62.png 2x" width="88" height="31" loading="lazy"></a></li>
+</ul>
+
+</footer>
+
+<script>(RLQ=window.RLQ||[]).push(function(){mw.config.set({"wgPageParseReport":{"limitreport":{"cputime":"0.186","walltime":"0.194","ppvisitednodes":{"value":2674,"limit":1000000},"postexpandincludesize":{"value":88112,"limit":2097152},"templateargumentsize":{"value":19620,"limit":2097152},"expansiondepth":{"value":19,"limit":100},"expensivefunctioncount":{"value":23,"limit":100},"unstrip-depth":{"value":0,"limit":20},"unstrip-size":{"value":0,"limit":5000000},"timingprofile":["100.00%   50.318      1 -total"," 90.91%   45.745      1 Template:LanguageBar"," 73.10%   36.785      2 Template:LanguageBar/foreach"," 43.30%   21.788     23 Template:LanguageBar/flagline"," 22.04%   11.092     23 Template:LanguageBar/flaglineinvert"," 14.91%    7.505     26 Template:Flag","  9.27%    4.665      1 Template:Language_name","  8.81%    4.434      2 Template:Note","  7.92%    3.983      1 Template:Yesno","  7.47%    3.758      2 Template:Callout_core"]},"cachereport":{"timestamp":"20260930180016","ttl":86400,"transientcontent":false}}});mw.config.set({"wgBackendResponseTime":74});});</script>
+
+</body></html>

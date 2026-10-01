@@ -4,6 +4,7 @@ import { Debug } from "../core/debug.js";
 import { karts, EnsureModerator, FindKartByMelon, DropKart } from "../core/kart-registry.js";
 import { SetUpPlayerKart, ForgetIntroLogo } from "./spawn.js";
 import { SetKartPaintColor } from "./look.js";
+import { ResetHudForPlayer } from "../hud/layout.js";
 import { PAINT_TRIGGER_NAME_PATTERN } from "../constants/index.js";
 
 export function RegisterKartInputs() {
@@ -21,6 +22,7 @@ export function RegisterKartInputs() {
         if (kart) {
             DropKart(playerSlot, kart);
         }
+        ResetHudForPlayer(playerSlot);
         // Promotes the next-oldest remaining player (Map preserves insertion
         // order) so there's always a moderator whenever anyone's still on the
         // map — see EnsureModerator's comment for why this can't just wait for

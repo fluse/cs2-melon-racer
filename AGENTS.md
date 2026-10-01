@@ -27,6 +27,7 @@ Current addon contents:
 
 ```
 docs/TRACK_CREATION.md                   # step-by-step Hammer guide for a new track
+docs/valve/scripting_api.html            # saved copy of Valve's cs_script API wiki page (the site blocks automated fetches)
 docs/mapping-api/*.md                    # Mapping API (map↔script contract): README.md = index of every input/name/pattern,
                                           #   01-…13-*.md one page per topic, each with setup / name-variant / "Values" tables
 maps/melon_racer.vmap                    # main map (binary DMX, Hammer-authoritative)
@@ -150,12 +151,16 @@ example addon at `content/csgo_addons/cs_script_demo/maps/scripts/` is the
 best reference — when in doubt, read its `.js` files and `point_script.d.ts`
 rather than guessing.
 
-The API reference is `maps/scripts/point_script.d.ts` (copied from the demo
-addon): Valve maintains it as the API changes, so it's authoritative and
-current. The wiki
+The API reference is `maps/scripts/point_script.d.ts`, a copy of the demo
+addon's: Valve maintains that one as the API changes, so when the demo's
+copy is newer, copy it over (it's types only — `npm test`/`npm run build`
+don't read it). The wiki page
 (https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API)
-sits behind an anti-bot challenge that blocks automated fetches — if
-something is only there, ask the user to paste it.
+has the same content in tables, with a few extra notes (e.g. `Delay` and
+`SetNextThink` land on the *nearest* tick, earlier or later). It blocks
+automated fetches, so a saved copy lives at
+[docs/valve/scripting_api.html](docs/valve/scripting_api.html) — read that
+instead; if it looks older than the d.ts, ask the user to save it again.
 
 ### How it fits together
 
@@ -195,19 +200,19 @@ something is only there, ask the user to paste it.
   times (`race/time-trial/`).
 - **Scheduling**: `SetThink(fn)` + `SetNextThink(time)` (tick-driven, time
   in `GetGameTime()` units), `Delay(seconds)` (returns a `Promise`),
-  `QueueAfterThinks(fn)` (experimental — runs once after all entities'
+  `QueueAfterThinks(fn)` (runs once after all entities'
   think functions this tick).
 - **Lifecycle**: `OnActivate(fn)` (point_script activated),
   `OnScriptInput(name, fn)` (fires when the point_script entity receives a
   Hammer I/O `RunScriptInput` input whose parameter matches `name` — this
   is how Hammer trigger outputs call into script), `OnScriptReload(...)`.
 - **Player lifecycle**: `OnPlayerConnect`, `OnPlayerActivate`,
-  `OnPlayerDisconnect`, `OnPlayerReset` (fires on every spawn, team change
-  and round restart). In this addon `OnPlayerReset` only re-freezes the pawn
+  `OnPlayerDisconnect` (gets only `playerSlot` — the controller is gone),
+  `OnPlayerTeamChanged` (`{ player, oldTeam }`), `OnPlayerReset` (fires on
+  every spawn, team change and round restart). In this addon `OnPlayerReset` only re-freezes the pawn
   and re-attaches the camera; it never spawns or moves a melon (see
   GAMEPLAY.md, "Spawn points").
-- **Round lifecycle**: `OnRoundStart`, `OnRoundEnd`, `OnBeginRoundRestart`
-  (experimental).
+- **Round lifecycle**: `OnRoundStart`, `OnRoundEnd`, `OnBeginRoundRestart`.
 - **Combat/movement events** (mostly irrelevant to a pure race map, but
   available): `OnModifyPlayerDamage`, `OnPlayerDamage`, `OnPlayerKill`,
   `OnPlayerJump`, `OnPlayerLand`, `OnPlayerChat`, `OnPlayerPing`,
@@ -230,6 +235,7 @@ something is only there, ask the user to paste it.
   is measured from velocity (`movement/contact/`). The fake engine in tests
   can't reproduce either.
 - **Game state**: `GetGameTime()`, `IsWarmupPeriod()`, `IsFreezePeriod()`,
+  `IsTeamIntroPeriod()`, `IsDedicatedServer()`, `GetGameMode()`/`GetGameType()`,
   `GetRoundRemainingTime()`/`SetRoundRemainingTime()`, `GetRoundsPlayed()`,
   `GetMapName()`.
 - **Commands**: `ClientCommand(slot, cmd)`, `ServerCommand(cmd)`,
@@ -248,9 +254,12 @@ interpolation, use for smooth scripted motion —, `GetMoveType`/`SetMoveType`,
 `Glow`/`Unglow`)
 → `CSWeaponBase` → `C4`.
 Also from `Entity`: `CSGrenadeProjectileBase`, `CSPlantedC4`.
+Also from `Entity`: `CSRadarPoint` (an icon on the radar/overview, per
+team) and `CSObservablePoint` (something spectators can watch).
 Also from `BaseModelEntity`: `CSObserverPawn`, `CSPlayerPawn` (movement
 input state via `IsInputPressed`/`WasInputJustPressed`/`WasInputJustReleased`
-+ `CSInputs` bitflags, weapon access, `GetCustomCamera()`).
++ `CSInputs` bitflags, weapon access incl. `DestroyWeapons()`,
+`SetEyeAngles(angles)` to turn the player's view, `GetCustomCamera()`).
 `CSPlayerController extends Entity` (`GetPlayerSlot`, `GetPlayerName`,
 `GetPlayerPawn`, `GetScore`/`AddScore`, `JoinTeam`, money functions) — the
 persistent per-client identity; **pawn** is the physical body that respawns.
@@ -262,7 +271,12 @@ every particle effect.
 `CustomPlayerCamera` — scripted camera control via
 `SetMode`/`SetFollowConfig` (modes: `DISABLED`, `CONTROLLED`,
 `CONTROLLED_POSITION`, `FOLLOW_POSITION`). The chase camera is
-`FOLLOW_POSITION` on the melon (`camera/follow.js`).
+`FOLLOW_POSITION` on the melon (`camera/follow.js`). `CameraFollowConfig`:
+`followEntity`, `followOffset` (from its origin, or eyes with `followEyes`),
+`cameraOffset` (rotated by the eye angles: x forward, y left, z up),
+`clipCameraOffset` (pull the camera in at walls) and
+`cameraOffsetReturnStrength` (how fast it returns after being pulled in —
+default 1, instant).
 `CustomHudLayout extends Entity` — see next section.
 
 ### Custom HUD (`custom_hud_layout`)
@@ -278,16 +292,23 @@ CS2 supports a scripted custom UI via Panorama, wired through the same
   from `game/bin/win64`
   (`-game csgo -addon melon_racer -i "<path to the .css/.xml under content/>"`,
   add `-f` if it reports "skipped"), then reload the map.
-- Supported tags only: `<Panel>`, `<Label>`, `<Image>`, `<Button>`
-  (`id`/`class`/`hittest`, plus `text` on Label and `src` on Image). No
-  client-side scripting or events inside the layout itself — all
-  interactivity goes through `Instance`.
+- Supported tags only: `<Panel>` (`id`, `class`, `hittest`), `<Label>`
+  (+ `text`), `<Image>` (+ `src`, `texturewidth`, `textureheight`),
+  `<Button>` (`id`, `class` only). No client-side scripting or events
+  inside the layout itself — all interactivity goes through `Instance`.
+- The engine sets these classes on an ancestor panel, for CSS to react to:
+  `HUD_TEAMINTRO_VISIBLE`, `HUD_BUYMENU_VISIBLE`, `HUD_SCOREBOARD_VISIBLE`,
+  `HUD_WINPANEL_VISIBLE`, `HUD_ENDOFMATCH_VISIBLE` (e.g.
+  `.HUD_SCOREBOARD_VISIBLE #some_panel { opacity: 0; }`).
 - Place a `custom_hud_layout` point entity in the map, set its `layout`
   property to the `.vxml` asset.
 - Drive it from script: `SetHasClass`/`SetHasClassForPlayer`,
   `SetDialogVariableString`/`...ForPlayer` (for text like a timer value),
   `SetInputCaptureEnabled` (mouse-driven menus), and listen for clicks via
-  `Instance.OnCustomHudClicked`.
+  `Instance.OnCustomHudClicked`. `Reset()`/`ResetForPlayer(slot)` drop the
+  overrides again. All per-player state is kept **per slot**, not per
+  player, so `OnPlayerDisconnect` resets the slot (`ResetHudForPlayer` in
+  `hud/layout.js`) — otherwise the next player in that slot inherits it.
 - See `cs_script_demo`'s `welcome_layout` (`custom_hud_layout` entity) +
   `panorama/layout/custom_game/welcome.xml` + `.../welcome.css` +
   `maps/scripts/setup.js` for a complete worked example (dismissible dialog

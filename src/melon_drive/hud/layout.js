@@ -28,3 +28,20 @@ export function GetSpeedHud() {
 export function SyncInputCapture(hud, slot, kart) {
     hud.SetInputCaptureEnabled(slot, Boolean(kart.hubModalOpen || kart.userMenuOpen));
 }
+
+/**
+ * Clears everything the HUD holds for a player slot — every per-player class
+ * and dialog variable, and input capture — when its player leaves. The layout
+ * keeps them per slot, not per player, so whoever joins next in that slot
+ * would otherwise start with the old player's open menu, finish image or
+ * moderator button, and in cursor mode until their own kart's HUD caught up.
+ * @param {number} slot
+ */
+export function ResetHudForPlayer(slot) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    hud.SetInputCaptureEnabled(slot, false);
+    hud.ResetForPlayer(slot);
+}

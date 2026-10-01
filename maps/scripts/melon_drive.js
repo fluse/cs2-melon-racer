@@ -1883,6 +1883,23 @@ function SyncInputCapture(hud, slot, kart) {
     hud.SetInputCaptureEnabled(slot, Boolean(kart.hubModalOpen || kart.userMenuOpen));
 }
 
+/**
+ * Clears everything the HUD holds for a player slot — every per-player class
+ * and dialog variable, and input capture — when its player leaves. The layout
+ * keeps them per slot, not per player, so whoever joins next in that slot
+ * would otherwise start with the old player's open menu, finish image or
+ * moderator button, and in cursor mode until their own kart's HUD caught up.
+ * @param {number} slot
+ */
+function ResetHudForPlayer(slot) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    hud.SetInputCaptureEnabled(slot, false);
+    hud.ResetForPlayer(slot);
+}
+
 // How a kart's melon looks while it's whole: its paint color plus an outline
 // glow in that same color — green (MELON_GLOW_UNPAINTED_COLOR) until it's
 // first painted (kart.painted) — which each player can switch
@@ -6419,6 +6436,7 @@ function RegisterKartInputs() {
         if (kart) {
             DropKart(playerSlot, kart);
         }
+        ResetHudForPlayer(playerSlot);
         // Promotes the next-oldest remaining player (Map preserves insertion
         // order) so there's always a moderator whenever anyone's still on the
         // map — see EnsureModerator's comment for why this can't just wait for
