@@ -152,3 +152,9 @@ test("liftoff: ground contact doesn't count right after a ground or wall jump", 
     assert.ok(!InLiftoff(10 + GROUND_LIFTOFF_TIME, 10, undefined));
     assert.ok(!InLiftoff(10, undefined, undefined));
 });
+
+test("wall jump: not while a wall bounce's jump-timing window is open", () => {
+    const s = { now: 10, grounded: false, wallContact: { time: 10, normal: wallA }, charge: 1 };
+    assert.equal(CanWallJump({ ...s, bounceTiming: true }), false);
+    assert.equal(CanWallJump({ ...s, bounceTiming: false }), true);
+});

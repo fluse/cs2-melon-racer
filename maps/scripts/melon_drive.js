@@ -74,7 +74,7 @@ function TraceSphere(config) {
  *   boostTrail?: { melon: any, entities: any[] }, // the boost trail running on this melon (unset: none) — see fx/boost-trail/boost-trail.js
  *   nextBounceTime?: number, lastBounceTime?: number, // wall-bounce timing, see UpdateKart
  *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
- *   lastJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // wall-bounce timing presses, see RegisterWallTimingPress
+ *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
  *   lastWallContact?: { time: number, normal: { x: number, y: number } }, // last wall touched in the air (probe or bounce) — see UpdateWallContact
@@ -465,12 +465,13 @@ const WALL_BOUNCE_PERFECT_JUMP_MULTIPLIER = 1.3; // extra multiplier on top for 
 // The timing press is the jump button, but separate from the normal jump:
 // it counts even in the air or while the jump is on cooldown (it gives no
 // upward push, only timing credit). Pressing again within this many seconds
-// of the previous press is treated as mashing and locks timing credit for
-// that long — see RegisterWallTimingPress.
+// of the previous press that did nothing (no ground or wall jump) is treated
+// as mashing and locks timing credit for that long — see WallTimingPress.
 const WALL_TIMING_SPAM_LOCKOUT = 0.4; // seconds
 // Every bounce also lifts the melon: its vertical speed is set to at least
-// this much upward (a falling melon's fall is cancelled first, one already
-// rising keeps its upward speed plus this). Same for every rating.
+// this much upward (a falling melon's fall is cancelled, one already rising
+// faster keeps its own speed — not added on top, so chained bounces don't
+// stack upward speed). Same for every rating except PERFECT (see below).
 // Higher: bounces send it up in an arc; 0 = vertical left to physics (old).
 // Stronger inside lift zones — see zones/lift/constants.js.
 const WALL_BOUNCE_UP_SPEED = 220; // units/sec upward
@@ -675,7 +676,8 @@ const LIFT_ZONE_NAME_PATTERN = /^lift_zone_(\d+(?:\.\d+)?)$/;
 // Higher: easier to reach the far wall of wide shafts; lower: more skill.
 const LIFT_ZONE_MIN_BOUNCE_SPEED = 450; // units/sec
 // Wall jumps in a lift zone cost no charge, are always full strength and
-// keep a bounce's higher upward kick. A narrow shaft has the melon at the
+// may follow a wall bounce at once (outside one, a press in the bounce's
+// jump-timing window is only timing). A narrow shaft has the melon at the
 // opposite wall sooner than WALL_JUMP_COOLDOWN, so there the cooldown is only
 // this (the next wall jump still needs the *other* wall, so one wall can't be
 // climbed alone) ...
@@ -1450,7 +1452,7 @@ function ApplyBreakCameraZoom(kart, elapsed) {
  *   bounceUpSpeed: number, // upward kick of a wall bounce (u/s)
  *   minBounceSpeed: number, // a bounce leaves the wall at least this fast (u/s), 0 = no minimum
  *   wallJumpCooldown: number, // seconds between two wall jumps
- *   freeWallJumps: boolean, // wall jumps cost no charge, are full strength, keep a higher upward kick
+ *   freeWallJumps: boolean, // wall jumps cost no charge, are full strength, may follow a bounce at once
  *   jumpBuffer: number, // seconds a jump press before touching a wall still counts, 0 = none
  * }} WallRules
  */
@@ -2285,11 +2287,15 @@ function CanWallJump(s) {
  *   lastGroundedTime?: number,
  *   charge: number,
  *   cooldown?: number, // WALL_JUMP_COOLDOWN, shorter in a lift zone
+ *   bounceTiming?: boolean, // a wall bounce's jump-timing window is still open — this press is its timing, not a wall jump
  * }} s
  */
-function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN }) {
+function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN, bounceTiming = false }) {
     if (grounded) {
         return "on the ground";
+    }
+    if (bounceTiming) {
+        return "counts as the wall bounce's jump timing (WALL_BOUNCE_PERFECT_JUMP_WINDOW still open)";
     }
     if (!wallContact) {
         return "no wall contact yet";
@@ -2319,7 +2325,8 @@ function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGro
  * the jump is that strong): speed along the wall is kept, the part across
  * it points away from the wall at charge × WALL_JUMP_PUSH_SPEED (or faster,
  * if it already was — e.g. just after a wall bounce), plus
- * charge × WALL_JUMP_UP_SPEED up.
+ * charge × WALL_JUMP_UP_SPEED up (the caller keeps a faster upward speed
+ * the melon already has, see TryWallJump).
  * @param {{ x: number, y: number }} v current horizontal velocity @param {{ x: number, y: number }} n wall normal (horizontal, unit length, pointing away from the wall) @param {number} charge
  */
 function WallJumpVelocity(v, n, charge) {
@@ -2389,6 +2396,24 @@ function GetBounceRating(angleFactor) {
  */
 function JumpTimingFactor(secondsApart) {
     return Math.max(0, 1 - Math.abs(secondsApart) / WALL_BOUNCE_PERFECT_JUMP_WINDOW);
+}
+
+/**
+ * Whether a jump press counts as wall-bounce timing, or is mashing. Only
+ * presses that *did nothing* — no ground jump, no wall jump — count towards
+ * mashing: a press within WALL_TIMING_SPAM_LOCKOUT of the last such idle
+ * press locks timing credit for that long. A real jump just before doesn't,
+ * so "jump, then time the wall" works, and so do chained wall jumps.
+ * @param {number} now
+ * @param {number | undefined} lastIdlePressTime the last press that did nothing
+ * @param {number | undefined} lockedUntil timing credit locked until then
+ * @returns {{ counts: boolean, mashing: boolean, lockedUntil: number | undefined }}
+ */
+function WallTimingPress(now, lastIdlePressTime, lockedUntil) {
+    if (lastIdlePressTime !== undefined && now - lastIdlePressTime < WALL_TIMING_SPAM_LOCKOUT) {
+        return { counts: false, mashing: true, lockedUntil: now + WALL_TIMING_SPAM_LOCKOUT };
+    }
+    return { counts: now >= (lockedUntil ?? -Infinity), mashing: false, lockedUntil };
 }
 
 /** @param {number} jumpFactor */
@@ -2465,8 +2490,11 @@ function WallBounceDamage(impactSpeed, speedGain, angleFactor) {
 }
 
 /**
- * Vertical velocity right after a wall bounce: a fall is cancelled, then
- * the kick is added on top (a melon already rising keeps that plus the kick).
+ * Vertical velocity right after a wall bounce: at least the kick upward — a
+ * fall is cancelled, a melon already rising faster keeps its own speed. Not
+ * added on top: chained bounces in a narrow shaft or corridor (less time
+ * between them than gravity needs to eat a kick) used to stack upward speed
+ * bounce after bounce.
  * @param {number} currentZ vertical velocity physics left this tick
  * @param {number} [upSpeed] the kick — WALL_BOUNCE_UP_SPEED, or a lift zone's
  * @param {number} [angleFactor] the bounce's angle closeness — a PERFECT
@@ -2474,7 +2502,7 @@ function WallBounceDamage(impactSpeed, speedGain, angleFactor) {
  */
 function BounceUpVelocity(currentZ, upSpeed = WALL_BOUNCE_UP_SPEED, angleFactor = 0) {
     const perfect = GetBounceRating(angleFactor) === BOUNCE_RATINGS[0];
-    return Math.max(currentZ, 0) + upSpeed * (perfect ? PERFECT_BOUNCE_UP_MULTIPLIER : 1);
+    return Math.max(currentZ, upSpeed * (perfect ? PERFECT_BOUNCE_UP_MULTIPLIER : 1));
 }
 
 /**
@@ -2772,26 +2800,35 @@ function DrawJumpDebug(slot, kart, grounded, wallNormal) {
 
 /**
  * Records a jump-button press for wall-bounce timing, separately from the
- * normal (ground-contact gated) jump. Anti-spam: a press less than
- * WALL_TIMING_SPAM_LOCKOUT after the previous one locks timing credit for
- * that long, so mashing jump along a wall never counts — only a single,
- * deliberately timed press does.
+ * normal (ground-contact gated) jump. Anti-spam (WallTimingPress): a press
+ * soon after one that did nothing locks timing credit, so mashing jump along
+ * a wall never counts — a ground or wall jump just before doesn't (see
+ * RecordIdlePress for what counts as doing nothing).
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} now
  * @returns {boolean} whether this press counts for wall timing
  */
 function RegisterWallTimingPress(kart, now) {
-    const previous = kart.lastJumpPressTime;
-    kart.lastJumpPressTime = now;
-    if (previous !== undefined && now - previous < WALL_TIMING_SPAM_LOCKOUT) {
-        kart.wallTimingLockedUntil = now + WALL_TIMING_SPAM_LOCKOUT;
+    kart.lastJumpPressTime = now; // every press — jump pads buffer on it
+    const press = WallTimingPress(now, kart.lastIdleJumpPressTime, kart.wallTimingLockedUntil);
+    kart.wallTimingLockedUntil = press.lockedUntil;
+    if (press.mashing) {
         kart.wallTimingPressTime = undefined; // an earlier press in the same mash doesn't count either
-        return false;
     }
-    if (now < (kart.wallTimingLockedUntil ?? 0)) {
-        return false;
+    if (press.counts) {
+        kart.wallTimingPressTime = now;
     }
-    kart.wallTimingPressTime = now;
-    return true;
+    return press.counts;
+}
+
+/**
+ * Refills the wall-jump charge — every tick, from the top of UpdateKart, so
+ * it also fills while the melon stands still, is race-locked or broken (it
+ * used to refill only on ticks that got as far as the jump handling).
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
+ */
+function RechargeWallJumpCharge(kart, dt) {
+    // ?? 1: karts carried over a hot reload from before the charge existed.
+    kart.wallJumpCharge = RechargeWallJump(kart.wallJumpCharge ?? 1, dt);
 }
 
 /** How full the wall-jump charge is, 0 (spent) to 1 (full) — what the HUD jump bar shows. @param {{ wallJumpCharge?: number }} kart */
@@ -2802,17 +2839,15 @@ function GetJumpChargeFraction(kart) {
 /**
  * Everything a jump press does this tick, applied to `v` (the velocity
  * UpdateKart is about to command, modified in place): the ground jump, the
- * wall-bounce timing credit, and the wall jump. Also refills the wall-jump
- * charge every tick, and fires a buffered wall jump (lift zones) without a
- * new press.
- * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {number} dt
+ * wall-bounce timing credit, and the wall jump. Also fires a buffered wall
+ * jump (lift zones) without a new press. (The charge refills in
+ * RechargeWallJumpCharge.)
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now
  * @param {boolean} grounded see UpdateGrounded @param {boolean} jumpPressed
  * @param {{ x: number, y: number, z: number }} v
  * @param {import("../../zones/lift/logic.js").WallRules} rules see CurrentWallRules
  */
-function ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v, rules) {
-    // ?? 1: karts carried over a hot reload from before the charge existed.
-    kart.wallJumpCharge = RechargeWallJump(kart.wallJumpCharge ?? 1, dt);
+function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
     if (!jumpPressed) {
         FireBufferedWallJump(slot, kart, now, grounded, v, rules);
         return;
@@ -2837,6 +2872,11 @@ function ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v, rules) {
     // isn't lost.
     const blockedBy = groundJump ? "ground jump instead" : TryWallJump(slot, kart, now, grounded, v, rules);
     LogWallJumpVerdict(slot, kart, blockedBy, rules.inLift);
+    // Neither a ground nor a wall jump: the press did nothing, so the next
+    // one soon after is mashing (see WallTimingPress).
+    if (!groundJump && blockedBy !== null) {
+        kart.lastIdleJumpPressTime = now;
+    }
     // In the air and not a wall jump yet: where there's a jump buffer (lift
     // zones), remember the press — a wall touched soon after still gets it.
     kart.bufferedWallJumpTime = blockedBy !== null && !grounded && rules.jumpBuffer > 0 ? now : undefined;
@@ -2889,6 +2929,9 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
     const wallContact = kart.lastWallContact;
     if (wallContact && wallContact.time > pressed && TryWallJump(slot, kart, now, grounded, v, rules) === null) {
         kart.bufferedWallJumpTime = undefined;
+        if (kart.lastIdleJumpPressTime === pressed) {
+            kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
+        }
         Debug(`wall jump: slot ${slot} from a press ${(now - pressed).toFixed(2)}s before touching the wall`);
     }
 }
@@ -2899,9 +2942,13 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
  * drops (so chained wall jumps get weaker). WallJumpVelocity keeps whichever
  * push away from the wall is stronger. Deliberately does NOT raise
  * kart.speedCap: chained wall jumps used to ratchet the melon ever faster.
- * With rules.freeWallJumps (lift zones) it's always full strength, costs no
- * charge and keeps a bounce's higher upward kick; the cooldown is
- * rules.wallJumpCooldown.
+ * Never lowers the melon's upward speed (a jump just after a ground jump,
+ * a bounce's kick or a jump pad launch keeps the faster one).
+ * While a wall bounce's jump-timing window is open (kart.pendingBounce),
+ * the press is that bounce's timing and no wall jump — otherwise every
+ * well-timed bounce also used up charge. Not in lift zones
+ * (rules.freeWallJumps): there it's always full strength, costs no charge,
+ * may follow a bounce at once, and the cooldown is rules.wallJumpCooldown.
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
  * @param {{ x: number, y: number, z: number }} v modified in place @param {import("../../zones/lift/logic.js").WallRules} rules
  * @returns {string | null} why it didn't happen, or null if it did
@@ -2917,6 +2964,7 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
         lastGroundedTime: kart.lastGroundedTime,
         charge,
         cooldown: rules.wallJumpCooldown,
+        bounceTiming: !rules.freeWallJumps && kart.pendingBounce !== undefined,
     });
     if (!wallContact || blockedBy !== null) {
         return blockedBy;
@@ -2924,7 +2972,7 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
     const jump = WallJumpVelocity({ x: v.x, y: v.y }, wallContact.normal, charge);
     v.x = jump.x;
     v.y = jump.y;
-    v.z = rules.freeWallJumps ? Math.max(v.z, jump.z) : jump.z;
+    v.z = Math.max(v.z, jump.z);
     kart.lastWallJump = { time: now, normal: wallContact.normal };
     if (!rules.freeWallJumps) {
         kart.wallJumpCharge = WallJumpChargeAfter(charge);
@@ -3849,9 +3897,15 @@ function ApplyHealing(kart, dt) {
     }
 }
 
-/** Back to full health — respawns after a break, checkpoint/race-flow teleports. @param {import("../../core/kart-registry.js").Kart} kart */
+/**
+ * Back to full health — respawns after a break, checkpoint/race-flow
+ * teleports. A melon arriving whole also gets a full wall-jump charge (the
+ * HUD jump bar), like a freshly spawned one.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
 function RestoreFullHealth(kart) {
     kart.health = MELON_MAX_HEALTH;
+    kart.wallJumpCharge = 1;
 }
 
 // Particle effects from point_templates, the one way every effect in
@@ -5738,6 +5792,9 @@ function SettleWallBounceDamage(slot, kart) {
 /** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt */
 function UpdateKart(slot, kart, dt) {
     const { pawn, melon } = kart;
+    // Before every early return below: the charge refills standing still,
+    // race-locked or broken too.
+    RechargeWallJumpCharge(kart, dt);
 
     // Locked during the pre-race countdown, and again once a kart has
     // finished its heat (parked so it stops re-triggering checkpoints).
@@ -5988,17 +6045,21 @@ function UpdateKart(slot, kart, dt) {
         kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), ATTACK_BOOST_MAX_SPEED);
     }
 
-    // Jump press (ground jump / wall jump / wall-bounce timing) and the
-    // wall-jump charge refill — see ApplyJump in jump.js.
+    // Jump press (ground jump / wall jump / wall-bounce timing) — see
+    // ApplyJump in jump.js.
     // A wall bounce also kicks it upward (WALL_BOUNCE_UP_SPEED, stronger in a
     // lift zone, and PERFECT_BOUNCE_UP_MULTIPLIER stronger for a PERFECT hit).
     const vzBase = bounceVelocity
         ? BounceUpVelocity(currentVelocity.z, wallRules.bounceUpSpeed, bounceAngleFactor)
         : currentVelocity.z;
     const v = { x: vx, y: vy, z: vzBase };
-    ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v, wallRules);
+    ApplyJump(slot, kart, now, grounded, jumpPressed, v, wallRules);
     // On a jump pad, a (just) pressed jump launches instead — see JUMP_PAD_*.
-    TryPadLaunch(slot, kart, now, jumpPressed, v, forwardDir);
+    // A press that launched did something, so it's no mashing press (see
+    // WallTimingPress).
+    if (TryPadLaunch(slot, kart, now, jumpPressed, v, forwardDir) && kart.lastIdleJumpPressTime === now) {
+        kart.lastIdleJumpPressTime = undefined;
+    }
     vx = v.x;
     vy = v.y;
     const vz = v.z;

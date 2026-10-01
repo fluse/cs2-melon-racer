@@ -41,12 +41,13 @@ export const WALL_BOUNCE_PERFECT_JUMP_MULTIPLIER = 1.3; // extra multiplier on t
 // The timing press is the jump button, but separate from the normal jump:
 // it counts even in the air or while the jump is on cooldown (it gives no
 // upward push, only timing credit). Pressing again within this many seconds
-// of the previous press is treated as mashing and locks timing credit for
-// that long — see RegisterWallTimingPress.
+// of the previous press that did nothing (no ground or wall jump) is treated
+// as mashing and locks timing credit for that long — see WallTimingPress.
 export const WALL_TIMING_SPAM_LOCKOUT = 0.4; // seconds
 // Every bounce also lifts the melon: its vertical speed is set to at least
-// this much upward (a falling melon's fall is cancelled first, one already
-// rising keeps its upward speed plus this). Same for every rating.
+// this much upward (a falling melon's fall is cancelled, one already rising
+// faster keeps its own speed — not added on top, so chained bounces don't
+// stack upward speed). Same for every rating except PERFECT (see below).
 // Higher: bounces send it up in an arc; 0 = vertical left to physics (old).
 // Stronger inside lift zones — see zones/lift/constants.js.
 export const WALL_BOUNCE_UP_SPEED = 220; // units/sec upward

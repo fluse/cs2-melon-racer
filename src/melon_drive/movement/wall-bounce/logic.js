@@ -16,6 +16,7 @@ import {
     WALL_CONTACT_MIN_STOP,
     WALL_BOUNCE_UP_SPEED,
     PERFECT_BOUNCE_UP_MULTIPLIER,
+    WALL_TIMING_SPAM_LOCKOUT,
 } from "../../constants/index.js";
 
 /**
@@ -71,6 +72,24 @@ export function GetBounceRating(angleFactor) {
  */
 export function JumpTimingFactor(secondsApart) {
     return Math.max(0, 1 - Math.abs(secondsApart) / WALL_BOUNCE_PERFECT_JUMP_WINDOW);
+}
+
+/**
+ * Whether a jump press counts as wall-bounce timing, or is mashing. Only
+ * presses that *did nothing* — no ground jump, no wall jump — count towards
+ * mashing: a press within WALL_TIMING_SPAM_LOCKOUT of the last such idle
+ * press locks timing credit for that long. A real jump just before doesn't,
+ * so "jump, then time the wall" works, and so do chained wall jumps.
+ * @param {number} now
+ * @param {number | undefined} lastIdlePressTime the last press that did nothing
+ * @param {number | undefined} lockedUntil timing credit locked until then
+ * @returns {{ counts: boolean, mashing: boolean, lockedUntil: number | undefined }}
+ */
+export function WallTimingPress(now, lastIdlePressTime, lockedUntil) {
+    if (lastIdlePressTime !== undefined && now - lastIdlePressTime < WALL_TIMING_SPAM_LOCKOUT) {
+        return { counts: false, mashing: true, lockedUntil: now + WALL_TIMING_SPAM_LOCKOUT };
+    }
+    return { counts: now >= (lockedUntil ?? -Infinity), mashing: false, lockedUntil };
 }
 
 /** @param {number} jumpFactor */
@@ -147,8 +166,11 @@ export function WallBounceDamage(impactSpeed, speedGain, angleFactor) {
 }
 
 /**
- * Vertical velocity right after a wall bounce: a fall is cancelled, then
- * the kick is added on top (a melon already rising keeps that plus the kick).
+ * Vertical velocity right after a wall bounce: at least the kick upward — a
+ * fall is cancelled, a melon already rising faster keeps its own speed. Not
+ * added on top: chained bounces in a narrow shaft or corridor (less time
+ * between them than gravity needs to eat a kick) used to stack upward speed
+ * bounce after bounce.
  * @param {number} currentZ vertical velocity physics left this tick
  * @param {number} [upSpeed] the kick — WALL_BOUNCE_UP_SPEED, or a lift zone's
  * @param {number} [angleFactor] the bounce's angle closeness — a PERFECT
@@ -156,7 +178,7 @@ export function WallBounceDamage(impactSpeed, speedGain, angleFactor) {
  */
 export function BounceUpVelocity(currentZ, upSpeed = WALL_BOUNCE_UP_SPEED, angleFactor = 0) {
     const perfect = GetBounceRating(angleFactor) === BOUNCE_RATINGS[0];
-    return Math.max(currentZ, 0) + upSpeed * (perfect ? PERFECT_BOUNCE_UP_MULTIPLIER : 1);
+    return Math.max(currentZ, upSpeed * (perfect ? PERFECT_BOUNCE_UP_MULTIPLIER : 1));
 }
 
 /**

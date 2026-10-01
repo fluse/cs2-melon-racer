@@ -31,7 +31,7 @@ import { AttackBoost, WithoutEnginePush } from "../attack-boost/logic.js";
 import { MomentumMaxSpeed, UpdateMomentum } from "../momentum/logic.js";
 import { LogAttackHeld } from "../../dev/attack-debug.js";
 import { Debug } from "../../core/debug.js";
-import { ApplyJump } from "../jump/jump.js";
+import { ApplyJump, RechargeWallJumpCharge } from "../jump/jump.js";
 import { UpdatePadFlight, TryPadLaunch } from "../../zones/jump-pad/jump-pad.js";
 import { UpdateGrounded, UpdateWallContact } from "../contact/contact.js";
 import { DrawJumpDebug } from "../../dev/jump-debug.js";
@@ -44,6 +44,9 @@ import { CurrentWallRules } from "../../zones/registry.js";
 /** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt */
 export function UpdateKart(slot, kart, dt) {
     const { pawn, melon } = kart;
+    // Before every early return below: the charge refills standing still,
+    // race-locked or broken too.
+    RechargeWallJumpCharge(kart, dt);
 
     // Locked during the pre-race countdown, and again once a kart has
     // finished its heat (parked so it stops re-triggering checkpoints).
@@ -294,17 +297,21 @@ export function UpdateKart(slot, kart, dt) {
         kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), ATTACK_BOOST_MAX_SPEED);
     }
 
-    // Jump press (ground jump / wall jump / wall-bounce timing) and the
-    // wall-jump charge refill — see ApplyJump in jump.js.
+    // Jump press (ground jump / wall jump / wall-bounce timing) — see
+    // ApplyJump in jump.js.
     // A wall bounce also kicks it upward (WALL_BOUNCE_UP_SPEED, stronger in a
     // lift zone, and PERFECT_BOUNCE_UP_MULTIPLIER stronger for a PERFECT hit).
     const vzBase = bounceVelocity
         ? BounceUpVelocity(currentVelocity.z, wallRules.bounceUpSpeed, bounceAngleFactor)
         : currentVelocity.z;
     const v = { x: vx, y: vy, z: vzBase };
-    ApplyJump(slot, kart, now, dt, grounded, jumpPressed, v, wallRules);
+    ApplyJump(slot, kart, now, grounded, jumpPressed, v, wallRules);
     // On a jump pad, a (just) pressed jump launches instead — see JUMP_PAD_*.
-    TryPadLaunch(slot, kart, now, jumpPressed, v, forwardDir);
+    // A press that launched did something, so it's no mashing press (see
+    // WallTimingPress).
+    if (TryPadLaunch(slot, kart, now, jumpPressed, v, forwardDir) && kart.lastIdleJumpPressTime === now) {
+        kart.lastIdleJumpPressTime = undefined;
+    }
     vx = v.x;
     vy = v.y;
     const vz = v.z;

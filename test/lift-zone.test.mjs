@@ -13,19 +13,22 @@ import {
     BOUNCE_RATINGS,
 } from "../src/melon_drive/constants/index.js";
 
-test("bounce kick cancels a fall, then adds the kick", () => {
+test("bounce kick cancels a fall: the melon leaves at the kick's speed", () => {
     assert.equal(BounceUpVelocity(-300), WALL_BOUNCE_UP_SPEED);
     assert.equal(BounceUpVelocity(0, LIFT_ZONE_UP_SPEED), LIFT_ZONE_UP_SPEED);
 });
 
-test("bounce kick adds on top of a melon already rising", () => {
-    assert.equal(BounceUpVelocity(100, LIFT_ZONE_UP_SPEED), 100 + LIFT_ZONE_UP_SPEED);
+// Regression: the kick was added on top of an upward speed, so chained
+// bounces in a narrow shaft stacked it ever higher.
+test("bounce kick doesn't add on top of a melon already rising", () => {
+    assert.equal(BounceUpVelocity(100, LIFT_ZONE_UP_SPEED), LIFT_ZONE_UP_SPEED, "slower than the kick: raised to it");
+    assert.equal(BounceUpVelocity(LIFT_ZONE_UP_SPEED + 100, LIFT_ZONE_UP_SPEED), LIFT_ZONE_UP_SPEED + 100, "faster: keeps its own speed");
 });
 
 test("a PERFECT bounce kicks PERFECT_BOUNCE_UP_MULTIPLIER harder, other ratings don't", () => {
     const perfect = BOUNCE_RATINGS[0].minAngleFactor;
     assert.equal(BounceUpVelocity(-300, WALL_BOUNCE_UP_SPEED, perfect), WALL_BOUNCE_UP_SPEED * PERFECT_BOUNCE_UP_MULTIPLIER);
-    assert.equal(BounceUpVelocity(100, LIFT_ZONE_UP_SPEED, 1), 100 + LIFT_ZONE_UP_SPEED * PERFECT_BOUNCE_UP_MULTIPLIER);
+    assert.equal(BounceUpVelocity(100, LIFT_ZONE_UP_SPEED, 1), LIFT_ZONE_UP_SPEED * PERFECT_BOUNCE_UP_MULTIPLIER);
     assert.equal(BounceUpVelocity(0, WALL_BOUNCE_UP_SPEED, BOUNCE_RATINGS[1].minAngleFactor), WALL_BOUNCE_UP_SPEED);
 });
 

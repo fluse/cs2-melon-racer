@@ -13,6 +13,7 @@ import {
     ReflectOffWall,
     WallBounceDamage,
     IsWallContact,
+    WallTimingPress,
 } from "../src/melon_drive/movement/wall-bounce/logic.js";
 import {
     WALL_BOUNCE_OPTIMAL_ANGLE,
@@ -24,6 +25,7 @@ import {
     WALL_BOUNCE_PERFECT_JUMP_MULTIPLIER,
     WALL_IMPACT_DAMAGE_THRESHOLD,
     BOUNCE_RATINGS,
+    WALL_TIMING_SPAM_LOCKOUT,
 } from "../src/melon_drive/constants/index.js";
 
 const EPS = 1e-9;
@@ -190,4 +192,21 @@ test("rating: PERFECT holds exactly within PERFECT_BOUNCE_TOLERANCE of the optim
     assert.equal(GetBounceRating(WallAngleFactor(edge - 0.01)), BOUNCE_RATINGS[0]);
     assert.equal(GetBounceRating(WallAngleFactor(WALL_BOUNCE_OPTIMAL_ANGLE - PERFECT_BOUNCE_TOLERANCE + 0.01)), BOUNCE_RATINGS[0]);
     assert.notEqual(GetBounceRating(WallAngleFactor(edge + 0.01)), BOUNCE_RATINGS[0]);
+});
+
+test("timing press: a first press counts", () => {
+    assert.deepEqual(WallTimingPress(10, undefined, undefined), { counts: true, mashing: false, lockedUntil: undefined });
+});
+
+test("timing press: soon after a press that did nothing it's mashing, and locks timing credit", () => {
+    const press = WallTimingPress(10, 10 - WALL_TIMING_SPAM_LOCKOUT / 2, undefined);
+    assert.equal(press.counts, false);
+    assert.equal(press.mashing, true);
+    assert.equal(press.lockedUntil, 10 + WALL_TIMING_SPAM_LOCKOUT);
+    assert.equal(WallTimingPress(10 + WALL_TIMING_SPAM_LOCKOUT / 2, undefined, press.lockedUntil).counts, false, "still locked");
+    assert.equal(WallTimingPress(10 + WALL_TIMING_SPAM_LOCKOUT, undefined, press.lockedUntil).counts, true, "lock over");
+});
+
+test("timing press: an idle press longer ago than the lockout doesn't count against it", () => {
+    assert.equal(WallTimingPress(10, 10 - WALL_TIMING_SPAM_LOCKOUT, undefined).counts, true);
 });

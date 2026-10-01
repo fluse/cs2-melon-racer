@@ -21,7 +21,13 @@ export function ApplyHealing(kart, dt) {
     }
 }
 
-/** Back to full health — respawns after a break, checkpoint/race-flow teleports. @param {import("../../core/kart-registry.js").Kart} kart */
+/**
+ * Back to full health — respawns after a break, checkpoint/race-flow
+ * teleports. A melon arriving whole also gets a full wall-jump charge (the
+ * HUD jump bar), like a freshly spawned one.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
 export function RestoreFullHealth(kart) {
     kart.health = MELON_MAX_HEALTH;
+    kart.wallJumpCharge = 1;
 }

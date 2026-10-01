@@ -22,7 +22,8 @@ export const LIFT_ZONE_NAME_PATTERN = /^lift_zone_(\d+(?:\.\d+)?)$/;
 // Higher: easier to reach the far wall of wide shafts; lower: more skill.
 export const LIFT_ZONE_MIN_BOUNCE_SPEED = 450; // units/sec
 // Wall jumps in a lift zone cost no charge, are always full strength and
-// keep a bounce's higher upward kick. A narrow shaft has the melon at the
+// may follow a wall bounce at once (outside one, a press in the bounce's
+// jump-timing window is only timing). A narrow shaft has the melon at the
 // opposite wall sooner than WALL_JUMP_COOLDOWN, so there the cooldown is only
 // this (the next wall jump still needs the *other* wall, so one wall can't be
 // climbed alone) ...

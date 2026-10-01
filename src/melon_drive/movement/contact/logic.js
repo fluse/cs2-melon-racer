@@ -118,11 +118,15 @@ export function CanWallJump(s) {
  *   lastGroundedTime?: number,
  *   charge: number,
  *   cooldown?: number, // WALL_JUMP_COOLDOWN, shorter in a lift zone
+ *   bounceTiming?: boolean, // a wall bounce's jump-timing window is still open — this press is its timing, not a wall jump
  * }} s
  */
-export function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN }) {
+export function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN, bounceTiming = false }) {
     if (grounded) {
         return "on the ground";
+    }
+    if (bounceTiming) {
+        return "counts as the wall bounce's jump timing (WALL_BOUNCE_PERFECT_JUMP_WINDOW still open)";
     }
     if (!wallContact) {
         return "no wall contact yet";
@@ -152,7 +156,8 @@ export function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, 
  * the jump is that strong): speed along the wall is kept, the part across
  * it points away from the wall at charge × WALL_JUMP_PUSH_SPEED (or faster,
  * if it already was — e.g. just after a wall bounce), plus
- * charge × WALL_JUMP_UP_SPEED up.
+ * charge × WALL_JUMP_UP_SPEED up (the caller keeps a faster upward speed
+ * the melon already has, see TryWallJump).
  * @param {{ x: number, y: number }} v current horizontal velocity @param {{ x: number, y: number }} n wall normal (horizontal, unit length, pointing away from the wall) @param {number} charge
  */
 export function WallJumpVelocity(v, n, charge) {

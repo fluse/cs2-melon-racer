@@ -199,8 +199,11 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   **independent of the normal jump**: it counts in the air and during the
   jump cooldown (no upward push — only timing credit), while the normal
   jump stays ground- and cooldown-gated. Anti-spam: pressing again within
-  `WALL_TIMING_SPAM_LOCKOUT` of the previous press locks timing credit for
-  that long, so mashing never counts.
+  `WALL_TIMING_SPAM_LOCKOUT` of a previous press **that did nothing** (no
+  ground jump, no wall jump) locks timing credit for that long, so mashing
+  never counts. A real jump just before doesn't (decided): jumping at a wall
+  and then timing the hit works, and so do chained wall jumps in a shaft.
+  Rule: `WallTimingPress` in `movement/wall-bounce/logic.js`.
 - **Cost — and how skill waives it:** wall hits have their own damage
   rules, separate from landings' `IMPACT_DAMAGE_*`: a base part from the
   impact itself (`WALL_IMPACT_DAMAGE_THRESHOLD`/`_SCALE`) plus
@@ -235,8 +238,11 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   others see who's boosting. Rule: `fx/boost-trail/logic.js`, applied by
   `fx/boost-trail/boost-trail.js` (`test/boost-trail.test.mjs`).
 - **Upward kick:** every bounce (any rating) also lifts the melon — its
-  vertical speed becomes `WALL_BOUNCE_UP_SPEED` upward (a fall is cancelled
-  first; a melon already rising keeps that plus the kick), so a bounce sends
+  vertical speed becomes at least `WALL_BOUNCE_UP_SPEED` upward (a fall is
+  cancelled; a melon already rising faster keeps its own speed — **not added
+  on top** (decided): in a narrow shaft or corridor bounces come faster than
+  gravity eats a kick, and adding them up let the upward speed grow with
+  every bounce), so a bounce sends
   it up in an arc instead of along the ground. A PERFECT bounce
   (`BOUNCE_RATINGS[0]`) kicks `PERFECT_BOUNCE_UP_MULTIPLIER` (×1.2, decided)
   harder — the normal kick and a lift zone's alike. Inside a **lift zone**
@@ -601,12 +607,16 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
 - **Wall jump**: in the air, touching a wall and pressing jump pushes the
   melon off the wall (`WALL_JUMP_PUSH_SPEED`, more if it's already moving
   away faster — e.g. right after a wall bounce) and up
-  (`WALL_JUMP_UP_SPEED`), keeping its speed along the wall. **Its strength
+  (`WALL_JUMP_UP_SPEED` — never slower upward than it already was: right
+  after a ground jump, a bounce's kick or a jump pad launch the faster
+  upward speed stays), keeping its speed along the wall. **Its strength
   is a charge** (`kart.wallJumpCharge`, shown by the HUD jump bar, which
   no longer shows a ground-jump cooldown): a wall jump is as strong as the
   charge is full and uses up `WALL_JUMP_CHARGE_COST` of it, so chained
   wall jumps get weaker (2 in a row, the second at half strength) until below `WALL_JUMP_MIN_CHARGE`
-  there's none; it refills over `WALL_JUMP_RECHARGE_SECONDS`. A wall jump
+  there's none; it refills over `WALL_JUMP_RECHARGE_SECONDS` — always, also
+  standing still, race-locked or broken — and is full again whenever the
+  melon arrives whole (every spawn that restores full health). A wall jump
   never raises the speed cap — chaining them used to make the melon faster
   and faster. "Touching" =
   a line trace in any of `WALL_PROBE_DIRECTIONS` horizontal directions
@@ -624,7 +634,13 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   wall can't be climbed forever: the next wall jump needs ground contact
   first or a different wall (`WALL_JUMP_SAME_WALL_DOT`) — bouncing between
   two facing walls chains. The same press still counts as wall-bounce
-  jump timing.
+  jump timing — and **while a bounce's timing window
+  (`WALL_BOUNCE_PERFECT_JUMP_WINDOW`) is open it's only that**, no wall jump
+  (decided): the bounce already is the reaction to the wall, and a timed
+  press used to also fire a wall jump that cost charge and cut the bounce's
+  upward kick. After the window, the bounce's wall stays jumpable for the
+  rest of `WALL_JUMP_WINDOW`. Lift zones are the exception: there a wall
+  jump is free and may follow a bounce at once.
 - **Jump debug view** (`dev/jump-debug.js`, all of it in that one file):
   toggled per player in the user menu ("Jump debug: ON/OFF", off by
   default), only for that player's own melon. While on, the contact state

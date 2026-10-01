@@ -18,7 +18,7 @@ import {
  *   bounceUpSpeed: number, // upward kick of a wall bounce (u/s)
  *   minBounceSpeed: number, // a bounce leaves the wall at least this fast (u/s), 0 = no minimum
  *   wallJumpCooldown: number, // seconds between two wall jumps
- *   freeWallJumps: boolean, // wall jumps cost no charge, are full strength, keep a higher upward kick
+ *   freeWallJumps: boolean, // wall jumps cost no charge, are full strength, may follow a bounce at once
  *   jumpBuffer: number, // seconds a jump press before touching a wall still counts, 0 = none
  * }} WallRules
  */

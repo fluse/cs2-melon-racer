@@ -297,8 +297,9 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → lift_enter
 - Every wall bounce kicks the melon upward: `WALL_BOUNCE_UP_SPEED` (220 u/s)
   normally, inside a lift zone its own kick instead. Parsed from a name
   matching `^lift_zone_(\d+(?:\.\d+)?)$`, any other name uses
-  `LIFT_ZONE_UP_SPEED` (450 u/s). A fall is cancelled first; a melon already
-  rising keeps that plus the kick. A PERFECT bounce kicks
+  `LIFT_ZONE_UP_SPEED` (450 u/s). That's the melon's upward speed right
+  after the bounce — a fall is cancelled, a melon already rising faster
+  keeps its own speed (kicks don't add up). A PERFECT bounce kicks
   `PERFECT_BOUNCE_UP_MULTIPLIER` (×1.2) harder.
 - Height gained per bounce ≈ kick² / 1600 units (gravity 800): 220 → ~30,
   450 → ~125, 600 → ~225. Size the zone to cover the whole climb, top

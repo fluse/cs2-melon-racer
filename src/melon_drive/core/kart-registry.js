@@ -21,7 +21,7 @@ import { predictionDotSet } from "./trace.js";
  *   boostTrail?: { melon: any, entities: any[] }, // the boost trail running on this melon (unset: none) — see fx/boost-trail/boost-trail.js
  *   nextBounceTime?: number, lastBounceTime?: number, // wall-bounce timing, see UpdateKart
  *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
- *   lastJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // wall-bounce timing presses, see RegisterWallTimingPress
+ *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
  *   lastWallContact?: { time: number, normal: { x: number, y: number } }, // last wall touched in the air (probe or bounce) — see UpdateWallContact
