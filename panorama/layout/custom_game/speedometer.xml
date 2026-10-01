@@ -101,7 +101,7 @@
 			<Button id="hub_start_button" class="HubStartButton">
 				<Label text="Start race" />
 			</Button>
-			<Label class="HubWaitingLabel" text="Rennen läuft bereits…" />
+			<Label class="HubWaitingLabel" text="Race already in progress…" />
 			<Button id="hub_abort_button" class="HubAbortButton">
 				<Label text="Cancel race" />
 			</Button>
@@ -121,8 +121,37 @@
 		     the next heat or the hub. -->
 		<Image id="finish_image" class="FinishImage Hidden" src="file://{images}/custom_game/word-finish.png" />
 
-		<!-- Line under the finish image between heats ("Nächste Strecke in 10s…"). -->
-		<Label id="break_label" class="BreakLabel Hidden" text="{s:break}" />
+		<!-- Countdown under the finish image between heats (BREAK_SECONDS … 0,
+		     see race-flow.js): a tens and a ones digit, all ten number images
+		     stacked in each; the On class on one image shows it. The tens
+		     slot (break_tens) only shows from 10 up, collapsed otherwise so
+		     a single digit stays centered. -->
+		<Panel id="break_countdown" class="BreakCountdown Hidden" hittest="false">
+			<Panel id="break_tens" class="BreakDigit BreakTens">
+				<Image id="break_tens_0" class="BreakDigitImage" src="file://{images}/custom_game/number-0.png" />
+				<Image id="break_tens_1" class="BreakDigitImage" src="file://{images}/custom_game/number-1.png" />
+				<Image id="break_tens_2" class="BreakDigitImage" src="file://{images}/custom_game/number-2.png" />
+				<Image id="break_tens_3" class="BreakDigitImage" src="file://{images}/custom_game/number-3.png" />
+				<Image id="break_tens_4" class="BreakDigitImage" src="file://{images}/custom_game/number-4.png" />
+				<Image id="break_tens_5" class="BreakDigitImage" src="file://{images}/custom_game/number-5.png" />
+				<Image id="break_tens_6" class="BreakDigitImage" src="file://{images}/custom_game/number-6.png" />
+				<Image id="break_tens_7" class="BreakDigitImage" src="file://{images}/custom_game/number-7.png" />
+				<Image id="break_tens_8" class="BreakDigitImage" src="file://{images}/custom_game/number-8.png" />
+				<Image id="break_tens_9" class="BreakDigitImage" src="file://{images}/custom_game/number-9.png" />
+			</Panel>
+			<Panel class="BreakDigit">
+				<Image id="break_ones_0" class="BreakDigitImage" src="file://{images}/custom_game/number-0.png" />
+				<Image id="break_ones_1" class="BreakDigitImage" src="file://{images}/custom_game/number-1.png" />
+				<Image id="break_ones_2" class="BreakDigitImage" src="file://{images}/custom_game/number-2.png" />
+				<Image id="break_ones_3" class="BreakDigitImage" src="file://{images}/custom_game/number-3.png" />
+				<Image id="break_ones_4" class="BreakDigitImage" src="file://{images}/custom_game/number-4.png" />
+				<Image id="break_ones_5" class="BreakDigitImage" src="file://{images}/custom_game/number-5.png" />
+				<Image id="break_ones_6" class="BreakDigitImage" src="file://{images}/custom_game/number-6.png" />
+				<Image id="break_ones_7" class="BreakDigitImage" src="file://{images}/custom_game/number-7.png" />
+				<Image id="break_ones_8" class="BreakDigitImage" src="file://{images}/custom_game/number-8.png" />
+				<Image id="break_ones_9" class="BreakDigitImage" src="file://{images}/custom_game/number-9.png" />
+			</Panel>
+		</Panel>
 
 		<!-- Wall-bounce feedback, shown briefly after each bounce (see
 		     UpdateBounceHud), in the bottom-right cluster right above the

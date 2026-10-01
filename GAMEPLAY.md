@@ -405,7 +405,7 @@ run by `race/heat/`):
    fires `hub_enter`/`hub_leave` script inputs on touch/untouch. While a
    kart is in it, that player sees a modal ("Start race" button) on the
    HUD — or, if a heat is already running for other players, the message
-   "Rennen läuft bereits…" instead of the button. Clicking the button only starts
+   "Race already in progress…" instead of the button. Clicking the button only starts
    a heat if the phase is still `HUB`. `hub_enter`/`hub_leave` are accepted
    **only from `hub_start_trigger` itself** (checked by caller name, and in
    the .vmap by `test/map/map-io.test.mjs`): any other trigger that should just
@@ -448,8 +448,9 @@ run by `race/heat/`):
    `lapsCompleted >= lapsToWin`, that kart is marked `finished` (locked in
    place, out of the way, so it doesn't keep re-triggering checkpoints) and
    that player immediately sees the big `word-finish.png` image
-   (`finish_image`) until the next heat or the hub, with the "next track /
-   back to hub in 10s" line under it once BREAK starts — it
+   (`finish_image`) until the next heat or the hub, with a countdown
+   under it once BREAK starts (`BREAK_SECONDS` … 0 in the
+   `number-0..9.png` images, `break_countdown`) — it
    does **not** end the heat by itself; see next. See "Multiple tracks &
    checkpoints" above for how it and `start_<trackId>` share a trigger.
 5. **BREAK** — once every kart that started this heat is either `finished`
@@ -473,7 +474,7 @@ The moderator's one power is aborting a heat that's already running
 mistake or needs to be redone. There's no separate always-visible button for
 this: the moderator gets it the same way anyone reaches the hub's "start"
 modal — by standing in `hub_start_trigger`. While a heat is running, a
-non-moderator standing there sees the "Rennen läuft bereits…" message;
+non-moderator standing there sees the "Race already in progress…" message;
 the moderator sees a "Cancel race" button instead
 (`hub_abort_button` in `speedometer.xml`, toggled via the `IsModerator` HUD
 class). Clicking it runs the same `ReturnAllToHub` + reset-to-`HUB` path a

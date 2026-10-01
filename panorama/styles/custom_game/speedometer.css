@@ -416,16 +416,15 @@
     }
 }
 
-/* Between-heat line right under .FinishImage ("Nächste Strecke in 10s…"). */
-.BreakLabel {
+/* Between-heat countdown right under .FinishImage (see #break_countdown):
+   two digit slots side by side, the number images stacked in each and
+   collapsed unless On; the whole tens slot is collapsed below 10, so a
+   single digit stays centered. */
+.BreakCountdown {
     horizontal-align: center;
     vertical-align: center;
-    margin-top: 20px;
-
-    font-size: 30px;
-    font-weight: bold;
-    color: #ffe066;
-    text-shadow: 2px 2px 4px black;
+    margin-top: 130px;
+    flow-children: right;
 
     transition-property: opacity;
     transition-duration: .15s;
@@ -433,6 +432,27 @@
 
     &.Hidden {
         opacity: 0;
+    }
+}
+
+/* Collapsed (no width, no margin) unless On — from 10 up. */
+.BreakTens {
+    visibility: collapse;
+    /* The number images have empty space at their sides — pull the two digits together. */
+    margin-right: -36px;
+
+    &.On {
+        visibility: visible;
+    }
+}
+
+.BreakDigitImage {
+    width: 128px;
+    height: 128px;
+    visibility: collapse;
+
+    &.On {
+        visibility: visible;
     }
 }
 

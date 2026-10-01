@@ -5114,6 +5114,30 @@ function UpdateUserMenu(slot, kart) {
     }
 }
 
+// Pure rules of the heat flow (no engine calls) — see race-flow.js.
+
+/**
+ * The number the BREAK countdown under the FINISH image shows, `remaining`
+ * seconds before the break ends: rounded, so it runs BREAK_SECONDS … 0 with
+ * every number but the first and the last up for a full second (0 for the
+ * break's last half second). Never below 0.
+ * @param {number} remaining
+ */
+function BreakCountdownValue(remaining) {
+    return Math.max(0, Math.round(remaining));
+}
+
+/**
+ * The digit images that show `value`: tens undefined below 10 (no leading
+ * zero), at most two digits (above 99 shows 99).
+ * @param {number} value
+ * @returns {{ tens: number | undefined, ones: number }}
+ */
+function CountdownDigits(value) {
+    const clamped = Math.min(99, Math.max(0, Math.floor(value)));
+    return { tens: clamped >= 10 ? Math.floor(clamped / 10) : undefined, ones: clamped % 10 };
+}
+
 // --- Race flow: hub -> countdown -> racing -> break --------------------
 // See GAMEPLAY.md's "Hub -> race -> next-track flow" for the full design.
 // Lives here (not a separate point_script) because it's tightly coupled to
@@ -5133,6 +5157,32 @@ let phaseEndTime = 0;
  * values above 3, so a COUNTDOWN_SECONDS > 3 shows nothing until 3.
  */
 const COUNTDOWN_SHOW_CLASSES = ["Show3", "Show2", "Show1", "ShowGo"];
+
+/** Number the BREAK countdown last sent to each slot — the digit images are
+ * only re-sent when it changes (one class per image, see speedometer.xml).
+ * @type {Map<number, number>} */
+const breakCountdownShown = new Map();
+
+/**
+ * Shows `value` on one player's break_countdown (number-0..9 images, a tens
+ * digit only from 10 up), or hides it with `value` undefined.
+ * @param {number} slot @param {number | undefined} value
+ */
+function SetBreakCountdown(slot, value) {
+    const hud = GetSpeedHud();
+    if (value === undefined) {
+        breakCountdownShown.delete(slot);
+    } else {
+        breakCountdownShown.set(slot, value);
+    }
+    const digits = value === undefined ? undefined : CountdownDigits(value);
+    hud?.SetHasClassForPlayer(slot, "break_countdown", "Hidden", value === undefined);
+    hud?.SetHasClassForPlayer(slot, "break_tens", "On", digits?.tens !== undefined);
+    for (let d = 0; d <= 9; d++) {
+        hud?.SetHasClassForPlayer(slot, `break_tens_${d}`, "On", digits?.tens === d);
+        hud?.SetHasClassForPlayer(slot, `break_ones_${d}`, "On", digits?.ones === d);
+    }
+}
 
 /**
  * Restores phase/activeTrackId/phaseEndTime from an OnScriptReload snapshot
@@ -5383,7 +5433,7 @@ function SendKartsOutOfRace(returning, spawn, label) {
         // non-HUB phase (a moderator abort can land mid-COUNTDOWN, not just
         // after a heat finishes normally in BREAK).
         GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
-        GetSpeedHud()?.SetHasClassForPlayer(slot, "break_label", "Hidden", true);
+        SetBreakCountdown(slot, undefined);
         SetFinishImageVisible(slot, false);
     });
 }
@@ -5458,29 +5508,35 @@ function UpdateRaceFlow(now) {
         if (racers.every((kart) => kart.finished)) {
             phase = RacePhase.BREAK;
             phaseEndTime = now + BREAK_SECONDS;
-            // "Ziel!" itself is the finish_image FinishKart already shows; this is just the line under it.
-            const message = NextTrackId() !== undefined ? `Nächste Strecke in ${BREAK_SECONDS}s…` : `Zurück zum Hub in ${BREAK_SECONDS}s…`;
-            for (const kart of racers) {
-                const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-                if (slot === undefined) {
-                    continue;
-                }
-                hud?.SetHasClassForPlayer(slot, "break_label", "Hidden", false);
-                hud?.SetDialogVariableStringForPlayer(slot, "break_label", "break", message);
-            }
+            // The countdown itself is drawn by the BREAK branch below, under
+            // the finish_image FinishKart already shows.
+            breakCountdownShown.clear();
             Debug(`UpdateRaceFlow: heat on track ${activeTrackId} complete, break started`);
         }
         return;
     }
 
-    if (phase === RacePhase.BREAK && now >= phaseEndTime) {
+    if (phase === RacePhase.BREAK && now < phaseEndTime) {
+        // Counting down to the next track / the hub: BREAK_SECONDS … 0 in
+        // number images under the finish image, re-sent only on change.
+        const value = BreakCountdownValue(phaseEndTime - now);
+        for (const kart of CurrentRacers()) {
+            const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+            if (slot !== undefined && breakCountdownShown.get(slot) !== value) {
+                SetBreakCountdown(slot, value);
+            }
+        }
+        return;
+    }
+
+    if (phase === RacePhase.BREAK) {
         const racers = CurrentRacers();
         const nextTrackId = NextTrackId();
         if (nextTrackId !== undefined) {
             for (const kart of racers) {
                 const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
                 if (slot !== undefined) {
-                    hud?.SetHasClassForPlayer(slot, "break_label", "Hidden", true);
+                    SetBreakCountdown(slot, undefined);
                 }
             }
             BeginHeat(nextTrackId);
