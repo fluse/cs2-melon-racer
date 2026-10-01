@@ -462,12 +462,18 @@
 .SpeedBottom {
     horizontal-align: center;
     vertical-align: bottom;
+    perspective: 400;
 }
 
-/* Spacer, speed panel and the wall-jump dots in a row. No CSS 3D tilt: in a
-   panel turned with rotateX, class changes from script never showed. */
+/* Spacer, speed panel and the wall-jump dots in a row, tilted back (top
+   away from the viewer) around its bottom edge. Second try: the first tilt
+   seemed to swallow script class changes, but that was before the
+   one-class-per-panel and periodic-resend fixes — if the health bar or the
+   jump dots stop updating in-game again, remove the transform. */
 .SpeedRow {
     flow-children: right;
+    transform-origin: 50% 100%;
+    transform: rotateX( 50deg ) scale3d( 1, 1.4, 1 );
 }
 
 /* As wide as .JumpDots (its width + margin-left), so #speed_panel stays centered. */

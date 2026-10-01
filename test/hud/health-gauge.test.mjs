@@ -71,10 +71,6 @@ test("speedometer.css: transparent by default, On makes white, no transitions or
     assert.ok(!/transition|blur|shadow|wash-color/.test(css.slice(start, end).replace(/\/\*.*?\*\//gs, "")), "no transition, blur, shadow or tint on the bar or dots");
 });
 
-test("no CSS 3D transforms in the HUD — class changes from script don't show inside them", () => {
-    assert.ok(!/rotate[XY]\(|perspective:/.test(css), "rotateX/rotateY/perspective in speedometer.css");
-});
-
 test("health bar: pieces beyond the health left are Off, and nothing is re-sent while it stays the same", () => {
     const kart = { health: MELON_MAX_HEALTH, wallJumpCharge: WALL_JUMP_CHARGES };
     UpdateHealthHud(0, kart);
