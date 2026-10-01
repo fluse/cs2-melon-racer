@@ -9,7 +9,7 @@ this file, the script doesn't know about it.
   [TRACK_CREATION.md](TRACK_CREATION.md).
 - For *why* things behave the way they do, see [GAMEPLAY.md](GAMEPLAY.md).
 - All names below are defined in
-  [src/melon_drive/constants/](src/melon_drive/constants/) (mostly `spawn.js`, `race.js`, `paint.js`, `teleport.js`);
+  the `constants.js` of each folder in [src/melon_drive/](src/melon_drive/) (mostly `kart/`, `race/`, `zones/teleport/`), all re-exported by `constants/index.js`;
   `test/mapping-api-doc.test.mjs` fails if one is missing from this file.
 
 ## 1. General conventions
@@ -421,7 +421,7 @@ outputs: OnStartTouch → melon_drive_script → RunScriptInput → jump_pad_ent
 | `SPAWN_UP_OFFSET` | 40 | units above the floor under `hub_spawn` / `intro_spawn` — keep spawn entities near the floor, a long drop can break the melon |
 
 Script inputs are pre-registered up to these limits; raise them in
-`constants/race.js` (and rebuild) if a map needs more.
+`race/constants.js` (and rebuild) if a map needs more.
 
 ## 6. Checking your map
 
@@ -449,7 +449,7 @@ Script inputs are pre-registered up to these limits; raise them in
 - a `checkpoint_spawn_<t>_<i>` `info_target` whose `checkpoint_<t>_<i>` no trigger fires,
 - entity names with leading/trailing whitespace.
 
-In game, with `DEBUG` on (`src/melon_drive/debug.js`), the console logs
+In game, with `DEBUG` on (`src/melon_drive/core/debug.js`), the console logs
 every touch the script accepts or ignores (`[melon_drive] checkpoint_1_2:
 …`). Wiring mistakes that `npm test` can't see from the .vmap (a teleporter
 pointing at a missing entity at runtime, `hub_enter` from the wrong trigger)

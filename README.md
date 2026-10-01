@@ -78,27 +78,19 @@ melon_racer/
 └── src/                                        # hand-authored gameplay scripts (edit here)
     ├── tsconfig.json                           # editor type-checking config
     ├── gamemode/index.js                       # cvars, teams, disables combat damage
-    └── melon_drive/                            # the core game mode, split by concern:
-        ├── index.js          # wiring: registers Instance.On*/OnScriptInput handlers
-        ├── constants/        # every tunable value (speeds, accel, health, timings, ...), one file per system
-        ├── kart-registry.js  # per-player kart state (the `karts` map)
-        ├── kart-spawn.js     # spawning/parking melons and player pawns
-        ├── physics/          # melon physics, one file per concern (import via physics/index.js):
-        │   ├── drive.js         # UpdateKart: the per-tick order, steering, friction, speed cap
-        │   ├── jump.js          # ground jump, wall jump + its charge, wall-bounce jump timing
-        │   ├── contact.js       # floor/wall contact probes + DEBUG overlay
-        │   ├── wall-bounce.js   # wall detection on impact, the bounce, its damage
-        │   ├── damage.js        # impact damage
-        │   ├── breaking.js      # breaking, the delay at the crash site, respawn after it
-        │   ├── break-effects.js # particles + physics pieces at the crash site
-        │   └── teleport.js      # checkpoint respawn, generic teleports, paint color
-        ├── camera.js         # third-person chase camera + distance/height controls
-        ├── hud.js            # drives the custom_hud_layout (speedometer, menus, banners)
-        ├── checkpoints.js    # checkpoint/finish script-input handlers, lap counting
-        ├── track-config.js   # parses start_* / checkpoint_* trigger names into track configs
-        ├── race-flow.js      # HUB / COUNTDOWN / RACING / BREAK state machine
-        ├── think.js          # per-tick driver calling into all the above
-        └── debug.js          # DEBUG flag + logging helper
+    └── melon_drive/                            # the core game mode, one folder per domain:
+        ├── index.js          # wiring only: tick loop, hot-reload snapshot, each domain's Register*Inputs()
+        ├── constants/index.js # re-exports every folder's constants.js (tunables + Hammer names)
+        ├── core/             # kart registry, per-tick driver (think.js), traces, Debug
+        ├── kart/             # spawning melons + parking pawns, spawn points, teleporting, paint + glow
+        ├── movement/         # driving, floor/wall contact, jumping, wall bounce, attack boost, momentum
+        ├── health/           # impact damage, breaking + respawn, healing
+        ├── zones/            # lift, jump pad, camera zone and teleporter triggers
+        ├── race/             # tracks from trigger names, checkpoints/laps, time trial, hub/heat flow
+        ├── camera/           # third-person chase camera and its zooms
+        ├── hud/              # one file per HUD panel (speedometer, bounce panel, track, hub modal, user menu), button clicks
+        ├── fx/               # particles, boost trail, guide line
+        └── dev/              # debug views (jump debug, attack log)
 ```
 
 There is no `addoninfo.txt` — CS2 Workshop Tools identifies this addon purely by its folder name (`melon_racer`) under `csgo_addons/`.
@@ -119,7 +111,7 @@ Hammer entities (triggers, point_templates, named by convention)
 maps/scripts/melon_drive.js   (AUTO-GENERATED bundle, this is what Hammer loads)
         │  Rollup-bundled 1:1 from
         ▼
-src/melon_drive/*.js          (source of truth — edit these)
+src/melon_drive/**/*.js        (source of truth — edit these)
         │  drives
         ▼
 panorama/.../speedometer.xml + .css   (custom_hud_layout — speedometer, menus, banners)
@@ -136,9 +128,9 @@ For the full `cs_script` API reference (available `Instance` calls, entity class
 Some common ways to build on this repo, and where to start:
 
 - **Add a new track** — pure Hammer work, no script changes. Follow [TRACK_CREATION.md](TRACK_CREATION.md) step by step.
-- **Tune physics/feel** (acceleration, top speed, jump height, impact-damage sensitivity, camera offsets, timings) — all tunables live in `src/melon_drive/constants/`, one file per system (`driving.js`, `jump.js`, `camera.js`, …). Change a value, rebuild, and hot-reload in tools mode to feel the difference immediately.
-- **Add HUD elements or menus** — edit `panorama/layout/custom_game/speedometer.xml` and the matching `speedometer.css`, then wire the new elements from `src/melon_drive/hud.js`. Note CS2's custom HUD layouts only support `<Panel>`, `<Label>`, `<Image>`, and `<Button>` — no native sliders/inputs and no inline scripting.
-- **Add gameplay mechanics** (boost pads, new trigger types, new melon behaviors) — follow the existing pattern: a Hammer trigger fires `RunScriptInput` on `melon_drive`, handled by a new (or extended) module under `src/melon_drive/`, registered from `index.js`.
+- **Tune physics/feel** (acceleration, top speed, jump height, impact-damage sensitivity, camera offsets, timings) — every tunable lives in the `constants.js` of the folder it belongs to (`movement/driving/`, `movement/jump/`, `camera/`, …), all re-exported by `src/melon_drive/constants/index.js`. Change a value, rebuild, and hot-reload in tools mode to feel the difference immediately.
+- **Add HUD elements or menus** — edit `panorama/layout/custom_game/speedometer.xml` and the matching `speedometer.css`, then wire the new elements from `src/melon_drive/hud/`. Note CS2's custom HUD layouts only support `<Panel>`, `<Label>`, `<Image>`, and `<Button>` — no native sliders/inputs and no inline scripting.
+- **Add gameplay mechanics** (boost pads, new trigger types, new melon behaviors) — follow the existing pattern: a Hammer trigger fires `RunScriptInput` on `melon_drive`, handled by a new feature folder (or an extended one) under the fitting domain in `src/melon_drive/` — `constants.js`, pure rules in `logic.js`, engine side, `inputs.js` for its script inputs — registered through that domain's `Register*Inputs()`.
 - **Add sound** — `soundevents/soundevents_addon.vsndevts` currently only contains Valve's stock example ambience events; there's no melon-specific audio yet (e.g. a break sound, engine/roll sound, countdown beep) — a good, self-contained first contribution.
 
 When in doubt about an engine API call or addon-editing rule, check [AGENTS.md](AGENTS.md) first — it also points at a local reference addon (`cs_script_demo`) with minimal worked examples for common `cs_script` patterns.

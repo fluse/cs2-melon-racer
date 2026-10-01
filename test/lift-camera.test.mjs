@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LiftCameraBlend, LiftCameraOffset } from "../src/melon_drive/logic/lift-camera.js";
+import { LiftCameraBlend, LiftCameraOffset } from "../src/melon_drive/camera/lift-zoom-logic.js";
 import { LIFT_CAMERA_EXTRA_DISTANCE, LIFT_CAMERA_EXTRA_HEIGHT, LIFT_CAMERA_EASE_SECONDS } from "../src/melon_drive/constants/index.js";
 
 const base = { x: -50, y: 0, z: 10 };

@@ -33,26 +33,29 @@ soundevents/soundevents_addon.vsndevts   # sound event defs (KV3)
 sounds/*.wav                             # ambience: birds, interior, vent
 src/tsconfig.json                        # editor tooling config for src/**/*.js (references ../maps/scripts/point_script.d.ts)
 src/gamemode/index.js                    # gamemode entry: a single small file
-src/melon_drive/index.js, *.js           # melon_drive entry: split into one file per concern —
-                                          #   debug.js, kart-registry.js, track-config.js,
-                                          #   hud.js, race-flow.js, time-trial.js (run clock + saved best times), spawn-points.js, kart-spawn.js,
-                                          #   checkpoints.js, zone-inputs.js (heal/lift zone script inputs),
-                                          #   prediction.js, trace.js, think.js, particles.js (spawning/placing/starting/stopping/removing every point_template
-                                          #   particle effect — break, PERFECT spark, heal, boost trail), boost-trail.js (starts/stops the boost trail
-                                          #   per tick), melon-look.js (paint color + outline glow) — index.js just wires them together
-src/melon_drive/camera/*.js              # chase camera, one file per concern: follow.js (chase camera, fixed offset,
-                                          #   the only SetFollowConfig), break-zoom.js, lift-zoom.js, zone-zoom.js (camera zones) — others import from camera/index.js
-src/melon_drive/physics/*.js             # melon physics, one file per concern: drive.js (UpdateKart, the per-tick order),
-                                          #   jump.js, jump-pad.js (jump pad launch + no-damage flight), contact.js (floor/wall probes), wall-bounce.js, damage.js, breaking.js,
-                                          #   break-effects.js, teleport.js, zones.js (which heal/lift zones a melon is in, and the
-                                          #   WallRules that follow from it), jump-debug.js (the user-menu jump debug view) — others import from physics/index.js
-src/melon_drive/heal/*.js                # everything that heals a melon, together so it's easy to find: constants.js (HEAL_ZONE_*,
-                                          #   heal_zone_full), logic.js (pure rules, test/heal.test.mjs), zone.js (ApplyHealing per tick,
-                                          #   RestoreFullHealth on respawn), effect.js (heal particle on entering a zone) — heal_enter/heal_leave are registered in zone-inputs.js
-src/melon_drive/constants/*.js           # every tunable/Hammer name, one file per system (driving, jump, jump-pad, health, wall-bounce, boost-trail, attack-boost, momentum, lift, prediction,
-                                          #   breaking, race, time-trial, paint, teleport, spawn, camera, hud, debug) — import from constants/index.js
-src/melon_drive/logic/*.js               # pure game rules (health bar, wall bounce, attack boost, momentum, jump pads, lift zones, checkpoint progress, checkpoint strip HUD, time trial, break sequence, lift/zone camera zoom, teleport, ground/wall contact) — no engine import, unit-tested
-test/*.test.mjs                          # node:test unit tests for src/*/logic/ (`npm test`), plus checks of the .vmap/.xml the script relies on
+src/melon_drive/index.js                 # melon_drive entry — wiring only: tick loop, hot-reload snapshot, each domain's Register*Inputs()
+src/melon_drive/<domain>/                # one folder per domain, each with an index.js (its public API); bigger
+                                          #   domains have one subfolder per feature (see "Folder layout" below):
+                                          #   core/      kart-registry.js (Kart type, karts map, moderator), think.js (per-tick driver), trace.js, debug.js
+                                          #   kart/      spawn.js (melon spawn, frozen pawn, intro logo), spawn-points.js, teleport.js (checkpoint respawn,
+                                          #              generic teleport), look.js (paint color + outline glow), inputs.js (player reset/disconnect, melon_paint)
+                                          #   movement/  driving/ (drive.js = UpdateKart, the per-tick order; steering), contact/ (floor/wall probes),
+                                          #              jump/, wall-bounce/, attack-boost/, momentum/
+                                          #   health/    damage/ (impacts, flat landings), breaking/ (break, effects at the crash site, respawn, melon_break),
+                                          #              heal/ (heal zones, full health on respawn)
+                                          #   zones/     registry.js (which zones a melon is in, the WallRules that follow), inputs.js (every *_enter/*_leave),
+                                          #              lift/, jump-pad/ (launch + no-damage flight), camera-zone/, teleport/ (melon_teleport)
+                                          #   race/      track-config.js (tracks from trigger names), checkpoints/ (progress, start_/checkpoint_/finish_ inputs),
+                                          #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs)
+                                          #   camera/    follow.js (chase camera, the only SetFollowConfig), break-zoom.js, lift-zoom.js, zone-zoom.js
+                                          #   hud/       layout.js (the custom_hud_layout), one file per panel: speedometer.js, bounce-panel.js,
+                                          #              track.js (time trial + checkpoint strip), hub-modal.js, user-menu.js; inputs.js (every button click)
+                                          #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
+                                          #              boost-trail/, prediction/ (the guide line)
+                                          #   dev/       jump-debug.js (the user-menu jump debug view), attack-debug.js
+src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
+test/*.test.mjs                          # node:test unit tests for the pure files (`npm test`), engine-side tests against the fake engine,
+                                          #   checks of the .vmap/.xml the script relies on, and module-layout.test.mjs (the folder rules below)
 test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities
 test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
@@ -77,25 +80,37 @@ materials/melon_racer/*_decal.vmat       # decals (csgo_static_overlay, transluc
 
 `src/<entry>/` is where gameplay code goes — one directory per `point_script`
 entity (currently `src/melon_drive/` and `src/gamemode/`), with `index.js` as
-that entry's actual module entry point. Split a growing entry into multiple
-files under its directory (melon_drive.js's split above is the reference
-example — constants and small cross-cutting helpers get their own file,
-`index.js` stays a thin wiring layer over `Instance.On*`/`OnScriptInput`
-registration) and import between them as normal ES modules, plus `import ...
-from "cs_script/point_script"` as usual — that specifier is a virtual module
-the CS2 engine provides at runtime, not a real package, so leave it as a bare
-import. A JSDoc-only type from another sibling file (no runtime import
-needed) is referenced as `@param {import("./other-file.js").TypeName}`.
+that entry's actual module entry point, kept a thin wiring layer over
+`Instance.On*`/`OnScriptInput` registration. Import between files as normal
+ES modules, plus `import ... from "cs_script/point_script"` as usual — that
+specifier is a virtual module the CS2 engine provides at runtime, not a real
+package, so leave it as a bare import. A JSDoc-only type from another file
+(no runtime import needed) is referenced as
+`@param {import("../core/kart-registry.js").Kart}`.
 
-When one of those files itself grows too big, turn it into a subfolder with
-one file per concern plus an `index.js` that re-exports what the rest of the
-entry uses — `src/melon_drive/physics/` (formerly `kart-physics.js`) is the
-reference. Engine-side files there mirror the pure rules in `logic/`
-(`physics/contact.js` ↔ `logic/contact.js`, …). Import from the folder's
-`index.js`, except where that would close an import cycle (e.g. `hud.js`
-takes `GetJumpChargeFraction` straight from `physics/jump.js`); Rollup
-prints `Circular dependency` warnings on `npm run build` — keep it free of
-them.
+### Folder layout (`src/melon_drive/` is the reference)
+
+- **Domains, then features, at most two levels.** Each top-level folder is a
+  domain (`kart/`, `movement/`, `race/`, …, see the tree above); a domain
+  that holds several mechanics has one subfolder per feature
+  (`movement/wall-bounce/`, `zones/jump-pad/`, …). Nothing but `index.js`
+  sits loose in `src/melon_drive/` (`test/module-layout.test.mjs`).
+- **Every feature folder has the same shape** (`health/heal/` is the
+  reference): `constants.js` (tunables, Hammer names), `logic.js` (pure
+  rules), engine-side files named by what they do, `inputs.js` exporting a
+  `Register…Inputs()` for its `OnScriptInput`s, and an `index.js` for its
+  public API where it has more than one consumer. A folder with several pure
+  rule files names them `<topic>-logic.js` next to the engine file they
+  serve (`camera/lift-zoom.js` ↔ `camera/lift-zoom-logic.js`).
+- **A new feature is a new folder** in the fitting domain, registered
+  through that domain's `index.js` (inputs) or `core/think.js` (per-tick
+  update) — nothing else central needs to change. Add its `constants.js`
+  to `constants/index.js`.
+- **Each domain's `index.js` is its public API** — other domains and tests
+  import from it, except where that would close an import cycle (e.g.
+  `hud/speedometer.js` takes `GetJumpChargeFraction` straight from
+  `movement/jump/jump.js`); Rollup prints `Circular dependency` warnings on
+  `npm run build` — keep it free of them.
 
 ### Build step: `src/` -> `maps/scripts/*.js`
 
@@ -306,19 +321,20 @@ examples — read these instead of guessing signatures:
   generated files directly. `point_script.d.ts`/`src/tsconfig.json` give
   editors type-checking against the real API; keep them in sync if Valve
   updates the demo addon's copies.
-- **Pure logic goes in `src/<entry>/logic/`, with tests.** Game rules that
-  are just math/state transitions (no traces, entities, HUD calls) live in
-  `logic/*.js` files that must **not** import `cs_script/point_script` (or
-  any sibling that does — only `constants/` and other `logic/` files), so
-  Node can load them. The engine-side files call into them and handle the
-  side effects (e.g. `checkpoints.js` logs/`FinishKart`s based on the result
-  string `ApplyCheckpointTouch` returns). Exception: a feature folder that
-  keeps one system together (`heal/`) has its pure rules in its own
-  `logic.js` under the same rules. Each has a `test/<name>.test.mjs`
+- **Pure logic goes in the feature's `logic.js` (or `<topic>-logic.js`),
+  with tests.** Game rules that are just math/state transitions (no traces,
+  entities, HUD calls) live in those files, which — like every
+  `constants.js` — must **not** import `cs_script/point_script` (or any
+  file that does — only other `constants.js`/`logic.js`/`*-logic.js` files
+  and `constants/index.js`), so Node can load them;
+  `test/module-layout.test.mjs` enforces it. The engine-side files next to
+  them call into them and handle the side effects (e.g.
+  `race/checkpoints/checkpoints.js` logs/`FinishKart`s based on the result
+  string `ApplyCheckpointTouch` returns). Each has a `test/<name>.test.mjs`
   using the built-in `node:test` runner — run `npm test` after touching
   them, and add/adjust a test when changing a rule. Write assertions in
   terms of the constants (`WALL_BOUNCE_OPTIMAL_ANGLE`, ...) rather than
-  their current values, so retuning `constants/` doesn't break tests.
+  their current values, so retuning a `constants.js` doesn't break tests.
 - **Engine-side files can be tested against a fake engine** when a rule
   spans them (e.g. `test/view-facing.test.mjs`: every teleport/spawn path
   turns the player's view): `import "./helpers/register-cs-script.mjs"`
@@ -327,7 +343,7 @@ examples — read these instead of guessing signatures:
   whose `world` holds fake entities (`Entity`, `CSPlayerPawn`,
   `PointTemplate`) and records every `Instance.On*` registration in
   `world.handlers`. It's a stub, not a simulation (traces never hit,
-  `Delay` resolves immediately) — prefer pure `logic/` tests, and extend
+  `Delay` resolves immediately) — prefer pure `logic.js` tests, and extend
   the mock only as far as a test needs.
 - Beyond that, verifying a gameplay change means loading the map in Hammer
   / launching CS2 in-game (`map melon_racer`), which only the user can do.

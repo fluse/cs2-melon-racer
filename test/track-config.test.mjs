@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity } from "./helpers/cs-script-mock.mjs";
 
-const { GetTrackConfig, GetTrackOrder } = await import("../src/melon_drive/track-config.js");
+const { GetTrackConfig, GetTrackOrder } = await import("../src/melon_drive/race/track-config.js");
 const { DEFAULT_LAPS_TO_WIN } = await import("../src/melon_drive/constants/index.js");
 
 /** @param {string} name @param {string} [className] */

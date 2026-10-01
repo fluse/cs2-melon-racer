@@ -10,14 +10,15 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "./helpers/cs-script-mock.mjs";
 
-const { karts } = await import("../src/melon_drive/kart-registry.js");
-const { SetUpPlayerKart } = await import("../src/melon_drive/kart-spawn.js");
-const { GetIntroSpawnPoint } = await import("../src/melon_drive/spawn-points.js");
-const { RespawnKartAtCheckpoint, TeleportKartTo, BreakMelon, HandleMelonLost } = await import("../src/melon_drive/physics/index.js");
-const { CurrentCameraZone, StrongestZone } = await import("../src/melon_drive/physics/zones.js");
+const { karts } = await import("../src/melon_drive/core/kart-registry.js");
+const { SetUpPlayerKart } = await import("../src/melon_drive/kart/spawn.js");
+const { GetIntroSpawnPoint } = await import("../src/melon_drive/kart/spawn-points.js");
+const { RespawnKartAtCheckpoint, TeleportKartTo } = await import("../src/melon_drive/kart/index.js");
+const { BreakMelon, HandleMelonLost } = await import("../src/melon_drive/health/index.js");
+const { CurrentCameraZone, StrongestZone } = await import("../src/melon_drive/zones/registry.js");
 const { UpdateZoneCamera } = await import("../src/melon_drive/camera/zone-zoom.js");
-const { CameraZoneFromName } = await import("../src/melon_drive/logic/camera-zone.js");
-const { ReturnAllToHub, BeginHeat } = await import("../src/melon_drive/race-flow.js");
+const { CameraZoneFromName } = await import("../src/melon_drive/zones/camera-zone/logic.js");
+const { ReturnAllToHub, BeginHeat } = await import("../src/melon_drive/race/heat/race-flow.js");
 const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, CAMERA_ZONE_EASE_SECONDS } = await import("../src/melon_drive/constants/index.js");
 await import("../src/melon_drive/index.js"); // registers the script inputs
 

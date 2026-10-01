@@ -2,7 +2,7 @@
 // effects stay), asserted in terms of the constants, not their values.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BreakCameraZoomFraction, BreakCameraOffset, PruneBreakEffects, BreakPieceVelocity, RecenterOnto } from "../src/melon_drive/logic/break-sequence.js";
+import { BreakCameraZoomFraction, BreakCameraOffset, PruneBreakEffects, BreakPieceVelocity, RecenterOnto } from "../src/melon_drive/health/breaking/logic.js";
 import {
     BREAK_CAMERA_ZOOM_SECONDS,
     BREAK_CAMERA_EXTRA_DISTANCE,

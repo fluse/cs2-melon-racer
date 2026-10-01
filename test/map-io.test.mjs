@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { ReadVmapConnections, ReadVmapEntities } from "./helpers/vmap.mjs";
-import { ParseTeleportTarget } from "../src/melon_drive/logic/teleport.js";
+import { ParseTeleportTarget } from "../src/melon_drive/zones/teleport/logic.js";
 import { HUB_TRIGGER_NAME, CHECKPOINT_SPAWN_NAME_PATTERN, START_TRIGGER_NAME_PATTERN, START_SPAWN_NAME_PATTERN, CHECKPOINT_TRIGGER_NAME_PATTERN } from "../src/melon_drive/constants/index.js";
 
 const vmapPath = fileURLToPath(new URL("../maps/melon_racer.vmap", import.meta.url));

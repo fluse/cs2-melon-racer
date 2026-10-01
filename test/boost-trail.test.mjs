@@ -1,13 +1,13 @@
-// The boost trail: when it's on (logic/boost-trail.js) and how
-// src/melon_drive/boost-trail.js starts, keeps and stops it on a melon,
+// The boost trail: when it's on (fx/boost-trail/logic.js) and how
+// src/melon_drive/fx/boost-trail/boost-trail.js starts, keeps and stops it on a melon,
 // against the fake engine in helpers/cs-script-mock.mjs.
 import "./helpers/register-cs-script.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, PointTemplate } from "./helpers/cs-script-mock.mjs";
 
-const { ShouldShowBoostTrail } = await import("../src/melon_drive/logic/boost-trail.js");
-const { UpdateBoostTrail, StopBoostTrail } = await import("../src/melon_drive/boost-trail.js");
+const { ShouldShowBoostTrail } = await import("../src/melon_drive/fx/boost-trail/logic.js");
+const { UpdateBoostTrail, StopBoostTrail } = await import("../src/melon_drive/fx/boost-trail/boost-trail.js");
 const { MAX_SPEED, BOOST_TRAIL_START_MARGIN, BOOST_TRAIL_STOP_MARGIN, BOOST_TRAIL_TEMPLATE_NAME, BOOST_TRAIL_FADE_SECONDS } =
     await import("../src/melon_drive/constants/index.js");
 

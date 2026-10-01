@@ -1,6 +1,6 @@
 // Checks the Hammer side of what the script spawns by name: every
-// point_template kart-spawn.js / physics/break-effects.js /
-// physics/wall-bounce.js (perfect spark) / heal/effect.js ForceSpawn must exist in
+// point_template kart/spawn.js / health/breaking/effects.js /
+// movement/wall-bounce/wall-bounce.js (perfect spark) / health/heal/effect.js ForceSpawn must exist in
 // maps/melon_racer.vmap exactly once, and point at real entities (the break,
 // spark and heal templates at info_particle_systems with an effect set) — otherwise the
 // script silently spawns nothing, e.g. no melon burst on a break.

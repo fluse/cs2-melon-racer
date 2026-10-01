@@ -1,0 +1,136 @@
+// Every button click in the HUD layout (OnCustomHudClicked): the hub modal's
+// start/close/abort buttons and the user menu's rows.
+import { Instance } from "cs_script/point_script";
+import { Debug } from "../core/debug.js";
+import { karts, IsModerator } from "../core/kart-registry.js";
+import { RespawnKartAtCheckpoint } from "../kart/teleport.js";
+import { IsMelonGlowOn, SetMelonGlow, SetKartPaintColor } from "../kart/look.js";
+import { IsPredictionOn, SetPrediction } from "../fx/prediction/prediction.js";
+import { IsJumpDebugOn, SetJumpDebug } from "../dev/jump-debug.js";
+import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial } from "../race/heat/race-flow.js";
+import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
+import { GetSpeedHud } from "./layout.js";
+import { HideHubModal } from "./hub-modal.js";
+import { SetUserMenuOpen, UpdateJumpDebugHud, UpdateMelonGlowHud, UpdatePredictionHud } from "./user-menu.js";
+import { COLOR_PRESETS } from "../constants/index.js";
+
+export function RegisterHudInputs() {
+    Instance.OnCustomHudClicked((event) => {
+        if (event.layout !== GetSpeedHud()) {
+            return;
+        }
+        if (event.buttonId === "hub_start_button") {
+            TryStartRace();
+        } else if (event.buttonId === "hub_close_button") {
+            // Dismiss just for the player who clicked it — doesn't touch
+            // kart.inHub, so they're still pulled into the next heat that starts
+            // while they're standing in hub_start_trigger, same as before.
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart) {
+                HideHubModal(slot, kart);
+            }
+        } else if (event.buttonId === "hub_abort_button") {
+            const slot = event.player.GetPlayerSlot();
+            if (IsModerator(slot)) {
+                TryAbortRace();
+            } else {
+                Debug(`hub_abort_button: slot ${slot} clicked but isn't the moderator, ignoring`);
+            }
+        } else if (event.buttonId === "usermenu_close_button") {
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart) {
+                SetUserMenuOpen(slot, kart, false);
+            }
+        } else if (event.buttonId === "usermenu_respawn_button") {
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (!kart) {
+                return;
+            }
+            if (kart.breaking) {
+                // Already mid-respawn from a break — it's about to land at this
+                // same checkpoint on its own, nothing for this click to do.
+                Debug(`usermenu_respawn_button: slot ${slot} kart is already breaking/respawning, ignoring`);
+                return;
+            }
+            if (kart.locked) {
+                // Held on the start grid for the countdown, or parked after
+                // finishing — it isn't going anywhere that respawning would fix,
+                // and mid-countdown it'd just teleport a racer around the grid.
+                Debug(`usermenu_respawn_button: slot ${slot} kart is locked, ignoring`);
+                return;
+            }
+            RespawnKartAtCheckpoint(kart);
+            SetUserMenuOpen(slot, kart, false);
+        } else if (event.buttonId === "usermenu_restart_button") {
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart && RestartTimeTrial(kart)) {
+                SetUserMenuOpen(slot, kart, false);
+            }
+        } else if (event.buttonId === "usermenu_hub_button") {
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (!kart) {
+                return;
+            }
+            // Self-service pull-out: just this racer leaves the heat, everyone
+            // else keeps going — unlike hub_abort_button, which is moderator-only
+            // and ends it for the whole group. ReturnAllToHub already supports a
+            // single-kart list (it's the same path a disconnecting racer takes).
+            Debug(`usermenu_hub_button: slot ${slot} returning to hub (racing=${kart.racing}, phase=${phase})`);
+            SetUserMenuOpen(slot, kart, false);
+            ReturnAllToHub([kart]);
+        } else if (event.buttonId === "usermenu_tutorial_button") {
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (!kart) {
+                return;
+            }
+            // Same self-service pull-out as the hub button above, to intro_spawn.
+            Debug(`usermenu_tutorial_button: slot ${slot} going to the tutorial (racing=${kart.racing}, phase=${phase})`);
+            SetUserMenuOpen(slot, kart, false);
+            SendKartToTutorial(kart);
+        } else if (event.buttonId === "usermenu_glow_button") {
+            // Per player: only this player's own melon (everyone still sees
+            // whatever glow a melon has — the engine's Glow isn't per viewer).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart) {
+                SetMelonGlow(kart, !IsMelonGlowOn(kart));
+                UpdateMelonGlowHud(slot, kart);
+            }
+        } else if (event.buttonId === "usermenu_prediction_button") {
+            // Per player: only this player's melon gets the line (drawn with
+            // DebugLine in the default render mode, so tools mode only).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart) {
+                SetPrediction(kart, !IsPredictionOn(kart));
+                UpdatePredictionHud(slot, kart);
+            }
+        } else if (event.buttonId === "usermenu_jumpdebug_button") {
+            // Per player: only this player's melon is drawn/logged (debug
+            // draws themselves only show in tools mode).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart) {
+                SetJumpDebug(kart, !IsJumpDebugOn(kart));
+                UpdateJumpDebugHud(slot, kart);
+            }
+        } else if (event.buttonId.startsWith("usermenu_color_")) {
+            const key = event.buttonId.slice("usermenu_color_".length);
+            const preset = COLOR_PRESETS[key];
+            if (!preset) {
+                Debug(`usermenu_color_${key}: no such color preset, ignoring`);
+                return;
+            }
+            const kart = karts.get(event.player.GetPlayerSlot());
+            if (kart) {
+                SetKartPaintColor(kart, preset);
+            }
+        }
+    });
+}

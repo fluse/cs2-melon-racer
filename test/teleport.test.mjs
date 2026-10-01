@@ -1,7 +1,7 @@
 // Rules of the generic teleporters (see TELEPORT_TRIGGER_NAME_PATTERN).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ParseTeleportTarget, ParseTeleportTrigger, TeleportExitVelocity, ViewAnglesFacing } from "../src/melon_drive/logic/teleport.js";
+import { ParseTeleportTarget, ParseTeleportTrigger, TeleportExitVelocity, ViewAnglesFacing } from "../src/melon_drive/zones/teleport/logic.js";
 import { TELEPORT_KEEP_SPEED } from "../src/melon_drive/constants/index.js";
 
 test("the destination is read from the trigger's own name", () => {

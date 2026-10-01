@@ -1,4 +1,4 @@
-// Jump pads: the rules (logic/jump-pad.js) and the real UpdateKart applying
+// Jump pads: the rules (zones/jump-pad/logic.js) and the real UpdateKart applying
 // them against the fake engine — jump pressed on the pad launches higher and
 // further, no press no launch, and no damage until shortly after landing.
 import "./helpers/register-cs-script.mjs";
@@ -6,11 +6,12 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "./helpers/cs-script-mock.mjs";
 
-const { JumpPadFromName, ShouldPadLaunch, PadLaunchVelocity, PadFlightAfter } = await import("../src/melon_drive/logic/jump-pad.js");
-const { karts } = await import("../src/melon_drive/kart-registry.js");
-const { SetUpPlayerKart } = await import("../src/melon_drive/kart-spawn.js");
-const { GetIntroSpawnPoint } = await import("../src/melon_drive/spawn-points.js");
-const { UpdateKart, ApplyImpactDamage } = await import("../src/melon_drive/physics/index.js");
+const { JumpPadFromName, ShouldPadLaunch, PadLaunchVelocity, PadFlightAfter } = await import("../src/melon_drive/zones/jump-pad/logic.js");
+const { karts } = await import("../src/melon_drive/core/kart-registry.js");
+const { SetUpPlayerKart } = await import("../src/melon_drive/kart/spawn.js");
+const { GetIntroSpawnPoint } = await import("../src/melon_drive/kart/spawn-points.js");
+const { UpdateKart } = await import("../src/melon_drive/movement/index.js");
+const { ApplyImpactDamage } = await import("../src/melon_drive/health/index.js");
 const C = await import("../src/melon_drive/constants/index.js");
 await import("../src/melon_drive/index.js"); // registers the script inputs
 

@@ -2,25 +2,24 @@
 // melon_drive, one file per system they configure. Import from here, not
 // from the single files. Actual mutable runtime state (kart registry, race
 // phase, caches) lives with the module that owns it instead — see
-// kart-registry.js, race-flow.js, track-config.js.
+// core/kart-registry.js, race/heat/race-flow.js, race/track-config.js.
 
-export * from "./driving.js";
-export * from "./jump.js";
-export * from "./jump-pad.js";
-export * from "./health.js";
-export * from "../heal/constants.js"; // heal zones live with the rest of healing in heal/
-export * from "./wall-bounce.js";
-export * from "./boost-trail.js";
-export * from "./attack-boost.js";
-export * from "./momentum.js";
-export * from "./lift.js";
-export * from "./prediction.js";
-export * from "./breaking.js";
-export * from "./race.js";
-export * from "./time-trial.js";
-export * from "./paint.js";
-export * from "./teleport.js";
-export * from "./spawn.js";
-export * from "./camera.js";
-export * from "./hud.js";
-export * from "./debug.js";
+export * from "../movement/driving/constants.js";
+export * from "../movement/jump/constants.js";
+export * from "../zones/jump-pad/constants.js";
+export * from "../health/damage/constants.js";
+export * from "../health/heal/constants.js"; // heal zones live with the rest of healing in heal/
+export * from "../movement/wall-bounce/constants.js";
+export * from "../fx/boost-trail/constants.js";
+export * from "../movement/attack-boost/constants.js";
+export * from "../movement/momentum/constants.js";
+export * from "../zones/lift/constants.js";
+export * from "../fx/prediction/constants.js";
+export * from "../health/breaking/constants.js";
+export * from "../race/constants.js";
+export * from "../race/time-trial/constants.js";
+export * from "../zones/teleport/constants.js";
+export * from "../kart/constants.js";
+export * from "../camera/constants.js";
+export * from "../hud/constants.js";
+export * from "../core/constants.js";

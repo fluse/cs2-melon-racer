@@ -13,7 +13,7 @@ import {
     ReflectOffWall,
     WallBounceDamage,
     IsWallContact,
-} from "../src/melon_drive/logic/wall-bounce.js";
+} from "../src/melon_drive/movement/wall-bounce/logic.js";
 import {
     WALL_BOUNCE_OPTIMAL_ANGLE,
     PERFECT_BOUNCE_TOLERANCE,

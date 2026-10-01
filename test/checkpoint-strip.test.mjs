@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CheckpointStrip } from "../src/melon_drive/logic/checkpoint-strip.js";
+import { CheckpointStrip } from "../src/melon_drive/hud/checkpoint-strip-logic.js";
 import { CHECKPOINT_HUD_SLOTS } from "../src/melon_drive/constants/index.js";
 
 const states = (strip) => strip.slots.map((s) => s.state);

@@ -1,4 +1,4 @@
-// Attack boost: the rule (logic/attack-boost.js) and the real UpdateKart
+// Attack boost: the rule (movement/attack-boost/logic.js) and the real UpdateKart
 // applying it against the fake engine — faster than MAX_SPEED, paid for
 // with health.
 import "./helpers/register-cs-script.mjs";
@@ -6,11 +6,11 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "./helpers/cs-script-mock.mjs";
 
-const { AttackBoost } = await import("../src/melon_drive/logic/attack-boost.js");
-const { karts } = await import("../src/melon_drive/kart-registry.js");
-const { SetUpPlayerKart } = await import("../src/melon_drive/kart-spawn.js");
-const { GetIntroSpawnPoint } = await import("../src/melon_drive/spawn-points.js");
-const { UpdateKart } = await import("../src/melon_drive/physics/index.js");
+const { AttackBoost } = await import("../src/melon_drive/movement/attack-boost/logic.js");
+const { karts } = await import("../src/melon_drive/core/kart-registry.js");
+const { SetUpPlayerKart } = await import("../src/melon_drive/kart/spawn.js");
+const { GetIntroSpawnPoint } = await import("../src/melon_drive/kart/spawn-points.js");
+const { UpdateKart } = await import("../src/melon_drive/movement/index.js");
 const C = await import("../src/melon_drive/constants/index.js");
 
 const DT = 1 / 64;

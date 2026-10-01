@@ -78,7 +78,7 @@ racing against the clock:
   again. Gone once a finish takes the melon off the track (a loop's next
   attempt has it again), in a heat (a free reset mid-race), in the hub or
   tutorial; ignored while the melon is breaking. \`RestartTimeTrial\` in
-  \`checkpoints.js\`, \`CanRestartTimeTrial\` in \`time-trial.js\`.
+  \`race/checkpoints/checkpoints.js\`, \`CanRestartTimeTrial\` in \`race/time-trial/time-trial.js\`.
 - Each player's **best time per track** is saved with
   `Instance.SetSaveData` (one JSON object for the addon, best times under
   `SAVE_DATA_BEST_TIMES_KEY`), so it survives map restarts. Keyed by
@@ -90,9 +90,9 @@ racing against the clock:
   it's over).
 
 Times are `Instance.GetGameTime()` differences, not wall-clock or per-tick
-accumulation. Constants: `constants/time-trial.js`; rules:
-`logic/time-trial.js` (`test/time-trial.test.mjs`), applied by
-`time-trial.js` (`test/time-trial-run.test.mjs`).
+accumulation. Constants: `race/time-trial/constants.js`; rules:
+`race/time-trial/logic.js` (`test/time-trial.test.mjs`), applied by
+`race/time-trial/time-trial.js` (`test/time-trial-run.test.mjs`).
 
 ## Melon props & boost pads
 
@@ -160,8 +160,8 @@ beyond that).
 **Flat landings hurt more:** landing on level ground (floor trace normal z ≥
 `FLAT_LANDING_MIN_NORMAL_Z`, and the impact mostly from above —
 `FLAT_LANDING_MIN_VERTICAL_SHARE`) multiplies that damage by
-`FLAT_LANDING_DAMAGE_MULTIPLIER` (`constants/health.js`, rule in
-`logic/health.js`). Landing on a slope, or crashing sideways, stays plain
+`FLAT_LANDING_DAMAGE_MULTIPLIER` (`health/damage/constants.js`, rule in
+`health/damage/logic.js`). Landing on a slope, or crashing sideways, stays plain
 impact damage; the threshold is the same, so landings that were free stay
 free.
 
@@ -181,7 +181,7 @@ melon is really touching it (`IsWallContact`): its center is within
 landing or bump in a small room bounced the melon off whatever wall lay
 ahead within trace range, seemingly off thin air. Since a collision often spans two ticks, the incoming velocity
 is whichever of the last two commanded velocities still heads more squarely
-into the wall. With `DEBUG` on (`debug.js`), every bounce logs the velocity
+into the wall. With `DEBUG` on (`core/debug.js`), every bounce logs the velocity
 angle next to the look angle (nothing is drawn in the world). There's no global "on/off per wall" — all walls do it.
 
 - **Angle is the skill part.** Angle closeness is 1 at exactly
@@ -232,8 +232,8 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   (decided): that speed shows only the perfect-hit spark, no trail, until it
   has decayed back to normal speed (a later non-PERFECT bounce or the attack
   boost shows the trail again). Visible to every player, so the
-  others see who's boosting. Rule: `logic/boost-trail.js`, applied by
-  `boost-trail.js` (`test/boost-trail.test.mjs`).
+  others see who's boosting. Rule: `fx/boost-trail/logic.js`, applied by
+  `fx/boost-trail/boost-trail.js` (`test/boost-trail.test.mjs`).
 - **Upward kick:** every bounce (any rating) also lifts the melon — its
   vertical speed becomes `WALL_BOUNCE_UP_SPEED` upward (a fall is cancelled
   first; a melon already rising keeps that plus the kick), so a bounce sends
@@ -249,7 +249,7 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   full strength, have a shorter cooldown (`LIFT_ZONE_WALL_JUMP_COOLDOWN`)
   and fire from a press made shortly before touching the wall
   (`LIFT_ZONE_JUMP_BUFFER`). While in a lift zone the chase camera eases back and
-  up (`LIFT_CAMERA_*` in `constants/camera.js`) so the climb stays in view,
+  up (`LIFT_CAMERA_*` in `camera/constants.js`) so the climb stays in view,
   looking through walls instead of being pulled in by them.
 - `WALL_BOUNCE_COOLDOWN` stops one wall contact from bouncing (and
   damaging) on consecutive ticks — including the plain landing/crash damage
@@ -273,7 +273,7 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   fast for its player to see the first one. Fresh copies per hit, so several karts' perfect hits
   at the same moment each show their own spark; `test/map-templates.test.mjs`
   checks the template exists in the .vmap and points at a particle system.
-- **Prediction line** (`prediction.js`, `PREDICTION_*`): a dotted line in
+- **Prediction line** (`fx/prediction/prediction.js`, `PREDICTION_*`): a dotted line in
   front of the melon along its current direction of travel up to the next
   wall, then on along the direction it would bounce off in, colored by the
   rating that hit would get at the current angle (`BOUNCE_RATINGS[].color`,
@@ -290,7 +290,7 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   `point_template` named `prediction_dot_template`, e.g. a small "Never
   Solid" `func_brush`, visible to everyone — every kart's line to every
   player) still exists but was judged to look worse than the debug line.
-  Traces skip dots either way (`trace.js`).
+  Traces skip dots either way (`core/trace.js`).
 
 ## Multiple tracks & checkpoints (implemented)
 
@@ -360,8 +360,8 @@ ends. Below it "LAP 1/3", only on tracks with more than one lap. The
 checkpoint count (and the laps-to-win count used by the flow below) comes
 from that track's trigger names — see "Hub → race → next-track flow".
 Flag icons: `tools/make-icons.mjs` (`track-start`, `track-finish`); rule:
-`logic/checkpoint-strip.js` (`test/checkpoint-strip.test.mjs`), applied
-in `hud.js`.
+`hud/checkpoint-strip-logic.js` (`test/checkpoint-strip.test.mjs`), applied
+in `hud/`.
 
 **Open question this raises**: should different tracks be mutually
 exclusive lap-wise (finishing/leaving one clears `trackId` back to
@@ -436,7 +436,7 @@ Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
    `countdown_panel`: one image per step, `number-3/2/1.png` and `word-go.png`
    in `panorama/images/custom_game/`, switched via `Show3`/`Show2`/`Show1`/
    `ShowGo` classes) counts down for the racers only. `COUNTDOWN_SECONDS`
-   in `constants/race.js` controls the length — there are only images for 3..1,
+   in `race/constants.js` controls the length — there are only images for 3..1,
    so a longer countdown shows nothing until 3.
 4. **RACING** — normal driving, existing checkpoint/lap logic, plus a
    dedicated `finish_<trackId>` script input (registered for every
@@ -542,12 +542,12 @@ While the attack boost is on, the boost trail shows from the first tick,
 whatever the speed (like Rocket League); letting go it keeps going only as
 long as the melon is still above the usual trail speed (see "Boost trail").
 Works on the ground and in the air, not while broken or race-locked.
-Constants: `constants/attack-boost.js`; rule: `logic/attack-boost.js`,
-applied in `physics/drive.js` (`test/attack-boost.test.mjs`).
+Constants: `movement/attack-boost/constants.js`; rule: `movement/attack-boost/logic.js`,
+applied in `movement/driving/drive.js` (`test/attack-boost.test.mjs`).
 The pawn must hold no weapon: the engine gives it a knife back after spawn,
 and every knife swing shoved the melon ~140 u/s — a free boost without the
-health cost. `HoldPawn` (`kart-spawn.js`) removes weapons every tick; with
-`DEBUG` on, `physics/attack-debug.js` logs what attack does (`[attack debug]`).
+health cost. `HoldPawn` (`kart/spawn.js`) removes weapons every tick; with
+`DEBUG` on, `dev/attack-debug.js` logs what attack does (`[attack debug]`).
 That alone didn't stop the push in-game, so on top: while attack is held
 and for `ATTACK_PUSH_GUARD_SECONDS` after, physics may not add horizontal
 speed beyond what the script commanded last tick (`WithoutEnginePush`) —
@@ -570,8 +570,8 @@ previous hit was at most `MOMENTUM_HIT_WINDOW` seconds ago — the first one
 back (same for a wall bounce's raised cap) does reaching the top speed
 count, and the run isn't broken either. Standing still, breaking and
 race-locking end the run. Speed earned by momentum isn't a boost: no
-`Boosted` HUD state, no boost trail. Constants: `constants/momentum.js`;
-rule: `logic/momentum.js`, applied in `physics/drive.js`
+`Boosted` HUD state, no boost trail. Constants: `movement/momentum/constants.js`;
+rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
 (`test/momentum.test.mjs`).
 
 ## Jumping (implemented)
@@ -625,7 +625,7 @@ rule: `logic/momentum.js`, applied in `physics/drive.js`
   first or a different wall (`WALL_JUMP_SAME_WALL_DOT`) — bouncing between
   two facing walls chains. The same press still counts as wall-bounce
   jump timing.
-- **Jump debug view** (`physics/jump-debug.js`, all of it in that one file):
+- **Jump debug view** (`dev/jump-debug.js`, all of it in that one file):
   toggled per player in the user menu ("Jump debug: ON/OFF", off by
   default), only for that player's own melon. While on, the contact state
   is on screen every tick (`GROUND` / `AIR` / `AIR + WALL`, whether it's
@@ -666,13 +666,13 @@ after landing, impacts and wall hits cost nothing (`DamageKart`); the attack
 boost's cost and `melon_break` still apply. Marked in the map by two
 ambient particle systems (`jump_pad_rings` + `jump_pad_sparks`, lime so
 they don't look like the cyan lift updraft). Constants:
-`constants/jump-pad.js`; rules: `logic/jump-pad.js`, applied by
-`physics/jump-pad.js` (`test/jump-pad.test.mjs`). Details for mappers:
+`zones/jump-pad/constants.js`; rules: `zones/jump-pad/logic.js`, applied by
+`zones/jump-pad/jump-pad.js` (`test/jump-pad.test.mjs`). Details for mappers:
 MAPPING_API.md 4.9.
 
 ## Spawn points (implemented)
 
-All spawn-entity lookups live in `spawn-points.js`; a melon always appears
+All spawn-entity lookups live in `kart/spawn-points.js`; a melon always appears
 `SPAWN_UP_OFFSET` above the floor traced straight down from the entity (no
 sideways offset, and exactly there — the `melon_template`'s own offset is
 corrected by a teleport right after `ForceSpawn`). Keep that drop short: a
@@ -682,7 +682,7 @@ long fall lands hard enough for the engine to destroy the melon on impact.
   (`logo_melon_racer.png`, `intro_logo` in `speedometer.xml`, full screen
   over a solid dark green backdrop, nothing of the world showing through) for `INTRO_LOGO_SECONDS`, the player's own body
   already frozen and hidden behind it; only then does the melon spawn
-  (`ShowIntroLogoThenSpawn` in `kart-spawn.js`). Reconnecting shows it again.
+  (`ShowIntroLogoThenSpawn` in `kart/spawn.js`). Reconnecting shows it again.
 - A player's very first melon (first join, i.e. no kart entry yet) appears
   at the `info_player_start` named `intro_spawn` — the tutorial area —
   facing that entity's own angles. It's also that new kart's respawn point
@@ -738,8 +738,8 @@ Each player switches it on/off for **their own melon** in the user menu's
 sees a melon's glow the same way — the engine's `Glow()` isn't per viewer,
 and the only per-viewer lever (the prop's "Glow Team") was ruled out: teams
 stay out of it (decided).
-`MELON_GLOW_ENABLED` (`constants/paint.js`) turns it off map-wide; applied
-by `melon-look.js`.
+`MELON_GLOW_ENABLED` (`kart/constants.js`) turns it off map-wide; applied
+by `kart/look.js`.
 
 ## Teleporters (implemented)
 
@@ -777,7 +777,7 @@ the destination's facing** too (pitch kept) — steering follows the view, so
 otherwise they'd keep driving the old way. That holds for every teleport
 and spawn of a melon, not just teleporters: checkpoint respawns, heat
 start, hub/tutorial, the first spawn (`FacePlayerView` in
-`spawn-points.js`). Broken or race-locked melons
+`kart/spawn-points.js`). Broken or race-locked melons
 (countdown, finished) ignore teleporters. Unlike Hammer's own
 `trigger_teleport`, this resets the per-tick tracking so the jump isn't
 read as a hard impact or wall hit.
@@ -793,13 +793,13 @@ takes the kart out of a running heat).
 Areas where the melon regains health over time: a `trigger_multiple`
 (filtered to `prop_physics`) whose `OnStartTouch` fires `RunScriptInput`
 `heal_enter` and whose `OnEndTouch` fires `heal_leave`. While inside, the
-melon heals every tick at `HEAL_ZONE_RATE` health/second (`constants/health.js`),
+melon heals every tick at `HEAL_ZONE_RATE` health/second (`health/damage/constants.js`),
 or at the rate in the trigger's name if it's called `heal_zone_<rate>`
 (e.g. `heal_zone_25`) — pure Hammer edit, same name-carries-the-config
 convention as paint triggers. A trigger named exactly `heal_zone_full` is a
 **full-heal zone**: the melon is refilled to `MELON_MAX_HEALTH` at once and
 kept full while inside. All healing code (constants, rules, zones and the
-full refill on respawn) lives in `src/melon_drive/heal/`. Capped at `MELON_MAX_HEALTH`; damage still
+full refill on respawn) lives in `src/melon_drive/health/heal/`. Capped at `MELON_MAX_HEALTH`; damage still
 applies inside, and overlapping zones don't stack (the fastest counts).
 Broken or race-locked melons don't heal. Teleports/respawns **keep** the
 melon's zones (heal, lift, camera): landing back inside the same trigger —
@@ -814,7 +814,7 @@ or race-locked melons). That effect is `particles/melon_racer/heal_crosses.vpcf`
 a burst of glowing "+" crosses rising off the melon, the same crosses and
 green/mint as the `holo_heal` gate material (`tools/make-holo.mjs`), all
 gone within the 2 s lifetime. All particle effects (break burst, PERFECT spark,
-heal) are spawned through `src/melon_drive/particles.js`
+heal) are spawned through `src/melon_drive/fx/particles.js`
 (`test/particles.test.mjs`).
 
 ## Camera zones (implemented)
@@ -833,11 +833,11 @@ front of* the melon, e.g. just above the ground (`camera_zone_front_40_0`), and 
 the camera right up behind the melon (default `CAMERA_CLOSEUP_DISTANCE`/`_HEIGHT`,
 16/4 units from its center), zooming in and out slowly
 (`CAMERA_CLOSEUP_EASE_SECONDS`). Any other
-name uses `CAMERA_ZONE_EXTRA_*` (`constants/camera.js`). The camera eases
+name uses `CAMERA_ZONE_EXTRA_*` (`camera/constants.js`). The camera eases
 over `CAMERA_ZONE_EASE_SECONDS` in and back out, never closer than
 `CAMERA_ZONE_MIN_DISTANCE`; overlapping camera zones don't stack (last
 entered counts), but a lift zone's zoom adds on top. Rules:
-`logic/camera-zone.js` (`test/camera-zone.test.mjs`), applied by
+`zones/camera-zone/logic.js` (`test/camera-zone.test.mjs`), applied by
 `camera/zone-zoom.js`. Details for mappers: MAPPING_API.md 4.8.
 
 ## Open design questions (not yet decided — ask before assuming)

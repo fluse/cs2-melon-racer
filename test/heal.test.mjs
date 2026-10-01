@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { HealedHealth, HealZoneRate } from "../src/melon_drive/heal/logic.js";
+import { HealedHealth, HealZoneRate } from "../src/melon_drive/health/heal/logic.js";
 import { MELON_MAX_HEALTH, HEAL_ZONE_RATE, HEAL_ZONE_FULL_NAME, HEAL_ZONE_FULL_RATE } from "../src/melon_drive/constants/index.js";
 
 test("healing adds rate * dt", () => {

@@ -1,4 +1,4 @@
-// The wall-bounce guide line (src/melon_drive/prediction.js) against the
+// The wall-bounce guide line (src/melon_drive/fx/prediction/prediction.js) against the
 // fake engine: off by default, drawn only once the player switches it on
 // in the user menu.
 import "./helpers/register-cs-script.mjs";
@@ -6,10 +6,10 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity } from "./helpers/cs-script-mock.mjs";
 
-const { UpdatePrediction, IsPredictionOn, SetPrediction } = await import("../src/melon_drive/prediction.js");
+const { UpdatePrediction, IsPredictionOn, SetPrediction } = await import("../src/melon_drive/fx/prediction/prediction.js");
 const { PREDICTION_MIN_SPEED, PREDICTION_RENDER_MODE } = await import("../src/melon_drive/constants/index.js");
 
-/** A kart as kart-spawn.js creates it, moving fast enough for a line. */
+/** A kart as kart/spawn.js creates it, moving fast enough for a line. */
 function MovingKart() {
     const melon = world.add(new Entity({ className: "prop_physics" }));
     melon.velocity = { x: PREDICTION_MIN_SPEED * 3, y: 0, z: 0 };

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ApplyCheckpointTouch, ApplyLapCompletion, ApplyStartTouch } from "../src/melon_drive/logic/checkpoint-progress.js";
+import { ApplyCheckpointTouch, ApplyLapCompletion, ApplyStartTouch } from "../src/melon_drive/race/checkpoints/logic.js";
 
 const TRACK = 1;
 const OTHER_TRACK = 2;
@@ -8,7 +8,7 @@ const RULES = { checkpoints: 3, lapsToWin: 2 };
 const RACE = { activeTrackId: TRACK, config: RULES };
 const FREE_ROAM = { activeTrackId: undefined, config: RULES };
 
-/** @param {Partial<import("../src/melon_drive/logic/checkpoint-progress.js").KartProgress>} [overrides] */
+/** @param {Partial<import("../src/melon_drive/race/checkpoints/logic.js").KartProgress>} [overrides] */
 function Kart(overrides) {
     return { trackId: undefined, checkpointIndex: 0, lapsCompleted: 0, racing: false, finished: false, ...overrides };
 }

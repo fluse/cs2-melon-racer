@@ -7,12 +7,12 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "./helpers/cs-script-mock.mjs";
 
-const { karts } = await import("../src/melon_drive/kart-registry.js");
-const { SetUpPlayerKart } = await import("../src/melon_drive/kart-spawn.js");
-const { GetIntroSpawnPoint } = await import("../src/melon_drive/spawn-points.js");
-const { BeginHeat, UpdateRaceFlow, ReturnAllToHub, RestoreRaceFlowSnapshot } = await import("../src/melon_drive/race-flow.js");
-const { GetBestTime } = await import("../src/melon_drive/time-trial.js");
-const { ParseSaveData, GetBestTimes } = await import("../src/melon_drive/logic/time-trial.js");
+const { karts } = await import("../src/melon_drive/core/kart-registry.js");
+const { SetUpPlayerKart } = await import("../src/melon_drive/kart/spawn.js");
+const { GetIntroSpawnPoint } = await import("../src/melon_drive/kart/spawn-points.js");
+const { BeginHeat, UpdateRaceFlow, ReturnAllToHub, RestoreRaceFlowSnapshot } = await import("../src/melon_drive/race/heat/race-flow.js");
+const { GetBestTime } = await import("../src/melon_drive/race/time-trial/time-trial.js");
+const { ParseSaveData, GetBestTimes } = await import("../src/melon_drive/race/time-trial/logic.js");
 const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, COUNTDOWN_SECONDS, RacePhase } = await import("../src/melon_drive/constants/index.js");
 await import("../src/melon_drive/index.js"); // registers the script inputs
 
@@ -129,8 +129,8 @@ test("save data other systems keep survives a new best", () => {
 });
 
 // The user menu's "Restart Time Trial" (RestartTimeTrial).
-const { RestartTimeTrial } = await import("../src/melon_drive/checkpoints.js");
-const { CanRestartTimeTrial } = await import("../src/melon_drive/time-trial.js");
+const { RestartTimeTrial } = await import("../src/melon_drive/race/checkpoints/checkpoints.js");
+const { CanRestartTimeTrial } = await import("../src/melon_drive/race/time-trial/time-trial.js");
 const { StartSpawnName, SPAWN_UP_OFFSET, MELON_MAX_HEALTH } = await import("../src/melon_drive/constants/index.js");
 
 test("restart: back to the start spawn, whole and still, clock at zero until the line", () => {

@@ -12,9 +12,9 @@ const layout = readFileSync(new URL("panorama/layout/custom_game/speedometer.xml
 const layoutIds = new Set([...layout.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
 
 const srcDir = new URL("src/melon_drive/", root);
-const source = readdirSync(srcDir)
+const source = readdirSync(srcDir, { recursive: true })
     .filter((f) => f.endsWith(".js"))
-    .map((f) => readFileSync(new URL(f, srcDir), "utf8"))
+    .map((f) => readFileSync(new URL(f.replaceAll("\\", "/"), srcDir), "utf8"))
     .join("\n");
 
 test("every HUD panel id the script sets classes/text on exists in speedometer.xml", () => {

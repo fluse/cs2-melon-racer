@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FormatRaceTime, ParseSaveData, GetBestTimes, RecordRunTime } from "../src/melon_drive/logic/time-trial.js";
+import { FormatRaceTime, ParseSaveData, GetBestTimes, RecordRunTime } from "../src/melon_drive/race/time-trial/logic.js";
 import { SAVE_DATA_BEST_TIMES_KEY } from "../src/melon_drive/constants/index.js";
 
 test("race times read m:ss.cc, cut off like a stopwatch", () => {

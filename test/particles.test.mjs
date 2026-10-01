@@ -1,4 +1,4 @@
-// The shared particle helper (src/melon_drive/particles.js) and its users —
+// The shared particle helper (src/melon_drive/fx/particles.js) and its users —
 // break burst, heal effect — against the fake engine in
 // helpers/cs-script-mock.mjs, whose ForceSpawn keeps each entity's Hammer
 // offset from its template like the real one.
@@ -7,9 +7,9 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, PointTemplate } from "./helpers/cs-script-mock.mjs";
 
-const { SpawnFromTemplate, PlaceAll, StartParticles, RemoveAfter, PlayParticleTemplate } = await import("../src/melon_drive/particles.js");
-const { PlayHealEffect } = await import("../src/melon_drive/heal/index.js");
-const { SpawnBreakParticles } = await import("../src/melon_drive/physics/break-effects.js");
+const { SpawnFromTemplate, PlaceAll, StartParticles, RemoveAfter, PlayParticleTemplate } = await import("../src/melon_drive/fx/particles.js");
+const { PlayHealEffect } = await import("../src/melon_drive/health/heal/index.js");
+const { SpawnBreakParticles } = await import("../src/melon_drive/health/breaking/effects.js");
 const { HEAL_PARTICLE_TEMPLATE_NAME, HEAL_PARTICLE_LIFETIME, BREAK_PARTICLE_TEMPLATE_NAME } = await import("../src/melon_drive/constants/index.js");
 
 /** Settles Instance.Delay(...).then(...) chains (the fake Delay resolves immediately). */

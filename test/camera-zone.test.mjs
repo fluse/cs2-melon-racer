@@ -8,7 +8,7 @@ import {
     ZoneCameraExtra,
     ZoneCameraOffset,
     ZoneCameraFront,
-} from "../src/melon_drive/logic/camera-zone.js";
+} from "../src/melon_drive/zones/camera-zone/logic.js";
 import {
     CAMERA_ZONE_EXTRA_DISTANCE,
     CAMERA_ZONE_EXTRA_HEIGHT,

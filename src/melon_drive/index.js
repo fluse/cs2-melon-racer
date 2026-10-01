@@ -12,29 +12,29 @@ import { Instance } from "cs_script/point_script";
 // The camera follows the melon directly (CustomPlayerCamera), so the pawn
 // doesn't need to be anywhere near it for the view to work.
 //
-// This file only wires cs_script's entity-lifecycle/input callbacks to the
-// logic in the sibling modules below — see constants/ for tunables,
-// kart-registry.js for the kart/moderator bookkeeping, race-flow.js for the
-// hub/countdown/racing/break state machine, kart-spawn.js / physics/ for
-// melon spawning and per-tick movement, jumping, damage and breaking, hud.js/camera.js for the
-// speedometer/HUD and chase camera, checkpoints.js for lap tracking, and
-// think.js for the per-tick driver.
+// This file only wires things up: the per-tick driver (core/think.js), the
+// hot-reload snapshot, and each domain's script inputs. The domains:
+//   core/      kart registry, tick loop, traces, Debug
+//   kart/      spawning, spawn points, teleporting, paint + glow
+//   movement/  driving, contact, jumping, wall bounce, attack boost, momentum
+//   health/    damage, breaking, healing
+//   zones/     lift, jump pad, camera zone, teleporter triggers
+//   race/      tracks, checkpoints, time trial, hub/heat flow
+//   camera/    chase camera and its zooms
+//   hud/       one file per HUD panel, button clicks
+//   fx/        particles, boost trail, guide line
+//   dev/       debug views
+// Tunables: each folder's constants.js, all re-exported by constants/index.js.
 
-import { Debug } from "./debug.js";
-import { PAINT_TRIGGER_NAME_PATTERN, COLOR_PRESETS, HUB_TRIGGER_NAME, TELEPORT_UP_OFFSET } from "./constants/index.js";
-import { karts, EnsureModerator, IsModerator, FindKartByMelon, moderatorSlot, SetModeratorSlot, DropKart } from "./kart-registry.js";
-import { SetUpPlayerKart, ForgetIntroLogo } from "./kart-spawn.js";
-import { Lifted, LevelAngles } from "./spawn-points.js";
-import { ParseTeleportTrigger, TeleportExitVelocity } from "./logic/teleport.js";
-import { RespawnKartAtCheckpoint, SetKartPaintColor, TeleportKartTo, BreakMelon, IsJumpDebugOn, SetJumpDebug } from "./physics/index.js";
-import { GetSpeedHud, ShowHubModal, HideHubModal, SetUserMenuOpen, UpdateJumpDebugHud, UpdateMelonGlowHud, UpdatePredictionHud } from "./hud.js";
-import { IsMelonGlowOn, SetMelonGlow } from "./melon-look.js";
-import { IsPredictionOn, SetPrediction } from "./prediction.js";
-import { phase, activeTrackId, phaseEndTime, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, RestoreRaceFlowSnapshot } from "./race-flow.js";
-import { RegisterCheckpointAndFinishInputs, RestartTimeTrial } from "./checkpoints.js";
-import { RegisterZoneInputs } from "./zone-inputs.js";
-import { Think } from "./think.js";
-import { RegisterAttackDebug } from "./physics/attack-debug.js";
+import { Debug } from "./core/debug.js";
+import { karts, moderatorSlot, SetModeratorSlot } from "./core/kart-registry.js";
+import { Think } from "./core/think.js";
+import { RegisterKartInputs } from "./kart/index.js";
+import { RegisterBreakInputs } from "./health/index.js";
+import { RegisterZoneInputs } from "./zones/index.js";
+import { phase, activeTrackId, phaseEndTime, RestoreRaceFlowSnapshot, RegisterRaceInputs } from "./race/index.js";
+import { RegisterHudInputs } from "./hud/index.js";
+import { RegisterAttackDebug } from "./dev/index.js";
 
 Instance.SetThink(Think);
 Instance.SetNextThink(Instance.GetGameTime());
@@ -61,287 +61,9 @@ Instance.OnScriptReload({
     },
 });
 
-// A reset keeps an existing kart where it is and just re-attaches it to the
-// pawn. A player without one gets it from EnsurePlayerKarts (think.js):
-// the logo first, then a melon in the tutorial (intro_spawn).
-Instance.OnPlayerReset(({ player }) => {
-    Debug(`OnPlayerReset: slot=${player.GetPlayerController()?.GetPlayerSlot()}`);
-    SetUpPlayerKart(player, undefined);
-});
-
-Instance.OnPlayerDisconnect(({ playerSlot }) => {
-    ForgetIntroLogo(playerSlot);
-    const kart = karts.get(playerSlot);
-    if (kart) {
-        DropKart(playerSlot, kart);
-    }
-    // Promotes the next-oldest remaining player (Map preserves insertion
-    // order) so there's always a moderator whenever anyone's still on the
-    // map — see EnsureModerator's comment for why this can't just wait for
-    // the next Think tick to notice.
-    EnsureModerator();
-});
-
-RegisterCheckpointAndFinishInputs();
-
-// Hub: place a trigger_multiple named "hub_start_trigger" in the hub area,
-// filtered to prop_physics like the checkpoints, with OnStartTouch/OnEndTouch
-// calling RunScriptInput "hub_enter"/"hub_leave" on this point_script. While a
-// kart is inside it, that player sees the "Jetzt starten" modal (or a
-// "race in progress" message if a heat is already running) — see
-// GAMEPLAY.md's "Hub -> race -> next-track flow".
-Instance.OnScriptInput("hub_enter", ({ caller, activator }) => {
-    const kart = activator && FindKartByMelon(activator);
-    if (!kart) {
-        Debug("hub_enter: activator wasn't a tracked melon, ignoring");
-        return;
-    }
-    // Only the hub's own start area may open the start modal. A trigger
-    // elsewhere wired to hub_enter by mistake (the intro's pass-through to
-    // the hub was — that should be hub_teleport) showed "start race" to
-    // players just driving through, and without a matching hub_leave it
-    // never closed again. test/map-io.test.mjs catches this in the .vmap.
-    // trim(): Hammer happily keeps a stray trailing space in a name (the map's
-    // hub trigger had one), which would otherwise reject the real trigger.
-    const callerName = caller?.GetEntityName().trim();
-    if (callerName !== HUB_TRIGGER_NAME) {
-        Instance.Msg(`[melon_drive] hub_enter fired by "${callerName ?? "?"}", not "${HUB_TRIGGER_NAME}" — ignoring. To send melons to the hub, use RunScriptInput hub_teleport instead.`);
-        return;
-    }
-    kart.inHub = true;
-    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-    if (slot !== undefined) {
-        ShowHubModal(slot, kart, phase);
-    }
-});
-
-Instance.OnScriptInput("hub_leave", ({ activator }) => {
-    const kart = activator && FindKartByMelon(activator);
-    if (!kart) {
-        return;
-    }
-    kart.inHub = false;
-    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-    if (slot !== undefined) {
-        HideHubModal(slot, kart);
-    }
-});
-
-// Hub teleporter: any trigger_multiple (filtered to prop_physics) whose
-// OnStartTouch calls RunScriptInput "hub_teleport" on this point_script sends
-// the touching melon back to the hub — same single-kart path as the user
-// menu's hub button, so a racer who rolls over it also leaves the heat.
-Instance.OnScriptInput("hub_teleport", ({ activator }) => {
-    const kart = activator && FindKartByMelon(activator);
-    if (!kart) {
-        Debug("hub_teleport: activator wasn't a tracked melon, ignoring");
-        return;
-    }
-    Debug(`hub_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} returning to hub (racing=${kart.racing}, phase=${phase})`);
-    ReturnAllToHub([kart]);
-});
-
-// See PAINT_TRIGGER_NAME_PATTERN above for the Hammer-side naming
-// convention — the color comes from the trigger's own name, not this
-// input's parameter, so any number of differently-colored triggers can
-// share this one handler.
-Instance.OnScriptInput("melon_paint", ({ caller, activator }) => {
-    const kart = activator && FindKartByMelon(activator);
-    if (!kart || !caller) {
-        Debug("melon_paint: activator wasn't a tracked melon, ignoring");
-        return;
-    }
-    const match = PAINT_TRIGGER_NAME_PATTERN.exec(caller.GetEntityName());
-    if (!match) {
-        Debug(`melon_paint: trigger "${caller.GetEntityName()}" doesn't match paint_trigger_<r>_<g>_<b>, ignoring`);
-        return;
-    }
-    const [, r, g, b] = match.map(Number);
-    SetKartPaintColor(kart, { r, g, b, a: 255 });
-    Debug(`melon_paint: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} painted (${r}, ${g}, ${b})`);
-});
-
-// Generic teleporter — see TELEPORT_TRIGGER_NAME_PATTERN for the Hammer
-// convention: the destination comes from the touched trigger's own name
-// (teleport_to_<destination>), so every teleporter shares this handler.
-// Msg, not Debug, for wiring mistakes: a teleporter that silently does
-// nothing is hard to spot otherwise.
-Instance.OnScriptInput("melon_teleport", ({ caller, activator }) => {
-    const kart = activator && FindKartByMelon(activator);
-    if (!kart || !caller) {
-        Debug("melon_teleport: activator wasn't a tracked melon, ignoring");
-        return;
-    }
-    if (kart.breaking || kart.locked) {
-        return; // broken (about to respawn) or parked by the race flow — leave it where it is
-    }
-    const triggerName = caller.GetEntityName();
-    const parsed = ParseTeleportTrigger(triggerName);
-    if (!parsed) {
-        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" isn't named teleport_[stop_|keep_][checkpoint_]to_<destination>, ignoring`);
-        return;
-    }
-    const destinationName = parsed.destination;
-    const destination = Instance.FindEntityByName(destinationName);
-    if (!destination) {
-        Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" points at "${destinationName}", but no entity has that name`);
-        return;
-    }
-    const yaw = destination.GetAbsAngles().yaw;
-    // Lifted like the race-flow teleports: a destination placed on (or
-    // sunk into) the floor would otherwise embed the melon in it.
-    const position = Lifted(destination.GetAbsOrigin(), TELEPORT_UP_OFFSET);
-    const angles = LevelAngles(yaw);
-    TeleportKartTo(kart, position, angles, TeleportExitVelocity(kart.melon.GetAbsVelocity(), yaw, parsed.keepSpeed));
-    if (parsed.setsRespawn) {
-        // Only the respawn point — track progress stays untouched, so this
-        // can't skip a race checkpoint.
-        kart.checkpointPosition = position;
-        kart.checkpointAngles = angles;
-    }
-    Debug(`melon_teleport: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} -> "${destinationName}"${parsed.setsRespawn ? " (new respawn point)" : ""}`);
-});
-
-// Kill trigger: any trigger_multiple (filtered to prop_physics) whose
-// OnStartTouch calls RunScriptInput "melon_break" breaks the touching melon
-// on the spot — same break as running out of health (effects at the crash
-// site, respawn at the last checkpoint after BREAK_RESPAWN_DELAY).
-Instance.OnScriptInput("melon_break", ({ activator }) => {
-    const kart = activator && FindKartByMelon(activator);
-    if (!kart) {
-        Debug("melon_break: activator wasn't a tracked melon, ignoring");
-        return;
-    }
-    if (kart.breaking || kart.locked) {
-        return; // already broken, or parked by the race flow (countdown, finished)
-    }
-    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot() ?? -1;
-    const velocity = kart.melon.GetAbsVelocity();
-    const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
-    kart.health = 0;
-    Debug(`melon_break: slot ${slot} broken by trigger`);
-    BreakMelon(slot, kart, speed > 0 ? velocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
-});
-
-// Heal and lift zones (heal_enter/heal_leave, lift_enter/lift_leave).
-RegisterZoneInputs();
+RegisterKartInputs(); // OnPlayerReset/OnPlayerDisconnect, melon_paint
+RegisterRaceInputs(); // start_/checkpoint_/finish_<trackId>, hub_enter/hub_leave/hub_teleport
+RegisterZoneInputs(); // heal/lift/camera/jump pad *_enter/*_leave, melon_teleport
+RegisterBreakInputs(); // melon_break
+RegisterHudInputs(); // OnCustomHudClicked
 RegisterAttackDebug();
-
-Instance.OnCustomHudClicked((event) => {
-    if (event.layout !== GetSpeedHud()) {
-        return;
-    }
-    if (event.buttonId === "hub_start_button") {
-        TryStartRace();
-    } else if (event.buttonId === "hub_close_button") {
-        // Dismiss just for the player who clicked it — doesn't touch
-        // kart.inHub, so they're still pulled into the next heat that starts
-        // while they're standing in hub_start_trigger, same as before.
-        const slot = event.player.GetPlayerSlot();
-        const kart = karts.get(slot);
-        if (kart) {
-            HideHubModal(slot, kart);
-        }
-    } else if (event.buttonId === "hub_abort_button") {
-        const slot = event.player.GetPlayerSlot();
-        if (IsModerator(slot)) {
-            TryAbortRace();
-        } else {
-            Debug(`hub_abort_button: slot ${slot} clicked but isn't the moderator, ignoring`);
-        }
-    } else if (event.buttonId === "usermenu_close_button") {
-        const slot = event.player.GetPlayerSlot();
-        const kart = karts.get(slot);
-        if (kart) {
-            SetUserMenuOpen(slot, kart, false);
-        }
-    } else if (event.buttonId === "usermenu_respawn_button") {
-        const slot = event.player.GetPlayerSlot();
-        const kart = karts.get(slot);
-        if (!kart) {
-            return;
-        }
-        if (kart.breaking) {
-            // Already mid-respawn from a break — it's about to land at this
-            // same checkpoint on its own, nothing for this click to do.
-            Debug(`usermenu_respawn_button: slot ${slot} kart is already breaking/respawning, ignoring`);
-            return;
-        }
-        if (kart.locked) {
-            // Held on the start grid for the countdown, or parked after
-            // finishing — it isn't going anywhere that respawning would fix,
-            // and mid-countdown it'd just teleport a racer around the grid.
-            Debug(`usermenu_respawn_button: slot ${slot} kart is locked, ignoring`);
-            return;
-        }
-        RespawnKartAtCheckpoint(kart);
-        SetUserMenuOpen(slot, kart, false);
-    } else if (event.buttonId === "usermenu_restart_button") {
-        const slot = event.player.GetPlayerSlot();
-        const kart = karts.get(slot);
-        if (kart && RestartTimeTrial(kart)) {
-            SetUserMenuOpen(slot, kart, false);
-        }
-    } else if (event.buttonId === "usermenu_hub_button") {
-        const slot = event.player.GetPlayerSlot();
-        const kart = karts.get(slot);
-        if (!kart) {
-            return;
-        }
-        // Self-service pull-out: just this racer leaves the heat, everyone
-        // else keeps going — unlike hub_abort_button, which is moderator-only
-        // and ends it for the whole group. ReturnAllToHub already supports a
-        // single-kart list (it's the same path a disconnecting racer takes).
-        Debug(`usermenu_hub_button: slot ${slot} returning to hub (racing=${kart.racing}, phase=${phase})`);
-        SetUserMenuOpen(slot, kart, false);
-        ReturnAllToHub([kart]);
-    } else if (event.buttonId === "usermenu_tutorial_button") {
-        const slot = event.player.GetPlayerSlot();
-        const kart = karts.get(slot);
-        if (!kart) {
-            return;
-        }
-        // Same self-service pull-out as the hub button above, to intro_spawn.
-        Debug(`usermenu_tutorial_button: slot ${slot} going to the tutorial (racing=${kart.racing}, phase=${phase})`);
-        SetUserMenuOpen(slot, kart, false);
-        SendKartToTutorial(kart);
-    } else if (event.buttonId === "usermenu_glow_button") {
-        // Per player: only this player's own melon (everyone still sees
-        // whatever glow a melon has — the engine's Glow isn't per viewer).
-        const slot = event.player.GetPlayerSlot();
-        const kart = karts.get(slot);
-        if (kart) {
-            SetMelonGlow(kart, !IsMelonGlowOn(kart));
-            UpdateMelonGlowHud(slot, kart);
-        }
-    } else if (event.buttonId === "usermenu_prediction_button") {
-        // Per player: only this player's melon gets the line (drawn with
-        // DebugLine in the default render mode, so tools mode only).
-        const slot = event.player.GetPlayerSlot();
-        const kart = karts.get(slot);
-        if (kart) {
-            SetPrediction(kart, !IsPredictionOn(kart));
-            UpdatePredictionHud(slot, kart);
-        }
-    } else if (event.buttonId === "usermenu_jumpdebug_button") {
-        // Per player: only this player's melon is drawn/logged (debug
-        // draws themselves only show in tools mode).
-        const slot = event.player.GetPlayerSlot();
-        const kart = karts.get(slot);
-        if (kart) {
-            SetJumpDebug(kart, !IsJumpDebugOn(kart));
-            UpdateJumpDebugHud(slot, kart);
-        }
-    } else if (event.buttonId.startsWith("usermenu_color_")) {
-        const key = event.buttonId.slice("usermenu_color_".length);
-        const preset = COLOR_PRESETS[key];
-        if (!preset) {
-            Debug(`usermenu_color_${key}: no such color preset, ignoring`);
-            return;
-        }
-        const kart = karts.get(event.player.GetPlayerSlot());
-        if (kart) {
-            SetKartPaintColor(kart, preset);
-        }
-    }
-});

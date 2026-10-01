@@ -8,9 +8,9 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "./helpers/cs-script-mock.mjs";
 
-const { karts } = await import("../src/melon_drive/kart-registry.js");
-const { SetUpPlayerKart } = await import("../src/melon_drive/kart-spawn.js");
-const { GetIntroSpawnPoint } = await import("../src/melon_drive/spawn-points.js");
+const { karts } = await import("../src/melon_drive/core/kart-registry.js");
+const { SetUpPlayerKart } = await import("../src/melon_drive/kart/spawn.js");
+const { GetIntroSpawnPoint } = await import("../src/melon_drive/kart/spawn-points.js");
 const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, MELON_MAX_HEALTH } = await import("../src/melon_drive/constants/index.js");
 await import("../src/melon_drive/index.js"); // registers the script inputs
 

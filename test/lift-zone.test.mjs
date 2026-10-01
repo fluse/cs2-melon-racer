@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BounceUpVelocity, WithMinSpeed } from "../src/melon_drive/logic/wall-bounce.js";
-import { LiftZoneUpSpeed, WallRules } from "../src/melon_drive/logic/lift.js";
+import { BounceUpVelocity, WithMinSpeed } from "../src/melon_drive/movement/wall-bounce/logic.js";
+import { LiftZoneUpSpeed, WallRules } from "../src/melon_drive/zones/lift/logic.js";
 import {
     WALL_BOUNCE_UP_SPEED,
     WALL_JUMP_COOLDOWN,

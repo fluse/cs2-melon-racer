@@ -1,4 +1,4 @@
-// The melon's outline glow (src/melon_drive/melon-look.js) against the fake
+// The melon's outline glow (src/melon_drive/kart/look.js) against the fake
 // engine: on by default, green until painted and then in the paint color, switched per kart from the user
 // menu, and off while the melon is broken.
 import "./helpers/register-cs-script.mjs";
@@ -6,8 +6,8 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity } from "./helpers/cs-script-mock.mjs";
 
-const { SetKartPaintColor } = await import("../src/melon_drive/physics/teleport.js");
-const { ShowMelonPaint, HideMelonGlow, IsMelonGlowOn, SetMelonGlow } = await import("../src/melon_drive/melon-look.js");
+const { SetKartPaintColor } = await import("../src/melon_drive/kart/look.js");
+const { ShowMelonPaint, HideMelonGlow, IsMelonGlowOn, SetMelonGlow } = await import("../src/melon_drive/kart/look.js");
 const { MELON_GLOW_ENABLED, MELON_GLOW_UNPAINTED_COLOR, COLOR_PRESETS } = await import("../src/melon_drive/constants/index.js");
 
 /** @param {boolean} [melonGlow] */

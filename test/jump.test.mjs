@@ -6,10 +6,10 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "./helpers/cs-script-mock.mjs";
 
-const { karts } = await import("../src/melon_drive/kart-registry.js");
-const { SetUpPlayerKart } = await import("../src/melon_drive/kart-spawn.js");
-const { GetIntroSpawnPoint } = await import("../src/melon_drive/spawn-points.js");
-const { UpdateKart } = await import("../src/melon_drive/physics/index.js");
+const { karts } = await import("../src/melon_drive/core/kart-registry.js");
+const { SetUpPlayerKart } = await import("../src/melon_drive/kart/spawn.js");
+const { GetIntroSpawnPoint } = await import("../src/melon_drive/kart/spawn-points.js");
+const { UpdateKart } = await import("../src/melon_drive/movement/index.js");
 const C = await import("../src/melon_drive/constants/index.js");
 
 const DT = 1 / 64;
@@ -271,13 +271,13 @@ test("wall jump never pushes the melon past its speed cap", () => {
 });
 
 test("the jump bar shows the wall-jump charge", async () => {
-    const { GetJumpChargeFraction } = await import("../src/melon_drive/physics/index.js");
+    const { GetJumpChargeFraction } = await import("../src/melon_drive/movement/index.js");
     kart.wallJumpCharge = 0.25;
     assert.equal(GetJumpChargeFraction(kart), 0.25);
 });
 
 test("jump debug view: off by default, logs jump presses once switched on", async () => {
-    const { SetJumpDebug } = await import("../src/melon_drive/physics/index.js");
+    const { SetJumpDebug } = await import("../src/melon_drive/dev/index.js");
     Geometry({ floorBelow: false, wallX: kart.melon.GetAbsOrigin().x + C.WALL_CONTACT_DISTANCE / 2 });
     Tick({ ...falling(-100, 300), jump: true });
     assert.ok(!world.messages.some((m) => m.includes("[jump debug]")), "nothing logged while off");

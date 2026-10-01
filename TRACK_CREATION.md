@@ -200,7 +200,7 @@ No script changes, no registration step — the moment these entities exist
 with the right names, the track is picked up automatically and slotted into
 the race sequence after track 1 (by ascending `trackId`). There's room for
 up to 8 tracks and 32 checkpoints per track (`MAX_TRACKS` /
-`MAX_CHECKPOINTS_PER_TRACK` in `constants/race.js` — raise these constants
+`MAX_CHECKPOINTS_PER_TRACK` in `race/constants.js` — raise these constants
 if you ever need more).
 
 ## Testing your track

@@ -3,12 +3,12 @@
 // the follow config (SetFollowOffset) — the break and lift zooms in this
 // folder go through it too, and so do the lift and camera-zone zooms.
 import { CustomCameraMode } from "cs_script/point_script";
-import { Debug } from "../debug.js";
-import { LiftCameraOffset } from "../logic/lift-camera.js";
-import { ZoneCameraClips, ZoneCameraOffset } from "../logic/camera-zone.js";
+import { Debug } from "../core/debug.js";
+import { LiftCameraOffset } from "./lift-zoom-logic.js";
+import { ZoneCameraClips, ZoneCameraOffset } from "../zones/camera-zone/logic.js";
 import { CAMERA_LATERAL, CAMERA_DISTANCE, CAMERA_HEIGHT, FOLLOW_OFFSET } from "../constants/index.js";
 
-/** The normal chase offset, before any zoom. @param {import("../kart-registry.js").Kart} kart */
+/** The normal chase offset, before any zoom. @param {import("../core/kart-registry.js").Kart} kart */
 export function GetCameraOffsetFor(kart) {
     return { x: -CAMERA_DISTANCE, y: CAMERA_LATERAL, z: CAMERA_HEIGHT };
 }
@@ -19,7 +19,7 @@ export function GetCameraOffsetFor(kart) {
  * (CustomPlayerCamera lives on the pawn instance, so this must be
  * re-called every time the player gets a fresh pawn, i.e. each respawn).
  * Keeps a lift zone's or camera zone's zoom if one is on (see ApplyZonedFollowOffset).
- * @param {import("../kart-registry.js").Kart} kart
+ * @param {import("../core/kart-registry.js").Kart} kart
  */
 export function ApplyCameraFollow(kart) {
     const camera = kart.pawn.GetCustomCamera();
@@ -33,7 +33,7 @@ export function ApplyCameraFollow(kart) {
  * (kart.liftCameraBlend, lift-zoom.js) and the camera-zone zoom
  * (kart.zoneCamera, zone-zoom.js); they add up. Walls pull the camera in
  * only while neither turns that off.
- * @param {import("../kart-registry.js").Kart} kart
+ * @param {import("../core/kart-registry.js").Kart} kart
  */
 export function ApplyZonedFollowOffset(kart) {
     const liftBlend = kart.liftCameraBlend ?? 0;
@@ -44,7 +44,7 @@ export function ApplyZonedFollowOffset(kart) {
 /**
  * Points the chase camera at the melon from `cameraOffset` (x forward,
  * negative = behind; z up — rotated by the player's eye angles).
- * @param {import("../kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} cameraOffset
+ * @param {import("../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} cameraOffset
  * @param {boolean} clipToWalls pull the camera in instead of letting it clip through walls — off while
  *   zoomed out for a lift zone, where the shaft wall right behind the melon would pull it straight back in
  */

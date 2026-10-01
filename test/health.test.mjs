@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { HealthBarState } from "../src/melon_drive/logic/health.js";
+import { HealthBarState } from "../src/melon_drive/health/damage/logic.js";
 import {
     MELON_MAX_HEALTH,
     HEALTH_BAR_SEGMENTS,
@@ -49,7 +49,7 @@ test("low/critical flags follow their thresholds", () => {
 });
 
 // --- impact damage: flat landings cost more ---
-import { ImpactDamage, IsFlatLanding } from "../src/melon_drive/logic/health.js";
+import { ImpactDamage, IsFlatLanding } from "../src/melon_drive/health/damage/logic.js";
 import {
     IMPACT_DAMAGE_THRESHOLD,
     IMPACT_DAMAGE_SCALE,

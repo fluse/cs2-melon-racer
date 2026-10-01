@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SteerTowards } from "../src/melon_drive/logic/steering.js";
+import { SteerTowards } from "../src/melon_drive/movement/driving/logic.js";
 import { STEER_GRIP_MAX_ANGLE } from "../src/melon_drive/constants/index.js";
 
 const EPS = 1e-6;

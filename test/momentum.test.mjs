@@ -1,4 +1,4 @@
-// Momentum: the rule (logic/momentum.js) and the real UpdateKart applying it
+// Momentum: the rule (movement/momentum/logic.js) and the real UpdateKart applying it
 // against the fake engine — reaching the top speed again and again in quick
 // succession raises it, dropping below MOMENTUM_MIN_SPEED resets it, and the
 // attack boost doesn't count.
@@ -7,11 +7,11 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "./helpers/cs-script-mock.mjs";
 
-const { NewMomentum, MomentumMaxSpeed, UpdateMomentum } = await import("../src/melon_drive/logic/momentum.js");
-const { karts } = await import("../src/melon_drive/kart-registry.js");
-const { SetUpPlayerKart } = await import("../src/melon_drive/kart-spawn.js");
-const { GetIntroSpawnPoint } = await import("../src/melon_drive/spawn-points.js");
-const { UpdateKart } = await import("../src/melon_drive/physics/index.js");
+const { NewMomentum, MomentumMaxSpeed, UpdateMomentum } = await import("../src/melon_drive/movement/momentum/logic.js");
+const { karts } = await import("../src/melon_drive/core/kart-registry.js");
+const { SetUpPlayerKart } = await import("../src/melon_drive/kart/spawn.js");
+const { GetIntroSpawnPoint } = await import("../src/melon_drive/kart/spawn-points.js");
+const { UpdateKart } = await import("../src/melon_drive/movement/index.js");
 const C = await import("../src/melon_drive/constants/index.js");
 
 const DT = 1 / 64;

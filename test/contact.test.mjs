@@ -1,8 +1,8 @@
-// Ground/wall contact and wall-jump rules (logic/contact.js), asserted in
+// Ground/wall contact and wall-jump rules (movement/contact/logic.js), asserted in
 // terms of the constants.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { VerticalAccel, IsSupported, IsGrounded, CanGroundJump, CanWallJump, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter, StoppedByWall, InLiftoff } from "../src/melon_drive/logic/contact.js";
+import { VerticalAccel, IsSupported, IsGrounded, CanGroundJump, CanWallJump, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter, StoppedByWall, InLiftoff } from "../src/melon_drive/movement/contact/logic.js";
 import {
     GRAVITY,
     FREE_FALL_FRACTION,

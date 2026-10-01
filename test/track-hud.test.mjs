@@ -6,11 +6,11 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "./helpers/cs-script-mock.mjs";
 
-const { karts } = await import("../src/melon_drive/kart-registry.js");
-const { SetUpPlayerKart } = await import("../src/melon_drive/kart-spawn.js");
-const { GetIntroSpawnPoint } = await import("../src/melon_drive/spawn-points.js");
-const { ReturnAllToHub, RestoreRaceFlowSnapshot } = await import("../src/melon_drive/race-flow.js");
-const { UpdateCheckpointHud } = await import("../src/melon_drive/hud.js");
+const { karts } = await import("../src/melon_drive/core/kart-registry.js");
+const { SetUpPlayerKart } = await import("../src/melon_drive/kart/spawn.js");
+const { GetIntroSpawnPoint } = await import("../src/melon_drive/kart/spawn-points.js");
+const { ReturnAllToHub, RestoreRaceFlowSnapshot } = await import("../src/melon_drive/race/heat/race-flow.js");
+const { UpdateCheckpointHud } = await import("../src/melon_drive/hud/index.js");
 const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, SPEED_HUD_ENTITY_NAME, RacePhase } = await import("../src/melon_drive/constants/index.js");
 await import("../src/melon_drive/index.js"); // registers the script inputs
 
