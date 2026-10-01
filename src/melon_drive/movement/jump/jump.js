@@ -1,10 +1,11 @@
 // Engine side of jumping: what a jump press does each tick (ground jump,
 // wall jump, wall-bounce timing credit) and the wall-jump charge the HUD
-// jump bar shows. The rules themselves are in ../logic/contact.js and
-// ../logic/wall-bounce.js; what a lift zone changes arrives as WallRules
-// (../logic/lift.js).
+// jump bar shows. The rules themselves are in ./logic.js (jumps, charge)
+// and ../wall-bounce/logic.js (timing); whether the melon is on the ground
+// or at a wall comes from ../contact/; what a lift zone changes arrives as
+// WallRules (../../zones/lift/logic.js).
 import { Debug } from "../../core/debug.js";
-import { CanGroundJump, WallJumpBlockReason, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter } from "../contact/logic.js";
+import { CanGroundJump, WallJumpBlockReason, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter } from "./logic.js";
 import { JumpTimingFactor, JumpMultiplier, WallTimingPress } from "../wall-bounce/logic.js";
 import { MomentumMaxSpeed } from "../momentum/logic.js";
 import { JUMP_SPEED } from "../../constants/index.js";

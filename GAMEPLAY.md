@@ -674,7 +674,10 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
     widens the reach);
   - a green ring just outside the grey one while a wall jump is possible
     (at a wall, or within `WALL_JUMP_WINDOW` after).
-- Tests: `test/contact.test.mjs` (rules) and `test/jump.test.mjs` (the real
+- Rules: `movement/contact/logic.js` (ground/wall contact,
+  `test/contact.test.mjs`) and `movement/jump/logic.js` (ground jump, wall
+  jump, charge, `test/jump-logic.test.mjs`).
+- Tests: those two and `test/jump.test.mjs` (the real
   `UpdateKart` against the fake engine).
 
 ## Jump pads (implemented)

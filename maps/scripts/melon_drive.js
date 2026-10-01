@@ -2196,48 +2196,12 @@ function IsOnPlayingTeam(pawn) {
     return team === 2 || team === 3;
 }
 
-// Pure ground/wall contact and wall-jump rules — no cs_script import, so
-// it's unit-testable in Node (see test/contact.test.mjs). movement/contact/contact.js and movement/jump/jump.js
-// runs the traces and feeds the results in here. See the JUMP_SPEED /
-// WALL_PROBE_DIRECTIONS comments in movement/jump/constants.js for the design.
-
-/**
- * The melon's vertical acceleration over the last tick: the vertical
- * velocity physics left it with, compared to the one we commanded.
- * @param {number} commandedVz @param {number} actualVz @param {number} dt
- */
-function VerticalAccel(commandedVz, actualVz, dt) {
-    return dt > 0 ? (actualVz - commandedVz) / dt : 0;
-}
-
-/**
- * Whether something held the melon up last tick: in free fall gravity
- * takes the full GRAVITY off its vertical velocity every second, anything
- * it rests or rolls on cancels a clear part of that.
- * @param {number} verticalAccel units/sec^2, see VerticalAccel
- */
-function IsSupported(verticalAccel) {
-    return verticalAccel > -FREE_FALL_FRACTION * GRAVITY;
-}
-
-/**
- * On the ground = held up (IsSupported) by a floor-like surface underneath
- * (the floor trace's normal; undefined if it found nothing).
- * @param {boolean} supported @param {number | undefined} floorNormalZ
- */
-function IsGrounded(supported, floorNormalZ) {
-    return supported && floorNormalZ !== undefined && floorNormalZ >= GROUND_NORMAL_MIN_Z;
-}
-
-/**
- * Whether the melon is still taking off from a jump (ground or wall, see
- * GROUND_LIFTOFF_TIME) — ground contact measured now doesn't count then.
- * @param {number} now @param {number | undefined} lastJumpTime @param {number | undefined} lastWallJumpTime
- */
-function InLiftoff(now, lastJumpTime, lastWallJumpTime) {
-    const last = Math.max(lastJumpTime ?? -Infinity, lastWallJumpTime ?? -Infinity);
-    return now - last < GROUND_LIFTOFF_TIME;
-}
+// Pure jump rules — ground jump, wall jump and the wall-jump charge — no
+// cs_script import, so they're unit-testable in Node (see
+// test/jump-logic.test.mjs). movement/jump/jump.js applies them; whether the
+// melon is on the ground or at a wall comes from movement/contact/. See the
+// JUMP_SPEED / WALL_PROBE_DIRECTIONS comments in movement/jump/constants.js
+// for the design.
 
 /**
  * Whether a jump press right now is a ground jump: on the ground, and it's
@@ -2250,30 +2214,6 @@ function CanGroundJump({ grounded, lastGroundedTime, lastJumpTime }) {
         return false;
     }
     return lastJumpTime === undefined || (lastGroundedTime !== undefined && lastGroundedTime > lastJumpTime);
-}
-
-/**
- * How far from the melon's center (to the wall's plane) a wall still counts
- * as at the melon: WALL_JUMP_CONTACT_RADIUS, plus how far the melon gets
- * towards it in one tick — at speed it would otherwise go from outside the
- * radius into the wall and off it again between two ticks.
- * @param {number} speedIntoWall units/sec towards the wall (negative: moving away)
- * @param {number} dt
- */
-function WallContactReach(speedIntoWall, dt) {
-    return WALL_JUMP_CONTACT_RADIUS + Math.max(0, speedIntoWall) * Math.max(0, dt);
-}
-
-/**
- * Whether a wall `gap` units from the melon's center is at the melon (see
- * WallContactReach) — the wall jump's contact test.
- * @param {number} gap center to the wall's plane
- * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal (pointing away from it)
- * @param {{ x: number, y: number }} velocity the melon's velocity now
- * @param {number} dt
- */
-function IsAtWall(gap, n, velocity, dt) {
-    return gap <= WallContactReach(-(velocity.x * n.x + velocity.y * n.y), dt);
 }
 
 /**
@@ -2823,9 +2763,10 @@ function DrawCollisionDebug(slot, kart, grounded, wallNormal, jumpWindow) {
 
 // Engine side of jumping: what a jump press does each tick (ground jump,
 // wall jump, wall-bounce timing credit) and the wall-jump charge the HUD
-// jump bar shows. The rules themselves are in ../logic/contact.js and
-// ../logic/wall-bounce.js; what a lift zone changes arrives as WallRules
-// (../logic/lift.js).
+// jump bar shows. The rules themselves are in ./logic.js (jumps, charge)
+// and ../wall-bounce/logic.js (timing); whether the melon is on the ground
+// or at a wall comes from ../contact/; what a lift zone changes arrives as
+// WallRules (../../zones/lift/logic.js).
 
 /**
  * Records a jump-button press for wall-bounce timing, separately from the
@@ -4993,6 +4934,74 @@ function RegisterHudInputs() {
 // track.js (time trial clock + checkpoint strip), hub-modal.js, user-menu.js.
 // layout.js finds the custom_hud_layout entity; inputs.js handles every
 // button click.
+
+// Pure ground/wall contact rules — is the melon on the ground, is a wall
+// right at it — no cs_script import, so it's unit-testable in Node (see
+// test/contact.test.mjs). movement/contact/contact.js runs the traces and
+// feeds the results in here; what a jump does with them is
+// movement/jump/logic.js.
+
+/**
+ * The melon's vertical acceleration over the last tick: the vertical
+ * velocity physics left it with, compared to the one we commanded.
+ * @param {number} commandedVz @param {number} actualVz @param {number} dt
+ */
+function VerticalAccel(commandedVz, actualVz, dt) {
+    return dt > 0 ? (actualVz - commandedVz) / dt : 0;
+}
+
+/**
+ * Whether something held the melon up last tick: in free fall gravity
+ * takes the full GRAVITY off its vertical velocity every second, anything
+ * it rests or rolls on cancels a clear part of that.
+ * @param {number} verticalAccel units/sec^2, see VerticalAccel
+ */
+function IsSupported(verticalAccel) {
+    return verticalAccel > -FREE_FALL_FRACTION * GRAVITY;
+}
+
+/**
+ * On the ground = held up (IsSupported) by a floor-like surface underneath
+ * (the floor trace's normal; undefined if it found nothing).
+ * @param {boolean} supported @param {number | undefined} floorNormalZ
+ */
+function IsGrounded(supported, floorNormalZ) {
+    return supported && floorNormalZ !== undefined && floorNormalZ >= GROUND_NORMAL_MIN_Z;
+}
+
+/**
+ * Whether the melon is still taking off from a jump (ground or wall, see
+ * GROUND_LIFTOFF_TIME) — ground contact measured now doesn't count then.
+ * @param {number} now @param {number | undefined} lastJumpTime @param {number | undefined} lastWallJumpTime
+ */
+function InLiftoff(now, lastJumpTime, lastWallJumpTime) {
+    const last = Math.max(lastJumpTime ?? -Infinity, lastWallJumpTime ?? -Infinity);
+    return now - last < GROUND_LIFTOFF_TIME;
+}
+
+/**
+ * How far from the melon's center (to the wall's plane) a wall still counts
+ * as at the melon: WALL_JUMP_CONTACT_RADIUS, plus how far the melon gets
+ * towards it in one tick — at speed it would otherwise go from outside the
+ * radius into the wall and off it again between two ticks.
+ * @param {number} speedIntoWall units/sec towards the wall (negative: moving away)
+ * @param {number} dt
+ */
+function WallContactReach(speedIntoWall, dt) {
+    return WALL_JUMP_CONTACT_RADIUS + Math.max(0, speedIntoWall) * Math.max(0, dt);
+}
+
+/**
+ * Whether a wall `gap` units from the melon's center is at the melon (see
+ * WallContactReach) — the wall jump's contact test.
+ * @param {number} gap center to the wall's plane
+ * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal (pointing away from it)
+ * @param {{ x: number, y: number }} velocity the melon's velocity now
+ * @param {number} dt
+ */
+function IsAtWall(gap, n, velocity, dt) {
+    return gap <= WallContactReach(-(velocity.x * n.x + velocity.y * n.y), dt);
+}
 
 // Steering grip (see STEER_GRIP_* in movement/driving/constants.js): turning the
 // melon's velocity towards where the player looks. Pure math, no engine.
