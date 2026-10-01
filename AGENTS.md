@@ -54,7 +54,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              lift/, jump-pad/ (launch + no-damage flight), camera-zone/, teleport/ (melon_teleport)
                                           #   race/      track-config.js (tracks from trigger names), checkpoints/ (progress, start_/checkpoint_/finish_ inputs),
                                           #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs)
-                                          #   camera/    follow.js (chase camera, the only SetFollowConfig), break-zoom.js, lift-zoom.js, zone-zoom.js
+                                          #   camera/    follow.js (chase camera, the only SetFollowConfig), wall-clip.js (eased pull-in at walls), break-zoom.js, lift-zoom.js, zone-zoom.js
                                           #   hud/       layout.js (the custom_hud_layout), one file per panel: speedometer.js, bounce-panel.js,
                                           #              track.js (time trial + checkpoint strip), hub-modal.js, user-menu.js; inputs.js (every button click)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),

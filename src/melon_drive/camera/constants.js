@@ -17,6 +17,28 @@ export const CAMERA_DISTANCE = 50;
 // Lower: flat, close-to-the-ground view.
 export const CAMERA_HEIGHT = 0;
 
+// Walls between the melon and the chase camera pull the camera in — done by
+// the script (camera/wall-clip.js), not the engine, so it eases both ways:
+// the engine's own clipping pulls in instantly, which jerks the view at every
+// pillar. A line trace from the melon to where the camera wants to be finds
+// the wall; the camera's distance then eases towards it.
+// The price: while it eases in, the camera is briefly behind or inside the
+// wall — keep the pull-in rate high.
+// Rates are per second (exponential: about 1 − e^(−rate·t) of the way after
+// t seconds — at 15, 90 % in 0.15 s; at 4, 90 % in 0.6 s).
+// Higher pull-in: hides walls sooner, but jerks again towards instant.
+export const CAMERA_WALL_PULL_IN_RATE = 15;
+// Higher return: back to full distance sooner after the wall; lower: calmer.
+export const CAMERA_WALL_RETURN_RATE = 4;
+// Units the camera stays in front of the wall it was pulled in by, so the
+// view doesn't graze the wall's surface.
+export const CAMERA_WALL_MARGIN = 8;
+// The break camera (camera/break-zoom.js) still uses the engine's clipping —
+// this is how fast it returns after being pulled in there
+// (CameraFollowConfig.cameraOffsetReturnStrength; 1 = instantly, the
+// engine's default; pulling in is always instant).
+export const CAMERA_OFFSET_RETURN_STRENGTH = 0.2;
+
 // Lift zones (see zones/lift/constants.js): while the melon is inside one, the
 // chase camera eases back and up by this much on top of the normal
 // CAMERA_DISTANCE/CAMERA_HEIGHT, so the climb and the opposite wall stay in view;

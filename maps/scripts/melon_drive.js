@@ -94,6 +94,8 @@ function TraceSphere(config) {
  *   pendingBounce?: { time: number, impactSpeed: number, impactDir: { x: number, y: number, z: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number }, // damage not yet charged — waits out the jump window, see SettleWallBounceDamage
  *   healZones?: Map<any, number>, // heal triggers the melon is inside -> their rate (health/s), see health/heal/zone.js
  *   liftCameraBlend?: number, // 0..1, how far the camera is zoomed out for a lift zone — see UpdateLiftCamera
+ *   cameraWallScale?: number, // 0..1, how much of the camera offset is left after a wall pulled it in — see camera/wall-clip.js
+ *   appliedFollowKey?: string, // the follow offset last written to the engine — see ApplyZonedFollowOffset
  *   liftZones?: Map<any, number>, // lift triggers the melon is inside -> their wall-bounce kick (u/s up), see zones/registry.js
  *   jumpPads?: Map<any, import("../zones/jump-pad/logic.js").JumpPad>, // jump pad triggers the melon is on -> their launch, see zones/registry.js
  *   lastPadLaunchTime?: number, // last jump pad launch — see ShouldPadLaunch
@@ -1025,6 +1027,28 @@ const CAMERA_DISTANCE = 50;
 // Lower: flat, close-to-the-ground view.
 const CAMERA_HEIGHT = 0;
 
+// Walls between the melon and the chase camera pull the camera in — done by
+// the script (camera/wall-clip.js), not the engine, so it eases both ways:
+// the engine's own clipping pulls in instantly, which jerks the view at every
+// pillar. A line trace from the melon to where the camera wants to be finds
+// the wall; the camera's distance then eases towards it.
+// The price: while it eases in, the camera is briefly behind or inside the
+// wall — keep the pull-in rate high.
+// Rates are per second (exponential: about 1 − e^(−rate·t) of the way after
+// t seconds — at 15, 90 % in 0.15 s; at 4, 90 % in 0.6 s).
+// Higher pull-in: hides walls sooner, but jerks again towards instant.
+const CAMERA_WALL_PULL_IN_RATE = 15;
+// Higher return: back to full distance sooner after the wall; lower: calmer.
+const CAMERA_WALL_RETURN_RATE = 4;
+// Units the camera stays in front of the wall it was pulled in by, so the
+// view doesn't graze the wall's surface.
+const CAMERA_WALL_MARGIN = 8;
+// The break camera (camera/break-zoom.js) still uses the engine's clipping —
+// this is how fast it returns after being pulled in there
+// (CameraFollowConfig.cameraOffsetReturnStrength; 1 = instantly, the
+// engine's default; pulling in is always instant).
+const CAMERA_OFFSET_RETURN_STRENGTH = 0.2;
+
 // Lift zones (see zones/lift/constants.js): while the melon is inside one, the
 // chase camera eases back and up by this much on top of the normal
 // CAMERA_DISTANCE/CAMERA_HEIGHT, so the climb and the opposite wall stay in view;
@@ -1123,6 +1147,90 @@ function LiftCameraOffset(base, blend) {
         y: base.y,
         z: base.z + LIFT_CAMERA_EXTRA_HEIGHT * eased,
     };
+}
+
+// Pure rules for the script's own camera wall clipping — no cs_script import,
+// so it's unit-testable in Node (see test/camera/wall-clip.test.mjs).
+// camera/wall-clip.js does the trace and applies the result.
+
+/**
+ * A camera offset (x forward, y left, z up — like
+ * CameraFollowConfig.cameraOffset) turned into a world-space vector by the
+ * player's eye angles (pitch positive = looking down, as in Source).
+ * @param {{ x: number, y: number, z: number }} offset @param {{ pitch: number, yaw: number }} angles
+ */
+function RotateCameraOffset(offset, angles) {
+    const p = (angles.pitch * Math.PI) / 180;
+    const y = (angles.yaw * Math.PI) / 180;
+    const forward = { x: Math.cos(p) * Math.cos(y), y: Math.cos(p) * Math.sin(y), z: -Math.sin(p) };
+    const left = { x: -Math.sin(y), y: Math.cos(y), z: 0 };
+    const up = { x: Math.sin(p) * Math.cos(y), y: Math.sin(p) * Math.sin(y), z: Math.cos(p) };
+    return {
+        x: forward.x * offset.x + left.x * offset.y + up.x * offset.z,
+        y: forward.y * offset.x + left.y * offset.y + up.y * offset.z,
+        z: forward.z * offset.x + left.z * offset.y + up.z * offset.z,
+    };
+}
+
+/**
+ * How much of the camera offset fits before a wall: 1 = the whole way (no
+ * wall), down to 0 = right at the melon. The camera stops
+ * CAMERA_WALL_MARGIN short of the wall.
+ * @param {boolean} didHit @param {number} fraction the trace's hit fraction @param {number} length the offset's length
+ */
+function WallClipScale(didHit, fraction, length) {
+    if (!didHit || length <= 0) {
+        return 1;
+    }
+    return Math.max(0, Math.min(1, (fraction * length - CAMERA_WALL_MARGIN) / length));
+}
+
+/**
+ * Eases the current scale towards `target` over `dt` seconds — fast when
+ * pulling in (CAMERA_WALL_PULL_IN_RATE), slower when going back out
+ * (CAMERA_WALL_RETURN_RATE). No current value yet (fresh spawn/respawn):
+ * straight to the target, so the camera doesn't glide in from somewhere.
+ * @param {number | undefined} current @param {number} target @param {number} dt
+ */
+function StepWallClipScale(current, target, dt) {
+    if (current === undefined) {
+        return target;
+    }
+    const rate = target < current ? CAMERA_WALL_PULL_IN_RATE : CAMERA_WALL_RETURN_RATE;
+    const next = target + (current - target) * Math.exp(-rate * Math.max(0, dt));
+    return Math.abs(next - target) < 0.001 ? target : next;
+}
+
+// The chase camera's wall pull-in, done by the script instead of the engine
+// (CAMERA_WALL_* in constants.js): the engine's clipCameraOffset pulls in
+// instantly, this eases both ways. The math is in wall-clip-logic.js.
+
+/**
+ * `offset` pulled in towards the melon as far as a wall in between needs it,
+ * eased over `dt` (kart.cameraWallScale keeps the current pull-in). The
+ * trace runs from the camera's pivot (the melon + FOLLOW_OFFSET) to where
+ * the camera would be, skipping the melon itself and players.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ * @param {{ x: number, y: number, z: number }} offset @param {number} dt
+ */
+function WallClippedOffset(kart, offset, dt) {
+    const origin = kart.melon.GetAbsOrigin();
+    const pivot = { x: origin.x + FOLLOW_OFFSET.x, y: origin.y + FOLLOW_OFFSET.y, z: origin.z + FOLLOW_OFFSET.z };
+    const toCamera = RotateCameraOffset(offset, kart.pawn.GetEyeAngles());
+    const length = Math.hypot(toCamera.x, toCamera.y, toCamera.z);
+    let target = 1;
+    if (length > 0) {
+        const trace = TraceLine({
+            start: pivot,
+            end: { x: pivot.x + toCamera.x, y: pivot.y + toCamera.y, z: pivot.z + toCamera.z },
+            ignoreEntity: kart.melon,
+            ignorePlayers: true,
+        });
+        target = trace.startedInSolid ? 1 : WallClipScale(trace.didHit, trace.fraction, length);
+    }
+    kart.cameraWallScale = StepWallClipScale(kart.cameraWallScale, target, dt);
+    const scale = kart.cameraWallScale;
+    return { x: offset.x * scale, y: offset.y * scale, z: offset.z * scale };
 }
 
 // Pure rules for camera zones — no cs_script import, so it's unit-testable in
@@ -1291,6 +1399,7 @@ function ZoneCameraOffset(base, state) {
 // offset (CAMERA_DISTANCE/CAMERA_HEIGHT), and the one place that writes
 // the follow config (SetFollowOffset) — the break and lift zooms in this
 // folder go through it too, and so do the lift and camera-zone zooms.
+// Walls pull the camera in through wall-clip.js (eased), not the engine.
 
 /** The normal chase offset, before any zoom. @param {import("../core/kart-registry.js").Kart} kart */
 function GetCameraOffsetFor(kart) {
@@ -1302,43 +1411,71 @@ function GetCameraOffsetFor(kart) {
  * pawn/melon. Called whenever the camera needs attaching
  * (CustomPlayerCamera lives on the pawn instance, so this must be
  * re-called every time the player gets a fresh pawn, i.e. each respawn).
- * Keeps a lift zone's or camera zone's zoom if one is on (see ApplyZonedFollowOffset).
+ * Keeps a lift zone's or camera zone's zoom if one is on (see ApplyZonedFollowOffset);
+ * the wall pull-in starts over, right at the distance that fits.
  * @param {import("../core/kart-registry.js").Kart} kart
  */
 function ApplyCameraFollow(kart) {
     const camera = kart.pawn.GetCustomCamera();
     camera.SetMode(CustomCameraMode.FOLLOW_POSITION);
-    ApplyZonedFollowOffset(kart);
+    kart.cameraWallScale = undefined;
+    kart.appliedFollowKey = undefined;
+    ApplyZonedFollowOffset(kart, 0);
     Debug(`ApplyCameraFollow: mode=${camera.GetMode()} for slot=${kart.pawn.GetPlayerController()?.GetPlayerSlot()}`);
+}
+
+/**
+ * Per tick: the chase camera with every zoom and the wall pull-in eased on.
+ * Left alone while the melon is breaking — the break camera owns it then,
+ * and the respawn re-applies it.
+ * @param {import("../core/kart-registry.js").Kart} kart @param {number} dt
+ */
+function UpdateFollowCamera(kart, dt) {
+    if (kart.breaking) {
+        return;
+    }
+    ApplyZonedFollowOffset(kart, dt);
 }
 
 /**
  * The normal offset with both zone zooms on top — the lift zoom
  * (kart.liftCameraBlend, lift-zoom.js) and the camera-zone zoom
  * (kart.zoneCamera, zone-zoom.js); they add up. Walls pull the camera in
- * only while neither turns that off.
- * @param {import("../core/kart-registry.js").Kart} kart
+ * (wall-clip.js, eased over `dt`) only while neither turns that off.
+ * @param {import("../core/kart-registry.js").Kart} kart @param {number} dt
  */
-function ApplyZonedFollowOffset(kart) {
+function ApplyZonedFollowOffset(kart, dt) {
     const liftBlend = kart.liftCameraBlend ?? 0;
     const offset = ZoneCameraOffset(LiftCameraOffset(GetCameraOffsetFor(kart), liftBlend), kart.zoneCamera);
-    SetFollowOffset(kart, offset, liftBlend === 0 && ZoneCameraClips(kart.zoneCamera));
+    const clips = liftBlend === 0 && ZoneCameraClips(kart.zoneCamera);
+    if (!clips) {
+        kart.cameraWallScale = undefined; // no wall pull-in out here; starts over once it's back on
+    }
+    const placed = clips ? WallClippedOffset(kart, offset, dt) : offset;
+    const key = `${placed.x.toFixed(2)},${placed.y.toFixed(2)},${placed.z.toFixed(2)}`;
+    if (key === kart.appliedFollowKey) {
+        return; // unchanged since the last tick — don't rewrite the engine's config
+    }
+    SetFollowOffset(kart, placed, false);
+    kart.appliedFollowKey = key;
 }
 
 /**
  * Points the chase camera at the melon from `cameraOffset` (x forward,
  * negative = behind; z up — rotated by the player's eye angles).
  * @param {import("../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} cameraOffset
- * @param {boolean} clipToWalls pull the camera in instead of letting it clip through walls — off while
- *   zoomed out for a lift zone, where the shaft wall right behind the melon would pull it straight back in
+ * @param {boolean} engineClipsToWalls let the engine pull the camera in at walls (instantly) — only the
+ *   break camera does; everything else goes through ApplyZonedFollowOffset's own, eased pull-in
  */
-function SetFollowOffset(kart, cameraOffset, clipToWalls) {
+function SetFollowOffset(kart, cameraOffset, engineClipsToWalls) {
     kart.pawn.GetCustomCamera().SetFollowConfig({
         followEntity: kart.melon,
         followOffset: FOLLOW_OFFSET,
         cameraOffset,
-        clipCameraOffset: clipToWalls,
+        clipCameraOffset: engineClipsToWalls,
+        cameraOffsetReturnStrength: CAMERA_OFFSET_RETURN_STRENGTH,
     });
+    kart.appliedFollowKey = undefined;
 }
 
 // Pure rules for the melon-break sequence — no cs_script import, so it's
@@ -1622,8 +1759,8 @@ function LatestZone(kart, kind) {
 
 /**
  * Per tick: eases the chase camera out while the melon is in a lift zone and
- * back in after it leaves. Only touches the camera while the zoom is
- * actually changing. Wall clipping is off for as long as it's zoomed out at
+ * back in after it leaves (UpdateFollowCamera in follow.js applies the
+ * zoom right after). Wall clipping is off for as long as it's zoomed out at
  * all (it looks through the shaft walls instead). Left alone while the melon
  * is breaking — the break camera owns it then, and the respawn re-applies it.
  * @param {import("../core/kart-registry.js").Kart} kart @param {number} dt
@@ -1632,13 +1769,7 @@ function UpdateLiftCamera(kart, dt) {
     if (kart.breaking) {
         return;
     }
-    const before = kart.liftCameraBlend ?? 0;
-    const after = LiftCameraBlend(before, InLiftZone(kart), dt);
-    if (after === before) {
-        return;
-    }
-    kart.liftCameraBlend = after;
-    ApplyZonedFollowOffset(kart);
+    kart.liftCameraBlend = LiftCameraBlend(kart.liftCameraBlend ?? 0, InLiftZone(kart), dt);
 }
 
 // Camera zones: zoom in or out while the melon is in a camera_enter/_leave
@@ -1646,8 +1777,8 @@ function UpdateLiftCamera(kart, dt) {
 
 /**
  * Per tick: eases the chase camera towards the zoom of the camera zone the
- * melon is in, and back to normal after it leaves. Only touches the camera
- * while the zoom is actually changing. Left alone while the melon is
+ * melon is in, and back to normal after it leaves (UpdateFollowCamera in
+ * follow.js applies the zoom right after). Left alone while the melon is
  * breaking — the break camera owns it then, and the respawn re-applies it.
  * @param {import("../core/kart-registry.js").Kart} kart @param {number} dt
  */
@@ -1655,18 +1786,12 @@ function UpdateZoneCamera(kart, dt) {
     if (kart.breaking) {
         return;
     }
-    const before = kart.zoneCamera;
-    const after = StepZoneCamera(before, CurrentCameraZone(kart) ?? NO_CAMERA_ZONE, dt);
-    if (after === before) {
-        return;
-    }
-    kart.zoneCamera = after;
-    ApplyZonedFollowOffset(kart);
+    kart.zoneCamera = StepZoneCamera(kart.zoneCamera, CurrentCameraZone(kart) ?? NO_CAMERA_ZONE, dt);
 }
 
 // Chase camera — one file per concern: follow.js (the normal chase camera),
 // break-zoom.js (pull-back on a break), lift-zoom.js
-// (zoom-out in lift zones), zone-zoom.js (zoom in/out in camera zones). Other parts of melon_drive import from here.
+// (zoom-out in lift zones), zone-zoom.js (zoom in/out in camera zones), wall-clip.js (eased pull-in at walls). Other parts of melon_drive import from here.
 
 // Pure rules for generic teleporters — no cs_script import, so it's
 // unit-testable in Node (see test/zones/teleport.test.mjs). zones/teleport/inputs.js's
@@ -6352,6 +6477,7 @@ function Think() {
             UpdateKart(slot, kart, dt);
             UpdateLiftCamera(kart, dt);
             UpdateZoneCamera(kart, dt);
+            UpdateFollowCamera(kart, dt);
             UpdatePrediction(kart, dt);
             UpdateBoostTrail(kart);
             UpdateSpeedHud(slot, kart);

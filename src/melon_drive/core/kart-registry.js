@@ -41,6 +41,8 @@ import { predictionDotSet } from "./trace.js";
  *   pendingBounce?: { time: number, impactSpeed: number, impactDir: { x: number, y: number, z: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number }, // damage not yet charged — waits out the jump window, see SettleWallBounceDamage
  *   healZones?: Map<any, number>, // heal triggers the melon is inside -> their rate (health/s), see health/heal/zone.js
  *   liftCameraBlend?: number, // 0..1, how far the camera is zoomed out for a lift zone — see UpdateLiftCamera
+ *   cameraWallScale?: number, // 0..1, how much of the camera offset is left after a wall pulled it in — see camera/wall-clip.js
+ *   appliedFollowKey?: string, // the follow offset last written to the engine — see ApplyZonedFollowOffset
  *   liftZones?: Map<any, number>, // lift triggers the melon is inside -> their wall-bounce kick (u/s up), see zones/registry.js
  *   jumpPads?: Map<any, import("../zones/jump-pad/logic.js").JumpPad>, // jump pad triggers the melon is on -> their launch, see zones/registry.js
  *   lastPadLaunchTime?: number, // last jump pad launch — see ShouldPadLaunch

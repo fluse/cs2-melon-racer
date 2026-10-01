@@ -497,7 +497,12 @@ direction at up to `STEER_GRIP_RATE` °/s on the ground and
 the camera points instead of drifting; only the bounce tick itself is left
 unsteered, so a bounce starts off at its computed angle), Space jumps (only with real ground contact, or off a wall in the air — see "Jumping" below). A third-person
 `CustomPlayerCamera` in `FOLLOW_POSITION` mode chase-cams behind the melon
-directly, so it doesn't need the pawn nearby to work.
+directly, so it doesn't need the pawn nearby to work. A wall between melon and
+camera pulls the camera in — eased by the script (`camera/wall-clip.js`,
+`CAMERA_WALL_*`): quickly in, more slowly back out (decided) — the engine's own clipping
+is instant both ways and jerks the view at every pillar. While
+easing in, the camera can be inside or behind the wall for a moment. The
+break camera keeps the engine's clipping.
 
 **Consequence:** the pawn's position means nothing for the race. Every
 trigger keys off the **melon** — filtered to `prop_physics`, with the

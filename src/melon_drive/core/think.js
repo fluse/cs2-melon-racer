@@ -9,7 +9,7 @@ import { UpdateKart } from "../movement/index.js";
 import { HandleMelonLost } from "../health/index.js";
 import { phase, UpdateRaceFlow } from "../race/heat/race-flow.js";
 import { UpdatePrediction, HidePrediction } from "../fx/prediction/prediction.js";
-import { UpdateLiftCamera, UpdateZoneCamera } from "../camera/index.js";
+import { UpdateLiftCamera, UpdateZoneCamera, UpdateFollowCamera } from "../camera/index.js";
 import { UpdateBoostTrail, StopBoostTrail } from "../fx/boost-trail/boost-trail.js";
 
 let lastHeartbeatTime = 0;
@@ -73,6 +73,7 @@ export function Think() {
             UpdateKart(slot, kart, dt);
             UpdateLiftCamera(kart, dt);
             UpdateZoneCamera(kart, dt);
+            UpdateFollowCamera(kart, dt);
             UpdatePrediction(kart, dt);
             UpdateBoostTrail(kart);
             UpdateSpeedHud(slot, kart);
