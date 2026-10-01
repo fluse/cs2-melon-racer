@@ -4,7 +4,7 @@
 // 64x64 grid, y down, rasterized with 4x4 supersampling. No dependencies,
 // so tweaking an icon is editing its shapes below and re-running this.
 import { writeFileSync, mkdirSync } from "node:fs";
-import { deflateSync } from "node:zlib";
+import { EncodePng } from "./png.mjs";
 
 const SIZE = 64;
 const SUPERSAMPLE = 4;
@@ -167,53 +167,17 @@ const ICONS = {
 
 // --- rasterize + PNG ---
 
-const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    return c >>> 0;
-});
-function crc32(buf) {
-    let c = 0xffffffff;
-    for (const b of buf) c = CRC_TABLE[(c ^ b) & 0xff] ^ (c >>> 8);
-    return (c ^ 0xffffffff) >>> 0;
-}
-function chunk(type, data) {
-    const out = Buffer.alloc(12 + data.length);
-    out.writeUInt32BE(data.length, 0);
-    out.write(type, 4, "ascii");
-    data.copy(out, 8);
-    out.writeUInt32BE(crc32(out.subarray(4, 8 + data.length)), 8 + data.length);
-    return out;
-}
-
 /** White pixels, alpha = the share of subsamples inside the shape. */
 function Rasterize(shape) {
-    const rows = Buffer.alloc(SIZE * (SIZE * 4 + 1));
-    for (let py = 0; py < SIZE; py++) {
-        rows[py * (SIZE * 4 + 1)] = 0; // PNG filter: none
-        for (let px = 0; px < SIZE; px++) {
-            let inside = 0;
-            for (let sy = 0; sy < SUPERSAMPLE; sy++) {
-                for (let sx = 0; sx < SUPERSAMPLE; sx++) {
-                    if (shape(px + (sx + 0.5) / SUPERSAMPLE, py + (sy + 0.5) / SUPERSAMPLE) < 0) inside++;
-                }
+    return EncodePng(SIZE, SIZE, (px, py) => {
+        let inside = 0;
+        for (let sy = 0; sy < SUPERSAMPLE; sy++) {
+            for (let sx = 0; sx < SUPERSAMPLE; sx++) {
+                if (shape(px + (sx + 0.5) / SUPERSAMPLE, py + (sy + 0.5) / SUPERSAMPLE) < 0) inside++;
             }
-            const o = py * (SIZE * 4 + 1) + 1 + px * 4;
-            rows[o] = rows[o + 1] = rows[o + 2] = 255;
-            rows[o + 3] = Math.round((inside / (SUPERSAMPLE * SUPERSAMPLE)) * 255);
         }
-    }
-    const header = Buffer.alloc(13);
-    header.writeUInt32BE(SIZE, 0);
-    header.writeUInt32BE(SIZE, 4);
-    header[8] = 8; // bit depth
-    header[9] = 6; // RGBA
-    return Buffer.concat([
-        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-        chunk("IHDR", header),
-        chunk("IDAT", deflateSync(rows)),
-        chunk("IEND", Buffer.alloc(0)),
-    ]);
+        return [255, 255, 255, Math.round((inside / (SUPERSAMPLE * SUPERSAMPLE)) * 255)];
+    });
 }
 
 mkdirSync(OUT_DIR, { recursive: true });

@@ -24,7 +24,9 @@ export function HealthBarState(health) {
         // ceil, not round: the melon only breaks at health <= 0, so any health
         // left must still show at least one segment — round() emptied the bar
         // while up to half a segment's worth of health remained.
-        filledSegments: Math.ceil(fraction * HEALTH_BAR_SEGMENTS),
+        // (minus a hair: 70 / 30 per segment leaves float dust like 29.0000000004,
+        // which ceil() turned into a still-full segment)
+        filledSegments: Math.max(0, Math.ceil(fraction * HEALTH_BAR_SEGMENTS - 1e-9)),
         low: fraction <= HEALTH_LOW_FRACTION,
         critical: fraction <= HEALTH_CRITICAL_FRACTION,
     };

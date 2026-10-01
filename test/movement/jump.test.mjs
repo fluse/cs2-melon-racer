@@ -175,10 +175,10 @@ test("wall jump in a lift zone: full strength, costs no charge, keeps the bounce
     const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
     Geometry({ floorBelow: false, wallX });
     kart.liftZones = new Map([[new Entity({ name: "lift_zone" }), C.LIFT_ZONE_UP_SPEED]]);
-    kart.wallJumpCharge = C.WALL_JUMP_MIN_CHARGE; // nearly spent outside a zone
+    kart.wallJumpCharge = 0; // none charged — outside a zone no wall jump
     const v = Tick({ ...fallingIntoWall(-100), jump: true });
     assert.ok(kart.lastWallJump, "wall jump happened");
-    assert.ok(kart.wallJumpCharge >= C.WALL_JUMP_MIN_CHARGE, "no charge used");
+    assert.ok(kart.wallJumpCharge >= 0, "no charge used");
     assert.equal(v.z, Math.max(C.LIFT_ZONE_UP_SPEED, C.WALL_JUMP_UP_SPEED));
     assert.ok(v.x <= -C.WALL_JUMP_PUSH_SPEED + 1e-9, `full-strength push off the wall (vx=${v.x})`);
 });
@@ -278,18 +278,18 @@ test("jumping again right after landing works — no cooldown", () => {
     assert.equal(again.z, C.JUMP_SPEED);
 });
 
-test("wall jump: strength follows the charge, and a spent charge means no wall jump", () => {
+test("wall jump: the last charge is still full strength, and none left means no wall jump", () => {
     const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
     Geometry({ floorBelow: false, wallX });
-    kart.wallJumpCharge = 0.5;
-    const half = Tick({ ...touchingWall(-100), jump: true });
-    assert.ok(Math.abs(half.z - C.WALL_JUMP_UP_SPEED * (0.5 + DT / C.WALL_JUMP_RECHARGE_SECONDS)) < 1e-6, `half-strength jump (vz=${half.z})`);
-    assert.ok(kart.wallJumpCharge < 0.5, "the jump used up charge");
+    kart.wallJumpCharge = 1;
+    const last = Tick({ ...touchingWall(-100), jump: true });
+    assert.equal(last.z, C.WALL_JUMP_UP_SPEED, `full-strength jump (vz=${last.z})`);
+    assert.ok(kart.wallJumpCharge < 1, "the jump used up its charge");
 
     kart.lastWallJump = undefined;
-    kart.wallJumpCharge = 0;
+    kart.wallJumpCharge = 0.9; // the next one still refilling
     const spent = Tick({ ...touchingWall(-100), jump: true });
-    assert.ok(spent.z < 0, "no wall jump with an empty charge");
+    assert.ok(spent.z < 0, "no wall jump until a whole charge is back");
 });
 
 // Regression: a wall jump used to raise the speed cap, so chaining them
@@ -319,6 +319,20 @@ test("wall jump at the optimal angle: PERFECT — faster, harder kick, shown lik
     assert.equal(kart.lastBounceTime, world.time, "bounce panel shows it");
     assert.ok(Math.abs(v.x + C.WALL_JUMP_PUSH_SPEED * C.WALL_JUMP_RATING_SPEED_MULTIPLIER.PERFECT) < 1e-6, `pushed off faster (vx=${v.x})`);
     assert.ok(Math.abs(v.z - C.WALL_JUMP_UP_SPEED * C.WALL_JUMP_PERFECT_UP_MULTIPLIER) < 1e-6, `kicked harder (vz=${v.z})`);
+});
+
+test("in a lift zone a wall jump isn't rated: at the optimal angle still a plain one, no feedback", () => {
+    const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
+    Geometry({ floorBelow: false, wallX });
+    kart.liftZones = new Map([[new Entity({ name: "lift_zone" }), C.LIFT_ZONE_UP_SPEED]]);
+    const rad = (C.WALL_BOUNCE_OPTIMAL_ANGLE * Math.PI) / 180;
+    const s = C.WALL_BOUNCE_MIN_IMPACT / 2;
+    const into = { x: Math.cos(rad) * s, y: Math.sin(rad) * s };
+    const v = Tick({ commanded: { ...into, z: -100 }, actual: { x: 0, y: into.y, z: -100 - C.GRAVITY * DT }, jump: true });
+    assert.ok(kart.lastWallJump, "the wall jump happened");
+    assert.equal(kart.lastBounceInfo, undefined, "no rating shown");
+    assert.ok(Math.abs(v.x + C.WALL_JUMP_PUSH_SPEED) < 1e-6, `plain push (vx=${v.x})`);
+    assert.equal(v.z, C.WALL_JUMP_UP_SPEED, "plain kick, no PERFECT multiplier");
 });
 
 // Regression: a press a couple of ticks after the touch only saw the melon
@@ -352,11 +366,11 @@ test("wall jump head-on: lowest rating, a plain wall jump", () => {
 test("a jump press on a wall bounce is only its timing — no wall jump, no charge used", NEEDS_BOUNCE, () => {
     const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
     Geometry({ floorBelow: false, wallX });
-    kart.wallJumpCharge = 0.5;
+    kart.wallJumpCharge = 1.5;
     const v = Tick({ ...fallingIntoWall(-100), jump: true });
     assert.equal(kart.lastBounceTime, world.time, "the hit counted as a wall bounce");
     assert.equal(kart.lastWallJump, undefined, "no wall jump");
-    assert.ok(kart.wallJumpCharge >= 0.5, `no charge used (${kart.wallJumpCharge})`);
+    assert.ok(kart.wallJumpCharge >= 1.5, `no charge used (${kart.wallJumpCharge})`);
     assert.equal(v.z, C.WALL_BOUNCE_UP_SPEED, "the bounce's kick stays");
     assert.equal(kart.pendingBounce.jumpFactor, 1, "the press counted as perfect timing");
 });
@@ -382,7 +396,7 @@ test("after a bounce's timing window, a wall jump needs the wall at the melon ag
     assert.equal(kart.lastWallJump, undefined, "off the wall: no wall jump");
 });
 
-test("in a lift zone a wall jump may still follow a bounce at once", () => {
+test("in a lift zone a wall jump may still follow a bounce at once", NEEDS_BOUNCE, () => {
     const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
     Geometry({ floorBelow: false, wallX });
     kart.liftZones = new Map([[new Entity({ name: "lift_zone" }), C.LIFT_ZONE_UP_SPEED]]);
@@ -405,7 +419,7 @@ test("a wall jump never lowers the upward speed", () => {
 });
 
 // Regression: the charge only refilled on ticks that got as far as the jump
-// handling — standing still (settled) or race-locked froze the HUD bar.
+// handling — standing still (settled) or race-locked froze the HUD.
 test("the wall-jump charge refills while standing still and while race-locked", () => {
     Geometry();
     kart.wallJumpCharge = 0.5;
@@ -418,11 +432,11 @@ test("the wall-jump charge refills while standing still and while race-locked", 
     assert.ok(kart.wallJumpCharge > before, "refilled while locked");
 });
 
-test("a melon arriving whole (full health restored) has a full wall-jump charge", async () => {
+test("a melon arriving whole (full health restored) has all its wall jumps charged", async () => {
     const { RestoreFullHealth } = await import("../../src/melon_drive/health/heal/index.js");
     kart.wallJumpCharge = 0;
     RestoreFullHealth(kart);
-    assert.equal(kart.wallJumpCharge, 1);
+    assert.equal(kart.wallJumpCharge, C.WALL_JUMP_CHARGES);
 });
 
 // Regression: any press within WALL_TIMING_SPAM_LOCKOUT of the previous one
@@ -450,10 +464,11 @@ test("mashing jump in the air still locks timing credit", NEEDS_BOUNCE, () => {
     assert.equal(kart.pendingBounce.jumpFactor, 0, "no timing credit while mashing");
 });
 
-test("the jump bar shows the wall-jump charge", async () => {
-    const { GetJumpChargeFraction } = await import("../../src/melon_drive/movement/index.js");
-    kart.wallJumpCharge = 0.25;
-    assert.equal(GetJumpChargeFraction(kart), 0.25);
+test("the jump icons show the wall-jump charges", async () => {
+    const { GetWallJumpCharges } = await import("../../src/melon_drive/movement/index.js");
+    kart.wallJumpCharge = 1.25;
+    assert.equal(GetWallJumpCharges(kart), 1.25);
+    assert.equal(GetWallJumpCharges({}), C.WALL_JUMP_CHARGES, "a kart from before the charges existed counts as full");
 });
 
 test("collision debug view: wall probes show on the ground too, without counting as wall contact", async () => {

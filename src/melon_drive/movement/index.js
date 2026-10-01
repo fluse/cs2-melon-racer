@@ -3,4 +3,4 @@
 // and wall probes), jump/ (ground + wall jump), wall-bounce/, attack-boost/,
 // momentum/. Other parts of melon_drive import from here.
 export { UpdateKart } from "./driving/drive.js";
-export { GetJumpChargeFraction } from "./jump/jump.js";
+export { GetWallJumpCharges } from "./jump/jump.js";

@@ -4,7 +4,7 @@ import { predictionDotSet } from "./trace.js";
 /**
  * @typedef {{
  *   pawn: any, melon: any,
- *   wallJumpCharge: number, // 0..1, see WALL_JUMP_CHARGE_COST — the HUD jump bar
+ *   wallJumpCharge: number, // wall jumps charged, 0..WALL_JUMP_CHARGES (fractional while one refills) — the HUD jump icons
  *   lastJumpTime?: number, // last ground jump — the next needs a newer ground contact, see CanGroundJump
  *   health: number, lastVelocity: { x: number, y: number, z: number } | undefined,
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
@@ -21,6 +21,8 @@ import { predictionDotSet } from "./trace.js";
  *   boostTrail?: { melon: any, entities: any[] }, // the boost trail running on this melon (unset: none) — see fx/boost-trail/boost-trail.js
  *   nextBounceTime?: number, lastBounceTime?: number, // wall-bounce timing, see UpdateKart
  *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
+ *   hudHealthSegments?: number, hudJumpReady?: boolean[], // what the health bar / jump dots last sent to the HUD — see UpdateHealthHud/UpdateJumpHud
+ *   hudResendAt?: { health?: number, jump?: number }, // when they send their whole state again — see HUD_RESEND_SECONDS
  *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded

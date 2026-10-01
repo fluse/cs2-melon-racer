@@ -56,7 +56,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #   race/      track-config.js (tracks from trigger names), checkpoints/ (progress, start_/checkpoint_/finish_ inputs),
                                           #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs)
                                           #   camera/    follow/ (chase camera, the only SetFollowConfig), wall-clip/ (eased pull-in at walls), break-zoom/, lift-zoom/, zone-zoom/
-                                          #   hud/       layout.js (the custom_hud_layout), one file per panel: speedometer.js, bounce-panel.js,
+                                          #   hud/       layout.js (the custom_hud_layout), one file per panel: speedometer.js (speed panel: km/h, health bar, jump dots), bounce-panel.js,
                                           #              track.js (time trial + checkpoint strip), hub-modal.js, user-menu.js; inputs.js (every button click)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
                                           #              boost-trail/, prediction/ (the guide line)
@@ -69,6 +69,7 @@ test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests ca
 test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
 tools/make-icons.mjs                     # generates panorama/images/custom_game/icons/*.png (user menu icons, checkpoint strip flags) — edit shapes there, re-run with node
+tools/png.mjs                            # the PNG encoder make-icons.mjs uses
 tools/make-decal.mjs                     # generates materials/melon_racer/<decal>_{color,trans}.png for every decal in its DECALS list
                                           #   (HUD logo, rawDecals/*.png|jpg — JPG via Windows System.Drawing; can key out a baked-in checkerboard, writes <name>_transparent.png)
 rawDecals/*.png                          # new source images for decals (make-decal.mjs input); once done, the tool moves
@@ -119,7 +120,7 @@ package, so leave it as a bare import. A JSDoc-only type from another file
   to `constants/index.js`.
 - **Each domain's `index.js` is its public API** — other domains and tests
   import from it, except where that would close an import cycle (e.g.
-  `hud/speedometer.js` takes `GetJumpChargeFraction` straight from
+  `hud/speedometer.js` takes `GetWallJumpCharges` straight from
   `movement/jump/jump.js`); Rollup prints `Circular dependency` warnings on
   `npm run build` — keep it free of them.
 

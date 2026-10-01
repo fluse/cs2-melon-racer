@@ -55,3 +55,23 @@ test("the checkpoint strip has CHECKPOINT_HUD_SLOTS slots, each with its line", 
     assert.deepEqual(missing, []);
     assert.ok(!layoutIds.has(`cp_slot_${CHECKPOINT_HUD_SLOTS}`), "no slot the script never updates");
 });
+
+// Regression: a stray </Panel> made resourcecompiler reject the whole
+// layout ("Start-end tags mismatch") — and the HUD then stays the old one.
+test("speedometer.xml's tags are balanced", () => {
+    const stack = [];
+    const xml = layout.replace(/<!--[\s\S]*?-->/g, "");
+    for (const m of xml.matchAll(/<(\/?)([A-Za-z]+)\b[^>]*?(\/?)>/g)) {
+        const [, closing, name, selfClosing] = m;
+        if (selfClosing) {
+            continue;
+        }
+        if (!closing) {
+            stack.push(name);
+            continue;
+        }
+        const line = xml.slice(0, m.index).split("\n").length;
+        assert.equal(stack.pop(), name, `</${name}> on line ${line} closes the wrong tag`);
+    }
+    assert.deepEqual(stack, [], "unclosed tags");
+});

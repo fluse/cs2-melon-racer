@@ -11,6 +11,7 @@ import {
     MELON_MAX_HEALTH,
     MELON_ENGINE_HEALTH,
     INTRO_LOGO_SECONDS,
+    WALL_JUMP_CHARGES,
 } from "../constants/index.js";
 
 // Spawn flow, in one sentence: a player without a kart gets a new one at the
@@ -109,7 +110,7 @@ function NewKartRecord(pawn, melon, spawnPoint) {
     return {
         pawn,
         melon,
-        wallJumpCharge: 1,
+        wallJumpCharge: WALL_JUMP_CHARGES,
         health: MELON_MAX_HEALTH,
         lastVelocity: undefined,
         trackId: undefined,

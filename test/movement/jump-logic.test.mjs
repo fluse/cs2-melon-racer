@@ -8,8 +8,7 @@ import {
     WALL_JUMP_COOLDOWN,
     WALL_JUMP_UP_SPEED,
     WALL_JUMP_PUSH_SPEED,
-    WALL_JUMP_CHARGE_COST,
-    WALL_JUMP_MIN_CHARGE,
+    WALL_JUMP_CHARGES,
     WALL_JUMP_RECHARGE_SECONDS,
 } from "../../src/melon_drive/constants/index.js";
 
@@ -17,38 +16,38 @@ const wallA = { x: 1, y: 0 };
 const wallB = { x: -1, y: 0 };
 
 test("wall jump: in the air, with a fresh wall contact", () => {
-    assert.equal(CanWallJump({ now: 10, grounded: false, wallContact: { time: 10, normal: wallA }, charge: 1 }), true);
+    assert.equal(CanWallJump({ now: 10, grounded: false, wallContact: { time: 10, normal: wallA }, charge: WALL_JUMP_CHARGES }), true);
     // (from 0: 10 + WALL_JUMP_WINDOW - 10 isn't exactly WALL_JUMP_WINDOW in floating point)
-    assert.equal(CanWallJump({ now: WALL_JUMP_WINDOW, grounded: false, wallContact: { time: 0, normal: wallA }, charge: 1 }), true);
+    assert.equal(CanWallJump({ now: WALL_JUMP_WINDOW, grounded: false, wallContact: { time: 0, normal: wallA }, charge: WALL_JUMP_CHARGES }), true);
 });
 
 test("wall jump: a longer window (lift zones) keeps the contact jumpable longer", () => {
-    const s = { now: 10 + WALL_JUMP_WINDOW * 3, grounded: false, wallContact: { time: 10, normal: wallA }, charge: 1 };
+    const s = { now: 10 + WALL_JUMP_WINDOW * 3, grounded: false, wallContact: { time: 10, normal: wallA }, charge: WALL_JUMP_CHARGES };
     assert.equal(CanWallJump(s), false);
     assert.equal(CanWallJump({ ...s, window: WALL_JUMP_WINDOW * 4 }), true);
 });
 
 test("wall jump: not on the ground, not without a wall, not after the window", () => {
-    assert.equal(CanWallJump({ now: 10, grounded: true, wallContact: { time: 10, normal: wallA }, charge: 1 }), false);
-    assert.equal(CanWallJump({ now: 10, grounded: false, charge: 1 }), false);
-    assert.equal(CanWallJump({ now: 10 + WALL_JUMP_WINDOW + 0.01, grounded: false, wallContact: { time: 10, normal: wallA }, charge: 1 }), false);
+    assert.equal(CanWallJump({ now: 10, grounded: true, wallContact: { time: 10, normal: wallA }, charge: WALL_JUMP_CHARGES }), false);
+    assert.equal(CanWallJump({ now: 10, grounded: false, charge: WALL_JUMP_CHARGES }), false);
+    assert.equal(CanWallJump({ now: 10 + WALL_JUMP_WINDOW + 0.01, grounded: false, wallContact: { time: 10, normal: wallA }, charge: WALL_JUMP_CHARGES }), false);
 });
 
 test("wall jump: can't climb the same wall forever", () => {
     const later = 10 + WALL_JUMP_COOLDOWN + 0.01;
-    const s = { now: later, grounded: false, wallContact: { time: later, normal: wallA }, lastWallJump: { time: 10, normal: wallA }, charge: 1 };
+    const s = { now: later, grounded: false, wallContact: { time: later, normal: wallA }, lastWallJump: { time: 10, normal: wallA }, charge: WALL_JUMP_CHARGES };
     assert.equal(CanWallJump(s), false, "same wall again");
     assert.equal(CanWallJump({ ...s, wallContact: { time: later, normal: wallB } }), true, "the opposite wall chains");
     assert.equal(CanWallJump({ ...s, lastGroundedTime: 10.1 }), true, "touched ground since — same wall is fine again");
 });
 
 test("wall jump: cooldown between two wall jumps", () => {
-    const s = { now: 10 + WALL_JUMP_COOLDOWN / 2, grounded: false, wallContact: { time: 10.1, normal: wallB }, lastWallJump: { time: 10, normal: wallA }, charge: 1 };
+    const s = { now: 10 + WALL_JUMP_COOLDOWN / 2, grounded: false, wallContact: { time: 10.1, normal: wallB }, lastWallJump: { time: 10, normal: wallA }, charge: WALL_JUMP_CHARGES };
     assert.equal(CanWallJump(s), false);
 });
 
 test("wall jump: not while a wall bounce's jump-timing window is open", () => {
-    const s = { now: 10, grounded: false, wallContact: { time: 10, normal: wallA }, charge: 1 };
+    const s = { now: 10, grounded: false, wallContact: { time: 10, normal: wallA }, charge: WALL_JUMP_CHARGES };
     assert.equal(CanWallJump({ ...s, bounceTiming: true }), false);
     assert.equal(CanWallJump({ ...s, bounceTiming: false }), true);
 });
@@ -73,35 +72,34 @@ test("ground jump: no cooldown, but a new ground contact since the last jump", (
     assert.equal(CanGroundJump({ grounded: true, lastGroundedTime: 10.02, lastJumpTime: 10 }), true, "landed again — right away, no cooldown");
 });
 
-// Regression: chained wall jumps kept the same strength (and raised the
-// speed cap), so the melon got faster and faster.
-test("chained wall jumps get weaker, until the charge is spent", () => {
-    let charge = 1;
-    const strengths = [];
+// Chained wall jumps: WALL_JUMP_CHARGES of them, each full strength, then
+// none until one has refilled.
+test("WALL_JUMP_CHARGES wall jumps in a row, each full strength, then none", () => {
+    let charge = WALL_JUMP_CHARGES;
+    let jumps = 0;
     while (CanWallJump({ now: 10, grounded: false, wallContact: { time: 10, normal: wallA }, charge })) {
-        strengths.push(WallJumpVelocity({ x: 0, y: 0 }, wallA, charge).z);
+        const v = WallJumpVelocity({ x: 0, y: 0 }, wallA);
+        assert.equal(v.z, WALL_JUMP_UP_SPEED, `jump ${jumps + 1} full strength up`);
+        assert.equal(v.x, WALL_JUMP_PUSH_SPEED, `jump ${jumps + 1} full strength off the wall`);
         charge = WallJumpChargeAfter(charge);
-        assert.ok(strengths.length < 100, "must run out");
+        jumps++;
+        assert.ok(jumps < 100, "must run out");
     }
-    assert.ok(strengths.length >= 2, "a couple of wall jumps in a row are possible");
-    for (let i = 1; i < strengths.length; i++) {
-        assert.ok(strengths[i] < strengths[i - 1], `jump ${i + 1} weaker than jump ${i}`);
-    }
-    assert.ok(charge < WALL_JUMP_MIN_CHARGE);
+    assert.equal(jumps, WALL_JUMP_CHARGES);
+    assert.equal(CanWallJump({ now: 10, grounded: false, wallContact: { time: 10, normal: wallA }, charge: 0.99 }), false, "a charge still refilling doesn't count");
 });
 
-test("a wall jump is as strong as the charge", () => {
-    const half = WallJumpVelocity({ x: 0, y: 0 }, wallA, 0.5);
-    assert.equal(half.z, WALL_JUMP_UP_SPEED * 0.5);
-    assert.equal(half.x, WALL_JUMP_PUSH_SPEED * 0.5);
-    assert.equal(WallJumpChargeAfter(1), 1 - WALL_JUMP_CHARGE_COST);
-    assert.equal(WallJumpChargeAfter(WALL_JUMP_CHARGE_COST / 2), 0, "never below empty");
+test("a wall jump uses up one whole charge; the one refilling keeps its progress", () => {
+    assert.equal(WallJumpChargeAfter(WALL_JUMP_CHARGES), WALL_JUMP_CHARGES - 1);
+    assert.equal(WallJumpChargeAfter(1.5), 0.5);
+    assert.equal(WallJumpChargeAfter(0.5), 0, "never below empty");
 });
 
-test("the charge refills to full over WALL_JUMP_RECHARGE_SECONDS, and not beyond", () => {
+test("charges refill one after the other, WALL_JUMP_RECHARGE_SECONDS each, and not beyond WALL_JUMP_CHARGES", () => {
     assert.equal(RechargeWallJump(0, WALL_JUMP_RECHARGE_SECONDS), 1);
     assert.equal(RechargeWallJump(0, WALL_JUMP_RECHARGE_SECONDS / 2), 0.5);
-    assert.equal(RechargeWallJump(0.9, WALL_JUMP_RECHARGE_SECONDS), 1);
+    assert.equal(RechargeWallJump(0, WALL_JUMP_RECHARGE_SECONDS * WALL_JUMP_CHARGES), WALL_JUMP_CHARGES, "empty -> full");
+    assert.equal(RechargeWallJump(WALL_JUMP_CHARGES - 0.1, WALL_JUMP_RECHARGE_SECONDS), WALL_JUMP_CHARGES);
     assert.equal(RechargeWallJump(0.4, -1), 0.4, "time never runs backwards");
 });
 

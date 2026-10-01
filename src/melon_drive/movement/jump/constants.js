@@ -39,12 +39,13 @@ export const GROUND_LIFTOFF_TIME = 0.15; // seconds
 // WALL_JUMP_CONTACT_RADIUS of the melon's center, plus one tick's travel
 // towards it — see WallContactReach — or a wall bounce just happened) and
 // pressing jump pushes the melon off that wall and up. The timing is that
-// distance: press while the wall is right at the melon, not some time after. Its strength comes from a charge
-// (the HUD jump bar): a wall jump is as strong as the charge is full
-// (WALL_JUMP_UP_SPEED / WALL_JUMP_PUSH_SPEED at 100%) and uses up
-// WALL_JUMP_CHARGE_COST of it, so chained wall jumps get weaker and weaker;
-// the charge refills over WALL_JUMP_RECHARGE_SECONDS. A wall jump never
-// raises the melon's speed cap, so chaining them can't build up speed.
+// distance: press while the wall is right at the melon, not some time after.
+// Charges (the HUD's jump icons): the melon holds WALL_JUMP_CHARGES wall
+// jumps, each one full strength (WALL_JUMP_UP_SPEED / WALL_JUMP_PUSH_SPEED)
+// and using up one; with none left there's no wall jump. They refill one
+// after the other, WALL_JUMP_RECHARGE_SECONDS each. A plain wall jump never
+// raises the melon's speed cap, so chaining them can't build up speed (only
+// an angle rating's bonus does, see WALL_JUMP_RATING_SPEED_MULTIPLIER).
 // Can't climb one wall forever: after a wall jump, the next one
 // needs ground contact first or a different wall (normal differing by more
 // than WALL_JUMP_SAME_WALL_DOT) — bouncing between two facing walls chains.
@@ -70,9 +71,8 @@ export const WALL_JUMP_CONTACT_RADIUS = 7; // units
 // LIFT_ZONE_WALL_JUMP_WINDOW.)
 export const WALL_JUMP_WINDOW = 0.035; // seconds
 export const WALL_JUMP_COOLDOWN = 0.45; // seconds between two wall jumps (was 0.3)
-export const WALL_JUMP_CHARGE_COST = 0.5; // share of a full charge one wall jump uses — 2 in a row, the second at half strength (was 0.34, ~3 in a row)
-export const WALL_JUMP_MIN_CHARGE = 0.15; // below this there's no wall jump at all (was 0.1)
-export const WALL_JUMP_RECHARGE_SECONDS = 5; // empty -> full (was 3)
+export const WALL_JUMP_CHARGES = 3; // wall jumps in a row, each full strength (was a 0..1 charge, half used per jump, weaker each time)
+export const WALL_JUMP_RECHARGE_SECONDS = 2; // seconds to refill one wall jump — they refill one after the other, empty -> full = WALL_JUMP_CHARGES × this
 export const WALL_JUMP_UP_SPEED = 240; // units/sec upward — well below the ground jump's JUMP_SPEED (was 380)
 export const WALL_JUMP_PUSH_SPEED = 160; // units/sec at least away from the wall (more if already moving away faster) (was 250)
 export const WALL_JUMP_SAME_WALL_DOT = 0.7; // normals closer than this (dot product, ~45°) count as the same wall

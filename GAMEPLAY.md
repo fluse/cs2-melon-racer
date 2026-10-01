@@ -244,7 +244,7 @@ bounces are skipped.
   stronger, so shafts and high walls can be climbed by bouncing between
   them; bounces there leave the wall with at least
   `LIFT_ZONE_MIN_BOUNCE_SPEED` (a head-on MISS would otherwise be too slow
-  to reach the far wall), and wall jumps there cost no charge, are always
+  to reach the far wall), and wall jumps there cost no charge (and need none), aren't rated by angle, are always
   full strength, have a shorter cooldown (`LIFT_ZONE_WALL_JUMP_COOLDOWN`)
   and fire from a press made shortly before touching the wall
   (`LIFT_ZONE_JUMP_BUFFER`); a wall contact there also stays jumpable
@@ -255,10 +255,10 @@ bounces are skipped.
   damaging) on consecutive ticks — including the plain landing/crash damage
   rule, which would otherwise charge the same contact a second time; `WALL_BOUNCE_MIN_IMPACT` keeps light
   scrapes as plain physics.
-- HUD: the speedometer gets `Boosted` while above `MAX_SPEED` and a short
+- HUD: the speed panel's km/h (bottom center) gets `Boosted` while above `MAX_SPEED` and a short
   `PerfectBounce` flash after a bounce with angle closeness ≥
   `PERFECT_BOUNCE_ANGLE_FACTOR` (`speedometer.css`). Separately, a
-  `bounce_panel` in the bottom-right HUD cluster, right above the speedometer (not centered: below the crosshair it would cover the track), shows for `BOUNCE_HUD_SECONDS` after
+  `bounce_panel` in the bottom-right HUD corner (not centered: below the crosshair it would cover the track), shows for `BOUNCE_HUD_SECONDS` after
   each bounce: a rating word by angle closeness (`BOUNCE_RATINGS`:
   PERFECT/GOOD/BAD/MISS), the exact angle hit, a 0°–90° scale in 10°
   segments with the 45° target outlined and the hit segment lit, and a
@@ -596,14 +596,17 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   away faster — e.g. right after a wall bounce) and up
   (`WALL_JUMP_UP_SPEED` — never slower upward than it already was: right
   after a ground jump, a bounce's kick or a jump pad launch the faster
-  upward speed stays), keeping its speed along the wall. **Its strength
-  is a charge** (`kart.wallJumpCharge`, shown by the HUD jump bar — the
-  ground jump has no cooldown to show): a wall jump is as strong as the
-  charge is full and uses up `WALL_JUMP_CHARGE_COST` of it, so chained
-  wall jumps get weaker (2 in a row, the second at half strength) until below `WALL_JUMP_MIN_CHARGE`
-  there's none; it refills over `WALL_JUMP_RECHARGE_SECONDS` — always, also
-  standing still, race-locked or broken — and is full again whenever the
-  melon arrives whole (every spawn that restores full health). **Rated by
+  upward speed stays), keeping its speed along the wall. **Charges**
+  (decided): the melon holds `WALL_JUMP_CHARGES` (3) wall jumps
+  (`kart.wallJumpCharge`, 0..3, fractional while one refills), **each one
+  full strength**; a wall jump uses up one, and with none left there's no
+  wall jump. They refill **one after the other**, `WALL_JUMP_RECHARGE_SECONDS`
+  (2 s) each — always, also standing still, race-locked or broken — and are
+  all back whenever the melon arrives whole (every spawn that restores full
+  health). HUD: three round outlines stacked right of the speed
+  panel (bottom center; bottom up, `jump_dot_<i>`), each filled white only
+  while that charge is ready — used up or refilling shows just the outline. Rule:
+  `hud/jump-dots-logic.js` (`test/hud/jump-dots.test.mjs`). The ground jump has no cooldown to show. **Rated by
   angle, like a bounce** (decided): the angle the melon came at the wall
   (its approach, remembered when the wall contact starts and kept while it
   goes on — `WallApproach` — so a press a tick or two after the touch,
@@ -619,7 +622,9 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   no penalty, a plain wall jump stays as it was;
   a PERFECT also kicks `WALL_JUMP_PERFECT_UP_MULTIPLIER` (×1.2) harder up and
   shows the perfect spark; every wall jump shows on the bounce panel and the
-  speedometer's `PerfectBounce` flash like a bounce. No health cost. Only
+  speedometer's `PerfectBounce` flash like a bounce. **Not in a lift zone**
+  (decided): there the shaft is climbed, not raced — a wall jump is a plain
+  one, no rating, boost or feedback. No health cost. Only
   that bonus raises the speed cap (decaying at `BOOST_DECAY`); a plain wall
   jump never does, and charge plus the same-wall rule still keep chaining
   in check. Rules: `WallJumpAngle`, `WallJumpRatingMultipliers`, `WallJumpBoostedVelocity` in

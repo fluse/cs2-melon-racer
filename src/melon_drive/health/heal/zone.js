@@ -1,7 +1,7 @@
 // Healing a kart's melon: heal zones (heal_enter / heal_leave, registered in
 // ../../zones/inputs.js — which zones it's in: ../../zones/registry.js) and the full
 // refill on every respawn/race-flow teleport.
-import { MELON_MAX_HEALTH } from "../../constants/index.js";
+import { MELON_MAX_HEALTH, WALL_JUMP_CHARGES } from "../../constants/index.js";
 import { StrongestZone } from "../../zones/registry.js";
 import { HealedHealth } from "./logic.js";
 
@@ -23,11 +23,11 @@ export function ApplyHealing(kart, dt) {
 
 /**
  * Back to full health — respawns after a break, checkpoint/race-flow
- * teleports. A melon arriving whole also gets a full wall-jump charge (the
- * HUD jump bar), like a freshly spawned one.
+ * teleports. A melon arriving whole also gets all its wall jumps charged
+ * (the HUD jump icons), like a freshly spawned one.
  * @param {import("../../core/kart-registry.js").Kart} kart
  */
 export function RestoreFullHealth(kart) {
     kart.health = MELON_MAX_HEALTH;
-    kart.wallJumpCharge = 1;
+    kart.wallJumpCharge = WALL_JUMP_CHARGES;
 }

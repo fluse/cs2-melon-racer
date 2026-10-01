@@ -57,7 +57,7 @@ function TraceSphere(config) {
 /**
  * @typedef {{
  *   pawn: any, melon: any,
- *   wallJumpCharge: number, // 0..1, see WALL_JUMP_CHARGE_COST — the HUD jump bar
+ *   wallJumpCharge: number, // wall jumps charged, 0..WALL_JUMP_CHARGES (fractional while one refills) — the HUD jump icons
  *   lastJumpTime?: number, // last ground jump — the next needs a newer ground contact, see CanGroundJump
  *   health: number, lastVelocity: { x: number, y: number, z: number } | undefined,
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
@@ -74,6 +74,8 @@ function TraceSphere(config) {
  *   boostTrail?: { melon: any, entities: any[] }, // the boost trail running on this melon (unset: none) — see fx/boost-trail/boost-trail.js
  *   nextBounceTime?: number, lastBounceTime?: number, // wall-bounce timing, see UpdateKart
  *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
+ *   hudHealthSegments?: number, hudJumpReady?: boolean[], // what the health bar / jump dots last sent to the HUD — see UpdateHealthHud/UpdateJumpHud
+ *   hudResendAt?: { health?: number, jump?: number }, // when they send their whole state again — see HUD_RESEND_SECONDS
  *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
@@ -270,12 +272,13 @@ const GROUND_LIFTOFF_TIME = 0.15; // seconds
 // WALL_JUMP_CONTACT_RADIUS of the melon's center, plus one tick's travel
 // towards it — see WallContactReach — or a wall bounce just happened) and
 // pressing jump pushes the melon off that wall and up. The timing is that
-// distance: press while the wall is right at the melon, not some time after. Its strength comes from a charge
-// (the HUD jump bar): a wall jump is as strong as the charge is full
-// (WALL_JUMP_UP_SPEED / WALL_JUMP_PUSH_SPEED at 100%) and uses up
-// WALL_JUMP_CHARGE_COST of it, so chained wall jumps get weaker and weaker;
-// the charge refills over WALL_JUMP_RECHARGE_SECONDS. A wall jump never
-// raises the melon's speed cap, so chaining them can't build up speed.
+// distance: press while the wall is right at the melon, not some time after.
+// Charges (the HUD's jump icons): the melon holds WALL_JUMP_CHARGES wall
+// jumps, each one full strength (WALL_JUMP_UP_SPEED / WALL_JUMP_PUSH_SPEED)
+// and using up one; with none left there's no wall jump. They refill one
+// after the other, WALL_JUMP_RECHARGE_SECONDS each. A plain wall jump never
+// raises the melon's speed cap, so chaining them can't build up speed (only
+// an angle rating's bonus does, see WALL_JUMP_RATING_SPEED_MULTIPLIER).
 // Can't climb one wall forever: after a wall jump, the next one
 // needs ground contact first or a different wall (normal differing by more
 // than WALL_JUMP_SAME_WALL_DOT) — bouncing between two facing walls chains.
@@ -301,9 +304,8 @@ const WALL_JUMP_CONTACT_RADIUS = 7; // units
 // LIFT_ZONE_WALL_JUMP_WINDOW.)
 const WALL_JUMP_WINDOW = 0.035; // seconds
 const WALL_JUMP_COOLDOWN = 0.45; // seconds between two wall jumps (was 0.3)
-const WALL_JUMP_CHARGE_COST = 0.5; // share of a full charge one wall jump uses — 2 in a row, the second at half strength (was 0.34, ~3 in a row)
-const WALL_JUMP_MIN_CHARGE = 0.15; // below this there's no wall jump at all (was 0.1)
-const WALL_JUMP_RECHARGE_SECONDS = 5; // empty -> full (was 3)
+const WALL_JUMP_CHARGES = 3; // wall jumps in a row, each full strength (was a 0..1 charge, half used per jump, weaker each time)
+const WALL_JUMP_RECHARGE_SECONDS = 2; // seconds to refill one wall jump — they refill one after the other, empty -> full = WALL_JUMP_CHARGES × this
 const WALL_JUMP_UP_SPEED = 240; // units/sec upward — well below the ground jump's JUMP_SPEED (was 380)
 const WALL_JUMP_PUSH_SPEED = 160; // units/sec at least away from the wall (more if already moving away faster) (was 250)
 const WALL_JUMP_SAME_WALL_DOT = 0.7; // normals closer than this (dot product, ~45°) count as the same wall
@@ -644,7 +646,7 @@ const ATTACK_BOOST_HEALTH_PER_SECOND = 20; // was 10
 // Lower (0): only while held — a push landing just after release gets through.
 const ATTACK_PUSH_GUARD_SECONDS = 0.3;
 
-// HUD entity and the speedometer/jump/health bars in speedometer.xml.
+// HUD entity and the speed panel (km/h, health bar, jump dots) in speedometer.xml.
 
 // Name of the custom_hud_layout entity (place one in Hammer pointing at
 // panorama/layout/custom_game/speedometer.vxml) that shows the speedometer.
@@ -652,18 +654,25 @@ const SPEED_HUD_ENTITY_NAME = "speed_hud";
 // Hammer units/sec -> km/h (1 unit = 1 inch: units/sec * 0.0254 * 3.6).
 const UNITS_TO_KMH = 0.0254 * 3.6;
 
-// Segmented wall-jump charge bar (kart.wallJumpCharge) — see JUMP_BAR_SEGMENTS panel ids
-// ("jump_seg_0" .. "jump_seg_{N-1}") in speedometer.xml.
-const JUMP_BAR_SEGMENTS = 10;
+// Wall-jump charges as dots right of the speed panel, one per
+// WALL_JUMP_CHARGES (stacked bottom up, "jump_dot_<i>" in speedometer.xml):
+// an outline, filled white only once that charge is ready. JumpDotFills
+// measures a refilling one in JUMP_DOT_FILL_STEPS steps; only the full step shows.
+const JUMP_DOT_FILL_STEPS = 8;
 
-// Segmented melon health bar — see HEALTH_BAR_SEGMENTS panel ids
-// ("health_seg_0" .. "health_seg_{N-1}") in speedometer.xml, filled up to
-// kart.health / MELON_MAX_HEALTH. Below these fractions the bar's fill color
-// shifts (green -> yellow -> red, see UpdateHealthHud/speedometer.css) to
-// warn that another hard impact will break the melon.
-const HEALTH_BAR_SEGMENTS = 20;
+// Melon health bar, in the speed panel under the km/h: filled left to right
+// in HEALTH_BAR_SEGMENTS steps up to kart.health / MELON_MAX_HEALTH — pieces
+// "health_seg_0" .. "health_seg_{N-1}" in speedometer.xml (add/remove
+// them there when changing the count). HEALTH_LOW/CRITICAL_FRACTION only feed HealthBarState's low/critical
+// flags — the bar itself stays white (no tint).
+const HEALTH_BAR_SEGMENTS = 30;
 const HEALTH_LOW_FRACTION = 0.6;
 const HEALTH_CRITICAL_FRACTION = 0.3;
+// The health bar and jump dots send a class only when it changes — plus
+// their whole state again this often (seconds): a class sent before the
+// player's HUD had loaded (e.g. full jump charges right at spawn) was lost
+// and, never changing, never sent again.
+const HUD_RESEND_SECONDS = 1;
 
 // Checkpoint strip at the top of the screen (start flag -> numbered
 // checkpoints -> finish flag) — see CHECKPOINT_HUD_SLOTS panel ids
@@ -2233,7 +2242,7 @@ function NewKartRecord(pawn, melon, spawnPoint) {
     return {
         pawn,
         melon,
-        wallJumpCharge: 1,
+        wallJumpCharge: WALL_JUMP_CHARGES,
         health: MELON_MAX_HEALTH,
         lastVelocity: undefined,
         trackId: undefined,
@@ -2609,16 +2618,22 @@ function CanGroundJump({ grounded, lastGroundedTime, lastJumpTime }) {
 }
 
 /**
- * The wall-jump charge after `dt` seconds of refilling (0..1).
- * @param {number} charge @param {number} dt
+ * The wall-jump charges (0..WALL_JUMP_CHARGES, fractional while one is
+ * refilling) after `dt` seconds of refilling — one after the other,
+ * WALL_JUMP_RECHARGE_SECONDS each.
+ * @param {number} charges @param {number} dt
  */
-function RechargeWallJump(charge, dt) {
-    return Math.min(1, charge + Math.max(0, dt) / WALL_JUMP_RECHARGE_SECONDS);
+function RechargeWallJump(charges, dt) {
+    return Math.min(WALL_JUMP_CHARGES, charges + Math.max(0, dt) / WALL_JUMP_RECHARGE_SECONDS);
 }
 
-/** The wall-jump charge left after one wall jump. @param {number} charge */
-function WallJumpChargeAfter(charge) {
-    return Math.max(0, charge - WALL_JUMP_CHARGE_COST);
+/**
+ * The charges left after one wall jump: one whole charge used. The one that
+ * was refilling keeps its progress.
+ * @param {number} charges
+ */
+function WallJumpChargeAfter(charges) {
+    return Math.max(0, charges - 1);
 }
 
 /**
@@ -2638,7 +2653,7 @@ function CanWallJump(s) {
  *   wallContact?: { time: number, normal: { x: number, y: number } },
  *   lastWallJump?: { time: number, normal: { x: number, y: number } },
  *   lastGroundedTime?: number,
- *   charge: number,
+ *   charge: number, // wall jumps charged, see WALL_JUMP_CHARGES — at least one whole one needed
  *   cooldown?: number, // WALL_JUMP_COOLDOWN, shorter in a lift zone
  *   window?: number, // WALL_JUMP_WINDOW, longer in a lift zone
  *   bounceTiming?: boolean, // a wall bounce's jump-timing window is still open — this press is its timing, not a wall jump
@@ -2657,8 +2672,8 @@ function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGro
     if (now - wallContact.time > window) {
         return `not at a wall (last there ${(now - wallContact.time).toFixed(3)}s ago > ${window}s)`;
     }
-    if (charge < WALL_JUMP_MIN_CHARGE) {
-        return `charge spent (${charge.toFixed(2)} < WALL_JUMP_MIN_CHARGE ${WALL_JUMP_MIN_CHARGE})`; // wait for it to refill
+    if (charge < 1) {
+        return `no wall jump charged (${charge.toFixed(2)} of ${WALL_JUMP_CHARGES})`; // wait for one to refill
     }
     if (!lastWallJump) {
         return null;
@@ -2675,20 +2690,19 @@ function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGro
 }
 
 /**
- * Velocity right after a wall jump at `charge` (0..1, see CanWallJump —
- * the jump is that strong): speed along the wall is kept, the part across
- * it points away from the wall at charge × WALL_JUMP_PUSH_SPEED (or faster,
- * if it already was — e.g. just after a wall bounce), plus
- * charge × WALL_JUMP_UP_SPEED up (the caller keeps a faster upward speed
- * the melon already has, see TryWallJump).
- * @param {{ x: number, y: number }} v current horizontal velocity @param {{ x: number, y: number }} n wall normal (horizontal, unit length, pointing away from the wall) @param {number} charge
+ * Velocity right after a wall jump (always full strength): speed along the
+ * wall is kept, the part across it points away from the wall at
+ * WALL_JUMP_PUSH_SPEED (or faster, if it already was — e.g. just after a
+ * wall bounce), plus WALL_JUMP_UP_SPEED up (the caller keeps a faster
+ * upward speed the melon already has, see TryWallJump).
+ * @param {{ x: number, y: number }} v current horizontal velocity @param {{ x: number, y: number }} n wall normal (horizontal, unit length, pointing away from the wall)
  */
-function WallJumpVelocity(v, n, charge) {
+function WallJumpVelocity(v, n) {
     const across = v.x * n.x + v.y * n.y;
     const alongX = v.x - across * n.x;
     const alongY = v.y - across * n.y;
-    const away = Math.max(across, WALL_JUMP_PUSH_SPEED * charge);
-    return { x: alongX + away * n.x, y: alongY + away * n.y, z: WALL_JUMP_UP_SPEED * charge };
+    const away = Math.max(across, WALL_JUMP_PUSH_SPEED);
+    return { x: alongX + away * n.x, y: alongY + away * n.y, z: WALL_JUMP_UP_SPEED };
 }
 
 /**
@@ -2989,7 +3003,9 @@ function HealthBarState(health) {
         // ceil, not round: the melon only breaks at health <= 0, so any health
         // left must still show at least one segment — round() emptied the bar
         // while up to half a segment's worth of health remained.
-        filledSegments: Math.ceil(fraction * HEALTH_BAR_SEGMENTS),
+        // (minus a hair: 70 / 30 per segment leaves float dust like 29.0000000004,
+        // which ceil() turned into a still-full segment)
+        filledSegments: Math.max(0, Math.ceil(fraction * HEALTH_BAR_SEGMENTS - 1e-9)),
         low: fraction <= HEALTH_LOW_FRACTION,
         critical: fraction <= HEALTH_CRITICAL_FRACTION,
     };
@@ -3233,13 +3249,13 @@ function ApplyHealing(kart, dt) {
 
 /**
  * Back to full health — respawns after a break, checkpoint/race-flow
- * teleports. A melon arriving whole also gets a full wall-jump charge (the
- * HUD jump bar), like a freshly spawned one.
+ * teleports. A melon arriving whole also gets all its wall jumps charged
+ * (the HUD jump icons), like a freshly spawned one.
  * @param {import("../../core/kart-registry.js").Kart} kart
  */
 function RestoreFullHealth(kart) {
     kart.health = MELON_MAX_HEALTH;
-    kart.wallJumpCharge = 1;
+    kart.wallJumpCharge = WALL_JUMP_CHARGES;
 }
 
 // The heal effect: particle_health_template played on the melon as it
@@ -4006,8 +4022,8 @@ function DrawCollisionDebug(slot, kart, grounded, wallNormal, jumpWindow) {
 }
 
 // Engine side of jumping: what a jump press does each tick (ground jump,
-// wall jump, wall-bounce timing credit) and the wall-jump charge the HUD
-// jump bar shows. The rules themselves are in ./logic.js (jumps, charge)
+// wall jump, wall-bounce timing credit) and the wall-jump charges the HUD's
+// jump icons show. The rules themselves are in ./logic.js (jumps, charge)
 // and ../wall-bounce/logic.js (timing); whether the melon is on the ground
 // or at a wall comes from ../contact/; what a lift zone changes arrives as
 // WallRules (../../zones/lift/logic.js).
@@ -4035,19 +4051,23 @@ function RegisterWallTimingPress(kart, now) {
 }
 
 /**
- * Refills the wall-jump charge — every tick, from the top of UpdateKart, so
+ * Refills the wall-jump charges — every tick, from the top of UpdateKart, so
  * it also fills while the melon stands still, is race-locked or broken (it
  * used to refill only on ticks that got as far as the jump handling).
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 function RechargeWallJumpCharge(kart, dt) {
-    // ?? 1: karts carried over a hot reload from before the charge existed.
-    kart.wallJumpCharge = RechargeWallJump(kart.wallJumpCharge ?? 1, dt);
+    // ?? full: karts carried over a hot reload from before the charge existed.
+    kart.wallJumpCharge = RechargeWallJump(kart.wallJumpCharge ?? WALL_JUMP_CHARGES, dt);
 }
 
-/** How full the wall-jump charge is, 0 (spent) to 1 (full) — what the HUD jump bar shows. @param {{ wallJumpCharge?: number }} kart */
-function GetJumpChargeFraction(kart) {
-    return kart.wallJumpCharge ?? 1;
+/**
+ * How many wall jumps are charged, 0..WALL_JUMP_CHARGES — fractional while
+ * one is refilling. What the HUD's jump icons show.
+ * @param {{ wallJumpCharge?: number }} kart
+ */
+function GetWallJumpCharges(kart) {
+    return kart.wallJumpCharge ?? WALL_JUMP_CHARGES;
 }
 
 /**
@@ -4152,11 +4172,11 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
 
 /**
  * Wall jump, if allowed right now: in the air, at (or just off) a wall, push
- * away from it and up, as strong as the charge is full, then the charge
- * drops (so chained wall jumps get weaker). WallJumpVelocity keeps whichever
+ * away from it and up at full strength, using up one of the
+ * WALL_JUMP_CHARGES (none left: no wall jump). WallJumpVelocity keeps whichever
  * push away from the wall is stronger. Rated by the angle it came at the
  * wall like a bounce (WallJumpAngle, WALL_JUMP_RATING_SPEED_MULTIPLIER): only
- * a PERFECT/GOOD one leaves with the speed it came in with times the
+ * (not in a lift zone) a PERFECT/GOOD one leaves with the speed it came in with times the
  * multiplier, like a bounce (WallJumpBoostedVelocity) — that raises kart.speedCap — a plain wall jump
  * doesn't, chained wall jumps used to ratchet the melon ever faster.
  * Never lowers the melon's upward speed (a jump just after a ground jump,
@@ -4164,7 +4184,7 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
  * While a wall bounce's jump-timing window is open (kart.pendingBounce),
  * the press is that bounce's timing and no wall jump — otherwise every
  * well-timed bounce also used up charge. Not in lift zones
- * (rules.freeWallJumps): there it's always full strength, costs no charge,
+ * (rules.freeWallJumps): there it costs no charge (none needed either),
  * may follow a bounce at once, and the cooldown is rules.wallJumpCooldown.
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
  * @param {{ x: number, y: number, z: number }} v modified in place @param {import("../../zones/lift/logic.js").WallRules} rules
@@ -4172,7 +4192,7 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
  */
 function TryWallJump(slot, kart, now, grounded, v, rules) {
     const wallContact = kart.lastWallContact;
-    const charge = rules.freeWallJumps ? 1 : kart.wallJumpCharge;
+    const charge = rules.freeWallJumps ? WALL_JUMP_CHARGES : kart.wallJumpCharge;
     const blockedBy = WallJumpBlockReason({
         now,
         grounded,
@@ -4187,37 +4207,71 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
     if (!wallContact || blockedBy !== null) {
         return blockedBy;
     }
-    // The approach remembered at the contact's start counts too: a press a
-    // tick or two after the touch would otherwise only see the slide along
-    // the wall (WALL_JUMP_APPROACH_MEMORY).
-    const rated = WallJumpAngle([v, kart.lastVelocity, kart.prevLastVelocity, FreshApproach(wallContact, now)], wallContact.normal);
-    const bonus = WallJumpRatingMultipliers(rated.rating);
-    const jump = WallJumpVelocity({ x: v.x, y: v.y }, wallContact.normal, charge);
-    const boosted = WallJumpBoostedVelocity(jump, rated.incomingSpeed, bonus.speed);
-    v.x = boosted.x;
-    v.y = boosted.y;
-    v.z = Math.max(v.z, jump.z * bonus.up);
-    if (bonus.speed > 1) {
-        kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(v.x, v.y));
-    }
-    // Same feedback as a bounce: the bounce panel and speedometer flash
-    // (jump timing full — it was jumped), a PERFECT's spark instead of the
-    // boost trail.
-    kart.lastBounceTime = now;
-    kart.lastBounceInfo = { angle: rated.angle, angleFactor: rated.angleFactor, jumpFactor: 1 };
-    kart.perfectBounceBoost = rated.rating === BOUNCE_RATINGS[0];
-    if (kart.perfectBounceBoost) {
-        PlayPerfectSpark(kart);
+    const jump = WallJumpVelocity({ x: v.x, y: v.y }, wallContact.normal);
+    // In a lift zone the angle doesn't matter — the shaft is climbed, not
+    // raced: a plain wall jump, no rating, boost or feedback.
+    /** @type {ReturnType<typeof WallJumpAngle> | undefined} */
+    let rated = undefined;
+    let bonus = { speed: 1, up: 1 };
+    if (rules.inLift) {
+        v.x = jump.x;
+        v.y = jump.y;
+        v.z = Math.max(v.z, jump.z);
+    } else {
+        // The approach remembered at the contact's start counts too: a press a
+        // tick or two after the touch would otherwise only see the slide along
+        // the wall (WALL_JUMP_APPROACH_MEMORY).
+        rated = WallJumpAngle([v, kart.lastVelocity, kart.prevLastVelocity, FreshApproach(wallContact, now)], wallContact.normal);
+        bonus = WallJumpRatingMultipliers(rated.rating);
+        const boosted = WallJumpBoostedVelocity(jump, rated.incomingSpeed, bonus.speed);
+        v.x = boosted.x;
+        v.y = boosted.y;
+        v.z = Math.max(v.z, jump.z * bonus.up);
+        if (bonus.speed > 1) {
+            kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(v.x, v.y));
+        }
+        // Same feedback as a bounce: the bounce panel and speedometer flash
+        // (jump timing full — it was jumped), a PERFECT's spark instead of the
+        // boost trail.
+        kart.lastBounceTime = now;
+        kart.lastBounceInfo = { angle: rated.angle, angleFactor: rated.angleFactor, jumpFactor: 1 };
+        kart.perfectBounceBoost = rated.rating === BOUNCE_RATINGS[0];
+        if (kart.perfectBounceBoost) {
+            PlayPerfectSpark(kart);
+        }
     }
     kart.lastWallJump = { time: now, normal: wallContact.normal };
     if (!rules.freeWallJumps) {
         kart.wallJumpCharge = WallJumpChargeAfter(charge);
     }
-    Debug(`wall jump: slot ${slot}, ${rated.rating.label} ${rated.angle.toFixed(0)}° (×${bonus.speed}), strength ${charge.toFixed(2)}${rules.freeWallJumps ? " (lift zone, free)" : ""}, off wall normal (${wallContact.normal.x.toFixed(2)}, ${wallContact.normal.y.toFixed(2)})`);
+    Debug(`wall jump: slot ${slot}, ${rated ? `${rated.rating.label} ${rated.angle.toFixed(0)}° (×${bonus.speed})` : "not rated"}, charges ${charge.toFixed(2)}${rules.freeWallJumps ? " (lift zone, free)" : ""}, off wall normal (${wallContact.normal.x.toFixed(2)}, ${wallContact.normal.y.toFixed(2)})`);
     return null;
 }
 
-// The bottom-right cluster: speed, jump charge bar and health bar.
+// Pure rule for the HUD's wall-jump dots — no cs_script import, so it's
+// unit-testable in Node (see test/hud/jump-dots.test.mjs). Applied by
+// UpdateJumpHud in ./speedometer.js.
+
+/**
+ * How full each jump dot is, in fill steps (0 = empty ..
+ * JUMP_DOT_FILL_STEPS = charged): the first floor(charges) dots are
+ * charged, the next one shows how far it has refilled (rounded down, so it
+ * only looks full once it is), the rest are empty.
+ * @param {number} charges wall jumps charged, fractional while one refills (see GetWallJumpCharges)
+ * @param {number} dots how many dots there are (WALL_JUMP_CHARGES)
+ * @returns {number[]}
+ */
+function JumpDotFills(charges, dots) {
+    const fills = [];
+    for (let i = 0; i < dots; i++) {
+        const part = Math.max(0, Math.min(1, charges - i));
+        fills.push(Math.floor(part * JUMP_DOT_FILL_STEPS + 1e-9));
+    }
+    return fills;
+}
+
+// The speed panel, bottom center: km/h, the health bar under it and the
+// wall-jump dots next to it.
 
 /** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart */
 function UpdateSpeedHud(slot, kart) {
@@ -4242,32 +4296,65 @@ function UpdateSpeedHud(slot, kart) {
     hud.SetHasClassForPlayer(slot, "speed_panel", "PerfectBounce", perfectFlash);
 }
 
-/** Jump bar = the wall-jump charge (see GetJumpChargeFraction). @param {number} slot @param {{ wallJumpCharge?: number }} kart */
+/**
+ * Whether `key`'s whole HUD state is due to be sent again (every
+ * HUD_RESEND_SECONDS, and on the first call) — in between only changes are.
+ * @param {import("../core/kart-registry.js").Kart} kart @param {"health" | "jump"} key
+ */
+function HudResendDue(kart, key) {
+    const now = Instance.GetGameTime();
+    const due = (kart.hudResendAt ??= {});
+    if (due[key] !== undefined && now < due[key]) {
+        return false;
+    }
+    due[key] = now + HUD_RESEND_SECONDS;
+    return true;
+}
+
+/**
+ * Jump dots = the wall-jump charges (see GetWallJumpCharges, JumpDotFills):
+ * a dot's fill ("jump_dot_<i>") is transparent by default and shown with
+ * "On" while that charge is ready — nothing while it refills. Sent when a
+ * dot changed (kart.hudJumpReady), and every dot again every
+ * HUD_RESEND_SECONDS. One class per panel: several classes toggled on one
+ * panel every tick never showed in-game.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
 function UpdateJumpHud(slot, kart) {
     const hud = GetSpeedHud();
     if (!hud) {
         return;
     }
-    const charge = GetJumpChargeFraction(kart);
-    const filledSegments = Math.round(charge * JUMP_BAR_SEGMENTS);
-    for (let i = 0; i < JUMP_BAR_SEGMENTS; i++) {
-        hud.SetHasClassForPlayer(slot, `jump_seg_${i}`, "Filled", i < filledSegments);
+    const ready = JumpDotFills(GetWallJumpCharges(kart), WALL_JUMP_CHARGES).map((fill) => fill === JUMP_DOT_FILL_STEPS);
+    const shown = HudResendDue(kart, "jump") ? undefined : kart.hudJumpReady;
+    for (let i = 0; i < ready.length; i++) {
+        if (shown === undefined || shown[i] !== ready[i]) {
+            hud.SetHasClassForPlayer(slot, `jump_dot_${i}`, "On", ready[i]);
+        }
     }
-    hud.SetHasClassForPlayer(slot, "jump_bar", "Ready", charge >= 1);
+    kart.hudJumpReady = ready;
 }
 
-/** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart */
+/**
+ * Health bar under the km/h: HEALTH_BAR_SEGMENTS pieces, transparent by
+ * default, the ones up to the health left shown with "On". Sent when the
+ * count changed (kart.hudHealthSegments), and all of it again every
+ * HUD_RESEND_SECONDS (see UpdateJumpHud).
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
 function UpdateHealthHud(slot, kart) {
     const hud = GetSpeedHud();
     if (!hud) {
         return;
     }
-    const bar = HealthBarState(kart.health);
-    for (let i = 0; i < HEALTH_BAR_SEGMENTS; i++) {
-        hud.SetHasClassForPlayer(slot, `health_seg_${i}`, "Filled", i < bar.filledSegments);
+    const filled = HealthBarState(kart.health).filledSegments;
+    if (!HudResendDue(kart, "health") && filled === kart.hudHealthSegments) {
+        return;
     }
-    hud.SetHasClassForPlayer(slot, "health_bar", "Low", bar.low);
-    hud.SetHasClassForPlayer(slot, "health_bar", "Critical", bar.critical);
+    for (let i = 0; i < HEALTH_BAR_SEGMENTS; i++) {
+        hud.SetHasClassForPlayer(slot, `health_seg_${i}`, "On", i < filled);
+    }
+    kart.hudHealthSegments = filled;
 }
 
 /**

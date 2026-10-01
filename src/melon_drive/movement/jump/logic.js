@@ -10,8 +10,7 @@ import {
     WALL_JUMP_UP_SPEED,
     WALL_JUMP_PUSH_SPEED,
     WALL_JUMP_SAME_WALL_DOT,
-    WALL_JUMP_CHARGE_COST,
-    WALL_JUMP_MIN_CHARGE,
+    WALL_JUMP_CHARGES,
     WALL_JUMP_RECHARGE_SECONDS,
     WALL_JUMP_RATING_SPEED_MULTIPLIER,
     WALL_JUMP_PERFECT_UP_MULTIPLIER,
@@ -34,16 +33,22 @@ export function CanGroundJump({ grounded, lastGroundedTime, lastJumpTime }) {
 }
 
 /**
- * The wall-jump charge after `dt` seconds of refilling (0..1).
- * @param {number} charge @param {number} dt
+ * The wall-jump charges (0..WALL_JUMP_CHARGES, fractional while one is
+ * refilling) after `dt` seconds of refilling — one after the other,
+ * WALL_JUMP_RECHARGE_SECONDS each.
+ * @param {number} charges @param {number} dt
  */
-export function RechargeWallJump(charge, dt) {
-    return Math.min(1, charge + Math.max(0, dt) / WALL_JUMP_RECHARGE_SECONDS);
+export function RechargeWallJump(charges, dt) {
+    return Math.min(WALL_JUMP_CHARGES, charges + Math.max(0, dt) / WALL_JUMP_RECHARGE_SECONDS);
 }
 
-/** The wall-jump charge left after one wall jump. @param {number} charge */
-export function WallJumpChargeAfter(charge) {
-    return Math.max(0, charge - WALL_JUMP_CHARGE_COST);
+/**
+ * The charges left after one wall jump: one whole charge used. The one that
+ * was refilling keeps its progress.
+ * @param {number} charges
+ */
+export function WallJumpChargeAfter(charges) {
+    return Math.max(0, charges - 1);
 }
 
 /**
@@ -63,7 +68,7 @@ export function CanWallJump(s) {
  *   wallContact?: { time: number, normal: { x: number, y: number } },
  *   lastWallJump?: { time: number, normal: { x: number, y: number } },
  *   lastGroundedTime?: number,
- *   charge: number,
+ *   charge: number, // wall jumps charged, see WALL_JUMP_CHARGES — at least one whole one needed
  *   cooldown?: number, // WALL_JUMP_COOLDOWN, shorter in a lift zone
  *   window?: number, // WALL_JUMP_WINDOW, longer in a lift zone
  *   bounceTiming?: boolean, // a wall bounce's jump-timing window is still open — this press is its timing, not a wall jump
@@ -82,8 +87,8 @@ export function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, 
     if (now - wallContact.time > window) {
         return `not at a wall (last there ${(now - wallContact.time).toFixed(3)}s ago > ${window}s)`;
     }
-    if (charge < WALL_JUMP_MIN_CHARGE) {
-        return `charge spent (${charge.toFixed(2)} < WALL_JUMP_MIN_CHARGE ${WALL_JUMP_MIN_CHARGE})`; // wait for it to refill
+    if (charge < 1) {
+        return `no wall jump charged (${charge.toFixed(2)} of ${WALL_JUMP_CHARGES})`; // wait for one to refill
     }
     if (!lastWallJump) {
         return null;
@@ -100,20 +105,19 @@ export function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, 
 }
 
 /**
- * Velocity right after a wall jump at `charge` (0..1, see CanWallJump —
- * the jump is that strong): speed along the wall is kept, the part across
- * it points away from the wall at charge × WALL_JUMP_PUSH_SPEED (or faster,
- * if it already was — e.g. just after a wall bounce), plus
- * charge × WALL_JUMP_UP_SPEED up (the caller keeps a faster upward speed
- * the melon already has, see TryWallJump).
- * @param {{ x: number, y: number }} v current horizontal velocity @param {{ x: number, y: number }} n wall normal (horizontal, unit length, pointing away from the wall) @param {number} charge
+ * Velocity right after a wall jump (always full strength): speed along the
+ * wall is kept, the part across it points away from the wall at
+ * WALL_JUMP_PUSH_SPEED (or faster, if it already was — e.g. just after a
+ * wall bounce), plus WALL_JUMP_UP_SPEED up (the caller keeps a faster
+ * upward speed the melon already has, see TryWallJump).
+ * @param {{ x: number, y: number }} v current horizontal velocity @param {{ x: number, y: number }} n wall normal (horizontal, unit length, pointing away from the wall)
  */
-export function WallJumpVelocity(v, n, charge) {
+export function WallJumpVelocity(v, n) {
     const across = v.x * n.x + v.y * n.y;
     const alongX = v.x - across * n.x;
     const alongY = v.y - across * n.y;
-    const away = Math.max(across, WALL_JUMP_PUSH_SPEED * charge);
-    return { x: alongX + away * n.x, y: alongY + away * n.y, z: WALL_JUMP_UP_SPEED * charge };
+    const away = Math.max(across, WALL_JUMP_PUSH_SPEED);
+    return { x: alongX + away * n.x, y: alongY + away * n.y, z: WALL_JUMP_UP_SPEED };
 }
 
 /**

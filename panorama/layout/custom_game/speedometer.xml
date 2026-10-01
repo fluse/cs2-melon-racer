@@ -4,6 +4,10 @@
 	</styles>
 
 	<Panel class="Root">
+		<!-- Black fade along the bottom of the screen, behind everything else
+		     (first child): 20% at the bottom edge, fading out upward. -->
+		<Panel class="BottomFade" hittest="false" />
+
 		<!-- Time trial, top left: the run clock, the player's best on this track,
 		     and after the finish the result (see time-trial.js). -->
 		<Panel id="run_panel" class="RunPanel Hidden">
@@ -122,7 +126,7 @@
 
 		<!-- Wall-bounce feedback, shown briefly after each bounce (see
 		     UpdateBounceHud), in the bottom-right cluster right above the
-		     speedometer: rating word + exact angle, a 0°..90° scale in 10°
+		     health bar: rating word + exact angle, a 0°..90° scale in 10°
 		     segments with the 45° target outlined and the hit segment lit,
 		     and a jump-timing bar. Rating* class on the panel colors it. -->
 		<Panel id="bounce_panel" class="BouncePanel Hidden">
@@ -153,49 +157,69 @@
 			</Panel>
 		</Panel>
 
-		<Panel id="speed_panel" class="SpeedPanel">
-			<Label id="speed_value" class="SpeedValue" text="{s:speed}" />
-			<Label class="SpeedUnit" text="KM/H" />
-		</Panel>
-
-		<!-- Melon health: a row of segments that fill left-to-right with
-		     kart.health / MELON_MAX_HEALTH, same segmented-bar look as
-		     JumpBar below. Turns yellow/red as the melon gets close to
-		     breaking, driven from script via UpdateHealthHud. -->
-		<Panel id="health_bar" class="HealthBar">
-			<Panel id="health_seg_0" class="HealthSegment" />
-			<Panel id="health_seg_1" class="HealthSegment" />
-			<Panel id="health_seg_2" class="HealthSegment" />
-			<Panel id="health_seg_3" class="HealthSegment" />
-			<Panel id="health_seg_4" class="HealthSegment" />
-			<Panel id="health_seg_5" class="HealthSegment" />
-			<Panel id="health_seg_6" class="HealthSegment" />
-			<Panel id="health_seg_7" class="HealthSegment" />
-			<Panel id="health_seg_8" class="HealthSegment" />
-			<Panel id="health_seg_9" class="HealthSegment" />
-			<Panel id="health_seg_10" class="HealthSegment" />
-			<Panel id="health_seg_11" class="HealthSegment" />
-			<Panel id="health_seg_12" class="HealthSegment" />
-			<Panel id="health_seg_13" class="HealthSegment" />
-			<Panel id="health_seg_14" class="HealthSegment" />
-			<Panel id="health_seg_15" class="HealthSegment" />
-			<Panel id="health_seg_16" class="HealthSegment" />
-			<Panel id="health_seg_17" class="HealthSegment" />
-			<Panel id="health_seg_18" class="HealthSegment" />
-			<Panel id="health_seg_19" class="HealthSegment" />
-		</Panel>
-
-		<Panel id="jump_bar" class="JumpBar">
-			<Panel id="jump_seg_0" class="JumpSegment" />
-			<Panel id="jump_seg_1" class="JumpSegment" />
-			<Panel id="jump_seg_2" class="JumpSegment" />
-			<Panel id="jump_seg_3" class="JumpSegment" />
-			<Panel id="jump_seg_4" class="JumpSegment" />
-			<Panel id="jump_seg_5" class="JumpSegment" />
-			<Panel id="jump_seg_6" class="JumpSegment" />
-			<Panel id="jump_seg_7" class="JumpSegment" />
-			<Panel id="jump_seg_8" class="JumpSegment" />
-			<Panel id="jump_seg_9" class="JumpSegment" />
+		<!-- Speed panel, bottom center: the km/h readout over the health bar —
+		     pure CSS, no images: a container that is only a white outline, inside
+		     it the fill bar of HEALTH_BAR_SEGMENTS white pieces in a row, emptying
+		     right to left — each piece transparent until the script makes it
+		     white with an "On" class (UpdateHealthHud) — and the wall-jump dots right of it.
+		     Every toggled panel gets exactly one class ("On") and starts without
+		     it: several different classes toggled on one panel never showed
+		     in-game. Flat on purpose: inside a panel turned with a CSS 3D
+		     transform, class changes from script never showed either. -->
+		<Panel id="speed_bottom" class="SpeedBottom">
+			<Panel class="SpeedRow">
+				<!-- as wide as the dots on the right, so the speed panel stays centered -->
+				<Panel class="SpeedRowSpacer" />
+				<Panel id="speed_panel" class="SpeedPanel">
+					<Panel class="SpeedReadout">
+						<Label id="speed_value" class="SpeedValue" text="{s:speed}" />
+					</Panel>
+					<!-- the container is the white outline; inside it the fill bar, emptying right to left -->
+					<Panel id="health_bar" class="HealthBar">
+						<Panel id="health_fill" class="HealthFill">
+							<Panel id="health_seg_0" class="HealthSeg" />
+							<Panel id="health_seg_1" class="HealthSeg" />
+							<Panel id="health_seg_2" class="HealthSeg" />
+							<Panel id="health_seg_3" class="HealthSeg" />
+							<Panel id="health_seg_4" class="HealthSeg" />
+							<Panel id="health_seg_5" class="HealthSeg" />
+							<Panel id="health_seg_6" class="HealthSeg" />
+							<Panel id="health_seg_7" class="HealthSeg" />
+							<Panel id="health_seg_8" class="HealthSeg" />
+							<Panel id="health_seg_9" class="HealthSeg" />
+							<Panel id="health_seg_10" class="HealthSeg" />
+							<Panel id="health_seg_11" class="HealthSeg" />
+							<Panel id="health_seg_12" class="HealthSeg" />
+							<Panel id="health_seg_13" class="HealthSeg" />
+							<Panel id="health_seg_14" class="HealthSeg" />
+							<Panel id="health_seg_15" class="HealthSeg" />
+							<Panel id="health_seg_16" class="HealthSeg" />
+							<Panel id="health_seg_17" class="HealthSeg" />
+							<Panel id="health_seg_18" class="HealthSeg" />
+							<Panel id="health_seg_19" class="HealthSeg" />
+							<Panel id="health_seg_20" class="HealthSeg" />
+							<Panel id="health_seg_21" class="HealthSeg" />
+							<Panel id="health_seg_22" class="HealthSeg" />
+							<Panel id="health_seg_23" class="HealthSeg" />
+							<Panel id="health_seg_24" class="HealthSeg" />
+							<Panel id="health_seg_25" class="HealthSeg" />
+							<Panel id="health_seg_26" class="HealthSeg" />
+							<Panel id="health_seg_27" class="HealthSeg" />
+							<Panel id="health_seg_28" class="HealthSeg" />
+							<Panel id="health_seg_29" class="HealthSeg" />
+						</Panel>
+					</Panel>
+				</Panel>
+				<!-- Wall-jump charges: one dot per WALL_JUMP_CHARGES, stacked bottom
+				     up (the last one, dot 0, at the bottom). Each dot is a white outline
+				     (JumpDot) with a fill inside (jump_dot_<i>), transparent until the
+				     script puts "On" on it once that charge is ready (UpdateJumpHud). -->
+				<Panel id="jump_bar" class="JumpDots">
+					<Panel class="JumpDot"><Panel id="jump_dot_2" class="JumpDotFill" /></Panel>
+					<Panel class="JumpDot"><Panel id="jump_dot_1" class="JumpDotFill" /></Panel>
+					<Panel class="JumpDot"><Panel id="jump_dot_0" class="JumpDotFill" /></Panel>
+				</Panel>
+			</Panel>
 		</Panel>
 
 		<!-- Press USE to toggle: a general-purpose settings/actions menu, not

@@ -3,6 +3,15 @@
     height: 100%;
 }
 
+/* Black fade along the bottom of the screen (behind the speed panel and the
+   bottom-right cluster): 20% opaque at the bottom edge, transparent at the top. */
+.BottomFade {
+    width: 100%;
+    height: 280px;
+    vertical-align: bottom;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #00000000 ), to( #00000033 ) );
+}
+
 /* Time trial, top left: big run clock, the player's best below it, and
    the finish time for a few seconds after a run (see time-trial.js). Shown
    while the kart is on a track (script toggles "Hidden"). */
@@ -427,63 +436,147 @@
     }
 }
 
-#speed_panel {
-    horizontal-align: right;
+/* Speed panel, bottom center (see UpdateSpeedHud / UpdateHealthHud): the
+   km/h readout over the melon's health bar. Sits right on the bottom edge
+   of the screen (#speed_panel's padding-bottom keeps the content off it). */
+.SpeedBottom {
+    horizontal-align: center;
     vertical-align: bottom;
-    margin-right: 40px;
-    margin-bottom: 90px;
-    width: 120px;
+}
+
+/* Spacer, speed panel and the wall-jump dots in a row. No CSS 3D tilt: in a
+   panel turned with rotateX, class changes from script never showed. */
+.SpeedRow {
+    flow-children: right;
+}
+
+/* As wide as .JumpDots (its width + margin-left), so #speed_panel stays centered. */
+.SpeedRowSpacer {
+    width: 26px;
+    height: 1px;
+}
+
+/* Readout and bar — a faint white line left and right, and a black
+   background, 20% opaque at the bottom, fading to transparent at the top. */
+#speed_panel {
+    vertical-align: bottom;
     flow-children: down;
 
-    padding: 10px 24px;
-    background-color: #00000088;
-    border: 2px solid #ffffff55;
-    border-radius: 14px;
+    padding: 0px 14px 10px 14px;
+    border-left: 2px solid #ffffff0d;
+    border-right: 2px solid #ffffff0d;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #00000000 ), to( #00000033 ) );
+}
 
-    transition-property: border-color, background-color;
-    transition-duration: .15s;
+/* Wall-jump charges: three dots stacked right of #speed_panel's right line.
+   Each dot is a white outline (.JumpDot, like .HealthBar around the health
+   fill) with a fill inside: transparent while that charge is used up or
+   refilling, white with "On" once it's ready (UpdateJumpHud; see .HealthSeg
+   why not the other way round). No transition. */
+.JumpDots {
+    vertical-align: center;
+    margin-left: 10px;
+    width: 16px;
+    flow-children: down;
+}
+
+.JumpDot {
+    width: 16px;
+    height: 16px;
+    margin-top: 5px;
+    padding: 2px;
+    border: 1px solid #ffffff80; /* 1px is the minimum — half transparent to look thinner */
+    border-radius: 8px;
+
+    &:first-child {
+        margin-top: 0px;
+    }
+}
+
+.JumpDotFill {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%; /* round whatever size is left inside the outline */
+    background-color: #00000000;
+
+    &.On {
+        background-color: #ffffff;
+    }
+}
+
+
+/* Health bar, CSS only. .HealthBar is the container: just a white outline,
+   transparent inside. In it .HealthFill, the fill bar: HEALTH_BAR_SEGMENTS
+   pieces sharing its width, emptying right to left. A piece is transparent
+   by default; UpdateHealthHud makes the ones up to the health left white
+   with "On". Not the other way round (white, hidden by a class): whether by
+   opacity or a transparent background, a hidden piece's white still showed
+   faintly in-game, while a color the class sets shows reliably. No
+   transition, blur, shadow or tint. */
+.HealthBar {
+    horizontal-align: center;
+    width: 240px;
+    height: 14px;
+    padding: 2px;
+    border: 2px solid #ffffff;
+    border-radius: 7px;
+}
+
+.HealthFill {
+    width: 100%;
+    height: 100%;
+    flow-children: right;
+}
+
+.HealthSeg {
+    width: fill-parent-flow(1.0);
+    height: 100%;
+    background-color: #00000000;
+
+    &:first-child {
+        border-radius: 3px 0px 0px 3px;
+    }
+    &:last-child {
+        border-radius: 0px 3px 3px 0px;
+    }
+}
+
+.HealthSeg.On {
+    background-color: #ffffff;
+}
+
+.SpeedReadout {
+    horizontal-align: center;
+    flow-children: down;
 }
 
 /* Wall-bounce feedback (see UpdateSpeedHud): Boosted while above normal top
-   speed, PerfectBounce as a short flash after a perfectly timed jump. */
-#speed_panel.Boosted {
-    border-color: #ff9933;
-}
-
+   speed, PerfectBounce as a short flash after a perfect hit. */
 #speed_panel.Boosted .SpeedValue {
     color: #ffb347;
 }
 
-#speed_panel.PerfectBounce {
-    border-color: #ffe066;
-    background-color: #ffe06666;
+#speed_panel.PerfectBounce .SpeedValue {
+    color: #ffe066;
 }
 
 .SpeedValue {
-    font-size: 48px;
+    font-size: 54px;
     font-weight: bold;
     color: white;
-    text-shadow: 2px 2px 2px black;
+    text-shadow: 2px 2px 3px black;
     horizontal-align: center;
-}
-
-.SpeedUnit {
-    font-size: 16px;
-    color: #ffffffaa;
-    horizontal-align: center;
-    margin-top: -4px;
 }
 
 /* Wall-bounce feedback panel (see UpdateBounceHud): part of the bottom-right
-   cluster, stacked right above #speed_panel (same right margin as it and the
-   bars below) — centered on screen it covered the track. Shown briefly after
+   corner — centered on screen it covered the track. Shown briefly after
    each bounce. The Rating* class on the panel sets the accent color used by
    the rating word, border and hit segment. */
 .BouncePanel {
     horizontal-align: right;
     vertical-align: bottom;
     margin-right: 40px;
-    margin-bottom: 196px; /* #speed_panel's margin-bottom, its height and a gap */
+    margin-bottom: 20px;
     flow-children: down;
 
     padding: 6px 10px;
@@ -597,101 +690,6 @@
 
 .BouncePanel.RatingMiss .BounceRating { color: #ff6666; }
 .BouncePanel.RatingMiss .BounceAngleSegment.Hit { background-color: #ff6666; }
-
-/* Melon health bar: a row of segments that light up left-to-right with
-   remaining health, same visual language as .JumpBar/.JumpSegment below.
-   Fill color shifts green -> yellow -> red as .Low/.Critical get toggled on
-   the bar (see UpdateHealthHud), warning that another hard impact breaks
-   the melon. */
-.HealthBar {
-    horizontal-align: right;
-    vertical-align: bottom;
-    margin-right: 40px;
-    margin-bottom: 54px;
-
-    flow-children: right;
-
-    padding: 6px;
-    background-color: #000000aa;
-    border: 2px solid #ffffff55;
-    border-radius: 6px;
-
-    transition-property: border-color;
-    transition-duration: .15s;
-
-    &.Critical {
-        border-color: #e05c5c;
-    }
-}
-
-.HealthSegment {
-    width: 7px;
-    height: 10px;
-    margin-left: 2px;
-    background-color: #ffffff33;
-    border-radius: 2px;
-
-    transition-property: background-color;
-    transition-duration: .1s;
-
-    &:first-child {
-        margin-left: 0px;
-    }
-
-    &.Filled {
-        background-color: #5ac85a;
-    }
-}
-
-.HealthBar.Low .HealthSegment.Filled {
-    background-color: #ffe066;
-}
-
-.HealthBar.Critical .HealthSegment.Filled {
-    background-color: #e05c5c;
-}
-
-/* Jump recharge bar: a row of segments that light up left-to-right as the
-   cooldown refills, driven from script via SetHasClassForPlayer("Filled"). */
-.JumpBar {
-    horizontal-align: right;
-    vertical-align: bottom;
-    margin-right: 40px;
-    margin-bottom: 20px;
-
-    flow-children: right;
-
-    padding: 6px;
-    background-color: #000000aa;
-    border: 2px solid #ffffff55;
-    border-radius: 6px;
-
-    transition-property: border-color;
-    transition-duration: .15s;
-
-    &.Ready {
-        border-color: #ffe066;
-    }
-}
-
-.JumpSegment {
-    width: 16px;
-    height: 16px;
-    margin-left: 3px;
-    background-color: #ffffff33;
-    border-radius: 3px;
-
-    transition-property: background-color;
-    transition-duration: .1s;
-
-    &:first-child {
-        margin-left: 0px;
-    }
-
-    &.Filled {
-        background-color: #ffe066;
-    }
-}
 
 /* General user menu (USE to toggle) — a green-framed card with the Melon
    Racer logo sitting on its top edge, over full-screen holo scanlines.
