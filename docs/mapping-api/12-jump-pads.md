@@ -1,4 +1,4 @@
-[Mapping API](README.md) › **12. Jump pads** · [← Camera zones](11-camera-zones.md) · [Checking your map →](13-checking.md)
+[Mapping API](README.md) › **12. Jump pads** · [← Camera zones](11-camera-zones.md) · [Water zones →](13-water-zones.md)
 
 # 12. Jump pads
 
@@ -64,4 +64,4 @@ Sized for a pad ~50 units across; for bigger pads raise `m_flConstantRadius`
 (rings) and `m_fRadiusMax` (sparks) in the .vpcf.
 
 ---
-[← Camera zones](11-camera-zones.md) · [Mapping API](README.md) · [Checking your map →](13-checking.md)
+[← Camera zones](11-camera-zones.md) · [Mapping API](README.md) · [Water zones →](13-water-zones.md)

@@ -76,3 +76,24 @@ export const WALL_JUMP_RECHARGE_SECONDS = 5; // empty -> full (was 3)
 export const WALL_JUMP_UP_SPEED = 240; // units/sec upward — well below the ground jump's JUMP_SPEED (was 380)
 export const WALL_JUMP_PUSH_SPEED = 160; // units/sec at least away from the wall (more if already moving away faster) (was 250)
 export const WALL_JUMP_SAME_WALL_DOT = 0.7; // normals closer than this (dot product, ~45°) count as the same wall
+// Wall jump angle rating — the wall bounce's PERFECT hit, for wall jumps:
+// the angle the melon came at the wall (from the wall normal, 0 = head-on,
+// 90 = along it) gets the same rating as a bounce (BOUNCE_RATINGS, 45° =
+// PERFECT, see WallJumpAngle in ./logic.js), shown on the bounce panel, a
+// PERFECT with the spark. A rating with a multiplier above 1 boosts it like
+// a bounce: it leaves with the full speed it came in with (not what's left
+// after the wall stopped it) times this, in the wall jump's direction (see
+// WallJumpBoostedVelocity). Keyed by BOUNCE_RATINGS[].label — no penalty
+// below GOOD, a plain wall jump stays as it was. Any gain lifts the speed cap like
+// a bounce (decays at BOOST_DECAY); charge and the same-wall rule still
+// limit chaining. A PERFECT also kicks WALL_JUMP_PERFECT_UP_MULTIPLIER
+// harder upward.
+export const WALL_JUMP_RATING_SPEED_MULTIPLIER = { PERFECT: 1.35, GOOD: 1.1, BAD: 1, MISS: 1 };
+export const WALL_JUMP_PERFECT_UP_MULTIPLIER = 1.2;
+// The angle is the melon's approach, remembered when the wall contact starts
+// (kart.lastWallContact.approach, see WallApproach): once it touches the
+// wall, physics stops it there and it only slides along — a press a tick or
+// two late used to read that slide as 90° (MISS). The remembered approach
+// counts for this long after the contact started — longer and a melon that
+// slid along a wall for a while could still cash in its old approach.
+export const WALL_JUMP_APPROACH_MEMORY = 0.15; // seconds

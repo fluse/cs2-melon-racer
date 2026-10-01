@@ -1,7 +1,8 @@
 // Trigger zones the melon can be inside — heal zones (heal_enter/heal_leave,
 // read by ../heal/), lift zones (lift_enter/lift_leave, zones/lift/constants.js) and
 // camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in camera-zone/constants.js)
-// and jump pads (jump_pad_enter/jump_pad_leave, zones/jump-pad/constants.js):
+// jump pads (jump_pad_enter/jump_pad_leave, zones/jump-pad/constants.js)
+// and water zones (water_enter/water_leave, zones/water/constants.js):
 // entering/leaving them (registered in inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.
 // Each kind is a Map on the kart: trigger entity -> its value (heal rate in
@@ -9,7 +10,7 @@
 // tracked separately.
 import { WallRules } from "./lift/logic.js";
 
-/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads"} ZoneKind */
+/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones"} ZoneKind */
 
 /**
  * The melon entered a zone trigger of this kind, worth `value`.
@@ -38,6 +39,7 @@ export function LeaveZones(kart) {
     kart.liftZones?.clear();
     kart.cameraZones?.clear();
     kart.jumpPads?.clear();
+    kart.waterZones?.clear();
 }
 
 /**
@@ -62,6 +64,15 @@ export function StrongestZone(kart, kind) {
 /** Whether the melon is inside a lift zone. @param {import("../core/kart-registry.js").Kart} kart */
 export function InLiftZone(kart) {
     return StrongestZone(kart, "liftZones") !== undefined;
+}
+
+/**
+ * Whether the melon is inside a water zone — its drag and buoyancy aren't
+ * impacts, see zones/water/constants.js.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+export function InWater(kart) {
+    return StrongestZone(kart, "waterZones") !== undefined;
 }
 
 /** The wall bounce / wall jump rules for where the melon is now (see WallRules). @param {import("../core/kart-registry.js").Kart} kart */

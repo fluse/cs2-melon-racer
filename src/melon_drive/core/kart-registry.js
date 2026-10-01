@@ -24,7 +24,7 @@ import { predictionDotSet } from "./trace.js";
  *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
- *   lastWallContact?: { time: number, normal: { x: number, y: number } }, // last wall touched in the air (probe or bounce) — see UpdateWallContact
+ *   lastWallContact?: { time: number, normal: { x: number, y: number }, approach?: { x: number, y: number }, approachTime?: number }, // last wall touched in the air (probe or bounce), with how the melon came at it — see UpdateWallContact
  *   lastWallJump?: { time: number, normal: { x: number, y: number } }, // see CanWallJump
  *   bufferedWallJumpTime?: number, // a lift-zone jump press not yet used, fired on the next wall touch — see LIFT_ZONE_JUMP_BUFFER
  *   perfectBounceBoost?: boolean, // its speed above MAX_SPEED is from a PERFECT bounce — no boost trail for that, see fx/boost-trail/boost-trail.js
@@ -46,6 +46,7 @@ import { predictionDotSet } from "./trace.js";
  *   liftZones?: Map<any, number>, // lift triggers the melon is inside -> their wall-bounce kick (u/s up), see zones/registry.js
  *   jumpPads?: Map<any, import("../zones/jump-pad/logic.js").JumpPad>, // jump pad triggers the melon is on -> their launch, see zones/registry.js
  *   lastPadLaunchTime?: number, // last jump pad launch — see ShouldPadLaunch
+ *   waterZones?: Map<any, number>, // water triggers the melon is inside (value unused), see zones/water/
  *   padFlight?: import("../zones/jump-pad/logic.js").PadFlight, // a jump pad launch's damage protection, still on — see zones/jump-pad/jump-pad.js
  *   cameraZones?: Map<any, import("../zones/camera-zone/logic.js").CameraZone>, // camera triggers the melon is inside -> their zoom, see zones/registry.js
  *   zoneCamera?: import("../zones/camera-zone/logic.js").ZoneCameraState, // the camera-zone zoom being eased in/out — see UpdateZoneCamera

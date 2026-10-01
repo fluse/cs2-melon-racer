@@ -1,4 +1,4 @@
-// Script inputs of the zone triggers — heal, lift and camera zones, jump pads,
+// Script inputs of the zone triggers — heal, lift, camera and water zones, jump pads,
 // plus the teleporters (teleport/inputs.js). The zones all work
 // the same way: OnStartTouch -> "<kind>_enter", OnEndTouch -> "<kind>_leave",
 // and the touched trigger's own name may carry its value (heal_zone_<rate>,
@@ -11,6 +11,7 @@ import { HealZoneRate, PlayHealEffect } from "../health/heal/index.js";
 import { LiftZoneUpSpeed } from "./lift/logic.js";
 import { CameraZoneFromName } from "./camera-zone/logic.js";
 import { JumpPadFromName } from "./jump-pad/logic.js";
+import { StopInWater } from "./water/water.js";
 import { EnterZone, LeaveZone } from "./registry.js";
 import { RegisterTeleportInput } from "./teleport/inputs.js";
 
@@ -50,5 +51,8 @@ export function RegisterZoneInputs() {
     RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
     // Jump pads — see jump-pad/constants.js. Read by jump-pad/jump-pad.js (launch, no damage).
     RegisterZone("jump_pad_enter", "jump_pad_leave", "jumpPads", JumpPadFromName, "up/forward u/s");
+    // Water zones (a trigger around a func_water) — see water/constants.js:
+    // landing in one stops the melon, and UpdateKart reads no impacts inside.
+    RegisterZone("water_enter", "water_leave", "waterZones", () => 1, "(water)", StopInWater);
     RegisterTeleportInput();
 }

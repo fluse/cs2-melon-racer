@@ -5,10 +5,11 @@
 // or at a wall comes from ../contact/; what a lift zone changes arrives as
 // WallRules (../../zones/lift/logic.js).
 import { Debug } from "../../core/debug.js";
-import { CanGroundJump, WallJumpBlockReason, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter } from "./logic.js";
+import { CanGroundJump, WallJumpBlockReason, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter, WallJumpAngle, WallJumpRatingMultipliers, WallJumpBoostedVelocity, FreshApproach } from "./logic.js";
 import { JumpTimingFactor, JumpMultiplier, WallTimingPress } from "../wall-bounce/logic.js";
 import { MomentumMaxSpeed } from "../momentum/logic.js";
-import { JUMP_SPEED } from "../../constants/index.js";
+import { PlayPerfectSpark } from "../wall-bounce/wall-bounce.js";
+import { JUMP_SPEED, BOUNCE_RATINGS } from "../../constants/index.js";
 import { LogJumpPress, LogWallJumpVerdict } from "../../dev/collision-debug.js";
 
 /**
@@ -153,8 +154,11 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
  * Wall jump, if allowed right now: in the air, at (or just off) a wall, push
  * away from it and up, as strong as the charge is full, then the charge
  * drops (so chained wall jumps get weaker). WallJumpVelocity keeps whichever
- * push away from the wall is stronger. Deliberately does NOT raise
- * kart.speedCap: chained wall jumps used to ratchet the melon ever faster.
+ * push away from the wall is stronger. Rated by the angle it came at the
+ * wall like a bounce (WallJumpAngle, WALL_JUMP_RATING_SPEED_MULTIPLIER): only
+ * a PERFECT/GOOD one leaves with the speed it came in with times the
+ * multiplier, like a bounce (WallJumpBoostedVelocity) — that raises kart.speedCap — a plain wall jump
+ * doesn't, chained wall jumps used to ratchet the melon ever faster.
  * Never lowers the melon's upward speed (a jump just after a ground jump,
  * a bounce's kick or a jump pad launch keeps the faster one).
  * While a wall bounce's jump-timing window is open (kart.pendingBounce),
@@ -183,14 +187,32 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
     if (!wallContact || blockedBy !== null) {
         return blockedBy;
     }
+    // The approach remembered at the contact's start counts too: a press a
+    // tick or two after the touch would otherwise only see the slide along
+    // the wall (WALL_JUMP_APPROACH_MEMORY).
+    const rated = WallJumpAngle([v, kart.lastVelocity, kart.prevLastVelocity, FreshApproach(wallContact, now)], wallContact.normal);
+    const bonus = WallJumpRatingMultipliers(rated.rating);
     const jump = WallJumpVelocity({ x: v.x, y: v.y }, wallContact.normal, charge);
-    v.x = jump.x;
-    v.y = jump.y;
-    v.z = Math.max(v.z, jump.z);
+    const boosted = WallJumpBoostedVelocity(jump, rated.incomingSpeed, bonus.speed);
+    v.x = boosted.x;
+    v.y = boosted.y;
+    v.z = Math.max(v.z, jump.z * bonus.up);
+    if (bonus.speed > 1) {
+        kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(v.x, v.y));
+    }
+    // Same feedback as a bounce: the bounce panel and speedometer flash
+    // (jump timing full — it was jumped), a PERFECT's spark instead of the
+    // boost trail.
+    kart.lastBounceTime = now;
+    kart.lastBounceInfo = { angle: rated.angle, angleFactor: rated.angleFactor, jumpFactor: 1 };
+    kart.perfectBounceBoost = rated.rating === BOUNCE_RATINGS[0];
+    if (kart.perfectBounceBoost) {
+        PlayPerfectSpark(kart);
+    }
     kart.lastWallJump = { time: now, normal: wallContact.normal };
     if (!rules.freeWallJumps) {
         kart.wallJumpCharge = WallJumpChargeAfter(charge);
     }
-    Debug(`wall jump: slot ${slot}, strength ${charge.toFixed(2)}${rules.freeWallJumps ? " (lift zone, free)" : ""}, off wall normal (${wallContact.normal.x.toFixed(2)}, ${wallContact.normal.y.toFixed(2)})`);
+    Debug(`wall jump: slot ${slot}, ${rated.rating.label} ${rated.angle.toFixed(0)}° (×${bonus.speed}), strength ${charge.toFixed(2)}${rules.freeWallJumps ? " (lift zone, free)" : ""}, off wall normal (${wallContact.normal.x.toFixed(2)}, ${wallContact.normal.y.toFixed(2)})`);
     return null;
 }

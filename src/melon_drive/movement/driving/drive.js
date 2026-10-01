@@ -19,6 +19,7 @@ import {
     IMPACT_DAMAGE_THRESHOLD,
     MELON_REST_SPEED,
     SETTLE_NUDGE_ANGULAR_SPEED,
+    WALL_BOUNCE_ENABLED,
     WALL_BOUNCE_MIN_IMPACT,
     WALL_BOUNCE_COOLDOWN,
     WALL_BOUNCE_PERFECT_JUMP_WINDOW,
@@ -39,7 +40,7 @@ import { ApplyImpactDamage } from "../../health/damage/damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage, WallBounceBreaksAtImpact } from "../wall-bounce/wall-bounce.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
 import { ApplyHealing } from "../../health/heal/index.js";
-import { CurrentWallRules } from "../../zones/registry.js";
+import { CurrentWallRules, InWater } from "../../zones/registry.js";
 
 /** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt */
 export function UpdateKart(slot, kart, dt) {
@@ -112,7 +113,10 @@ export function UpdateKart(slot, kart, dt) {
     /** @type {{ x: number, y: number } | undefined} */
     let bounceVelocity = undefined;
     let bounceAngleFactor = 0;
-    if (kart.lastVelocity) {
+    // In water (water_enter/water_leave) the water's drag and buoyancy keep
+    // pulling the velocity away from what we commanded — that's no impact
+    // and no wall, so neither damage nor a bounce comes from it.
+    if (kart.lastVelocity && !InWater(kart)) {
         const impactDelta = {
             x: currentVelocity.x - kart.lastVelocity.x,
             y: currentVelocity.y - kart.lastVelocity.y,
@@ -126,7 +130,7 @@ export function UpdateKart(slot, kart, dt) {
         // charged via pendingBounce), not a new crash to take damage from.
         const inBounceCooldown = now < (kart.nextBounceTime ?? 0);
         const wallNormal =
-            impactSpeed > WALL_BOUNCE_MIN_IMPACT && !inBounceCooldown
+            WALL_BOUNCE_ENABLED && impactSpeed > WALL_BOUNCE_MIN_IMPACT && !inBounceCooldown
                 ? DetectWallNormal(kart, impactDelta)
                 : null;
         const bounce = wallNormal ? ComputeWallBounce(kart, wallNormal, now) : null;

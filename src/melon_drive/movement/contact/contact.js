@@ -4,6 +4,7 @@
 // optional debug view.
 import { IsGrounded, InLiftoff, IsAtWall, WallContactReach } from "./logic.js";
 import { TraceLine } from "../../core/trace.js";
+import { WallApproach } from "../jump/logic.js";
 import { RecordFloorProbe, RecordWallProbes, IsCollisionDebugOn } from "../../dev/collision-debug.js";
 import {
     GROUND_CHECK_DISTANCE,
@@ -119,6 +120,10 @@ export function UpdateWallContact(kart, origin, now, currentVelocity, dt, ground
     if (!nearest.at || grounded) {
         return undefined;
     }
-    kart.lastWallContact = { time: now, normal: nearest.normal };
+    // How the melon came at this wall, for the wall jump's angle rating —
+    // remembered from the contact's start (WallApproach), before physics
+    // stopped it against the wall.
+    const approach = WallApproach(kart.lastWallContact, now, nearest.normal, [currentVelocity, kart.lastVelocity, kart.prevLastVelocity]);
+    kart.lastWallContact = { time: now, normal: nearest.normal, ...approach };
     return nearest.normal;
 }

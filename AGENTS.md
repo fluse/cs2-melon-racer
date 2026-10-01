@@ -29,7 +29,7 @@ Current addon contents:
 docs/TRACK_CREATION.md                   # step-by-step Hammer guide for a new track
 docs/valve/scripting_api.html            # saved copy of Valve's cs_script API wiki page (the site blocks automated fetches)
 docs/mapping-api/*.md                    # Mapping API (map↔script contract): README.md = index of every input/name/pattern,
-                                          #   01-…13-*.md one page per topic, each with setup / name-variant / "Values" tables
+                                          #   01-…14-*.md one page per topic, each with setup / name-variant / "Values" tables
 maps/melon_racer.vmap                    # main map (binary DMX, Hammer-authoritative)
 maps/content_examples/lighting_info.vmap
 maps/scripts/*.js                        # AUTO-GENERATED bundle output, see below — don't hand-edit
@@ -51,7 +51,8 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #   health/    damage/ (impacts, flat landings), breaking/ (break, effects at the crash site, respawn, melon_break),
                                           #              heal/ (heal zones, full health on respawn)
                                           #   zones/     registry.js (which zones a melon is in, the WallRules that follow), inputs.js (every *_enter/*_leave),
-                                          #              lift/, jump-pad/ (launch + no-damage flight), camera-zone/, teleport/ (melon_teleport)
+                                          #              lift/, jump-pad/ (launch + no-damage flight), camera-zone/, water/ (stop on entry, no impacts inside),
+                                          #              teleport/ (melon_teleport)
                                           #   race/      track-config.js (tracks from trigger names), checkpoints/ (progress, start_/checkpoint_/finish_ inputs),
                                           #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs)
                                           #   camera/    follow/ (chase camera, the only SetFollowConfig), wall-clip/ (eased pull-in at walls), break-zoom/, lift-zoom/, zone-zoom/

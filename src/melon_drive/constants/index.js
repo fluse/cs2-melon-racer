@@ -7,6 +7,7 @@
 export * from "../movement/driving/constants.js";
 export * from "../movement/jump/constants.js";
 export * from "../zones/jump-pad/constants.js";
+export * from "../zones/water/constants.js";
 export * from "../health/damage/constants.js";
 export * from "../health/heal/constants.js"; // heal zones live with the rest of healing in heal/
 export * from "../movement/wall-bounce/constants.js";

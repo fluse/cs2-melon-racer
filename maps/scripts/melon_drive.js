@@ -77,7 +77,7 @@ function TraceSphere(config) {
  *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
- *   lastWallContact?: { time: number, normal: { x: number, y: number } }, // last wall touched in the air (probe or bounce) — see UpdateWallContact
+ *   lastWallContact?: { time: number, normal: { x: number, y: number }, approach?: { x: number, y: number }, approachTime?: number }, // last wall touched in the air (probe or bounce), with how the melon came at it — see UpdateWallContact
  *   lastWallJump?: { time: number, normal: { x: number, y: number } }, // see CanWallJump
  *   bufferedWallJumpTime?: number, // a lift-zone jump press not yet used, fired on the next wall touch — see LIFT_ZONE_JUMP_BUFFER
  *   perfectBounceBoost?: boolean, // its speed above MAX_SPEED is from a PERFECT bounce — no boost trail for that, see fx/boost-trail/boost-trail.js
@@ -99,6 +99,7 @@ function TraceSphere(config) {
  *   liftZones?: Map<any, number>, // lift triggers the melon is inside -> their wall-bounce kick (u/s up), see zones/registry.js
  *   jumpPads?: Map<any, import("../zones/jump-pad/logic.js").JumpPad>, // jump pad triggers the melon is on -> their launch, see zones/registry.js
  *   lastPadLaunchTime?: number, // last jump pad launch — see ShouldPadLaunch
+ *   waterZones?: Map<any, number>, // water triggers the melon is inside (value unused), see zones/water/
  *   padFlight?: import("../zones/jump-pad/logic.js").PadFlight, // a jump pad launch's damage protection, still on — see zones/jump-pad/jump-pad.js
  *   cameraZones?: Map<any, import("../zones/camera-zone/logic.js").CameraZone>, // camera triggers the melon is inside -> their zoom, see zones/registry.js
  *   zoneCamera?: import("../zones/camera-zone/logic.js").ZoneCameraState, // the camera-zone zoom being eased in/out — see UpdateZoneCamera
@@ -306,6 +307,27 @@ const WALL_JUMP_RECHARGE_SECONDS = 5; // empty -> full (was 3)
 const WALL_JUMP_UP_SPEED = 240; // units/sec upward — well below the ground jump's JUMP_SPEED (was 380)
 const WALL_JUMP_PUSH_SPEED = 160; // units/sec at least away from the wall (more if already moving away faster) (was 250)
 const WALL_JUMP_SAME_WALL_DOT = 0.7; // normals closer than this (dot product, ~45°) count as the same wall
+// Wall jump angle rating — the wall bounce's PERFECT hit, for wall jumps:
+// the angle the melon came at the wall (from the wall normal, 0 = head-on,
+// 90 = along it) gets the same rating as a bounce (BOUNCE_RATINGS, 45° =
+// PERFECT, see WallJumpAngle in ./logic.js), shown on the bounce panel, a
+// PERFECT with the spark. A rating with a multiplier above 1 boosts it like
+// a bounce: it leaves with the full speed it came in with (not what's left
+// after the wall stopped it) times this, in the wall jump's direction (see
+// WallJumpBoostedVelocity). Keyed by BOUNCE_RATINGS[].label — no penalty
+// below GOOD, a plain wall jump stays as it was. Any gain lifts the speed cap like
+// a bounce (decays at BOOST_DECAY); charge and the same-wall rule still
+// limit chaining. A PERFECT also kicks WALL_JUMP_PERFECT_UP_MULTIPLIER
+// harder upward.
+const WALL_JUMP_RATING_SPEED_MULTIPLIER = { PERFECT: 1.35, GOOD: 1.1, BAD: 1, MISS: 1 };
+const WALL_JUMP_PERFECT_UP_MULTIPLIER = 1.2;
+// The angle is the melon's approach, remembered when the wall contact starts
+// (kart.lastWallContact.approach, see WallApproach): once it touches the
+// wall, physics stops it there and it only slides along — a press a tick or
+// two late used to read that slide as 90° (MISS). The remembered approach
+// counts for this long after the contact started — longer and a melon that
+// slid along a wall for a while could still cash in its old approach.
+const WALL_JUMP_APPROACH_MEMORY = 0.15; // seconds
 
 // Jump pads: a trigger_multiple (filtered to prop_physics) with
 // OnStartTouch -> RunScriptInput "jump_pad_enter" and OnEndTouch ->
@@ -340,6 +362,19 @@ const JUMP_PAD_COOLDOWN = 0.5; // seconds
 const JUMP_PAD_LANDING_GRACE = 0.3; // seconds
 // ...and at most this long after the launch, even without landing.
 const JUMP_PAD_MAX_PROTECTED_SECONDS = 6;
+
+// Water zones: a trigger_multiple (filtered to prop_physics like the other
+// triggers) around a func_water, with OnStartTouch -> RunScriptInput
+// "water_enter" and OnEndTouch -> "water_leave". The script can't see
+// func_water itself, so the trigger is what tells it the melon is in water.
+// Landing in it, the melon loses its momentum at once (speed, spin, boosted
+// speed cap, momentum steps); while inside, the water's drag and buoyancy
+// aren't read as impacts — no wall bounces, no impact damage there.
+// Rule: zones/water/logic.js, applied by zones/water/water.js.
+
+// How much of its speed (and spin) the melon keeps on entering the water.
+// 0: stops dead. 0.2: keeps a fifth of it.
+const WATER_ENTRY_SPEED_KEEP = 0;
 
 // Melon health and impact damage from landings/crashes (wall hits have their own rules in wall-bounce.js).
 
@@ -459,6 +494,9 @@ const HEAL_PARTICLE_LIFETIME = 2;
 // result once more — fully for the exact same tick, fading out towards the
 // window's edges. Floors/landings never bounce — they keep using the
 // plain IMPACT_DAMAGE_* rules (health.js).
+// Map-wide switch for testing without it: off, no wall ever bounces — a
+// wall hit is a plain crash (IMPACT_DAMAGE_* rules, physics stops the melon).
+const WALL_BOUNCE_ENABLED = false;
 const WALL_BOUNCE_MIN_IMPACT = 200; // units/sec of sudden velocity change before a wall hit counts as a bounce at all
 const WALL_NORMAL_MAX_Z = 0.5; // |normal.z| above this is a floor/ceiling/steep ramp, not a wall
 const WALL_BOUNCE_TRACE_DISTANCE = 160; // ray length from last tick's position along the incoming direction — must reach the wall even at grazing angles (grows with 1/cos(angle))
@@ -1652,14 +1690,15 @@ function LiftZoneUpSpeed(triggerName) {
 // Trigger zones the melon can be inside — heal zones (heal_enter/heal_leave,
 // read by ../heal/), lift zones (lift_enter/lift_leave, zones/lift/constants.js) and
 // camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in camera-zone/constants.js)
-// and jump pads (jump_pad_enter/jump_pad_leave, zones/jump-pad/constants.js):
+// jump pads (jump_pad_enter/jump_pad_leave, zones/jump-pad/constants.js)
+// and water zones (water_enter/water_leave, zones/water/constants.js):
 // entering/leaving them (registered in inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.
 // Each kind is a Map on the kart: trigger entity -> its value (heal rate in
 // health/s, lift kick in u/s, camera zoom), so overlapping zones and their leaves are
 // tracked separately.
 
-/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads"} ZoneKind */
+/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones"} ZoneKind */
 
 /**
  * The melon entered a zone trigger of this kind, worth `value`.
@@ -1688,6 +1727,7 @@ function LeaveZones(kart) {
     kart.liftZones?.clear();
     kart.cameraZones?.clear();
     kart.jumpPads?.clear();
+    kart.waterZones?.clear();
 }
 
 /**
@@ -1712,6 +1752,15 @@ function StrongestZone(kart, kind) {
 /** Whether the melon is inside a lift zone. @param {import("../core/kart-registry.js").Kart} kart */
 function InLiftZone(kart) {
     return StrongestZone(kart, "liftZones") !== undefined;
+}
+
+/**
+ * Whether the melon is inside a water zone — its drag and buoyancy aren't
+ * impacts, see zones/water/constants.js.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function InWater(kart) {
+    return StrongestZone(kart, "waterZones") !== undefined;
 }
 
 /** The wall bounce / wall jump rules for where the melon is now (see WallRules). @param {import("../core/kart-registry.js").Kart} kart */
@@ -2344,109 +2393,6 @@ function IsOnPlayingTeam(pawn) {
     return team === 2 || team === 3;
 }
 
-// Pure jump rules — ground jump, wall jump and the wall-jump charge — no
-// cs_script import, so they're unit-testable in Node (see
-// test/movement/jump-logic.test.mjs). movement/jump/jump.js applies them; whether the
-// melon is on the ground or at a wall comes from movement/contact/. See the
-// JUMP_SPEED / WALL_PROBE_DIRECTIONS comments in movement/jump/constants.js
-// for the design.
-
-/**
- * Whether a jump press right now is a ground jump: on the ground, and it's
- * a new ground contact since the last jump — touching down is what resets
- * the jump, no cooldown.
- * @param {{ grounded: boolean, lastGroundedTime?: number, lastJumpTime?: number }} s
- */
-function CanGroundJump({ grounded, lastGroundedTime, lastJumpTime }) {
-    if (!grounded) {
-        return false;
-    }
-    return lastJumpTime === undefined || (lastGroundedTime !== undefined && lastGroundedTime > lastJumpTime);
-}
-
-/**
- * The wall-jump charge after `dt` seconds of refilling (0..1).
- * @param {number} charge @param {number} dt
- */
-function RechargeWallJump(charge, dt) {
-    return Math.min(1, charge + Math.max(0, dt) / WALL_JUMP_RECHARGE_SECONDS);
-}
-
-/** The wall-jump charge left after one wall jump. @param {number} charge */
-function WallJumpChargeAfter(charge) {
-    return Math.max(0, charge - WALL_JUMP_CHARGE_COST);
-}
-
-/**
- * Whether a jump press right now is a wall jump.
- * @param {Parameters<typeof WallJumpBlockReason>[0]} s
- */
-function CanWallJump(s) {
-    return WallJumpBlockReason(s) === null;
-}
-
-/**
- * Why a jump press right now is *not* a wall jump, or null if it is one —
- * the collision debug log prints this.
- * @param {{
- *   now: number,
- *   grounded: boolean,
- *   wallContact?: { time: number, normal: { x: number, y: number } },
- *   lastWallJump?: { time: number, normal: { x: number, y: number } },
- *   lastGroundedTime?: number,
- *   charge: number,
- *   cooldown?: number, // WALL_JUMP_COOLDOWN, shorter in a lift zone
- *   window?: number, // WALL_JUMP_WINDOW, longer in a lift zone
- *   bounceTiming?: boolean, // a wall bounce's jump-timing window is still open — this press is its timing, not a wall jump
- * }} s
- */
-function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN, window = WALL_JUMP_WINDOW, bounceTiming = false }) {
-    if (grounded) {
-        return "on the ground";
-    }
-    if (bounceTiming) {
-        return "counts as the wall bounce's jump timing (WALL_BOUNCE_PERFECT_JUMP_WINDOW still open)";
-    }
-    if (!wallContact) {
-        return "no wall contact yet";
-    }
-    if (now - wallContact.time > window) {
-        return `not at a wall (last there ${(now - wallContact.time).toFixed(3)}s ago > ${window}s)`;
-    }
-    if (charge < WALL_JUMP_MIN_CHARGE) {
-        return `charge spent (${charge.toFixed(2)} < WALL_JUMP_MIN_CHARGE ${WALL_JUMP_MIN_CHARGE})`; // wait for it to refill
-    }
-    if (!lastWallJump) {
-        return null;
-    }
-    if (now - lastWallJump.time < cooldown) {
-        return `cooldown (${(now - lastWallJump.time).toFixed(2)}s since the last wall jump < ${cooldown}s)`;
-    }
-    if (lastGroundedTime !== undefined && lastGroundedTime > lastWallJump.time) {
-        return null; // touched ground since — any wall is fresh again
-    }
-    const sameWall =
-        wallContact.normal.x * lastWallJump.normal.x + wallContact.normal.y * lastWallJump.normal.y > WALL_JUMP_SAME_WALL_DOT;
-    return sameWall ? "same wall as the last wall jump (touch ground or another wall first)" : null;
-}
-
-/**
- * Velocity right after a wall jump at `charge` (0..1, see CanWallJump —
- * the jump is that strong): speed along the wall is kept, the part across
- * it points away from the wall at charge × WALL_JUMP_PUSH_SPEED (or faster,
- * if it already was — e.g. just after a wall bounce), plus
- * charge × WALL_JUMP_UP_SPEED up (the caller keeps a faster upward speed
- * the melon already has, see TryWallJump).
- * @param {{ x: number, y: number }} v current horizontal velocity @param {{ x: number, y: number }} n wall normal (horizontal, unit length, pointing away from the wall) @param {number} charge
- */
-function WallJumpVelocity(v, n, charge) {
-    const across = v.x * n.x + v.y * n.y;
-    const alongX = v.x - across * n.x;
-    const alongY = v.y - across * n.y;
-    const away = Math.max(across, WALL_JUMP_PUSH_SPEED * charge);
-    return { x: alongX + away * n.x, y: alongY + away * n.y, z: WALL_JUMP_UP_SPEED * charge };
-}
-
 // Pure wall-bounce math — no cs_script import, so it's unit-testable in
 // Node (see test/movement/wall-bounce.test.mjs). movement/wall-bounce/wall-bounce.js does the engine side
 // (detecting the wall normal via traces, applying the velocity, debug draws)
@@ -2642,6 +2588,220 @@ function WithMinSpeed(v, minSpeed) {
     return { x: v.x * scale, y: v.y * scale };
 }
 
+// Pure jump rules — ground jump, wall jump and the wall-jump charge — no
+// cs_script import, so they're unit-testable in Node (see
+// test/movement/jump-logic.test.mjs). movement/jump/jump.js applies them; whether the
+// melon is on the ground or at a wall comes from movement/contact/. See the
+// JUMP_SPEED / WALL_PROBE_DIRECTIONS comments in movement/jump/constants.js
+// for the design.
+
+/**
+ * Whether a jump press right now is a ground jump: on the ground, and it's
+ * a new ground contact since the last jump — touching down is what resets
+ * the jump, no cooldown.
+ * @param {{ grounded: boolean, lastGroundedTime?: number, lastJumpTime?: number }} s
+ */
+function CanGroundJump({ grounded, lastGroundedTime, lastJumpTime }) {
+    if (!grounded) {
+        return false;
+    }
+    return lastJumpTime === undefined || (lastGroundedTime !== undefined && lastGroundedTime > lastJumpTime);
+}
+
+/**
+ * The wall-jump charge after `dt` seconds of refilling (0..1).
+ * @param {number} charge @param {number} dt
+ */
+function RechargeWallJump(charge, dt) {
+    return Math.min(1, charge + Math.max(0, dt) / WALL_JUMP_RECHARGE_SECONDS);
+}
+
+/** The wall-jump charge left after one wall jump. @param {number} charge */
+function WallJumpChargeAfter(charge) {
+    return Math.max(0, charge - WALL_JUMP_CHARGE_COST);
+}
+
+/**
+ * Whether a jump press right now is a wall jump.
+ * @param {Parameters<typeof WallJumpBlockReason>[0]} s
+ */
+function CanWallJump(s) {
+    return WallJumpBlockReason(s) === null;
+}
+
+/**
+ * Why a jump press right now is *not* a wall jump, or null if it is one —
+ * the collision debug log prints this.
+ * @param {{
+ *   now: number,
+ *   grounded: boolean,
+ *   wallContact?: { time: number, normal: { x: number, y: number } },
+ *   lastWallJump?: { time: number, normal: { x: number, y: number } },
+ *   lastGroundedTime?: number,
+ *   charge: number,
+ *   cooldown?: number, // WALL_JUMP_COOLDOWN, shorter in a lift zone
+ *   window?: number, // WALL_JUMP_WINDOW, longer in a lift zone
+ *   bounceTiming?: boolean, // a wall bounce's jump-timing window is still open — this press is its timing, not a wall jump
+ * }} s
+ */
+function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN, window = WALL_JUMP_WINDOW, bounceTiming = false }) {
+    if (grounded) {
+        return "on the ground";
+    }
+    if (bounceTiming) {
+        return "counts as the wall bounce's jump timing (WALL_BOUNCE_PERFECT_JUMP_WINDOW still open)";
+    }
+    if (!wallContact) {
+        return "no wall contact yet";
+    }
+    if (now - wallContact.time > window) {
+        return `not at a wall (last there ${(now - wallContact.time).toFixed(3)}s ago > ${window}s)`;
+    }
+    if (charge < WALL_JUMP_MIN_CHARGE) {
+        return `charge spent (${charge.toFixed(2)} < WALL_JUMP_MIN_CHARGE ${WALL_JUMP_MIN_CHARGE})`; // wait for it to refill
+    }
+    if (!lastWallJump) {
+        return null;
+    }
+    if (now - lastWallJump.time < cooldown) {
+        return `cooldown (${(now - lastWallJump.time).toFixed(2)}s since the last wall jump < ${cooldown}s)`;
+    }
+    if (lastGroundedTime !== undefined && lastGroundedTime > lastWallJump.time) {
+        return null; // touched ground since — any wall is fresh again
+    }
+    const sameWall =
+        wallContact.normal.x * lastWallJump.normal.x + wallContact.normal.y * lastWallJump.normal.y > WALL_JUMP_SAME_WALL_DOT;
+    return sameWall ? "same wall as the last wall jump (touch ground or another wall first)" : null;
+}
+
+/**
+ * Velocity right after a wall jump at `charge` (0..1, see CanWallJump —
+ * the jump is that strong): speed along the wall is kept, the part across
+ * it points away from the wall at charge × WALL_JUMP_PUSH_SPEED (or faster,
+ * if it already was — e.g. just after a wall bounce), plus
+ * charge × WALL_JUMP_UP_SPEED up (the caller keeps a faster upward speed
+ * the melon already has, see TryWallJump).
+ * @param {{ x: number, y: number }} v current horizontal velocity @param {{ x: number, y: number }} n wall normal (horizontal, unit length, pointing away from the wall) @param {number} charge
+ */
+function WallJumpVelocity(v, n, charge) {
+    const across = v.x * n.x + v.y * n.y;
+    const alongX = v.x - across * n.x;
+    const alongY = v.y - across * n.y;
+    const away = Math.max(across, WALL_JUMP_PUSH_SPEED * charge);
+    return { x: alongX + away * n.x, y: alongY + away * n.y, z: WALL_JUMP_UP_SPEED * charge };
+}
+
+/**
+ * The angle a wall jump came at the wall, rated like a wall bounce. By the
+ * time of the press physics has usually stopped the melon against the wall
+ * already, so of the velocities given (this tick's, last tick's commanded,
+ * the one before) whichever heads most squarely into the wall counts. None
+ * heading into it at all (only along it, or already away): 90°, grazing.
+ * incomingSpeed is that velocity's horizontal speed — what a bonus builds on
+ * (see WallJumpBoostedVelocity).
+ * @param {Array<{ x: number, y: number } | undefined>} velocities
+ * @param {{ x: number, y: number }} n wall normal (horizontal, unit length, pointing away from the wall)
+ * @returns {{ angle: number, angleFactor: number, rating: typeof BOUNCE_RATINGS[number], incomingSpeed: number }}
+ */
+function WallJumpAngle(velocities, n) {
+    const best = MostHeadOn(velocities, n);
+    const bestInto = best ? HeadOnRatio(best, n) : 0; // cos(angle)
+    const incomingSpeed = best ? Math.hypot(best.x, best.y) : 0;
+    const angle = (Math.acos(Math.min(1, bestInto)) * 180) / Math.PI;
+    const angleFactor = WallAngleFactor(angle);
+    return { angle, angleFactor, rating: GetBounceRating(angleFactor), incomingSpeed };
+}
+
+/**
+ * A rated wall jump's horizontal velocity: with a bonus (multiplier > 1) it
+ * works like a bounce — the full speed the melon came in with (not what's
+ * left after the wall stopped it), times the multiplier, in the plain wall
+ * jump's direction (away from the wall, along it). Never slower than the
+ * plain jump × multiplier. Without a bonus the plain jump stays as it is.
+ * @param {{ x: number, y: number }} jump the plain wall jump's horizontal velocity (WallJumpVelocity)
+ * @param {number} incomingSpeed see WallJumpAngle @param {number} multiplier see WallJumpRatingMultipliers
+ */
+function WallJumpBoostedVelocity(jump, incomingSpeed, multiplier) {
+    const plain = Math.hypot(jump.x, jump.y);
+    if (multiplier <= 1 || plain <= 0) {
+        return { x: jump.x, y: jump.y };
+    }
+    const scale = (Math.max(plain, incomingSpeed) * multiplier) / plain;
+    return { x: jump.x * scale, y: jump.y * scale };
+}
+
+/**
+ * Speed and upward multipliers a wall jump's rating earns (see
+ * WALL_JUMP_RATING_SPEED_MULTIPLIER).
+ * @param {typeof BOUNCE_RATINGS[number]} rating
+ */
+function WallJumpRatingMultipliers(rating) {
+    const table = /** @type {Record<string, number>} */ (WALL_JUMP_RATING_SPEED_MULTIPLIER);
+    return {
+        speed: table[rating.label] ?? 1,
+        up: rating === BOUNCE_RATINGS[0] ? WALL_JUMP_PERFECT_UP_MULTIPLIER : 1,
+    };
+}
+
+/**
+ * cos of the angle between a horizontal velocity and the way into a wall
+ * (1 = head-on, 0 = along it, below 0 = away from it).
+ * @param {{ x: number, y: number }} v @param {{ x: number, y: number }} n wall normal, pointing away from the wall
+ */
+function HeadOnRatio(v, n) {
+    const speed = Math.hypot(v.x, v.y);
+    return speed < 1 ? -Infinity : -(v.x * n.x + v.y * n.y) / speed;
+}
+
+/**
+ * Of the velocities given, the one heading most squarely into the wall —
+ * undefined if none heads into it at all.
+ * @template {{ x: number, y: number }} V
+ * @param {Array<V | undefined>} velocities @param {{ x: number, y: number }} n
+ * @returns {V | undefined}
+ */
+function MostHeadOn(velocities, n) {
+    /** @type {V | undefined} */
+    let best = undefined;
+    for (const v of velocities) {
+        if (v && HeadOnRatio(v, n) > 0 && (!best || HeadOnRatio(v, n) > HeadOnRatio(best, n))) {
+            best = v;
+        }
+    }
+    return best;
+}
+
+/**
+ * The approach remembered with a wall contact (see WALL_JUMP_APPROACH_MEMORY):
+ * a contact that continues the previous one (that wall, last seen within
+ * WALL_JUMP_WINDOW) keeps its approach and start time, unless one of this
+ * tick's velocities heads in more squarely; a new contact starts from them.
+ * @param {{ time: number, normal: { x: number, y: number }, approach?: { x: number, y: number }, approachTime?: number } | undefined} previous kart.lastWallContact
+ * @param {number} now @param {{ x: number, y: number }} n this contact's wall normal
+ * @param {Array<{ x: number, y: number } | undefined>} velocities this tick's, last tick's and the one before's
+ * @returns {{ approach?: { x: number, y: number }, approachTime: number }}
+ */
+function WallApproach(previous, now, n, velocities) {
+    const continues =
+        previous !== undefined &&
+        now - previous.time <= WALL_JUMP_WINDOW &&
+        previous.normal.x * n.x + previous.normal.y * n.y > WALL_JUMP_SAME_WALL_DOT;
+    const kept = continues ? previous.approach : undefined;
+    const best = MostHeadOn([kept, ...velocities], n);
+    return {
+        approach: best ? { x: best.x, y: best.y } : undefined,
+        approachTime: continues && previous.approachTime !== undefined ? previous.approachTime : now,
+    };
+}
+
+/**
+ * The remembered approach if it's still recent enough to count.
+ * @param {{ approach?: { x: number, y: number }, approachTime?: number }} contact @param {number} now
+ */
+function FreshApproach(contact, now) {
+    return contact.approachTime !== undefined && now - contact.approachTime <= WALL_JUMP_APPROACH_MEMORY ? contact.approach : undefined;
+}
+
 // Momentum — repeatedly reaching the top speed raises it (MOMENTUM_* in
 // movement/momentum/constants.js). Pure rule, no cs_script import; movement/driving/drive.js
 // applies it (test/movement/momentum.test.mjs).
@@ -2698,6 +2858,929 @@ function UpdateMomentum(momentum, horizSpeed, now, boosted) {
     const chained = momentum.lastHitTime !== undefined && now - momentum.lastHitTime <= MOMENTUM_HIT_WINDOW;
     const steps = chained ? Math.min(momentum.steps + 1, MOMENTUM_MAX_STEPS) : momentum.steps;
     return { steps, armed: false, lastHitTime: now };
+}
+
+// Particle effects from point_templates, the one way every effect in
+// melon_drive is spawned: the break burst (health/breaking/effects.js), the
+// PERFECT spark (movement/wall-bounce/wall-bounce.js), the heal sparkle (health/heal/effect.js)
+// and the boost trail (fx/boost-trail/boost-trail.js).
+// Tested against the fake engine in test/fx/particles.test.mjs.
+//
+// Two engine quirks every caller would otherwise have to know about:
+// - ForceSpawn keeps each templated entity's Hammer offset from its
+//   point_template, so without moving them the effect plays wherever the
+//   template happens to sit relative to it (see PlaceAll).
+// - "Start Active" alone doesn't reliably play an info_particle_system
+//   spawned later from a point_template — it's started explicitly
+//   (StartParticles).
+
+/**
+ * A fresh copy of the named point_template's entities, spawned at
+ * `position` — still at their Hammer offsets, not started yet.
+ * @param {string} templateName @param {any} position @param {any} [angles]
+ * @param {{ warn?: boolean }} [options] warn: report a missing/broken
+ *   template with Instance.Msg (always in the console) instead of Debug —
+ *   for effects that are part of the map's contract, where silently
+ *   spawning nothing is the bug.
+ * @returns {any[]} empty if nothing spawned
+ */
+function SpawnFromTemplate(templateName, position, angles, { warn = false } = {}) {
+    const report = warn ? (/** @type {string} */ text) => Instance.Msg(`[melon_drive] ${text}`) : Debug;
+    const template = Instance.FindEntityByName(templateName);
+    if (!template) {
+        report(`SpawnFromTemplate: no point_template named "${templateName}" in the map`);
+        return [];
+    }
+    if (!(template instanceof PointTemplate)) {
+        report(`SpawnFromTemplate: "${templateName}" is a ${template.GetClassName()}, not a point_template`);
+        return [];
+    }
+    const spawned = template.ForceSpawn(position, angles) ?? [];
+    if (spawned.length === 0) {
+        report(`SpawnFromTemplate: ForceSpawn of "${templateName}" returned nothing — check its Template01.. entries in Hammer`);
+    }
+    return spawned;
+}
+
+/** @param {any} entity */
+function IsParticleSystem(entity) {
+    return entity.GetClassName() === "info_particle_system";
+}
+
+/** Moves every entity exactly onto `position` (undoing ForceSpawn's Hammer offsets). @param {any[]} entities @param {any} position */
+function PlaceAll(entities, position) {
+    for (const entity of entities) {
+        entity.Teleport({ position });
+    }
+}
+
+/** Starts every info_particle_system among `entities`. @param {any[]} entities */
+function StartParticles(entities) {
+    for (const entity of entities) {
+        if (IsParticleSystem(entity)) {
+            Instance.EntFireAtTarget({ target: entity, input: "Start" });
+        }
+    }
+}
+
+/**
+ * Stops every info_particle_system among `entities` that's still around:
+ * no new particles, the ones already out play to the end of their lifetime.
+ * @param {any[]} entities
+ */
+function StopParticles(entities) {
+    for (const entity of entities) {
+        if (entity.IsValid() && IsParticleSystem(entity)) {
+            Instance.EntFireAtTarget({ target: entity, input: "Stop" });
+        }
+    }
+}
+
+/**
+ * Removes `entities` after `seconds` (those still around — a parented one
+ * goes with its parent if that's removed first). Removing an
+ * info_particle_system ends its particles, so `seconds` must cover the
+ * effect's own duration.
+ * @param {any[]} entities @param {number} seconds
+ */
+function RemoveAfter(entities, seconds) {
+    Instance.Delay(seconds).then(() => {
+        for (const entity of entities) {
+            if (entity.IsValid()) {
+                entity.Remove();
+            }
+        }
+    });
+}
+
+/**
+ * The whole short-lived effect in one call: a fresh copy of the template,
+ * placed exactly at `position`, optionally riding along on `parent`,
+ * started, and removed after `lifetime` seconds.
+ * @param {string} templateName @param {any} position
+ * @param {{ lifetime: number, parent?: any, angles?: any, warn?: boolean }} options
+ * @returns {any[]} the spawned entities (empty if nothing spawned)
+ */
+function PlayParticleTemplate(templateName, position, { lifetime, parent, angles, warn }) {
+    const spawned = SpawnFromTemplate(templateName, position, angles, { warn });
+    PlaceAll(spawned, position);
+    if (parent) {
+        for (const entity of spawned) {
+            entity.SetParent(parent);
+        }
+    }
+    StartParticles(spawned);
+    RemoveAfter(spawned, lifetime);
+    return spawned;
+}
+
+// Pure health-bar math — no cs_script import, so it's unit-testable in
+// Node (see test/health/health.test.mjs). hud/ turns the result into HUD classes.
+
+/**
+ * What the segmented health bar should show for a given health value.
+ * @param {number} health
+ * @returns {{ fraction: number, filledSegments: number, low: boolean, critical: boolean }}
+ */
+function HealthBarState(health) {
+    const fraction = Math.max(0, Math.min(1, health / MELON_MAX_HEALTH));
+    return {
+        fraction,
+        // ceil, not round: the melon only breaks at health <= 0, so any health
+        // left must still show at least one segment — round() emptied the bar
+        // while up to half a segment's worth of health remained.
+        filledSegments: Math.ceil(fraction * HEALTH_BAR_SEGMENTS),
+        low: fraction <= HEALTH_LOW_FRACTION,
+        critical: fraction <= HEALTH_CRITICAL_FRACTION,
+    };
+}
+
+/**
+ * Whether an impact is the melon landing on flat, level ground: the floor
+ * under it is at least FLAT_LANDING_MIN_NORMAL_Z level and the impact
+ * (the velocity change physics forced) points mostly upward.
+ * @param {{ x: number, y: number, z: number }} impactDelta
+ * @param {number | undefined} floorNormalZ this tick's floor trace, undefined if it hit nothing
+ */
+function IsFlatLanding(impactDelta, floorNormalZ) {
+    if (floorNormalZ === undefined || floorNormalZ < FLAT_LANDING_MIN_NORMAL_Z) {
+        return false;
+    }
+    const impactSpeed = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
+    return impactSpeed > 0 && impactDelta.z / impactSpeed >= FLAT_LANDING_MIN_VERTICAL_SHARE;
+}
+
+/**
+ * Health lost from a landing/crash (not a wall bounce): IMPACT_DAMAGE_* above
+ * the threshold, times FLAT_LANDING_DAMAGE_MULTIPLIER for a flat landing.
+ * @param {{ x: number, y: number, z: number }} impactDelta
+ * @param {number | undefined} floorNormalZ
+ * @returns {{ damage: number, flatLanding: boolean }}
+ */
+function ImpactDamage(impactDelta, floorNormalZ) {
+    const impactSpeed = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
+    const flatLanding = IsFlatLanding(impactDelta, floorNormalZ);
+    const base = Math.max(0, impactSpeed - IMPACT_DAMAGE_THRESHOLD) * IMPACT_DAMAGE_SCALE;
+    return { damage: flatLanding ? base * FLAT_LANDING_DAMAGE_MULTIPLIER : base, flatLanding };
+}
+
+// Healing math (HealedHealth, HealZoneRate): health/heal/logic.js.
+
+// Jump pads (JUMP_PAD_* in zones/jump-pad/constants.js). Pure rules, no cs_script
+// import; zones/jump-pad/jump-pad.js applies them (test/zones/jump-pad.test.mjs).
+
+/** @typedef {{ up: number, forward: number }} JumpPad upward launch speed, horizontal speed added (units/sec) */
+/** @typedef {{ launchTime: number, landedTime?: number }} PadFlight a launch whose damage protection is still on */
+
+/**
+ * A pad's launch, from its trigger name (see JUMP_PAD_NAME_PATTERN), else
+ * the defaults. @param {string} triggerName @returns {JumpPad}
+ */
+function JumpPadFromName(triggerName) {
+    const match = JUMP_PAD_NAME_PATTERN.exec(triggerName.trim());
+    return {
+        up: match ? Number(match[1]) : JUMP_PAD_UP_SPEED,
+        forward: match?.[2] !== undefined ? Number(match[2]) : JUMP_PAD_FORWARD_BOOST,
+    };
+}
+
+/**
+ * Whether the melon on a pad launches this tick: a jump press now, or one
+ * made at most JUMP_PAD_BUFFER ago that hasn't launched it yet — and not
+ * again within JUMP_PAD_COOLDOWN of the last launch.
+ * @param {number} now @param {boolean} jumpPressed this tick
+ * @param {number | undefined} lastPressTime last jump press @param {number | undefined} lastLaunchTime last pad launch
+ */
+function ShouldPadLaunch(now, jumpPressed, lastPressTime, lastLaunchTime) {
+    if (lastLaunchTime !== undefined && now - lastLaunchTime < JUMP_PAD_COOLDOWN) {
+        return false;
+    }
+    if (jumpPressed) {
+        return true;
+    }
+    return (
+        lastPressTime !== undefined &&
+        now - lastPressTime <= JUMP_PAD_BUFFER &&
+        (lastLaunchTime === undefined || lastPressTime > lastLaunchTime)
+    );
+}
+
+/**
+ * The velocity right after a launch: `pad.up` upward (a fall is cancelled; a
+ * melon already rising faster keeps that), and `pad.forward` more horizontal
+ * speed along where it's going — along `lookDir` if it's barely moving.
+ * @param {{ x: number, y: number, z: number }} v @param {{ x: number, y: number }} lookDir unit vector
+ * @param {JumpPad} pad
+ */
+function PadLaunchVelocity(v, lookDir, pad) {
+    const speed = Math.hypot(v.x, v.y);
+    const dir = speed > JUMP_PAD_MIN_DIRECTION_SPEED ? { x: v.x / speed, y: v.y / speed } : lookDir;
+    const launched = speed + pad.forward;
+    return { x: dir.x * launched, y: dir.y * launched, z: Math.max(v.z, pad.up) };
+}
+
+/**
+ * The launch's damage protection this tick, or undefined once it's over:
+ * JUMP_PAD_LANDING_GRACE after the first ground contact after taking off
+ * (contact within GROUND_LIFTOFF_TIME of the launch is the pad itself), or
+ * JUMP_PAD_MAX_PROTECTED_SECONDS after the launch at the latest.
+ * @param {PadFlight | undefined} flight @param {number} now @param {number | undefined} lastGroundedTime
+ * @returns {PadFlight | undefined}
+ */
+function PadFlightAfter(flight, now, lastGroundedTime) {
+    if (!flight || now - flight.launchTime > JUMP_PAD_MAX_PROTECTED_SECONDS) {
+        return undefined;
+    }
+    const landedTime =
+        flight.landedTime ??
+        (lastGroundedTime !== undefined && lastGroundedTime > flight.launchTime + GROUND_LIFTOFF_TIME ? lastGroundedTime : undefined);
+    if (landedTime !== undefined && now - landedTime > JUMP_PAD_LANDING_GRACE) {
+        return undefined;
+    }
+    return landedTime === flight.landedTime ? flight : { ...flight, landedTime };
+}
+
+// Engine side of jump pads (JUMP_PAD_*): launching a melon off the pad it's
+// on when jump is pressed, and the damage protection that follows. The rules
+// are in ../logic/jump-pad.js; which pad the melon is on, in zones.js.
+
+/**
+ * Per tick, before any damage: ends the launch's damage protection once the
+ * melon has landed (see PadFlightAfter).
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} now
+ */
+function UpdatePadFlight(kart, now) {
+    kart.padFlight = PadFlightAfter(kart.padFlight, now, kart.lastGroundedTime);
+}
+
+/**
+ * Whether the melon takes no damage right now: on a jump pad, or flying off
+ * one (until shortly after landing).
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function IsPadProtected(kart) {
+    return kart.padFlight !== undefined || CurrentJumpPad(kart) !== undefined;
+}
+
+/**
+ * On a jump pad with a (just) pressed jump: launches the melon — `v` (the
+ * velocity UpdateKart is about to command) is replaced in place, after the
+ * normal jump handling, so the launch wins over a ground/wall jump.
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now
+ * @param {boolean} jumpPressed @param {{ x: number, y: number, z: number }} v
+ * @param {{ x: number, y: number }} lookDir
+ * @returns {boolean} whether it launched
+ */
+function TryPadLaunch(slot, kart, now, jumpPressed, v, lookDir) {
+    const pad = CurrentJumpPad(kart);
+    if (!pad || !ShouldPadLaunch(now, jumpPressed, kart.lastJumpPressTime, kart.lastPadLaunchTime)) {
+        return false;
+    }
+    const launched = PadLaunchVelocity(v, lookDir, pad);
+    v.x = launched.x;
+    v.y = launched.y;
+    v.z = launched.z;
+    kart.lastPadLaunchTime = now;
+    // Counts as a jump: the pad still pushing up for a tick isn't ground
+    // contact (GROUND_LIFTOFF_TIME), and the next ground jump needs a landing.
+    kart.lastJumpTime = now;
+    kart.padFlight = { launchTime: now };
+    // Faster than the top speed, like a wall-bounce boost — decays at BOOST_DECAY.
+    kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(v.x, v.y));
+    Debug(`jump pad: slot ${slot} launched (${launched.z.toFixed(0)} u/s up, ${Math.hypot(v.x, v.y).toFixed(0)} u/s horizontal)`);
+    return true;
+}
+
+// Health loss from hard impacts (landings, crashes) — see IMPACT_DAMAGE_*.
+
+/**
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
+ * @param {{ x: number, y: number, z: number }} impactDelta the velocity change physics forced this tick
+ */
+function ApplyImpactDamage(slot, kart, impactDelta) {
+    const impactSpeed = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
+    const { damage, flatLanding } = ImpactDamage(impactDelta, kart.floorNormalZ);
+    DamageKart(slot, kart, damage, `impact ${impactSpeed.toFixed(0)} u/s${flatLanding ? " (flat landing)" : ""}`);
+}
+
+/**
+ * Impact and wall-bounce damage. None on a jump pad or flying off one (see
+ * IsPadProtected) — the attack boost's cost and melon_break triggers still apply.
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} damage @param {string} reason
+ */
+function DamageKart(slot, kart, damage, reason) {
+    if (IsPadProtected(kart)) {
+        Debug(`slot ${slot}: ${reason} -> no damage (jump pad)`);
+        return;
+    }
+    kart.health -= damage;
+    Debug(`slot ${slot}: ${reason} -> ${damage.toFixed(0)} dmg, health ${kart.health.toFixed(0)}/${MELON_MAX_HEALTH}`);
+}
+
+// Pure healing math — no cs_script import, so it's unit-testable in Node
+// (see test/health/heal.test.mjs). zone.js applies it to karts.
+
+/**
+ * Health after healing for dt seconds at rate health/second, never above
+ * MELON_MAX_HEALTH (and never lowering a value that's already above it).
+ * HEAL_ZONE_FULL_RATE heals to full at once, whatever dt is.
+ * @param {number} health @param {number} rate @param {number} dt
+ */
+function HealedHealth(health, rate, dt) {
+    if (health >= MELON_MAX_HEALTH) {
+        return health;
+    }
+    if (rate === HEAL_ZONE_FULL_RATE) {
+        return MELON_MAX_HEALTH; // Infinity * a 0 dt would be NaN
+    }
+    return Math.min(MELON_MAX_HEALTH, health + Math.max(0, rate) * Math.max(0, dt));
+}
+
+/**
+ * Heal rate (health/second) of a heal trigger: HEAL_ZONE_FULL_RATE for
+ * HEAL_ZONE_FULL_NAME, parsed from a "heal_zone_<rate>" name, else
+ * HEAL_ZONE_RATE.
+ * @param {string} triggerName
+ */
+function HealZoneRate(triggerName) {
+    const name = triggerName.trim(); // Hammer keeps stray trailing spaces
+    if (name === HEAL_ZONE_FULL_NAME) {
+        return HEAL_ZONE_FULL_RATE;
+    }
+    const match = HEAL_ZONE_NAME_PATTERN.exec(name);
+    return match ? Number(match[1]) : HEAL_ZONE_RATE;
+}
+
+// Healing a kart's melon: heal zones (heal_enter / heal_leave, registered in
+// ../../zones/inputs.js — which zones it's in: ../../zones/registry.js) and the full
+// refill on every respawn/race-flow teleport.
+
+/** Health per second the melon heals right now (0 outside heal zones). @param {import("../../core/kart-registry.js").Kart} kart */
+function CurrentHealRate(kart) {
+    return StrongestZone(kart, "healZones") ?? 0;
+}
+
+/**
+ * Heals the melon for this tick at the fastest rate of the zones it's in.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
+ */
+function ApplyHealing(kart, dt) {
+    const rate = CurrentHealRate(kart);
+    if (rate > 0) {
+        kart.health = HealedHealth(kart.health, rate, dt);
+    }
+}
+
+/**
+ * Back to full health — respawns after a break, checkpoint/race-flow
+ * teleports. A melon arriving whole also gets a full wall-jump charge (the
+ * HUD jump bar), like a freshly spawned one.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function RestoreFullHealth(kart) {
+    kart.health = MELON_MAX_HEALTH;
+    kart.wallJumpCharge = 1;
+}
+
+// The heal effect: particle_health_template played on the melon as it
+// enters a heal zone (hooked up in ../../zones/inputs.js).
+
+/**
+ * Plays a fresh copy of the heal effect on the melon, parented so it rides
+ * along while the melon rolls through the zone. Not for melons that can't
+ * heal right now (broken, or locked by the race flow — see ApplyHealing's
+ * caller).
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function PlayHealEffect(kart) {
+    if (kart.breaking || kart.locked || !kart.melon.IsValid()) {
+        return;
+    }
+    PlayParticleTemplate(HEAL_PARTICLE_TEMPLATE_NAME, kart.melon.GetAbsOrigin(), { lifetime: HEAL_PARTICLE_LIFETIME, parent: kart.melon });
+}
+
+// Everything that heals a melon, in one place: constants.js (HEAL_ZONE_* and
+// the trigger names), logic.js (pure rules, unit-tested in test/health/heal.test.mjs)
+// zone.js (applying them to karts) and effect.js (the particle_health_template
+// played on entering a zone). The heal_enter/heal_leave inputs are
+// registered with the other zones in ../../zones/inputs.js; the constants are
+// also re-exported by ../constants/index.js. Import from here.
+
+// What a break leaves at the crash site: the two break templates'
+// particles and any physics pieces in them, placed on the crash site, flung
+// out, and cleaned up after BREAK_EFFECT_LIFETIME.
+
+/**
+ * Converts a direction vector into the pitch/yaw/roll a particle template
+ * should spawn with to visually point along it (Source's angle convention:
+ * yaw rotates around Z, pitch is negative-up/positive-down from horizontal).
+ * @param {{ x: number, y: number, z: number }} dir @param {number} length
+ */
+function DirectionToAngles(dir, length) {
+    const yaw = (Math.atan2(dir.y, dir.x) * 180) / Math.PI;
+    const pitch = -(Math.asin(Math.min(1, Math.max(-1, dir.z / length))) * 180) / Math.PI;
+    return { pitch, yaw, roll: 0 };
+}
+
+// Every break's spawned effect entities, kept so they can stay at the crash
+// site for a long time (BREAK_EFFECT_LIFETIME) and still get cleaned up —
+// see PruneBreakEffects.
+/** @type {Array<{ spawnTime: number, entities: any[] }>} */
+let breakEffects = [];
+
+/** Removes break effects that are too old, or too many. */
+function CleanUpBreakEffects() {
+    const { expired, kept } = PruneBreakEffects(breakEffects, Instance.GetGameTime());
+    breakEffects = kept;
+    for (const effect of expired) {
+        for (const entity of effect.entities) {
+            if (entity.IsValid()) {
+                entity.Remove();
+            }
+        }
+    }
+}
+
+/**
+ * Spawns one break template at the crash site and starts its particles.
+ * Warns in the console (even with DEBUG off) if it's missing — silently
+ * spawning nothing on a break is the bug.
+ * @param {string} templateName @param {any} position @param {any} angles
+ * @returns {any[]} the spawned entities (empty if nothing spawned)
+ */
+function SpawnBreakTemplate(templateName, position, angles) {
+    const spawned = SpawnFromTemplate(templateName, position, angles, { warn: true });
+    PlaceAtCrashSite(spawned, position);
+    StartParticles(spawned);
+    if (spawned.length > 0) {
+        Debug(`SpawnBreakTemplate: "${templateName}" spawned ${spawned.map((e) => e.GetClassName()).join(", ")} at ${JSON.stringify(position)}`);
+    }
+    return spawned;
+}
+
+/**
+ * ForceSpawn keeps each templated entity's Hammer offset from its
+ * point_template (see fx/particles.js; same as melon_template, SpawnMelonAt) — in the map
+ * the break particles sit ~200 units next to their templates, so they
+ * played that far away from the crash site, somewhere different on every
+ * break (the offset is rotated by the impact direction). Put particle
+ * systems exactly on the crash site, and center the pieces' group on it,
+ * keeping their layout relative to each other.
+ * @param {any[]} entities @param {any} position
+ */
+function PlaceAtCrashSite(entities, position) {
+    const pieces = entities.filter((e) => e.GetClassName().startsWith("prop_physics"));
+    const placed = RecenterOnto(pieces.map((p) => p.GetAbsOrigin()), position);
+    pieces.forEach((piece, i) => piece.Teleport({ position: placed[i] }));
+    PlaceAll(entities.filter((e) => !pieces.includes(e)), position);
+}
+
+/**
+ * Flings any physics props a break template spawned (e.g. the melon model's
+ * own break pieces, models/cs_italy/italy_food_melon/italy_food_melon/
+ * piece*.vmdl, added to melon_break_chunks_template in Hammer) outward from
+ * the crash site, tinted in the melon's paint color. They then lie there as
+ * ordinary physics props until BREAK_EFFECT_LIFETIME removes them — unlike
+ * the chunks particle, which is only sprite flecks that fade within moments.
+ * @param {any[]} entities @param {any} position @param {{ r: number, g: number, b: number, a: number }} color
+ */
+function LaunchBreakPieces(entities, position, color) {
+    for (const piece of entities) {
+        if (!piece.GetClassName().startsWith("prop_physics")) {
+            continue;
+        }
+        piece.SetColor(color);
+        const spin = () => (Math.random() * 2 - 1) * BREAK_PIECE_SPIN;
+        piece.Teleport({
+            velocity: BreakPieceVelocity(position, piece.GetAbsOrigin(), Math.random() * Math.PI * 2),
+            angularVelocity: { x: spin(), y: spin(), z: spin() },
+        });
+    }
+}
+
+/**
+ * Spawns both break effects at the crash site — the main burst plus the
+ * chunks template layered on top of it. Independent of each other (either
+ * can be missing from Hammer without the other failing).
+ * @param {any} position @param {any} angles @param {{ r: number, g: number, b: number, a: number }} color the melon's paint, for any pieces
+ * @returns {boolean} whether at least one of them actually spawned — see
+ * BreakMelon's fallback tint for why callers need to know this, not just
+ * fire-and-forget.
+ */
+function SpawnBreakParticles(position, angles, color) {
+    const entities = [
+        ...SpawnBreakTemplate(BREAK_PARTICLE_TEMPLATE_NAME, position, angles),
+        ...SpawnBreakTemplate(BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, position, angles),
+    ];
+    LaunchBreakPieces(entities, position, color);
+    if (entities.length === 0) {
+        return false;
+    }
+    // Deliberately not removed on respawn — the chunks should keep lying at
+    // the crash site long after the melon is back on the track.
+    breakEffects.push({ spawnTime: Instance.GetGameTime(), entities });
+    CleanUpBreakEffects();
+    Instance.Delay(BREAK_EFFECT_LIFETIME).then(CleanUpBreakEffects);
+    return true;
+}
+
+// Moving a kart's melon on purpose: checkpoint respawn and generic teleports.
+
+/**
+ * Teleports a kart's melon back to its last checkpoint and resets it to a
+ * fresh, undamaged state — the shared final step of both the automatic
+ * post-break respawn and the manual "Respawn at last checkpoint" user menu
+ * button.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function RespawnKartAtCheckpoint(kart) {
+    kart.melon.Teleport({
+        position: kart.checkpointPosition,
+        angles: kart.checkpointAngles,
+        velocity: { x: 0, y: 0, z: 0 },
+    });
+    FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
+    kart.lastWallContact = undefined; // that wall is somewhere else now
+    RestoreFullHealth(kart);
+    // Cleared, not measured against zero: this is our own intentional
+    // velocity reset, not a physical impact to react to.
+    kart.lastVelocity = undefined;
+    kart.settled = false;
+    kart.speedCap = undefined;
+    kart.pendingBounce = undefined;
+    // Zones are kept: a respawn inside the zone the melon broke in never sends
+    // a new OnStartTouch, and leaving one by teleport still sends OnEndTouch.
+}
+
+/**
+ * Moves a kart's melon somewhere else mid-drive (a generic teleporter, see
+ * the melon_teleport input) without touching its health, respawn point or
+ * checkpoint progress (a checkpoint_ teleporter sets the respawn point
+ * itself, see the melon_teleport input). The tracking state that compares against last tick
+ * is cleared, so the jump in position/velocity isn't read as a hard impact
+ * (damage) or a wall hit. speedCap is kept, so a wall-bounce boost carried
+ * through the teleport isn't clamped away.
+ * @param {import("../core/kart-registry.js").Kart} kart @param {any} position @param {any} angles @param {{ x: number, y: number, z: number }} velocity
+ */
+function TeleportKartTo(kart, position, angles, velocity) {
+    kart.melon.Teleport({ position, angles, velocity, angularVelocity: { x: 0, y: 0, z: 0 } });
+    FacePlayerView(kart.pawn, angles.yaw);
+    kart.lastWallContact = undefined; // that wall is somewhere else now
+    kart.lastVelocity = undefined;
+    kart.prevLastVelocity = undefined;
+    kart.prevOrigin = undefined;
+    kart.settled = false;
+    kart.pendingBounce = undefined;
+    // Zones are kept: a respawn inside the zone the melon broke in never sends
+    // a new OnStartTouch, and leaving one by teleport still sends OnEndTouch.
+}
+
+// A melon breaking: BreakMelon (health ran out) / HandleMelonLost (the
+// entity vanished), the delay at the crash site, and the respawn after it.
+
+/**
+ * Common tail end of every break, whether it was caught by our own
+ * kart.health tracking (BreakMelon) or discovered after the fact because the
+ * melon vanished on its own (HandleMelonLost): wait out BREAK_RESPAWN_DELAY,
+ * then bring the kart back — reusing the same (hidden) melon where possible,
+ * or spawning a brand new one at the checkpoint if the original is actually
+ * gone.
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function ScheduleRespawnAfterBreak(slot, kart) {
+    // Which race-flow teleport this break happened after — see
+    // Kart.teleportGen. Compared against, rather than checking
+    // kart.racing/locked: those also describe perfectly ordinary states
+    // (free-roaming the hub, parked after finishing) in which a broken melon
+    // still needs to go back to its checkpoint.
+    const teleportGen = kart.teleportGen;
+    Instance.Delay(BREAK_RESPAWN_DELAY).then(() => {
+        kart.breaking = false;
+        kart.breakTime = undefined;
+        if (!kart.pawn.IsValid() || karts.get(slot) !== kart) {
+            return; // player disconnected, or a fresh kart already replaced this one
+        }
+        if (!kart.melon.IsValid()) {
+            // The melon wasn't just hidden by us — it's genuinely gone (the
+            // engine's own physics broke the prop_physics_multiplayer for
+            // real on a hard enough hit, see HandleMelonLost) — spawn a fresh
+            // one instead of teleporting an entity that no longer exists.
+            // Checked before the teleportGen case below, and regardless of
+            // racing/locked: otherwise a melon lost outside a heat would never
+            // come back, and Think would re-run HandleMelonLost on it forever.
+            // checkpointPosition is correct even if the race flow moved on
+            // meanwhile — BeginHeat/ReturnAllToHub set it to their own
+            // (skipped, since the melon was dead) teleport target.
+            RespawnDestroyedMelon(slot, kart);
+            return;
+        }
+        SetMelonMotion(kart.melon, true); // before any respawn teleport below
+        ShowMelonPaint(kart);
+        // Back from the pulled-out break camera (ApplyBreakCameraZoom) to the
+        // player's normal chase offset.
+        ApplyCameraFollow(kart);
+        if (kart.teleportGen !== teleportGen) {
+            // The race flow moved this kart while it was mid-break (next
+            // heat's BeginHeat, or ReturnAllToHub via finish/moderator
+            // abort/the player's own "Return to hub" button). That
+            // already-current teleport wins — don't stomp it a second later
+            // with a now-stale checkpoint.
+            RestoreFullHealth(kart);
+            return;
+        }
+        RespawnKartAtCheckpoint(kart);
+    });
+}
+
+/**
+ * Switches a melon's physics motion off for the break and back on for the
+ * respawn (prop_physics' DisableMotion/EnableMotion inputs — it has no input
+ * to make it non-solid). While broken the hidden melon stays at the crash
+ * site, and the break's own prop_physics pieces spawn right inside it: with
+ * motion on they shoved it around every physics step, between the ticks that
+ * hold it still, and the chase camera following it shook along. With motion
+ * off it doesn't budge — the pieces bounce off it instead.
+ * @param {any} melon @param {boolean} enabled
+ */
+function SetMelonMotion(melon, enabled) {
+    Instance.EntFireAtTarget({ target: melon, input: enabled ? "EnableMotion" : "DisableMotion" });
+}
+
+/** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart */
+function RespawnDestroyedMelon(slot, kart) {
+    const melon = SpawnMelonAt(kart.checkpointPosition, kart.checkpointAngles);
+    if (!melon) {
+        // kart.breaking is already cleared, so Think's invalid-melon check
+        // runs HandleMelonLost again next tick — that's the retry.
+        Debug(`slot ${slot}: could not respawn a melon after it was destroyed, will keep retrying`);
+        return;
+    }
+    kart.melon = melon;
+    FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
+    ShowMelonPaint(kart);
+    RestoreFullHealth(kart);
+    kart.lastVelocity = undefined;
+    kart.settled = false;
+    kart.speedCap = undefined;
+    kart.pendingBounce = undefined;
+    LeaveZones(kart); // a new melon entity — the old one's zones never send heal_leave/lift_leave
+    ApplyCameraFollow(kart);
+}
+
+/** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed */
+function BreakMelon(slot, kart, impactDir, impactSpeed) {
+    if (kart.breaking) {
+        return; // already broken and counting down to its respawn
+    }
+    kart.breaking = true;
+    kart.breakTime = Instance.GetGameTime();
+    const breakPosition = kart.melon.GetAbsOrigin();
+    // Oriented along the velocity change the impact caused, not the melon's
+    // own orientation — while rolling, that's an essentially random tumble
+    // unrelated to which way it just got hit.
+    const breakAngles = DirectionToAngles(impactDir, impactSpeed);
+    Debug(`slot ${slot}: melon broke at ${JSON.stringify(breakPosition)} — respawning at checkpoint ${kart.checkpointIndex} in ${BREAK_RESPAWN_DELAY}s`);
+
+    kart.melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
+    SetMelonMotion(kart.melon, false); // so the break pieces below can't shove it (and the camera) around
+    kart.lastVelocity = undefined;
+    kart.settled = false;
+    // Hidden entirely when the break particle actually spawned — it reads as
+    // the melon shredding apart, which a dark husk just sitting there in one
+    // piece doesn't. But without a "melon_break_template" placed in Hammer
+    // there's nothing else marking the crash site: the melon would just
+    // vanish and silently reappear at the checkpoint BREAK_RESPAWN_DELAY
+    // later, which looks like the camera instantly cut to the respawn. Tint
+    // it dark and leave it visible instead, so there's always something at
+    // the crash site to see while it waits out the respawn delay.
+    // kart.paintColor itself is untouched either way, restored in
+    // ScheduleRespawnAfterBreak.
+    const particlesSpawned = SpawnBreakParticles(breakPosition, breakAngles, kart.paintColor);
+    kart.melon.SetColor(particlesSpawned ? { r: 255, g: 255, b: 255, a: 0 } : BREAK_TINT_FALLBACK);
+    HideMelonGlow(kart);
+
+    ScheduleRespawnAfterBreak(slot, kart);
+}
+
+/**
+ * Recovery path for a melon that broke for real instead of just being hidden
+ * by BreakMelon above — the engine's own physics can destroy a
+ * prop_physics_multiplayer outright on a hard enough impact, sometimes
+ * before our own kart.health tracking even gets a chance to react. Without
+ * this, that kart would silently lose its melon with no break particle, no
+ * delay, and (since nothing else re-creates it while the player's pawn stays
+ * alive — see gamemode/index.js) no way back at all. Runs the same
+ * particle + delay + checkpoint-respawn sequence as a script-detected break,
+ * using the last position/angles Think() saw the melon at (it's already gone
+ * by the time this runs, so it can't be asked directly).
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function HandleMelonLost(slot, kart) {
+    if (kart.breaking) {
+        return; // already mid-break/respawn over this same loss
+    }
+    kart.breaking = true;
+    kart.health = 0;
+    const breakPosition = kart.lastKnownPosition ?? kart.checkpointPosition;
+    const breakAngles = kart.lastKnownAngles ?? kart.checkpointAngles;
+    Debug(`slot ${slot}: melon was destroyed at ${JSON.stringify(breakPosition)} — respawning at checkpoint ${kart.checkpointIndex} in ${BREAK_RESPAWN_DELAY}s`);
+    SpawnBreakParticles(breakPosition, breakAngles, kart.paintColor);
+    ScheduleRespawnAfterBreak(slot, kart);
+}
+
+// Engine side of the wall bounce: finding the wall's normal on impact
+// (traces + IsWallContact), computing the bounce, DEBUG logging, and
+// charging its damage once the jump-timing window closes. The math is in
+// ../logic/wall-bounce.js.
+
+/**
+ * Whether the impact this tick was against a wall, and if so that wall's
+ * (horizontal, unit-length) normal — see the trace order inside. Floors/
+ * ceilings (mostly vertical normal) and other physics props (other karts'
+ * melons, loose melons in the map) don't count — only walls bounce.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDelta
+ * @returns {{ x: number, y: number, method: string, hitPoint?: any } | null}
+ */
+function DetectWallNormal(kart, impactDelta) {
+    const v = kart.lastVelocity;
+    if (!v) {
+        return null;
+    }
+    const horizSpeed = Math.hypot(v.x, v.y);
+    if (horizSpeed < 1) {
+        return null; // purely vertical motion — a landing, never a wall
+    }
+    const dir = { x: v.x / horizSpeed, y: v.y / horizSpeed };
+    const ignoreEntity = [kart.melon, kart.pawn];
+
+    // 1st choice: a thin ray from where the melon was *last* tick (before
+    // contact) along its incoming direction — gives the wall's real face
+    // normal, independent of how vphysics resolved the collision. Long
+    // enough to still reach the wall at grazing angles, where the distance
+    // along the travel direction grows with 1/cos(angle).
+    // 2nd: a sphere sweep from the current position (catches thin posts or
+    // edges the center ray slips past).
+    // Neither finds a wall -> no bounce. (There used to be a last resort
+    // that took the impact direction itself as the normal, but with no wall
+    // found that bounced the melon off thin air.)
+    // Whatever they find must then pass IsWallContact: the ray reaches far
+    // ahead, and in a small room it finds some wall on nearly every hard
+    // landing or bump, even though the melon isn't touching it.
+    const from = kart.prevOrigin ?? kart.melon.GetAbsOrigin();
+    const ray = TraceLine({
+        start: from,
+        end: {
+            x: from.x + dir.x * WALL_BOUNCE_TRACE_DISTANCE,
+            y: from.y + dir.y * WALL_BOUNCE_TRACE_DISTANCE,
+            z: from.z,
+        },
+        ignoreEntity,
+        ignorePlayers: true,
+    });
+    /** @type {any} */
+    let trace = ray.didHit && !ray.startedInSolid ? ray : null;
+    let method = "ray";
+    if (!trace) {
+        const start = kart.melon.GetAbsOrigin();
+        const sphere = TraceSphere({
+            radius: WALL_BOUNCE_TRACE_RADIUS,
+            start,
+            end: {
+                x: start.x + dir.x * WALL_BOUNCE_SPHERE_TRACE_DISTANCE,
+                y: start.y + dir.y * WALL_BOUNCE_SPHERE_TRACE_DISTANCE,
+                z: start.z,
+            },
+            ignoreEntity,
+            ignorePlayers: true,
+        });
+        trace = sphere.didHit && !sphere.startedInSolid ? sphere : null;
+        method = "sphere";
+    }
+
+    if (!trace) {
+        return null;
+    }
+    const hit = trace.hitEntity;
+    if (hit && !hit.IsWorld() && hit.GetClassName().startsWith("prop_physics")) {
+        return null;
+    }
+    const { x: nx, y: ny, z: nz } = trace.normal;
+    if (Math.abs(nz) > WALL_NORMAL_MAX_Z) {
+        return null;
+    }
+    const h = Math.hypot(nx, ny);
+    if (h <= 0) {
+        return null;
+    }
+    const n = { x: nx / h, y: ny / h };
+    const hitPoint = trace.end;
+    const incoming = PickIncomingVelocity(v, kart.prevLastVelocity, n);
+    if (!IsWallContact(kart.melon.GetAbsOrigin(), hitPoint, n, incoming, kart.melon.GetAbsVelocity())) {
+        Debug(`wall bounce rejected: wall found via ${method} isn't actually being touched (impact ${Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z).toFixed(0)} u/s)`);
+        return null;
+    }
+    return { ...n, method, hitPoint };
+}
+
+/**
+ * DEBUG only: logs the velocity-based bounce angle next to the look-based
+ * one, so a "that felt like 45°" mismatch can be told apart from a
+ * measuring bug.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @param {{ x: number, y: number, method: string }} n @param {number} angle
+ */
+function DebugLogBounce(kart, n, angle) {
+    if (!DEBUG) {
+        return;
+    }
+    const yaw = (kart.pawn.GetEyeAngles().yaw * Math.PI) / 180;
+    const lookDir = { x: Math.cos(yaw), y: Math.sin(yaw) };
+    const lookInto = -(lookDir.x * n.x + lookDir.y * n.y);
+    const lookAngle = lookInto > 0 ? (Math.acos(Math.min(1, lookInto)) * 180) / Math.PI : NaN;
+    Debug(
+        `bounce angle: velocity ${angle.toFixed(1)}°, look ${Number.isNaN(lookAngle) ? "away from wall" : lookAngle.toFixed(1) + "°"}, ` +
+        `normal via ${n.method}`
+    );
+}
+
+/**
+ * Reflects the melon's pre-impact horizontal velocity off a wall and scales
+ * it by how well the hit was angled (see WALL_BOUNCE_* in movement/wall-bounce/constants.js).
+ * Horizontal only — the upward kick (WALL_BOUNCE_UP_SPEED) is added by UpdateKart.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, method: string, hitPoint?: any }} n @param {number} now
+ * @returns {{ velocity: { x: number, y: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number } | null}
+ *   null if the melon wasn't actually moving into the wall
+ */
+function ComputeWallBounce(kart, n, now) {
+    const v = PickIncomingVelocity(/** @type {{ x: number, y: number, z: number }} */ (kart.lastVelocity), kart.prevLastVelocity, n);
+    // A timing press just *before* the hit counts here; one just after is
+    // handled by UpdateKart's jump code upgrading kart.pendingBounce.
+    const jumpFactor = kart.wallTimingPressTime !== undefined ? JumpTimingFactor(now - kart.wallTimingPressTime) : 0;
+    const bounce = ReflectOffWall(v, n, jumpFactor);
+    if (!bounce) {
+        return null;
+    }
+    DebugLogBounce(kart, n, bounce.angle);
+    // A PERFECT hit shows its own spark instead of the boost trail — see
+    // ShouldShowBoostTrail. Any other rating's speed shows the trail again.
+    kart.perfectBounceBoost = GetBounceRating(bounce.angleFactor) === BOUNCE_RATINGS[0];
+    if (kart.perfectBounceBoost) {
+        PlayPerfectSpark(kart);
+    }
+    return { ...bounce, jumpFactor };
+}
+
+/**
+ * Spawns two fresh copies of the perfect_hit_particle_template and starts
+ * them, removed again after PERFECT_SPARK_LIFETIME: one left at the hit spot
+ * on the wall, and one parented to the melon so it rides along — the melon
+ * is off the wall so fast that the player would otherwise never see the
+ * spark behind them. Fresh copies per hit, so several karts' perfect hits
+ * at the same moment each show their own. Also played by a PERFECT wall jump.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function PlayPerfectSpark(kart) {
+    const position = kart.melon.GetAbsOrigin();
+    PlayParticleTemplate(PERFECT_SPARK_TEMPLATE_NAME, position, { lifetime: PERFECT_SPARK_LIFETIME });
+    PlayParticleTemplate(PERFECT_SPARK_TEMPLATE_NAME, position, { lifetime: PERFECT_SPARK_LIFETIME, parent: kart.melon });
+}
+
+/**
+ * Whether kart.pendingBounce breaks the melon right at the wall — see
+ * IsLethalAtImpact. A jump pad's damage protection still saves it.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function WallBounceBreaksAtImpact(kart) {
+    const p = kart.pendingBounce;
+    return p !== undefined && !IsPadProtected(kart) && IsLethalAtImpact(kart.health, p.impactSpeed, p.speedGain, p.angleFactor);
+}
+
+/**
+ * Charges kart.pendingBounce's damage now that its jump window is over (a
+ * late jump can still have raised its speed gain): the wall's usual impact +
+ * speed-gain damage, reduced by angle closeness — a perfect 45° hit is free.
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
+ * @returns {boolean} whether the melon broke from it
+ */
+function SettleWallBounceDamage(slot, kart) {
+    const p = kart.pendingBounce;
+    kart.pendingBounce = undefined;
+    if (!p) {
+        return false;
+    }
+    const damage = WallBounceDamage(p.impactSpeed, p.speedGain, p.angleFactor);
+    DamageKart(
+        slot,
+        kart,
+        damage,
+        `wall bounce ${p.angle.toFixed(0)}° (angle ${p.angleFactor.toFixed(2)}, jump ${p.jumpFactor.toFixed(2)}), ` +
+        `impact ${p.impactSpeed.toFixed(0)} u/s, gained ${p.speedGain.toFixed(0)} u/s`
+    );
+    if (kart.health <= 0) {
+        BreakMelon(slot, kart, p.impactDir, p.impactSpeed);
+        return true;
+    }
+    return false;
 }
 
 // Collision debug view: everything that shows how ground/wall contact and jump
@@ -3071,8 +4154,11 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
  * Wall jump, if allowed right now: in the air, at (or just off) a wall, push
  * away from it and up, as strong as the charge is full, then the charge
  * drops (so chained wall jumps get weaker). WallJumpVelocity keeps whichever
- * push away from the wall is stronger. Deliberately does NOT raise
- * kart.speedCap: chained wall jumps used to ratchet the melon ever faster.
+ * push away from the wall is stronger. Rated by the angle it came at the
+ * wall like a bounce (WallJumpAngle, WALL_JUMP_RATING_SPEED_MULTIPLIER): only
+ * a PERFECT/GOOD one leaves with the speed it came in with times the
+ * multiplier, like a bounce (WallJumpBoostedVelocity) — that raises kart.speedCap — a plain wall jump
+ * doesn't, chained wall jumps used to ratchet the melon ever faster.
  * Never lowers the melon's upward speed (a jump just after a ground jump,
  * a bounce's kick or a jump pad launch keeps the faster one).
  * While a wall bounce's jump-timing window is open (kart.pendingBounce),
@@ -3101,69 +4187,35 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
     if (!wallContact || blockedBy !== null) {
         return blockedBy;
     }
+    // The approach remembered at the contact's start counts too: a press a
+    // tick or two after the touch would otherwise only see the slide along
+    // the wall (WALL_JUMP_APPROACH_MEMORY).
+    const rated = WallJumpAngle([v, kart.lastVelocity, kart.prevLastVelocity, FreshApproach(wallContact, now)], wallContact.normal);
+    const bonus = WallJumpRatingMultipliers(rated.rating);
     const jump = WallJumpVelocity({ x: v.x, y: v.y }, wallContact.normal, charge);
-    v.x = jump.x;
-    v.y = jump.y;
-    v.z = Math.max(v.z, jump.z);
+    const boosted = WallJumpBoostedVelocity(jump, rated.incomingSpeed, bonus.speed);
+    v.x = boosted.x;
+    v.y = boosted.y;
+    v.z = Math.max(v.z, jump.z * bonus.up);
+    if (bonus.speed > 1) {
+        kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(v.x, v.y));
+    }
+    // Same feedback as a bounce: the bounce panel and speedometer flash
+    // (jump timing full — it was jumped), a PERFECT's spark instead of the
+    // boost trail.
+    kart.lastBounceTime = now;
+    kart.lastBounceInfo = { angle: rated.angle, angleFactor: rated.angleFactor, jumpFactor: 1 };
+    kart.perfectBounceBoost = rated.rating === BOUNCE_RATINGS[0];
+    if (kart.perfectBounceBoost) {
+        PlayPerfectSpark(kart);
+    }
     kart.lastWallJump = { time: now, normal: wallContact.normal };
     if (!rules.freeWallJumps) {
         kart.wallJumpCharge = WallJumpChargeAfter(charge);
     }
-    Debug(`wall jump: slot ${slot}, strength ${charge.toFixed(2)}${rules.freeWallJumps ? " (lift zone, free)" : ""}, off wall normal (${wallContact.normal.x.toFixed(2)}, ${wallContact.normal.y.toFixed(2)})`);
+    Debug(`wall jump: slot ${slot}, ${rated.rating.label} ${rated.angle.toFixed(0)}° (×${bonus.speed}), strength ${charge.toFixed(2)}${rules.freeWallJumps ? " (lift zone, free)" : ""}, off wall normal (${wallContact.normal.x.toFixed(2)}, ${wallContact.normal.y.toFixed(2)})`);
     return null;
 }
-
-// Pure health-bar math — no cs_script import, so it's unit-testable in
-// Node (see test/health/health.test.mjs). hud/ turns the result into HUD classes.
-
-/**
- * What the segmented health bar should show for a given health value.
- * @param {number} health
- * @returns {{ fraction: number, filledSegments: number, low: boolean, critical: boolean }}
- */
-function HealthBarState(health) {
-    const fraction = Math.max(0, Math.min(1, health / MELON_MAX_HEALTH));
-    return {
-        fraction,
-        // ceil, not round: the melon only breaks at health <= 0, so any health
-        // left must still show at least one segment — round() emptied the bar
-        // while up to half a segment's worth of health remained.
-        filledSegments: Math.ceil(fraction * HEALTH_BAR_SEGMENTS),
-        low: fraction <= HEALTH_LOW_FRACTION,
-        critical: fraction <= HEALTH_CRITICAL_FRACTION,
-    };
-}
-
-/**
- * Whether an impact is the melon landing on flat, level ground: the floor
- * under it is at least FLAT_LANDING_MIN_NORMAL_Z level and the impact
- * (the velocity change physics forced) points mostly upward.
- * @param {{ x: number, y: number, z: number }} impactDelta
- * @param {number | undefined} floorNormalZ this tick's floor trace, undefined if it hit nothing
- */
-function IsFlatLanding(impactDelta, floorNormalZ) {
-    if (floorNormalZ === undefined || floorNormalZ < FLAT_LANDING_MIN_NORMAL_Z) {
-        return false;
-    }
-    const impactSpeed = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
-    return impactSpeed > 0 && impactDelta.z / impactSpeed >= FLAT_LANDING_MIN_VERTICAL_SHARE;
-}
-
-/**
- * Health lost from a landing/crash (not a wall bounce): IMPACT_DAMAGE_* above
- * the threshold, times FLAT_LANDING_DAMAGE_MULTIPLIER for a flat landing.
- * @param {{ x: number, y: number, z: number }} impactDelta
- * @param {number | undefined} floorNormalZ
- * @returns {{ damage: number, flatLanding: boolean }}
- */
-function ImpactDamage(impactDelta, floorNormalZ) {
-    const impactSpeed = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
-    const flatLanding = IsFlatLanding(impactDelta, floorNormalZ);
-    const base = Math.max(0, impactSpeed - IMPACT_DAMAGE_THRESHOLD) * IMPACT_DAMAGE_SCALE;
-    return { damage: flatLanding ? base * FLAT_LANDING_DAMAGE_MULTIPLIER : base, flatLanding };
-}
-
-// Healing math (HealedHealth, HealZoneRate): health/heal/logic.js.
 
 // The bottom-right cluster: speed, jump charge bar and health bar.
 
@@ -3973,260 +5025,6 @@ function UpdateUserMenu(slot, kart) {
         // a heat, the hub) with the menu up.
         GetSpeedHud()?.SetHasClassForPlayer(slot, "usermenu_restart_row", "Hidden", !CanRestartTimeTrial(kart));
     }
-}
-
-// Pure healing math — no cs_script import, so it's unit-testable in Node
-// (see test/health/heal.test.mjs). zone.js applies it to karts.
-
-/**
- * Health after healing for dt seconds at rate health/second, never above
- * MELON_MAX_HEALTH (and never lowering a value that's already above it).
- * HEAL_ZONE_FULL_RATE heals to full at once, whatever dt is.
- * @param {number} health @param {number} rate @param {number} dt
- */
-function HealedHealth(health, rate, dt) {
-    if (health >= MELON_MAX_HEALTH) {
-        return health;
-    }
-    if (rate === HEAL_ZONE_FULL_RATE) {
-        return MELON_MAX_HEALTH; // Infinity * a 0 dt would be NaN
-    }
-    return Math.min(MELON_MAX_HEALTH, health + Math.max(0, rate) * Math.max(0, dt));
-}
-
-/**
- * Heal rate (health/second) of a heal trigger: HEAL_ZONE_FULL_RATE for
- * HEAL_ZONE_FULL_NAME, parsed from a "heal_zone_<rate>" name, else
- * HEAL_ZONE_RATE.
- * @param {string} triggerName
- */
-function HealZoneRate(triggerName) {
-    const name = triggerName.trim(); // Hammer keeps stray trailing spaces
-    if (name === HEAL_ZONE_FULL_NAME) {
-        return HEAL_ZONE_FULL_RATE;
-    }
-    const match = HEAL_ZONE_NAME_PATTERN.exec(name);
-    return match ? Number(match[1]) : HEAL_ZONE_RATE;
-}
-
-// Healing a kart's melon: heal zones (heal_enter / heal_leave, registered in
-// ../../zones/inputs.js — which zones it's in: ../../zones/registry.js) and the full
-// refill on every respawn/race-flow teleport.
-
-/** Health per second the melon heals right now (0 outside heal zones). @param {import("../../core/kart-registry.js").Kart} kart */
-function CurrentHealRate(kart) {
-    return StrongestZone(kart, "healZones") ?? 0;
-}
-
-/**
- * Heals the melon for this tick at the fastest rate of the zones it's in.
- * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
- */
-function ApplyHealing(kart, dt) {
-    const rate = CurrentHealRate(kart);
-    if (rate > 0) {
-        kart.health = HealedHealth(kart.health, rate, dt);
-    }
-}
-
-/**
- * Back to full health — respawns after a break, checkpoint/race-flow
- * teleports. A melon arriving whole also gets a full wall-jump charge (the
- * HUD jump bar), like a freshly spawned one.
- * @param {import("../../core/kart-registry.js").Kart} kart
- */
-function RestoreFullHealth(kart) {
-    kart.health = MELON_MAX_HEALTH;
-    kart.wallJumpCharge = 1;
-}
-
-// Particle effects from point_templates, the one way every effect in
-// melon_drive is spawned: the break burst (health/breaking/effects.js), the
-// PERFECT spark (movement/wall-bounce/wall-bounce.js), the heal sparkle (health/heal/effect.js)
-// and the boost trail (fx/boost-trail/boost-trail.js).
-// Tested against the fake engine in test/fx/particles.test.mjs.
-//
-// Two engine quirks every caller would otherwise have to know about:
-// - ForceSpawn keeps each templated entity's Hammer offset from its
-//   point_template, so without moving them the effect plays wherever the
-//   template happens to sit relative to it (see PlaceAll).
-// - "Start Active" alone doesn't reliably play an info_particle_system
-//   spawned later from a point_template — it's started explicitly
-//   (StartParticles).
-
-/**
- * A fresh copy of the named point_template's entities, spawned at
- * `position` — still at their Hammer offsets, not started yet.
- * @param {string} templateName @param {any} position @param {any} [angles]
- * @param {{ warn?: boolean }} [options] warn: report a missing/broken
- *   template with Instance.Msg (always in the console) instead of Debug —
- *   for effects that are part of the map's contract, where silently
- *   spawning nothing is the bug.
- * @returns {any[]} empty if nothing spawned
- */
-function SpawnFromTemplate(templateName, position, angles, { warn = false } = {}) {
-    const report = warn ? (/** @type {string} */ text) => Instance.Msg(`[melon_drive] ${text}`) : Debug;
-    const template = Instance.FindEntityByName(templateName);
-    if (!template) {
-        report(`SpawnFromTemplate: no point_template named "${templateName}" in the map`);
-        return [];
-    }
-    if (!(template instanceof PointTemplate)) {
-        report(`SpawnFromTemplate: "${templateName}" is a ${template.GetClassName()}, not a point_template`);
-        return [];
-    }
-    const spawned = template.ForceSpawn(position, angles) ?? [];
-    if (spawned.length === 0) {
-        report(`SpawnFromTemplate: ForceSpawn of "${templateName}" returned nothing — check its Template01.. entries in Hammer`);
-    }
-    return spawned;
-}
-
-/** @param {any} entity */
-function IsParticleSystem(entity) {
-    return entity.GetClassName() === "info_particle_system";
-}
-
-/** Moves every entity exactly onto `position` (undoing ForceSpawn's Hammer offsets). @param {any[]} entities @param {any} position */
-function PlaceAll(entities, position) {
-    for (const entity of entities) {
-        entity.Teleport({ position });
-    }
-}
-
-/** Starts every info_particle_system among `entities`. @param {any[]} entities */
-function StartParticles(entities) {
-    for (const entity of entities) {
-        if (IsParticleSystem(entity)) {
-            Instance.EntFireAtTarget({ target: entity, input: "Start" });
-        }
-    }
-}
-
-/**
- * Stops every info_particle_system among `entities` that's still around:
- * no new particles, the ones already out play to the end of their lifetime.
- * @param {any[]} entities
- */
-function StopParticles(entities) {
-    for (const entity of entities) {
-        if (entity.IsValid() && IsParticleSystem(entity)) {
-            Instance.EntFireAtTarget({ target: entity, input: "Stop" });
-        }
-    }
-}
-
-/**
- * Removes `entities` after `seconds` (those still around — a parented one
- * goes with its parent if that's removed first). Removing an
- * info_particle_system ends its particles, so `seconds` must cover the
- * effect's own duration.
- * @param {any[]} entities @param {number} seconds
- */
-function RemoveAfter(entities, seconds) {
-    Instance.Delay(seconds).then(() => {
-        for (const entity of entities) {
-            if (entity.IsValid()) {
-                entity.Remove();
-            }
-        }
-    });
-}
-
-/**
- * The whole short-lived effect in one call: a fresh copy of the template,
- * placed exactly at `position`, optionally riding along on `parent`,
- * started, and removed after `lifetime` seconds.
- * @param {string} templateName @param {any} position
- * @param {{ lifetime: number, parent?: any, angles?: any, warn?: boolean }} options
- * @returns {any[]} the spawned entities (empty if nothing spawned)
- */
-function PlayParticleTemplate(templateName, position, { lifetime, parent, angles, warn }) {
-    const spawned = SpawnFromTemplate(templateName, position, angles, { warn });
-    PlaceAll(spawned, position);
-    if (parent) {
-        for (const entity of spawned) {
-            entity.SetParent(parent);
-        }
-    }
-    StartParticles(spawned);
-    RemoveAfter(spawned, lifetime);
-    return spawned;
-}
-
-// The heal effect: particle_health_template played on the melon as it
-// enters a heal zone (hooked up in ../../zones/inputs.js).
-
-/**
- * Plays a fresh copy of the heal effect on the melon, parented so it rides
- * along while the melon rolls through the zone. Not for melons that can't
- * heal right now (broken, or locked by the race flow — see ApplyHealing's
- * caller).
- * @param {import("../../core/kart-registry.js").Kart} kart
- */
-function PlayHealEffect(kart) {
-    if (kart.breaking || kart.locked || !kart.melon.IsValid()) {
-        return;
-    }
-    PlayParticleTemplate(HEAL_PARTICLE_TEMPLATE_NAME, kart.melon.GetAbsOrigin(), { lifetime: HEAL_PARTICLE_LIFETIME, parent: kart.melon });
-}
-
-// Everything that heals a melon, in one place: constants.js (HEAL_ZONE_* and
-// the trigger names), logic.js (pure rules, unit-tested in test/health/heal.test.mjs)
-// zone.js (applying them to karts) and effect.js (the particle_health_template
-// played on entering a zone). The heal_enter/heal_leave inputs are
-// registered with the other zones in ../../zones/inputs.js; the constants are
-// also re-exported by ../constants/index.js. Import from here.
-
-// Moving a kart's melon on purpose: checkpoint respawn and generic teleports.
-
-/**
- * Teleports a kart's melon back to its last checkpoint and resets it to a
- * fresh, undamaged state — the shared final step of both the automatic
- * post-break respawn and the manual "Respawn at last checkpoint" user menu
- * button.
- * @param {import("../core/kart-registry.js").Kart} kart
- */
-function RespawnKartAtCheckpoint(kart) {
-    kart.melon.Teleport({
-        position: kart.checkpointPosition,
-        angles: kart.checkpointAngles,
-        velocity: { x: 0, y: 0, z: 0 },
-    });
-    FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
-    kart.lastWallContact = undefined; // that wall is somewhere else now
-    RestoreFullHealth(kart);
-    // Cleared, not measured against zero: this is our own intentional
-    // velocity reset, not a physical impact to react to.
-    kart.lastVelocity = undefined;
-    kart.settled = false;
-    kart.speedCap = undefined;
-    kart.pendingBounce = undefined;
-    // Zones are kept: a respawn inside the zone the melon broke in never sends
-    // a new OnStartTouch, and leaving one by teleport still sends OnEndTouch.
-}
-
-/**
- * Moves a kart's melon somewhere else mid-drive (a generic teleporter, see
- * the melon_teleport input) without touching its health, respawn point or
- * checkpoint progress (a checkpoint_ teleporter sets the respawn point
- * itself, see the melon_teleport input). The tracking state that compares against last tick
- * is cleared, so the jump in position/velocity isn't read as a hard impact
- * (damage) or a wall hit. speedCap is kept, so a wall-bounce boost carried
- * through the teleport isn't clamped away.
- * @param {import("../core/kart-registry.js").Kart} kart @param {any} position @param {any} angles @param {{ x: number, y: number, z: number }} velocity
- */
-function TeleportKartTo(kart, position, angles, velocity) {
-    kart.melon.Teleport({ position, angles, velocity, angularVelocity: { x: 0, y: 0, z: 0 } });
-    FacePlayerView(kart.pawn, angles.yaw);
-    kart.lastWallContact = undefined; // that wall is somewhere else now
-    kart.lastVelocity = undefined;
-    kart.prevLastVelocity = undefined;
-    kart.prevOrigin = undefined;
-    kart.settled = false;
-    kart.pendingBounce = undefined;
-    // Zones are kept: a respawn inside the zone the melon broke in never sends
-    // a new OnStartTouch, and leaving one by teleport still sends OnEndTouch.
 }
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
@@ -5290,131 +6088,6 @@ function RegisterAttackDebug() {
     });
 }
 
-// Jump pads (JUMP_PAD_* in zones/jump-pad/constants.js). Pure rules, no cs_script
-// import; zones/jump-pad/jump-pad.js applies them (test/zones/jump-pad.test.mjs).
-
-/** @typedef {{ up: number, forward: number }} JumpPad upward launch speed, horizontal speed added (units/sec) */
-/** @typedef {{ launchTime: number, landedTime?: number }} PadFlight a launch whose damage protection is still on */
-
-/**
- * A pad's launch, from its trigger name (see JUMP_PAD_NAME_PATTERN), else
- * the defaults. @param {string} triggerName @returns {JumpPad}
- */
-function JumpPadFromName(triggerName) {
-    const match = JUMP_PAD_NAME_PATTERN.exec(triggerName.trim());
-    return {
-        up: match ? Number(match[1]) : JUMP_PAD_UP_SPEED,
-        forward: match?.[2] !== undefined ? Number(match[2]) : JUMP_PAD_FORWARD_BOOST,
-    };
-}
-
-/**
- * Whether the melon on a pad launches this tick: a jump press now, or one
- * made at most JUMP_PAD_BUFFER ago that hasn't launched it yet — and not
- * again within JUMP_PAD_COOLDOWN of the last launch.
- * @param {number} now @param {boolean} jumpPressed this tick
- * @param {number | undefined} lastPressTime last jump press @param {number | undefined} lastLaunchTime last pad launch
- */
-function ShouldPadLaunch(now, jumpPressed, lastPressTime, lastLaunchTime) {
-    if (lastLaunchTime !== undefined && now - lastLaunchTime < JUMP_PAD_COOLDOWN) {
-        return false;
-    }
-    if (jumpPressed) {
-        return true;
-    }
-    return (
-        lastPressTime !== undefined &&
-        now - lastPressTime <= JUMP_PAD_BUFFER &&
-        (lastLaunchTime === undefined || lastPressTime > lastLaunchTime)
-    );
-}
-
-/**
- * The velocity right after a launch: `pad.up` upward (a fall is cancelled; a
- * melon already rising faster keeps that), and `pad.forward` more horizontal
- * speed along where it's going — along `lookDir` if it's barely moving.
- * @param {{ x: number, y: number, z: number }} v @param {{ x: number, y: number }} lookDir unit vector
- * @param {JumpPad} pad
- */
-function PadLaunchVelocity(v, lookDir, pad) {
-    const speed = Math.hypot(v.x, v.y);
-    const dir = speed > JUMP_PAD_MIN_DIRECTION_SPEED ? { x: v.x / speed, y: v.y / speed } : lookDir;
-    const launched = speed + pad.forward;
-    return { x: dir.x * launched, y: dir.y * launched, z: Math.max(v.z, pad.up) };
-}
-
-/**
- * The launch's damage protection this tick, or undefined once it's over:
- * JUMP_PAD_LANDING_GRACE after the first ground contact after taking off
- * (contact within GROUND_LIFTOFF_TIME of the launch is the pad itself), or
- * JUMP_PAD_MAX_PROTECTED_SECONDS after the launch at the latest.
- * @param {PadFlight | undefined} flight @param {number} now @param {number | undefined} lastGroundedTime
- * @returns {PadFlight | undefined}
- */
-function PadFlightAfter(flight, now, lastGroundedTime) {
-    if (!flight || now - flight.launchTime > JUMP_PAD_MAX_PROTECTED_SECONDS) {
-        return undefined;
-    }
-    const landedTime =
-        flight.landedTime ??
-        (lastGroundedTime !== undefined && lastGroundedTime > flight.launchTime + GROUND_LIFTOFF_TIME ? lastGroundedTime : undefined);
-    if (landedTime !== undefined && now - landedTime > JUMP_PAD_LANDING_GRACE) {
-        return undefined;
-    }
-    return landedTime === flight.landedTime ? flight : { ...flight, landedTime };
-}
-
-// Engine side of jump pads (JUMP_PAD_*): launching a melon off the pad it's
-// on when jump is pressed, and the damage protection that follows. The rules
-// are in ../logic/jump-pad.js; which pad the melon is on, in zones.js.
-
-/**
- * Per tick, before any damage: ends the launch's damage protection once the
- * melon has landed (see PadFlightAfter).
- * @param {import("../../core/kart-registry.js").Kart} kart @param {number} now
- */
-function UpdatePadFlight(kart, now) {
-    kart.padFlight = PadFlightAfter(kart.padFlight, now, kart.lastGroundedTime);
-}
-
-/**
- * Whether the melon takes no damage right now: on a jump pad, or flying off
- * one (until shortly after landing).
- * @param {import("../../core/kart-registry.js").Kart} kart
- */
-function IsPadProtected(kart) {
-    return kart.padFlight !== undefined || CurrentJumpPad(kart) !== undefined;
-}
-
-/**
- * On a jump pad with a (just) pressed jump: launches the melon — `v` (the
- * velocity UpdateKart is about to command) is replaced in place, after the
- * normal jump handling, so the launch wins over a ground/wall jump.
- * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now
- * @param {boolean} jumpPressed @param {{ x: number, y: number, z: number }} v
- * @param {{ x: number, y: number }} lookDir
- * @returns {boolean} whether it launched
- */
-function TryPadLaunch(slot, kart, now, jumpPressed, v, lookDir) {
-    const pad = CurrentJumpPad(kart);
-    if (!pad || !ShouldPadLaunch(now, jumpPressed, kart.lastJumpPressTime, kart.lastPadLaunchTime)) {
-        return false;
-    }
-    const launched = PadLaunchVelocity(v, lookDir, pad);
-    v.x = launched.x;
-    v.y = launched.y;
-    v.z = launched.z;
-    kart.lastPadLaunchTime = now;
-    // Counts as a jump: the pad still pushing up for a tick isn't ground
-    // contact (GROUND_LIFTOFF_TIME), and the next ground jump needs a landing.
-    kart.lastJumpTime = now;
-    kart.padFlight = { launchTime: now };
-    // Faster than the top speed, like a wall-bounce boost — decays at BOOST_DECAY.
-    kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(v.x, v.y));
-    Debug(`jump pad: slot ${slot} launched (${launched.z.toFixed(0)} u/s up, ${Math.hypot(v.x, v.y).toFixed(0)} u/s horizontal)`);
-    return true;
-}
-
 // Engine side of ground/wall contact: the floor and wall probes (line
 // traces — see UpdateGrounded for why not TraceSphere). The rules are in
 // ./logic.js; what the probes saw goes to dev/collision-debug.js for the
@@ -5527,500 +6200,12 @@ function UpdateWallContact(kart, origin, now, currentVelocity, dt, grounded) {
     if (!nearest.at || grounded) {
         return undefined;
     }
-    kart.lastWallContact = { time: now, normal: nearest.normal };
+    // How the melon came at this wall, for the wall jump's angle rating —
+    // remembered from the contact's start (WallApproach), before physics
+    // stopped it against the wall.
+    const approach = WallApproach(kart.lastWallContact, now, nearest.normal, [currentVelocity, kart.lastVelocity, kart.prevLastVelocity]);
+    kart.lastWallContact = { time: now, normal: nearest.normal, ...approach };
     return nearest.normal;
-}
-
-// Health loss from hard impacts (landings, crashes) — see IMPACT_DAMAGE_*.
-
-/**
- * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
- * @param {{ x: number, y: number, z: number }} impactDelta the velocity change physics forced this tick
- */
-function ApplyImpactDamage(slot, kart, impactDelta) {
-    const impactSpeed = Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z);
-    const { damage, flatLanding } = ImpactDamage(impactDelta, kart.floorNormalZ);
-    DamageKart(slot, kart, damage, `impact ${impactSpeed.toFixed(0)} u/s${flatLanding ? " (flat landing)" : ""}`);
-}
-
-/**
- * Impact and wall-bounce damage. None on a jump pad or flying off one (see
- * IsPadProtected) — the attack boost's cost and melon_break triggers still apply.
- * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} damage @param {string} reason
- */
-function DamageKart(slot, kart, damage, reason) {
-    if (IsPadProtected(kart)) {
-        Debug(`slot ${slot}: ${reason} -> no damage (jump pad)`);
-        return;
-    }
-    kart.health -= damage;
-    Debug(`slot ${slot}: ${reason} -> ${damage.toFixed(0)} dmg, health ${kart.health.toFixed(0)}/${MELON_MAX_HEALTH}`);
-}
-
-// What a break leaves at the crash site: the two break templates'
-// particles and any physics pieces in them, placed on the crash site, flung
-// out, and cleaned up after BREAK_EFFECT_LIFETIME.
-
-/**
- * Converts a direction vector into the pitch/yaw/roll a particle template
- * should spawn with to visually point along it (Source's angle convention:
- * yaw rotates around Z, pitch is negative-up/positive-down from horizontal).
- * @param {{ x: number, y: number, z: number }} dir @param {number} length
- */
-function DirectionToAngles(dir, length) {
-    const yaw = (Math.atan2(dir.y, dir.x) * 180) / Math.PI;
-    const pitch = -(Math.asin(Math.min(1, Math.max(-1, dir.z / length))) * 180) / Math.PI;
-    return { pitch, yaw, roll: 0 };
-}
-
-// Every break's spawned effect entities, kept so they can stay at the crash
-// site for a long time (BREAK_EFFECT_LIFETIME) and still get cleaned up —
-// see PruneBreakEffects.
-/** @type {Array<{ spawnTime: number, entities: any[] }>} */
-let breakEffects = [];
-
-/** Removes break effects that are too old, or too many. */
-function CleanUpBreakEffects() {
-    const { expired, kept } = PruneBreakEffects(breakEffects, Instance.GetGameTime());
-    breakEffects = kept;
-    for (const effect of expired) {
-        for (const entity of effect.entities) {
-            if (entity.IsValid()) {
-                entity.Remove();
-            }
-        }
-    }
-}
-
-/**
- * Spawns one break template at the crash site and starts its particles.
- * Warns in the console (even with DEBUG off) if it's missing — silently
- * spawning nothing on a break is the bug.
- * @param {string} templateName @param {any} position @param {any} angles
- * @returns {any[]} the spawned entities (empty if nothing spawned)
- */
-function SpawnBreakTemplate(templateName, position, angles) {
-    const spawned = SpawnFromTemplate(templateName, position, angles, { warn: true });
-    PlaceAtCrashSite(spawned, position);
-    StartParticles(spawned);
-    if (spawned.length > 0) {
-        Debug(`SpawnBreakTemplate: "${templateName}" spawned ${spawned.map((e) => e.GetClassName()).join(", ")} at ${JSON.stringify(position)}`);
-    }
-    return spawned;
-}
-
-/**
- * ForceSpawn keeps each templated entity's Hammer offset from its
- * point_template (see fx/particles.js; same as melon_template, SpawnMelonAt) — in the map
- * the break particles sit ~200 units next to their templates, so they
- * played that far away from the crash site, somewhere different on every
- * break (the offset is rotated by the impact direction). Put particle
- * systems exactly on the crash site, and center the pieces' group on it,
- * keeping their layout relative to each other.
- * @param {any[]} entities @param {any} position
- */
-function PlaceAtCrashSite(entities, position) {
-    const pieces = entities.filter((e) => e.GetClassName().startsWith("prop_physics"));
-    const placed = RecenterOnto(pieces.map((p) => p.GetAbsOrigin()), position);
-    pieces.forEach((piece, i) => piece.Teleport({ position: placed[i] }));
-    PlaceAll(entities.filter((e) => !pieces.includes(e)), position);
-}
-
-/**
- * Flings any physics props a break template spawned (e.g. the melon model's
- * own break pieces, models/cs_italy/italy_food_melon/italy_food_melon/
- * piece*.vmdl, added to melon_break_chunks_template in Hammer) outward from
- * the crash site, tinted in the melon's paint color. They then lie there as
- * ordinary physics props until BREAK_EFFECT_LIFETIME removes them — unlike
- * the chunks particle, which is only sprite flecks that fade within moments.
- * @param {any[]} entities @param {any} position @param {{ r: number, g: number, b: number, a: number }} color
- */
-function LaunchBreakPieces(entities, position, color) {
-    for (const piece of entities) {
-        if (!piece.GetClassName().startsWith("prop_physics")) {
-            continue;
-        }
-        piece.SetColor(color);
-        const spin = () => (Math.random() * 2 - 1) * BREAK_PIECE_SPIN;
-        piece.Teleport({
-            velocity: BreakPieceVelocity(position, piece.GetAbsOrigin(), Math.random() * Math.PI * 2),
-            angularVelocity: { x: spin(), y: spin(), z: spin() },
-        });
-    }
-}
-
-/**
- * Spawns both break effects at the crash site — the main burst plus the
- * chunks template layered on top of it. Independent of each other (either
- * can be missing from Hammer without the other failing).
- * @param {any} position @param {any} angles @param {{ r: number, g: number, b: number, a: number }} color the melon's paint, for any pieces
- * @returns {boolean} whether at least one of them actually spawned — see
- * BreakMelon's fallback tint for why callers need to know this, not just
- * fire-and-forget.
- */
-function SpawnBreakParticles(position, angles, color) {
-    const entities = [
-        ...SpawnBreakTemplate(BREAK_PARTICLE_TEMPLATE_NAME, position, angles),
-        ...SpawnBreakTemplate(BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME, position, angles),
-    ];
-    LaunchBreakPieces(entities, position, color);
-    if (entities.length === 0) {
-        return false;
-    }
-    // Deliberately not removed on respawn — the chunks should keep lying at
-    // the crash site long after the melon is back on the track.
-    breakEffects.push({ spawnTime: Instance.GetGameTime(), entities });
-    CleanUpBreakEffects();
-    Instance.Delay(BREAK_EFFECT_LIFETIME).then(CleanUpBreakEffects);
-    return true;
-}
-
-// A melon breaking: BreakMelon (health ran out) / HandleMelonLost (the
-// entity vanished), the delay at the crash site, and the respawn after it.
-
-/**
- * Common tail end of every break, whether it was caught by our own
- * kart.health tracking (BreakMelon) or discovered after the fact because the
- * melon vanished on its own (HandleMelonLost): wait out BREAK_RESPAWN_DELAY,
- * then bring the kart back — reusing the same (hidden) melon where possible,
- * or spawning a brand new one at the checkpoint if the original is actually
- * gone.
- * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
- */
-function ScheduleRespawnAfterBreak(slot, kart) {
-    // Which race-flow teleport this break happened after — see
-    // Kart.teleportGen. Compared against, rather than checking
-    // kart.racing/locked: those also describe perfectly ordinary states
-    // (free-roaming the hub, parked after finishing) in which a broken melon
-    // still needs to go back to its checkpoint.
-    const teleportGen = kart.teleportGen;
-    Instance.Delay(BREAK_RESPAWN_DELAY).then(() => {
-        kart.breaking = false;
-        kart.breakTime = undefined;
-        if (!kart.pawn.IsValid() || karts.get(slot) !== kart) {
-            return; // player disconnected, or a fresh kart already replaced this one
-        }
-        if (!kart.melon.IsValid()) {
-            // The melon wasn't just hidden by us — it's genuinely gone (the
-            // engine's own physics broke the prop_physics_multiplayer for
-            // real on a hard enough hit, see HandleMelonLost) — spawn a fresh
-            // one instead of teleporting an entity that no longer exists.
-            // Checked before the teleportGen case below, and regardless of
-            // racing/locked: otherwise a melon lost outside a heat would never
-            // come back, and Think would re-run HandleMelonLost on it forever.
-            // checkpointPosition is correct even if the race flow moved on
-            // meanwhile — BeginHeat/ReturnAllToHub set it to their own
-            // (skipped, since the melon was dead) teleport target.
-            RespawnDestroyedMelon(slot, kart);
-            return;
-        }
-        SetMelonMotion(kart.melon, true); // before any respawn teleport below
-        ShowMelonPaint(kart);
-        // Back from the pulled-out break camera (ApplyBreakCameraZoom) to the
-        // player's normal chase offset.
-        ApplyCameraFollow(kart);
-        if (kart.teleportGen !== teleportGen) {
-            // The race flow moved this kart while it was mid-break (next
-            // heat's BeginHeat, or ReturnAllToHub via finish/moderator
-            // abort/the player's own "Return to hub" button). That
-            // already-current teleport wins — don't stomp it a second later
-            // with a now-stale checkpoint.
-            RestoreFullHealth(kart);
-            return;
-        }
-        RespawnKartAtCheckpoint(kart);
-    });
-}
-
-/**
- * Switches a melon's physics motion off for the break and back on for the
- * respawn (prop_physics' DisableMotion/EnableMotion inputs — it has no input
- * to make it non-solid). While broken the hidden melon stays at the crash
- * site, and the break's own prop_physics pieces spawn right inside it: with
- * motion on they shoved it around every physics step, between the ticks that
- * hold it still, and the chase camera following it shook along. With motion
- * off it doesn't budge — the pieces bounce off it instead.
- * @param {any} melon @param {boolean} enabled
- */
-function SetMelonMotion(melon, enabled) {
-    Instance.EntFireAtTarget({ target: melon, input: enabled ? "EnableMotion" : "DisableMotion" });
-}
-
-/** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart */
-function RespawnDestroyedMelon(slot, kart) {
-    const melon = SpawnMelonAt(kart.checkpointPosition, kart.checkpointAngles);
-    if (!melon) {
-        // kart.breaking is already cleared, so Think's invalid-melon check
-        // runs HandleMelonLost again next tick — that's the retry.
-        Debug(`slot ${slot}: could not respawn a melon after it was destroyed, will keep retrying`);
-        return;
-    }
-    kart.melon = melon;
-    FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
-    ShowMelonPaint(kart);
-    RestoreFullHealth(kart);
-    kart.lastVelocity = undefined;
-    kart.settled = false;
-    kart.speedCap = undefined;
-    kart.pendingBounce = undefined;
-    LeaveZones(kart); // a new melon entity — the old one's zones never send heal_leave/lift_leave
-    ApplyCameraFollow(kart);
-}
-
-/** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed */
-function BreakMelon(slot, kart, impactDir, impactSpeed) {
-    if (kart.breaking) {
-        return; // already broken and counting down to its respawn
-    }
-    kart.breaking = true;
-    kart.breakTime = Instance.GetGameTime();
-    const breakPosition = kart.melon.GetAbsOrigin();
-    // Oriented along the velocity change the impact caused, not the melon's
-    // own orientation — while rolling, that's an essentially random tumble
-    // unrelated to which way it just got hit.
-    const breakAngles = DirectionToAngles(impactDir, impactSpeed);
-    Debug(`slot ${slot}: melon broke at ${JSON.stringify(breakPosition)} — respawning at checkpoint ${kart.checkpointIndex} in ${BREAK_RESPAWN_DELAY}s`);
-
-    kart.melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
-    SetMelonMotion(kart.melon, false); // so the break pieces below can't shove it (and the camera) around
-    kart.lastVelocity = undefined;
-    kart.settled = false;
-    // Hidden entirely when the break particle actually spawned — it reads as
-    // the melon shredding apart, which a dark husk just sitting there in one
-    // piece doesn't. But without a "melon_break_template" placed in Hammer
-    // there's nothing else marking the crash site: the melon would just
-    // vanish and silently reappear at the checkpoint BREAK_RESPAWN_DELAY
-    // later, which looks like the camera instantly cut to the respawn. Tint
-    // it dark and leave it visible instead, so there's always something at
-    // the crash site to see while it waits out the respawn delay.
-    // kart.paintColor itself is untouched either way, restored in
-    // ScheduleRespawnAfterBreak.
-    const particlesSpawned = SpawnBreakParticles(breakPosition, breakAngles, kart.paintColor);
-    kart.melon.SetColor(particlesSpawned ? { r: 255, g: 255, b: 255, a: 0 } : BREAK_TINT_FALLBACK);
-    HideMelonGlow(kart);
-
-    ScheduleRespawnAfterBreak(slot, kart);
-}
-
-/**
- * Recovery path for a melon that broke for real instead of just being hidden
- * by BreakMelon above — the engine's own physics can destroy a
- * prop_physics_multiplayer outright on a hard enough impact, sometimes
- * before our own kart.health tracking even gets a chance to react. Without
- * this, that kart would silently lose its melon with no break particle, no
- * delay, and (since nothing else re-creates it while the player's pawn stays
- * alive — see gamemode/index.js) no way back at all. Runs the same
- * particle + delay + checkpoint-respawn sequence as a script-detected break,
- * using the last position/angles Think() saw the melon at (it's already gone
- * by the time this runs, so it can't be asked directly).
- * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
- */
-function HandleMelonLost(slot, kart) {
-    if (kart.breaking) {
-        return; // already mid-break/respawn over this same loss
-    }
-    kart.breaking = true;
-    kart.health = 0;
-    const breakPosition = kart.lastKnownPosition ?? kart.checkpointPosition;
-    const breakAngles = kart.lastKnownAngles ?? kart.checkpointAngles;
-    Debug(`slot ${slot}: melon was destroyed at ${JSON.stringify(breakPosition)} — respawning at checkpoint ${kart.checkpointIndex} in ${BREAK_RESPAWN_DELAY}s`);
-    SpawnBreakParticles(breakPosition, breakAngles, kart.paintColor);
-    ScheduleRespawnAfterBreak(slot, kart);
-}
-
-// Engine side of the wall bounce: finding the wall's normal on impact
-// (traces + IsWallContact), computing the bounce, DEBUG logging, and
-// charging its damage once the jump-timing window closes. The math is in
-// ../logic/wall-bounce.js.
-
-/**
- * Whether the impact this tick was against a wall, and if so that wall's
- * (horizontal, unit-length) normal — see the trace order inside. Floors/
- * ceilings (mostly vertical normal) and other physics props (other karts'
- * melons, loose melons in the map) don't count — only walls bounce.
- * @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDelta
- * @returns {{ x: number, y: number, method: string, hitPoint?: any } | null}
- */
-function DetectWallNormal(kart, impactDelta) {
-    const v = kart.lastVelocity;
-    if (!v) {
-        return null;
-    }
-    const horizSpeed = Math.hypot(v.x, v.y);
-    if (horizSpeed < 1) {
-        return null; // purely vertical motion — a landing, never a wall
-    }
-    const dir = { x: v.x / horizSpeed, y: v.y / horizSpeed };
-    const ignoreEntity = [kart.melon, kart.pawn];
-
-    // 1st choice: a thin ray from where the melon was *last* tick (before
-    // contact) along its incoming direction — gives the wall's real face
-    // normal, independent of how vphysics resolved the collision. Long
-    // enough to still reach the wall at grazing angles, where the distance
-    // along the travel direction grows with 1/cos(angle).
-    // 2nd: a sphere sweep from the current position (catches thin posts or
-    // edges the center ray slips past).
-    // Neither finds a wall -> no bounce. (There used to be a last resort
-    // that took the impact direction itself as the normal, but with no wall
-    // found that bounced the melon off thin air.)
-    // Whatever they find must then pass IsWallContact: the ray reaches far
-    // ahead, and in a small room it finds some wall on nearly every hard
-    // landing or bump, even though the melon isn't touching it.
-    const from = kart.prevOrigin ?? kart.melon.GetAbsOrigin();
-    const ray = TraceLine({
-        start: from,
-        end: {
-            x: from.x + dir.x * WALL_BOUNCE_TRACE_DISTANCE,
-            y: from.y + dir.y * WALL_BOUNCE_TRACE_DISTANCE,
-            z: from.z,
-        },
-        ignoreEntity,
-        ignorePlayers: true,
-    });
-    /** @type {any} */
-    let trace = ray.didHit && !ray.startedInSolid ? ray : null;
-    let method = "ray";
-    if (!trace) {
-        const start = kart.melon.GetAbsOrigin();
-        const sphere = TraceSphere({
-            radius: WALL_BOUNCE_TRACE_RADIUS,
-            start,
-            end: {
-                x: start.x + dir.x * WALL_BOUNCE_SPHERE_TRACE_DISTANCE,
-                y: start.y + dir.y * WALL_BOUNCE_SPHERE_TRACE_DISTANCE,
-                z: start.z,
-            },
-            ignoreEntity,
-            ignorePlayers: true,
-        });
-        trace = sphere.didHit && !sphere.startedInSolid ? sphere : null;
-        method = "sphere";
-    }
-
-    if (!trace) {
-        return null;
-    }
-    const hit = trace.hitEntity;
-    if (hit && !hit.IsWorld() && hit.GetClassName().startsWith("prop_physics")) {
-        return null;
-    }
-    const { x: nx, y: ny, z: nz } = trace.normal;
-    if (Math.abs(nz) > WALL_NORMAL_MAX_Z) {
-        return null;
-    }
-    const h = Math.hypot(nx, ny);
-    if (h <= 0) {
-        return null;
-    }
-    const n = { x: nx / h, y: ny / h };
-    const hitPoint = trace.end;
-    const incoming = PickIncomingVelocity(v, kart.prevLastVelocity, n);
-    if (!IsWallContact(kart.melon.GetAbsOrigin(), hitPoint, n, incoming, kart.melon.GetAbsVelocity())) {
-        Debug(`wall bounce rejected: wall found via ${method} isn't actually being touched (impact ${Math.hypot(impactDelta.x, impactDelta.y, impactDelta.z).toFixed(0)} u/s)`);
-        return null;
-    }
-    return { ...n, method, hitPoint };
-}
-
-/**
- * DEBUG only: logs the velocity-based bounce angle next to the look-based
- * one, so a "that felt like 45°" mismatch can be told apart from a
- * measuring bug.
- * @param {import("../../core/kart-registry.js").Kart} kart
- * @param {{ x: number, y: number, method: string }} n @param {number} angle
- */
-function DebugLogBounce(kart, n, angle) {
-    if (!DEBUG) {
-        return;
-    }
-    const yaw = (kart.pawn.GetEyeAngles().yaw * Math.PI) / 180;
-    const lookDir = { x: Math.cos(yaw), y: Math.sin(yaw) };
-    const lookInto = -(lookDir.x * n.x + lookDir.y * n.y);
-    const lookAngle = lookInto > 0 ? (Math.acos(Math.min(1, lookInto)) * 180) / Math.PI : NaN;
-    Debug(
-        `bounce angle: velocity ${angle.toFixed(1)}°, look ${Number.isNaN(lookAngle) ? "away from wall" : lookAngle.toFixed(1) + "°"}, ` +
-        `normal via ${n.method}`
-    );
-}
-
-/**
- * Reflects the melon's pre-impact horizontal velocity off a wall and scales
- * it by how well the hit was angled (see WALL_BOUNCE_* in movement/wall-bounce/constants.js).
- * Horizontal only — the upward kick (WALL_BOUNCE_UP_SPEED) is added by UpdateKart.
- * @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, method: string, hitPoint?: any }} n @param {number} now
- * @returns {{ velocity: { x: number, y: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number } | null}
- *   null if the melon wasn't actually moving into the wall
- */
-function ComputeWallBounce(kart, n, now) {
-    const v = PickIncomingVelocity(/** @type {{ x: number, y: number, z: number }} */ (kart.lastVelocity), kart.prevLastVelocity, n);
-    // A timing press just *before* the hit counts here; one just after is
-    // handled by UpdateKart's jump code upgrading kart.pendingBounce.
-    const jumpFactor = kart.wallTimingPressTime !== undefined ? JumpTimingFactor(now - kart.wallTimingPressTime) : 0;
-    const bounce = ReflectOffWall(v, n, jumpFactor);
-    if (!bounce) {
-        return null;
-    }
-    DebugLogBounce(kart, n, bounce.angle);
-    // A PERFECT hit shows its own spark instead of the boost trail — see
-    // ShouldShowBoostTrail. Any other rating's speed shows the trail again.
-    kart.perfectBounceBoost = GetBounceRating(bounce.angleFactor) === BOUNCE_RATINGS[0];
-    if (kart.perfectBounceBoost) {
-        PlayPerfectSpark(kart);
-    }
-    return { ...bounce, jumpFactor };
-}
-
-/**
- * Spawns two fresh copies of the perfect_hit_particle_template and starts
- * them, removed again after PERFECT_SPARK_LIFETIME: one left at the hit spot
- * on the wall, and one parented to the melon so it rides along — the melon
- * is off the wall so fast that the player would otherwise never see the
- * spark behind them. Fresh copies per hit, so several karts' perfect hits
- * at the same moment each show their own.
- * @param {import("../../core/kart-registry.js").Kart} kart
- */
-function PlayPerfectSpark(kart) {
-    const position = kart.melon.GetAbsOrigin();
-    PlayParticleTemplate(PERFECT_SPARK_TEMPLATE_NAME, position, { lifetime: PERFECT_SPARK_LIFETIME });
-    PlayParticleTemplate(PERFECT_SPARK_TEMPLATE_NAME, position, { lifetime: PERFECT_SPARK_LIFETIME, parent: kart.melon });
-}
-
-/**
- * Whether kart.pendingBounce breaks the melon right at the wall — see
- * IsLethalAtImpact. A jump pad's damage protection still saves it.
- * @param {import("../../core/kart-registry.js").Kart} kart
- */
-function WallBounceBreaksAtImpact(kart) {
-    const p = kart.pendingBounce;
-    return p !== undefined && !IsPadProtected(kart) && IsLethalAtImpact(kart.health, p.impactSpeed, p.speedGain, p.angleFactor);
-}
-
-/**
- * Charges kart.pendingBounce's damage now that its jump window is over (a
- * late jump can still have raised its speed gain): the wall's usual impact +
- * speed-gain damage, reduced by angle closeness — a perfect 45° hit is free.
- * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
- * @returns {boolean} whether the melon broke from it
- */
-function SettleWallBounceDamage(slot, kart) {
-    const p = kart.pendingBounce;
-    kart.pendingBounce = undefined;
-    if (!p) {
-        return false;
-    }
-    const damage = WallBounceDamage(p.impactSpeed, p.speedGain, p.angleFactor);
-    DamageKart(
-        slot,
-        kart,
-        damage,
-        `wall bounce ${p.angle.toFixed(0)}° (angle ${p.angleFactor.toFixed(2)}, jump ${p.jumpFactor.toFixed(2)}), ` +
-        `impact ${p.impactSpeed.toFixed(0)} u/s, gained ${p.speedGain.toFixed(0)} u/s`
-    );
-    if (kart.health <= 0) {
-        BreakMelon(slot, kart, p.impactDir, p.impactSpeed);
-        return true;
-    }
-    return false;
 }
 
 // Per-tick melon driving (UpdateKart): the order everything happens in each
@@ -6099,7 +6284,10 @@ function UpdateKart(slot, kart, dt) {
     /** @type {{ x: number, y: number } | undefined} */
     let bounceVelocity = undefined;
     let bounceAngleFactor = 0;
-    if (kart.lastVelocity) {
+    // In water (water_enter/water_leave) the water's drag and buoyancy keep
+    // pulling the velocity away from what we commanded — that's no impact
+    // and no wall, so neither damage nor a bounce comes from it.
+    if (kart.lastVelocity && !InWater(kart)) {
         const impactDelta = {
             x: currentVelocity.x - kart.lastVelocity.x,
             y: currentVelocity.y - kart.lastVelocity.y,
@@ -6113,7 +6301,7 @@ function UpdateKart(slot, kart, dt) {
         // charged via pendingBounce), not a new crash to take damage from.
         const inBounceCooldown = now < (kart.nextBounceTime ?? 0);
         const wallNormal =
-            impactSpeed > WALL_BOUNCE_MIN_IMPACT && !inBounceCooldown
+            WALL_BOUNCE_ENABLED && impactSpeed > WALL_BOUNCE_MIN_IMPACT && !inBounceCooldown
                 ? DetectWallNormal(kart, impactDelta)
                 : null;
         const bounce = wallNormal ? ComputeWallBounce(kart, wallNormal, now) : null;
@@ -6648,6 +6836,47 @@ function RegisterKartInputs() {
 // lifecycle / paint trigger inputs (inputs.js). The kart record itself and
 // the registry of all karts are in core/kart-registry.js.
 
+// Water zones (WATER_* in zones/water/constants.js). Pure rules, no cs_script
+// import; zones/water/water.js applies them (test/zones/water.test.mjs).
+
+/**
+ * What's left of a velocity (or spin) when the melon lands in water: every
+ * axis scaled by WATER_ENTRY_SPEED_KEEP.
+ * @param {{ x: number, y: number, z: number }} v
+ */
+function WaterEntryVelocity(v) {
+    return { x: v.x * WATER_ENTRY_SPEED_KEEP, y: v.y * WATER_ENTRY_SPEED_KEEP, z: v.z * WATER_ENTRY_SPEED_KEEP };
+}
+
+// Engine side of water zones (WATER_* in constants.js): stopping a melon that
+// lands in water. Which water zones the melon is in is tracked in
+// ../registry.js (InWater); UpdateKart skips impact and wall-bounce detection
+// while it's inside.
+
+/**
+ * The melon just entered a water zone: it loses its momentum at once — speed
+ * and spin (see WATER_ENTRY_SPEED_KEEP), a boosted speed cap and the
+ * momentum run. The per-tick tracking is cleared, so the stop isn't read as
+ * an impact (damage) or a wall hit. A broken melon is frozen anyway.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function StopInWater(kart) {
+    if (kart.breaking) {
+        return;
+    }
+    kart.melon.Move({
+        velocity: WaterEntryVelocity(kart.melon.GetAbsVelocity()),
+        angularVelocity: WaterEntryVelocity(kart.melon.GetAbsAngularVelocity()),
+    });
+    kart.lastVelocity = undefined;
+    kart.prevLastVelocity = undefined;
+    kart.prevOrigin = undefined;
+    kart.settled = false;
+    kart.speedCap = undefined;
+    kart.momentum = undefined;
+    kart.lastWallContact = undefined;
+}
+
 // The generic teleporter input, melon_teleport.
 
 function RegisterTeleportInput() {
@@ -6693,7 +6922,7 @@ function RegisterTeleportInput() {
     });
 }
 
-// Script inputs of the zone triggers — heal, lift and camera zones, jump pads,
+// Script inputs of the zone triggers — heal, lift, camera and water zones, jump pads,
 // plus the teleporters (teleport/inputs.js). The zones all work
 // the same way: OnStartTouch -> "<kind>_enter", OnEndTouch -> "<kind>_leave",
 // and the touched trigger's own name may carry its value (heal_zone_<rate>,
@@ -6736,11 +6965,14 @@ function RegisterZoneInputs() {
     RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
     // Jump pads — see jump-pad/constants.js. Read by jump-pad/jump-pad.js (launch, no damage).
     RegisterZone("jump_pad_enter", "jump_pad_leave", "jumpPads", JumpPadFromName, "up/forward u/s");
+    // Water zones (a trigger around a func_water) — see water/constants.js:
+    // landing in one stops the melon, and UpdateKart reads no impacts inside.
+    RegisterZone("water_enter", "water_leave", "waterZones", () => 1, "(water)", StopInWater);
     RegisterTeleportInput();
 }
 
 // Map triggers that change what a melon does while it's inside: lift/,
-// jump-pad/, camera-zone/ (heal zones are in health/heal/), plus the
+// jump-pad/, camera-zone/, water/ (heal zones are in health/heal/), plus the
 // teleporters (teleport/). registry.js tracks which zones a melon is in;
 // inputs.js registers every *_enter/*_leave and melon_teleport input.
 

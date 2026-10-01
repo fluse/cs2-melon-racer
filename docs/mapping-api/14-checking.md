@@ -1,6 +1,6 @@
-[Mapping API](README.md) › **13. Checking your map** · [← Jump pads](12-jump-pads.md)
+[Mapping API](README.md) › **14. Checking your map** · [← Water zones](13-water-zones.md)
 
-# 13. Checking your map
+# 14. Checking your map
 
 ## `npm test`
 

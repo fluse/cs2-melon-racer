@@ -28,7 +28,8 @@ this folder, the script doesn't know about it.
 | 10 | [Lift zones](10-lift-zones.md) | Climb shafts by bouncing between walls |
 | 11 | [Camera zones](11-camera-zones.md) | Zoom out/in, front view, close-up |
 | 12 | [Jump pads](12-jump-pads.md) | Timed launch pads, no damage |
-| 13 | [Checking your map](13-checking.md) | What `npm test` catches, debug log, minimal checklist |
+| 13 | [Water zones](13-water-zones.md) | Landing in water stops the melon, no bounces in it |
+| 14 | [Checking your map](14-checking.md) | What `npm test` catches, debug log, minimal checklist |
 
 ## All script inputs
 
@@ -56,6 +57,8 @@ script, and `npm test` fails on it.
 | `camera_leave` | **End** | the same camera trigger | — | [Camera zones](11-camera-zones.md) |
 | `jump_pad_enter` | Start | any jump pad trigger | name (launch) | [Jump pads](12-jump-pads.md) |
 | `jump_pad_leave` | **End** | the same jump pad trigger | — | [Jump pads](12-jump-pads.md) |
+| `water_enter` | Start | any trigger around a `func_water` | — | [Water zones](13-water-zones.md) |
+| `water_leave` | **End** | the same water trigger | — | [Water zones](13-water-zones.md) |
 
 ## All entity names
 

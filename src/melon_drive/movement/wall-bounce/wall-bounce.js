@@ -170,10 +170,10 @@ export function ComputeWallBounce(kart, n, now) {
  * on the wall, and one parented to the melon so it rides along — the melon
  * is off the wall so fast that the player would otherwise never see the
  * spark behind them. Fresh copies per hit, so several karts' perfect hits
- * at the same moment each show their own.
+ * at the same moment each show their own. Also played by a PERFECT wall jump.
  * @param {import("../../core/kart-registry.js").Kart} kart
  */
-function PlayPerfectSpark(kart) {
+export function PlayPerfectSpark(kart) {
     const position = kart.melon.GetAbsOrigin();
     PlayParticleTemplate(PERFECT_SPARK_TEMPLATE_NAME, position, { lifetime: PERFECT_SPARK_LIFETIME });
     PlayParticleTemplate(PERFECT_SPARK_TEMPLATE_NAME, position, { lifetime: PERFECT_SPARK_LIFETIME, parent: kart.melon });

@@ -17,6 +17,8 @@ const DT = 1 / 64;
 const NEAR_WALL = C.WALL_JUMP_CONTACT_RADIUS / 2;
 const WALL_TIMING_SPAM_LOCKOUT_HALF = () => C.WALL_TIMING_SPAM_LOCKOUT / 2;
 const FLOOR_Z = 0;
+/** Tests that need wall bounces — skipped while WALL_BOUNCE_ENABLED is off. */
+const NEEDS_BOUNCE = { skip: !C.WALL_BOUNCE_ENABLED && "WALL_BOUNCE_ENABLED is off" };
 
 /** @type {CSPlayerPawn} */
 let pawn;
@@ -153,7 +155,7 @@ test("wall jump: a press the tick after leaving the wall still counts (WALL_JUMP
     assert.equal(v.z, C.WALL_JUMP_UP_SPEED);
 });
 
-test("wall bounce: lifts the melon by WALL_BOUNCE_UP_SPEED, cancelling its fall", () => {
+test("wall bounce: lifts the melon by WALL_BOUNCE_UP_SPEED, cancelling its fall", NEEDS_BOUNCE, () => {
     const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
     Geometry({ floorBelow: false, wallX });
     const v = Tick(fallingIntoWall(-100));
@@ -161,7 +163,7 @@ test("wall bounce: lifts the melon by WALL_BOUNCE_UP_SPEED, cancelling its fall"
     assert.equal(v.z, C.WALL_BOUNCE_UP_SPEED);
 });
 
-test("wall bounce in a lift zone: kicked up by the zone's speed instead", () => {
+test("wall bounce in a lift zone: kicked up by the zone's speed instead", NEEDS_BOUNCE, () => {
     const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
     Geometry({ floorBelow: false, wallX });
     kart.liftZones = new Map([[new Entity({ name: "lift_zone_600" }), 600]]);
@@ -169,7 +171,7 @@ test("wall bounce in a lift zone: kicked up by the zone's speed instead", () => 
     assert.equal(v.z, 600);
 });
 
-test("wall jump in a lift zone: full strength, costs no charge, keeps the bounce's higher kick", () => {
+test("wall jump in a lift zone: full strength, costs no charge, keeps the bounce's higher kick", NEEDS_BOUNCE, () => {
     const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
     Geometry({ floorBelow: false, wallX });
     kart.liftZones = new Map([[new Entity({ name: "lift_zone" }), C.LIFT_ZONE_UP_SPEED]]);
@@ -181,7 +183,7 @@ test("wall jump in a lift zone: full strength, costs no charge, keeps the bounce
     assert.ok(v.x <= -C.WALL_JUMP_PUSH_SPEED + 1e-9, `full-strength push off the wall (vx=${v.x})`);
 });
 
-test("head-on wall bounce in a lift zone still leaves at LIFT_ZONE_MIN_BOUNCE_SPEED", () => {
+test("head-on wall bounce in a lift zone still leaves at LIFT_ZONE_MIN_BOUNCE_SPEED", NEEDS_BOUNCE, () => {
     const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
     Geometry({ floorBelow: false, wallX });
     kart.liftZones = new Map([[new Entity({ name: "lift_zone" }), C.LIFT_ZONE_UP_SPEED]]);
@@ -303,10 +305,51 @@ test("wall jump never pushes the melon past its speed cap", () => {
     assert.equal(kart.speedCap, C.MAX_SPEED);
 });
 
+// A wall jump is rated by the angle the melon came at the wall, like a bounce
+// (WallJumpAngle) — slow enough here that the hit itself is no bounce.
+test("wall jump at the optimal angle: PERFECT — faster, harder kick, shown like a bounce", () => {
+    const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
+    Geometry({ floorBelow: false, wallX });
+    const rad = (C.WALL_BOUNCE_OPTIMAL_ANGLE * Math.PI) / 180;
+    const s = C.WALL_BOUNCE_MIN_IMPACT / 2;
+    const into = { x: Math.cos(rad) * s, y: Math.sin(rad) * s };
+    const v = Tick({ commanded: { ...into, z: -100 }, actual: { x: 0, y: into.y, z: -100 - C.GRAVITY * DT }, jump: true });
+    assert.ok(kart.lastWallJump, "the wall jump happened");
+    assert.equal(kart.lastBounceInfo.angleFactor >= C.BOUNCE_RATINGS[0].minAngleFactor, true, "rated PERFECT");
+    assert.equal(kart.lastBounceTime, world.time, "bounce panel shows it");
+    assert.ok(Math.abs(v.x + C.WALL_JUMP_PUSH_SPEED * C.WALL_JUMP_RATING_SPEED_MULTIPLIER.PERFECT) < 1e-6, `pushed off faster (vx=${v.x})`);
+    assert.ok(Math.abs(v.z - C.WALL_JUMP_UP_SPEED * C.WALL_JUMP_PERFECT_UP_MULTIPLIER) < 1e-6, `kicked harder (vz=${v.z})`);
+});
+
+// Regression: a press a couple of ticks after the touch only saw the melon
+// sliding along the wall (physics had stopped it there) — read as 90°, MISS.
+test("wall jump pressed a couple of ticks after the touch still gets the approach's rating", () => {
+    const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
+    Geometry({ floorBelow: false, wallX });
+    const rad = (C.WALL_BOUNCE_OPTIMAL_ANGLE * Math.PI) / 180;
+    const s = C.WALL_BOUNCE_MIN_IMPACT / 2;
+    const into = { x: Math.cos(rad) * s, y: Math.sin(rad) * s };
+    const slide = { x: 0, y: into.y };
+    let v = Tick({ commanded: { ...into, z: -100 }, actual: { ...slide, z: -100 - C.GRAVITY * DT } }); // the touch, no press
+    v = Tick({ commanded: v, actual: { ...slide, z: v.z - C.GRAVITY * DT } }); // sliding along it
+    Tick({ commanded: { ...v, x: 0 }, actual: { ...slide, z: v.z - C.GRAVITY * DT }, jump: true });
+    assert.ok(kart.lastWallJump, "the wall jump happened");
+    assert.ok(Math.abs(kart.lastBounceInfo.angle - C.WALL_BOUNCE_OPTIMAL_ANGLE) < 1e-6, `rated by the approach (${kart.lastBounceInfo.angle}°)`);
+});
+
+test("wall jump head-on: lowest rating, a plain wall jump", () => {
+    const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
+    Geometry({ floorBelow: false, wallX });
+    const v = Tick({ ...touchingWall(-100), jump: true });
+    assert.equal(kart.lastBounceInfo.angle, 0);
+    assert.equal(v.z, C.WALL_JUMP_UP_SPEED);
+    assert.ok(Math.abs(v.x + C.WALL_JUMP_PUSH_SPEED) < 1e-6, `plain push (vx=${v.x})`);
+});
+
 // Regression: a press timed for a wall bounce also fired a wall jump, which
 // used up charge and replaced the bounce's upward kick with the (weaker)
 // wall jump's — timed bounces went lower than untimed ones.
-test("a jump press on a wall bounce is only its timing — no wall jump, no charge used", () => {
+test("a jump press on a wall bounce is only its timing — no wall jump, no charge used", NEEDS_BOUNCE, () => {
     const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
     Geometry({ floorBelow: false, wallX });
     kart.wallJumpCharge = 0.5;
@@ -318,7 +361,7 @@ test("a jump press on a wall bounce is only its timing — no wall jump, no char
     assert.equal(kart.pendingBounce.jumpFactor, 1, "the press counted as perfect timing");
 });
 
-test("a late press still inside the bounce's timing window is no wall jump either", () => {
+test("a late press still inside the bounce's timing window is no wall jump either", NEEDS_BOUNCE, () => {
     const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
     Geometry({ floorBelow: false, wallX });
     const bounced = Tick(fallingIntoWall(-100));
@@ -385,7 +428,7 @@ test("a melon arriving whole (full health restored) has a full wall-jump charge"
 // Regression: any press within WALL_TIMING_SPAM_LOCKOUT of the previous one
 // locked timing credit — a ground jump at a wall and then a timed press on
 // the hit never got credit.
-test("a ground jump just before doesn't block timing credit on the following wall hit", () => {
+test("a ground jump just before doesn't block timing credit on the following wall hit", NEEDS_BOUNCE, () => {
     Geometry();
     Tick({ ...rolling(), jump: true }); // ground jump
     assert.ok(kart.lastJumpTime === world.time, "test setup: ground jump");
@@ -395,7 +438,7 @@ test("a ground jump just before doesn't block timing credit on the following wal
     assert.equal(kart.pendingBounce?.jumpFactor, 1, "the press on the hit counted as perfect timing");
 });
 
-test("mashing jump in the air still locks timing credit", () => {
+test("mashing jump in the air still locks timing credit", NEEDS_BOUNCE, () => {
     Geometry({ floorBelow: false });
     Tick({ ...falling(-100, 300), jump: true }); // does nothing: in the air, no wall
     world.time += WALL_TIMING_SPAM_LOCKOUT_HALF();

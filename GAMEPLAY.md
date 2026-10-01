@@ -168,7 +168,11 @@ bump in a small room doesn't bounce the melon off some wall further ahead
 within trace range. Since a collision often spans two ticks, the incoming velocity
 is whichever of the last two commanded velocities still heads more squarely
 into the wall. With `DEBUG` on (`core/debug.js`), every bounce logs the velocity
-angle next to the look angle (nothing is drawn in the world). There's no global "on/off per wall" — all walls do it.
+angle next to the look angle (nothing is drawn in the world). There's no "on/off per wall" — all walls do it. `WALL_BOUNCE_ENABLED`
+(`movement/wall-bounce/constants.js`) switches the whole mechanic off
+map-wide for testing: a wall hit is then a plain crash (`IMPACT_DAMAGE_*`),
+wall jumps (and their angle rating) still work, and the tests that need
+bounces are skipped.
 
 - **Angle is the skill part.** Angle closeness is 1 at exactly
   `WALL_BOUNCE_OPTIMAL_ANGLE` (45° from the wall normal) and falls off
@@ -599,9 +603,27 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   wall jumps get weaker (2 in a row, the second at half strength) until below `WALL_JUMP_MIN_CHARGE`
   there's none; it refills over `WALL_JUMP_RECHARGE_SECONDS` — always, also
   standing still, race-locked or broken — and is full again whenever the
-  melon arrives whole (every spawn that restores full health). A wall jump
-  never raises the speed cap, so chaining them can't make the melon faster
-  and faster. **The timing is the distance** (decided): a press only
+  melon arrives whole (every spawn that restores full health). **Rated by
+  angle, like a bounce** (decided): the angle the melon came at the wall
+  (its approach, remembered when the wall contact starts and kept while it
+  goes on — `WallApproach` — so a press a tick or two after the touch,
+  when physics has already stopped it against the wall and it only slides
+  along, still gets the real angle; it counts for
+  `WALL_JUMP_APPROACH_MEMORY` after the contact started) gets a
+  `BOUNCE_RATINGS` rating, 45° = PERFECT. A rating with a bonus
+  (`WALL_JUMP_RATING_SPEED_MULTIPLIER`: PERFECT ×1.35, GOOD ×1.1) **boosts it
+  like a bounce** (decided): the melon leaves with the full speed it came in
+  with — not what's left after the wall stopped it — times that, in the wall
+  jump's direction (away from the wall, along it), so a PERFECT at top speed
+  goes out at ~1.35 × `MAX_SPEED` (`WallJumpBoostedVelocity`). BAD/MISS ×1:
+  no penalty, a plain wall jump stays as it was;
+  a PERFECT also kicks `WALL_JUMP_PERFECT_UP_MULTIPLIER` (×1.2) harder up and
+  shows the perfect spark; every wall jump shows on the bounce panel and the
+  speedometer's `PerfectBounce` flash like a bounce. No health cost. Only
+  that bonus raises the speed cap (decaying at `BOOST_DECAY`); a plain wall
+  jump never does, and charge plus the same-wall rule still keep chaining
+  in check. Rules: `WallJumpAngle`, `WallJumpRatingMultipliers`, `WallJumpBoostedVelocity` in
+  `movement/jump/logic.js`. **The timing is the distance** (decided): a press only
   counts while the wall is right at the melon — a line trace in any of
   `WALL_PROBE_DIRECTIONS` (16) horizontal directions finds a steep, non-prop
   surface whose plane is within `WALL_JUMP_CONTACT_RADIUS` (7 units) of the
@@ -677,6 +699,23 @@ they don't look like the cyan lift updraft). Constants:
 `zones/jump-pad/constants.js`; rules: `zones/jump-pad/logic.js`, applied by
 `zones/jump-pad/jump-pad.js` (`test/zones/jump-pad.test.mjs`). Details for mappers:
 [Mapping API: jump pads](docs/mapping-api/12-jump-pads.md).
+
+## Water zones (implemented)
+
+`func_water` has no outputs, so the script learns about water from a
+`trigger_multiple` around it (filtered to `prop_physics`) with
+`OnStartTouch` → `RunScriptInput` `water_enter` and `OnEndTouch` →
+`water_leave`. **Landing in water, the melon loses its momentum at once**
+(decided): speed and spin (`WATER_ENTRY_SPEED_KEEP`, 0 = stops dead), a
+boosted speed cap and its momentum steps. Inside, the water's drag and
+buoyancy keep pulling the velocity away from what the script commanded,
+which used to read as impacts and wall hits — the melon bounced off
+unpredictably — so in water there are **no wall bounces and no impact
+damage**. Driving and jumping work as usual. Constants:
+`zones/water/constants.js`; rule: `zones/water/logic.js`, applied by
+`zones/water/water.js` and `movement/driving/drive.js`
+(`test/zones/water.test.mjs`). Details for mappers:
+[Mapping API: water zones](docs/mapping-api/13-water-zones.md).
 
 ## Spawn points (implemented)
 

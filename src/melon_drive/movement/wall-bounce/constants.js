@@ -13,6 +13,9 @@
 // result once more — fully for the exact same tick, fading out towards the
 // window's edges. Floors/landings never bounce — they keep using the
 // plain IMPACT_DAMAGE_* rules (health.js).
+// Map-wide switch for testing without it: off, no wall ever bounces — a
+// wall hit is a plain crash (IMPACT_DAMAGE_* rules, physics stops the melon).
+export const WALL_BOUNCE_ENABLED = false;
 export const WALL_BOUNCE_MIN_IMPACT = 200; // units/sec of sudden velocity change before a wall hit counts as a bounce at all
 export const WALL_NORMAL_MAX_Z = 0.5; // |normal.z| above this is a floor/ceiling/steep ramp, not a wall
 export const WALL_BOUNCE_TRACE_DISTANCE = 160; // ray length from last tick's position along the incoming direction — must reach the wall even at grazing angles (grows with 1/cos(angle))

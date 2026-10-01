@@ -36,6 +36,8 @@ const SCRIPT_INPUTS = [
     "camera_leave",
     "jump_pad_enter",
     "jump_pad_leave",
+    "water_enter",
+    "water_leave",
 ];
 
 test("every entity name the script looks up is in the Mapping API", () => {

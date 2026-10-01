@@ -22,6 +22,7 @@ export class Entity {
         this.origin = clone(origin);
         this.angles = clone(angles);
         this.velocity = { x: 0, y: 0, z: 0 };
+        this.angularVelocity = { x: 0, y: 0, z: 0 };
         this.valid = true;
         this.color = undefined;
     }
@@ -30,9 +31,11 @@ export class Entity {
     GetAbsOrigin() { return clone(this.origin); }
     GetAbsAngles() { return clone(this.angles); }
     GetAbsVelocity() { return clone(this.velocity); }
+    GetAbsAngularVelocity() { return clone(this.angularVelocity); }
     IsValid() { return this.valid; }
     IsWorld() { return false; }
-    Teleport({ position, angles, velocity } = {}) {
+    Teleport({ position, angles, velocity, angularVelocity } = {}) {
+        if (angularVelocity) this.angularVelocity = clone(angularVelocity);
         if (position) this.origin = clone(position);
         if (angles) this.angles = clone(angles);
         if (velocity) this.velocity = clone(velocity);
