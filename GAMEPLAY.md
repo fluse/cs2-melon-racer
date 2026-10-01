@@ -8,50 +8,37 @@ design changes here rather than back in AGENTS.md.
 
 ## Concept
 
-A CS2 Workshop racing map ("Melon Racer"). Players race along a track;
-`prop_physics` melon props are the map's signature gimmick (pushed/launched
-rather than shot). Exact vehicle/movement feel (on-foot racing vs.
-pushing/riding a melon vs. something else) is not yet locked down — see
-Open Questions.
+A CS2 Workshop racing map ("Melon Racer"). Every player drives their own
+`prop_physics` melon (see "Movement model"); the player's own body stays
+frozen and hidden. The melon has health, breaks on hard crashes and
+respawns at its last checkpoint.
 
-## Track layout (inferred from existing assets)
+## Flow of a session
 
-The addon ships ambience for both outdoor (`bird_01.wav`…`bird_06.wav`) and
-interior (`interior_01.wav`, `vent_01.wav`) sections, so the track is
-expected to move between outdoor and interior segments. Keep new
-`soundevents/soundevents_addon.vsndevts` entries split the same way —
-one ambient loop per section type, not one global soundscape — and place
+1. **Join** — picking a team shows the logo, then the player's melon
+   spawns at `intro_spawn`, the tutorial area ("Spawn points").
+2. **Free roaming** — drive anywhere. Crossing a track's start line puts the
+   melon on that track and starts a time trial ("Time trial", "Multiple
+   tracks & checkpoints").
+3. **Hub** — players gather in `hub_start_trigger` and start a race
+   together ("Hub → race → next-track flow").
+4. **Heats** — one per track in `trackId` order: countdown, race, break,
+   next track; after the last one everyone returns to the hub.
+
+Nobody dies: `gamemode` aborts all player damage. Instead the melon breaks
+(health at 0, or a kill trigger) and respawns at its respawn point — see
+"Melon health & breaking". There's no automatic out-of-bounds volume: a
+drop the map shouldn't forgive gets a kill trigger (`melon_break`), one it
+should gets a teleporter.
+
+## Ambience
+
+The addon ships ambience for outdoor (`bird_01.wav`…`bird_06.wav`) and
+interior (`interior_01.wav`, `vent_01.wav`) sections. Keep
+`soundevents/soundevents_addon.vsndevts` split the same way — one ambient
+loop per section type, not one global soundscape — with
 `env_soundscape`/ambient-trigger volumes at the outdoor↔interior
-transitions once the layout exists in Hammer.
-
-## Round flow (current design, subject to change)
-
-1. **Warmup/Freeze** — players join, get placed at the start line.
-   `Instance.OnPlayerActivate`/`OnPlayerReset` is the hook to place a
-   fresh/respawning player at the start (or their last checkpoint, if
-   mid-race state should survive a respawn — TBD, see Open Questions).
-2. **Start** — a start trigger begins that player's timer
-   (`Instance.GetGameTime()` captured per player) and enables checkpoint
-   tracking for them.
-3. **Checkpoints** — sequential `trigger_multiple` volumes along the track.
-   Each fires `RunScriptInput` on a `point_script` entity with a
-   checkpoint-index parameter; script records "highest checkpoint reached"
-   per player.
-4. **Out-of-bounds / fall reset** — a catch-volume teleports the player back
-   to their last checkpoint (`pawn.Teleport({ position, velocity: {x:0,y:0,z:0} })`)
-   rather than killing/respawning them, so mid-race state isn't lost.
-5. **Finish** — stops that player's timer, records their time, updates the
-   HUD/leaderboard.
-
-## Checkpoint logic
-
-- Track progress per player in a `Map` keyed by `CSPlayerController` (or
-  pawn) — not by array index — so it survives disconnects/reconnects
-  cleanly.
-- A checkpoint should only ever move a player's progress *forward*; touching
-  an earlier checkpoint again (e.g. doubling back) must not regress it.
-- Respawn/reset position = the *last checkpoint's* stored position/angle,
-  not the map's start line, once past checkpoint 1.
+transitions.
 
 ## Time trial (decided, implemented)
 
@@ -77,8 +64,8 @@ racing against the clock:
   and standing still, the clock at zero until it crosses the start line
   again. Gone once a finish takes the melon off the track (a loop's next
   attempt has it again), in a heat (a free reset mid-race), in the hub or
-  tutorial; ignored while the melon is breaking. \`RestartTimeTrial\` in
-  \`race/checkpoints/checkpoints.js\`, \`CanRestartTimeTrial\` in \`race/time-trial/time-trial.js\`.
+  tutorial; ignored while the melon is breaking. `RestartTimeTrial` in
+  `race/checkpoints/checkpoints.js`, `CanRestartTimeTrial` in `race/time-trial/time-trial.js`.
 - Each player's **best time per track** is saved with
   `Instance.SetSaveData` (one JSON object for the addon, best times under
   `SAVE_DATA_BEST_TIMES_KEY`), so it survives map restarts. Keyed by
@@ -94,27 +81,24 @@ accumulation. Constants: `race/time-trial/constants.js`; rules:
 `race/time-trial/logic.js` (`test/race/time-trial.test.mjs`), applied by
 `race/time-trial/time-trial.js` (`test/race/time-trial-run.test.mjs`).
 
-## Melon props & boost pads
+## Speed sources
 
-- Melon props are `prop_physics`. Boost pads are triggers that fire an
-  entity input (`EntFireAtName`/`EntFireAtTarget`) on touch rather than
-  scripting velocity directly, so mass/friction/boost-force tuning stays in
-  Hammer entity properties and doesn't require a script edit to iterate on.
-- If a boost needs a feel that pure physics forces can't give (an
-  instant/guaranteed launch), use `Teleport({ velocity })` on the touched
-  entity as the exception, not the default.
+All speed above plain driving (`MAX_SPEED`) is scripted, not left to Hammer
+physics forces: wall bounces, the attack boost, jump pads and momentum
+(each has its own section below). There are no separate boost pads.
 
 ## Melon health & breaking (decided)
 
-The melon has a health pool (`MELON_MAX_HEALTH` in `melon_drive.js`) that's
+The melon has a health pool (`MELON_MAX_HEALTH`, `health/damage/constants.js`) that's
 worn down by hard impacts — crashing into geometry or landing a big fall —
 not by fall distance or a fixed "you touched the ground" event. Each tick the
 velocity the script commanded last tick is compared against the melon's
 actual velocity now; physics only overrides that gradually (steering,
 gravity) unless something forcibly stopped it (a wall, the ground after a
 fall), so a large gap is read as an impact and scaled into damage. At 0
-health the melon "breaks": it's teleported back to the position/angles of
-the last checkpoint it reached (or the player's spawn point, if none yet),
+health the melon "breaks": it's teleported to its respawn point — the last
+checkpoint it reached, else the track's start spawn, the tutorial or hub
+spawn it was last sent to, or a respawn teleporter's destination —
 velocity zeroed, health reset to full. The melon entity itself isn't
 destroyed/recreated (keeps the camera's `followEntity` and other references
 valid). Before that reset, the break plays out at the crash site: the melon
@@ -138,20 +122,20 @@ tinted in the melon's paint color, flung outward from the crash site
 pieces, `models/cs_italy/italy_food_melon/italy_food_melon/piece.vmdl`,
 `piece1.vmdl` … `piece8.vmdl`, arranged close together in roughly a
 melon's shape. Where the templates and their entities sit in Hammer doesn't
-matter: `ForceSpawn` would keep each entity's offset from its template, so
+matter: `ForceSpawn` keeps each entity's offset from its template, so
 script moves particle systems exactly onto the crash site and centers the
 pieces' group on it (keeping their layout relative to each other). If lying pieces get in the karts' way, mark them as debris.
 
 `test/map/map-templates.test.mjs` checks the .vmap to make sure both
 templates exist and are wired up, and that no other `melon_break_*`
 template creeps in (the `npm test` failure names whatever's
-missing). There's no break sound yet.
+missing). There's no break sound.
 
 **Kill triggers:** a `trigger_multiple` (filtered to `prop_physics`) whose
 `OnStartTouch` fires `RunScriptInput` `melon_break` breaks the touching
 melon at once, whatever its health — the same break as above (effects at
-the spot, respawn at the last checkpoint). For lava, spikes, a drop the
-fall reset shouldn't forgive, … Broken or race-locked melons ignore it.
+the spot, respawn at the last checkpoint). For lava, spikes, a drop that
+shouldn't be survivable, … Broken or race-locked melons ignore it.
 
 Tune via `IMPACT_DAMAGE_THRESHOLD` (units/sec of sudden velocity change
 before damage starts) and `IMPACT_DAMAGE_SCALE` (health lost per unit/sec
@@ -162,8 +146,8 @@ beyond that).
 `FLAT_LANDING_MIN_VERTICAL_SHARE`) multiplies that damage by
 `FLAT_LANDING_DAMAGE_MULTIPLIER` (`health/damage/constants.js`, rule in
 `health/damage/logic.js`). Landing on a slope, or crashing sideways, stays plain
-impact damage; the threshold is the same, so landings that were free stay
-free.
+impact damage; the threshold is the same, so a landing below it stays
+free either way.
 
 ## Wall bounce — speed for health (implemented)
 
@@ -177,9 +161,9 @@ incoming direction (then a short `TraceSphere` from the current position;
 if neither finds a wall, there's no bounce). A found wall only counts if the
 melon is really touching it (`IsWallContact`): its center is within
 `WALL_CONTACT_DISTANCE` of the wall plane, and the impact took away at least
-`WALL_CONTACT_MIN_STOP` of its speed into that wall. Otherwise a hard
-landing or bump in a small room bounced the melon off whatever wall lay
-ahead within trace range, seemingly off thin air. Since a collision often spans two ticks, the incoming velocity
+`WALL_CONTACT_MIN_STOP` of its speed into that wall — so a hard landing or
+bump in a small room doesn't bounce the melon off some wall further ahead
+within trace range. Since a collision often spans two ticks, the incoming velocity
 is whichever of the last two commanded velocities still heads more squarely
 into the wall. With `DEBUG` on (`core/debug.js`), every bounce logs the velocity
 angle next to the look angle (nothing is drawn in the world). There's no global "on/off per wall" — all walls do it.
@@ -227,7 +211,7 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   orange) with a few falling juice droplets follows it — the addon's own
   `particles/melon_racer/boost_trail.vpcf` and `boost_trail_juice.vpcf`,
   one `info_particle_system` each in the `particle_boost_trail_template`
-  point_template (the juice as a child system never showed in-game),
+  point_template (as a child system the juice doesn't render),
   riding along on the melon. It stops once the boost has decayed below
   `MAX_SPEED` + `BOOST_TRAIL_STOP_MARGIN` (lower, so it doesn't flicker)
   and when the melon breaks or is race-locked; the particles already out
@@ -241,13 +225,13 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   vertical speed becomes at least `WALL_BOUNCE_UP_SPEED` upward (a fall is
   cancelled; a melon already rising faster keeps its own speed — **not added
   on top** (decided): in a narrow shaft or corridor bounces come faster than
-  gravity eats a kick, and adding them up let the upward speed grow with
-  every bounce), so a bounce sends
+  gravity eats a kick, so adding them up would let the upward speed grow
+  with every bounce), so a bounce sends
   it up in an arc instead of along the ground. A PERFECT bounce
   (`BOUNCE_RATINGS[0]`) kicks `PERFECT_BOUNCE_UP_MULTIPLIER` (×1.2, decided)
   harder — the normal kick and a lift zone's alike. Inside a **lift zone**
   (`lift_enter`/`lift_leave` trigger, `LIFT_ZONE_UP_SPEED` or
-  `lift_zone_<speed>` in its name — see MAPPING_API.md 4.7) the kick is
+  `lift_zone_<speed>` in its name — see [Mapping API: lift zones](docs/mapping-api/10-lift-zones.md)) the kick is
   stronger, so shafts and high walls can be climbed by bouncing between
   them; bounces there leave the wall with at least
   `LIFT_ZONE_MIN_BOUNCE_SPEED` (a head-on MISS would otherwise be too slow
@@ -265,7 +249,7 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
 - HUD: the speedometer gets `Boosted` while above `MAX_SPEED` and a short
   `PerfectBounce` flash after a bounce with angle closeness ≥
   `PERFECT_BOUNCE_ANGLE_FACTOR` (`speedometer.css`). Separately, a
-  `bounce_panel` in the bottom-right HUD cluster, right above the speedometer (centered below the crosshair it covered the track), shows for `BOUNCE_HUD_SECONDS` after
+  `bounce_panel` in the bottom-right HUD cluster, right above the speedometer (not centered: below the crosshair it would cover the track), shows for `BOUNCE_HUD_SECONDS` after
   each bounce: a rating word by angle closeness (`BOUNCE_RATINGS`:
   PERFECT/GOOD/BAD/MISS), the exact angle hit, a 0°–90° scale in 10°
   segments with the 45° target outlined and the hit segment lit, and a
@@ -296,16 +280,15 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   that's intended. The alternative `"dots"` mode (entities from a
   `point_template` named `prediction_dot_template`, e.g. a small "Never
   Solid" `func_brush`, visible to everyone — every kart's line to every
-  player) still exists but was judged to look worse than the debug line.
+  player) exists too, but looks worse than the debug line.
   Traces skip dots either way (`core/trace.js`).
 
 ## Multiple tracks & checkpoints (implemented)
 
 The map has more than one track, so checkpoint identity is `(trackId,
-index)`, not just an index. Checkpoint tracking lives in `melon_drive.js`
-(not a separate script — see AGENTS.md's note on one `point_script` entity
-per independent subsystem; checkpoints are tightly coupled to kart/melon
-state, so they stay together). `MAX_TRACKS` × `MAX_CHECKPOINTS_PER_TRACK`
+index)`, not just an index. Checkpoint tracking lives in
+`race/checkpoints/`, inside the `melon_drive` script (not a separate
+`point_script` — checkpoints share the kart state). `MAX_TRACKS` × `MAX_CHECKPOINTS_PER_TRACK`
 script inputs are pre-registered as `checkpoint_<trackId>_<index>` — e.g.
 track 2's 3rd checkpoint is `checkpoint_2_3` — plus one `start_<trackId>`
 and one `finish_<trackId>` per track. A track is **start line →
@@ -320,9 +303,8 @@ line, several laps) or point-to-point (finish somewhere else, one lap)
 - An `info_target` named `checkpoint_spawn_<trackId>_<index>` where a
   broken melon should respawn after reaching this checkpoint, facing its
   yaw (without one: the trigger's own position/angles).
-- Filtered (via a `filter_activator_class` set to `prop_physics`, or by name
-  if that's ever ambiguous) so only melons — not the frozen/parked player
-  pawns — can trigger it.
+- Filtered (via a `filter_activator_class` set to `prop_physics`) so only
+  melons — not the frozen player pawns — can trigger it.
 - Its `OnStartTouch` output fires `RunScriptInput` on this map's
   `point_script` entity, with the parameter set to `checkpoint_<trackId>_N`
   matching that track's id and this checkpoint's position along it (starting
@@ -338,8 +320,9 @@ never backward, and strictly one checkpoint at a time: touching checkpoint N
 only counts right after N-1, so a shortcut that skips checkpoints doesn't
 count toward the lap (a kart that misses one has to go back for it — keep
 checkpoint triggers thick enough that a fast melon can't tunnel through
-them). Progress is tracked per kart (keyed by melon entity). The
-last-touched checkpoint's `checkpoint_spawn_*` info_target is also where a
+them). Progress lives on the kart (`karts`, one per player slot,
+`core/kart-registry.js`); a trigger's activator melon is mapped to its kart
+by `FindKartByMelon`. The last-touched checkpoint's `checkpoint_spawn_*` info_target is also where a
 broken melon respawns (see above). Returning to the hub (heat over, abort,
 or the user menu's hub button) clears the kart's track progress and moves
 its respawn point to the hub.
@@ -370,27 +353,21 @@ Flag icons: `tools/make-icons.mjs` (`track-start`, `track-finish`); rule:
 `hud/checkpoint-strip-logic.js` (`test/hud/checkpoint-strip.test.mjs`), applied
 in `hud/`.
 
-**Open question this raises**: should different tracks be mutually
-exclusive lap-wise (finishing/leaving one clears `trackId` back to
-"undecided"), or can a racer freely hop between tracks mid-run with each
-track's progress remembered independently? Currently it's the latter by
-accident (switching tracks only overwrites `checkpointIndex`/position, a
-track's own progress isn't stored separately) — this still holds for casual
-free-roam driving between race heats, but see the next section: while a race
-heat is active, only the currently active track's checkpoints matter for
-win/finish purposes.
+**Switching tracks while free roaming:** crossing another track's start
+line puts the melon on that track and starts over there — the old track's
+progress isn't kept (there's one `trackId`/`checkpointIndex` per kart, not
+one per track). In a heat only the heat's track counts. Whether progress
+should be kept per track is an open question (see the end of this file).
 
 ## Hub → race → next-track flow (decided, implemented)
 
 The map is one continuous space: a **hub** area where players gather/drive
 around freely, plus the racing tracks (see above). A full run through the
 map is a sequence of race **heats**, one per track, in ascending `trackId`
-order — not free late-joining mid-heat, and not a `changelevel` between
-"maps": the addon only ships a single `.vmap`, so "next map" from the
-original request means *next track in that sequence*, staying in the same
-map. All of this lives in `melon_drive.js` alongside the kart/checkpoint
-state it's tightly coupled to, not a separate `point_script` — same
-reasoning as checkpoints living there instead of their own file.
+order — no late-joining mid-heat, and no `changelevel`: the addon ships a
+single `.vmap`, so "next map" means *next track in that sequence*, staying
+in the same map. All of this lives in `race/heat/`, inside the `melon_drive`
+script alongside the kart/checkpoint state it's tightly coupled to.
 
 **Track config lives entirely in Hammer trigger names**, not in a
 hand-maintained JS lookup: each track has one start trigger, a
@@ -398,8 +375,8 @@ hand-maintained JS lookup: each track has one start trigger, a
 `start_<trackId>_laps<lapsToWin>` (e.g. `start_1_laps3` = track 1, 3 laps to
 win; without `_laps`, `DEFAULT_LAPS_TO_WIN` = 1), and its checkpoint count
 is the highest `checkpoint_<trackId>_<index>` trigger name in the map.
-Custom keyvalues on the trigger were considered instead (e.g. a `laps`
-key) — `cs_script` has no API to read them, so names it is (decided).
+Names, not custom keyvalues (e.g. a `laps` key): `cs_script` has no API to
+read keyvalues (decided).
 Script finds every `trigger_multiple` in the map on first use, parses those
 names, and builds the track list from them — adding/removing a track or
 changing its checkpoint/lap count is a pure Hammer edit, no script change
@@ -410,15 +387,16 @@ which is unreliable (no floor trace; Hammer may not turn a brush entity's
 angles with its geometry), hence the separate entity (decided). The start
 trigger fires `start_<trackId>` itself (see above).
 
-Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
+Phases (module-level state machine, `RacePhase` in `race/constants.js`,
+run by `race/heat/`):
 
 1. **HUB** — default state, also the state the whole group returns to after
    the last track's heat ends. A `trigger_multiple` named
    `hub_start_trigger`, filtered to `prop_physics` like the checkpoints,
    fires `hub_enter`/`hub_leave` script inputs on touch/untouch. While a
-   kart is in it, that player sees a modal ("Jetzt starten" button) on the
-   HUD — or, if a heat is already running for other players, a "race in
-   progress" message instead of the button. Clicking the button only starts
+   kart is in it, that player sees a modal ("Start race" button) on the
+   HUD — or, if a heat is already running for other players, the message
+   "Rennen läuft bereits…" instead of the button. Clicking the button only starts
    a heat if the phase is still `HUB`. `hub_enter`/`hub_leave` are accepted
    **only from `hub_start_trigger` itself** (checked by caller name, and in
    the .vmap by `test/map/map-io.test.mjs`): any other trigger that should just
@@ -426,15 +404,13 @@ Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
    instead, which sends the touching melon to `hub_spawn` without the modal.
 2. Clicking start: **every kart currently standing in the hub trigger**
    (not every connected player) is pulled into the heat — the ones outside
-   it stay in the hub. This matches the original request ("all players who
-   want to take part must be on the trigger area"). Their laps/checkpoint
-   progress resets and they're teleported to the lowest-`trackId` track's
-   start trigger (small per-racer lateral offset so they don't spawn
-   stacked on each other). `trackId` is set to that track right there,
-   rather than waiting for the physical `start_<trackId>` touch to
-   report it, so the checkpoint/lap HUD is already visible ("0/N", lap "1/M")
-   the instant the countdown starts instead of staying hidden until that
-   trigger fires — crossing the start line after GO then changes nothing.
+   it stay in the hub (decided: whoever wants to race stands in the
+   trigger). Their laps/checkpoint progress resets and they're teleported
+   to the lowest-`trackId` track's `start_spawn_<trackId>`, lined up side by
+   side `RACE_SPAWN_LATERAL_SPACING` apart. `trackId` is set to that track
+   right there, not on the physical `start_<trackId>` touch, so the
+   checkpoint strip and lap counter are visible the instant the countdown
+   starts — crossing the start line after GO then changes nothing.
 3. **COUNTDOWN** — every racing kart is `locked`: `UpdateKart` skips all
    input/friction handling for a locked kart and just holds its horizontal
    velocity at zero every tick (vertical velocity is left alone so gravity
@@ -470,15 +446,15 @@ Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
 5. **BREAK** — once every kart that started this heat is either `finished`
    or has disconnected (the latter already drops its kart entry via
    `OnPlayerDisconnect`, so it can't block the group), the heat is over.
-   After a fixed `BREAK_SECONDS` (10, per the original request) the flow
-   either starts a fresh COUNTDOWN on the next track in sequence, or, if
-   that was the last track, teleports the whole group back to the hub
-   trigger's own transform and returns to phase `HUB`.
+   After a fixed `BREAK_SECONDS` (10, decided) the flow either starts a
+   fresh COUNTDOWN on the next track in sequence, or, if that was the last
+   track, teleports the whole group to `hub_spawn` and returns to phase
+   `HUB`.
 
 ## Moderator (decided, implemented)
 
 The first player to get a kart (i.e. the first to join the map, tracked via
-`moderatorSlot` in `melon_drive.js`) is the **moderator** for as long as
+`moderatorSlot` in `core/kart-registry.js`) is the **moderator** for as long as
 they're connected. If they disconnect, the next-oldest remaining player
 (insertion order of the `karts` map) is promoted, so there's always exactly
 one moderator whenever anyone is on the map.
@@ -488,8 +464,8 @@ The moderator's one power is aborting a heat that's already running
 mistake or needs to be redone. There's no separate always-visible button for
 this: the moderator gets it the same way anyone reaches the hub's "start"
 modal — by standing in `hub_start_trigger`. While a heat is running, a
-non-moderator standing there sees the existing "Rennen läuft bereits…"
-message; the moderator sees a "Rennen abbrechen" button instead
+non-moderator standing there sees the "Rennen läuft bereits…" message;
+the moderator sees a "Cancel race" button instead
 (`hub_abort_button` in `speedometer.xml`, toggled via the `IsModerator` HUD
 class). Clicking it runs the same `ReturnAllToHub` + reset-to-`HUB` path a
 heat normally takes when it finishes on its own, just triggered early
@@ -499,17 +475,17 @@ instead of after the last track's `BREAK`.
 
 Free-look: each player automatically gets their own `prop_physics` melon
 (spawned per-player from a `point_template` named `melon_template` — see
-`maps/scripts/melon_drive.js`): `EnsurePlayerKarts` (every tick) gives any
+`kart/spawn.js`): `EnsurePlayerKarts` (every tick) gives any
 alive player on T or CT without a kart one at the intro, after the logo
 (see "Spawn points"), moves a kart over to a player's new
-pawn, and re-attaches a chase camera the engine reset (joining a team used
-to leave the player looking through their frozen body instead). T and CT
+pawn, and re-attaches a chase camera the engine reset (joining a team
+resets it, which would leave the player looking through their frozen
+body). T and CT
 are both fine for racing; only unassigned players/spectators are put on CT.
 The player's own pawn is frozen and made non-solid (`CSMoveType.NOCLIP` —
 `NONE` would leave its hitbox solid for the melon to crash into), hidden
 (`SetColor` alpha 0), and **stays at the map's player spawn** it appeared
-at, which sits away from the tracks (it's no longer parked high in the
-sky). WASD would still fly a noclip pawn around, so `HoldPawn` puts it
+at, which sits away from the tracks. WASD would still fly a noclip pawn around, so `HoldPawn` puts it
 back once it drifts more than `PAWN_DRIFT_TOLERANCE`. It deliberately does
 **not** track the melon's position. There's
 no separate turn control —
@@ -523,16 +499,13 @@ unsteered, so a bounce starts off at its computed angle), Space jumps (only with
 `CustomPlayerCamera` in `FOLLOW_POSITION` mode chase-cams behind the melon
 directly, so it doesn't need the pawn nearby to work.
 
-**Consequence for checkpoint/out-of-bounds work below**: since the pawn no
-longer moves with the melon, checkpoint triggers, lap progress, and the
-out-of-bounds catch-volume all need to key off the **melon** entity (e.g.
-`OnStartTouch` filtered to the `prop_physics` classname, or comparing
-`caller`/`activator` against the tracked kart's melon), not the player
-pawn — the pawn's position is no longer meaningful for race progress.
+**Consequence:** the pawn's position means nothing for the race. Every
+trigger keys off the **melon** — filtered to `prop_physics`, with the
+script mapping the activator melon to its kart.
 
 Tuning constants (accel, max speed, friction, jump speed, spawn offset,
-camera offsets) live at the top of `melon_drive.js` — iterate them in-game
-via hot reload
+camera offsets) live in each feature folder's `constants.js` (all
+re-exported by `constants/index.js`) — iterate them in-game via hot reload
 rather than guessing.
 
 ## Attack boost — speed for health (implemented)
@@ -552,10 +525,10 @@ Works on the ground and in the air, not while broken or race-locked.
 Constants: `movement/attack-boost/constants.js`; rule: `movement/attack-boost/logic.js`,
 applied in `movement/driving/drive.js` (`test/movement/attack-boost.test.mjs`).
 The pawn must hold no weapon: the engine gives it a knife back after spawn,
-and every knife swing shoved the melon ~140 u/s — a free boost without the
+and every knife swing shoves the melon ~140 u/s — a free boost without the
 health cost. `HoldPawn` (`kart/spawn.js`) removes weapons every tick; with
 `DEBUG` on, `dev/attack-debug.js` logs what attack does (`[attack debug]`).
-That alone didn't stop the push in-game, so on top: while attack is held
+Removing weapons alone doesn't stop the push in-game, so in addition: while attack is held
 and for `ATTACK_PUSH_GUARD_SECONDS` after, physics may not add horizontal
 speed beyond what the script commanded last tick (`WithoutEnginePush`) —
 speed then only comes from driving (W, up to `MAX_SPEED` as always) and the
@@ -593,16 +566,15 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   melon up cancels a clear part of that (`IsSupported`,
   `FREE_FALL_FRACTION`). A short trace down confirms the support is
   floor-like (`GROUND_NORMAL_MIN_Z`), not a wall or an edge — a line trace,
-  not `TraceSphere` (a sphere probe from the melon's center found no floor
-  in-engine at all, which broke jumping). So a melon a
+  not `TraceSphere` (a sphere probe from the melon's center finds no floor
+  in-engine at all). So a melon a
   few units up in the air is "in the air", whatever its (egg) shape.
   `GROUND_COYOTE_TIME` (0.08 s) only bridges the tiny hops a rolling melon
-  makes. (Before: a 48-unit ray down from the center counted as ground,
-  plus 0.15 s grace — a melon well into a jump could jump again.)
+  makes — a longer grace would let a melon well into a jump jump again.
   The floor trace (`GROUND_CHECK_DISTANCE`) is short on purpose: a resting
-  melon's center is only ~7 units above the floor, and a longer trace still
-  found it ~40 units up in a jump — one tick of measured support there was
-  enough for a mid-air jump. Nor does ground contact count for
+  melon's center is only ~7 units above the floor, and a longer trace would
+  still find it ~40 units up in a jump — one tick of measured support there
+  is enough for a mid-air jump. Nor does ground contact count for
   `GROUND_LIFTOFF_TIME` after any jump (the floor still pushes the melon up
   for a tick while it takes off).
 - **Wall jump**: in the air, touching a wall and pressing jump pushes the
@@ -611,14 +583,14 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   (`WALL_JUMP_UP_SPEED` — never slower upward than it already was: right
   after a ground jump, a bounce's kick or a jump pad launch the faster
   upward speed stays), keeping its speed along the wall. **Its strength
-  is a charge** (`kart.wallJumpCharge`, shown by the HUD jump bar, which
-  no longer shows a ground-jump cooldown): a wall jump is as strong as the
+  is a charge** (`kart.wallJumpCharge`, shown by the HUD jump bar — the
+  ground jump has no cooldown to show): a wall jump is as strong as the
   charge is full and uses up `WALL_JUMP_CHARGE_COST` of it, so chained
   wall jumps get weaker (2 in a row, the second at half strength) until below `WALL_JUMP_MIN_CHARGE`
   there's none; it refills over `WALL_JUMP_RECHARGE_SECONDS` — always, also
   standing still, race-locked or broken — and is full again whenever the
   melon arrives whole (every spawn that restores full health). A wall jump
-  never raises the speed cap — chaining them used to make the melon faster
+  never raises the speed cap, so chaining them can't make the melon faster
   and faster. **The timing is the distance** (decided): a press only
   counts while the wall is right at the melon — a line trace in any of
   `WALL_PROBE_DIRECTIONS` (16) horizontal directions finds a steep, non-prop
@@ -632,20 +604,16 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   surface find nothing in-engine; the radius is the melon's half size plus
   a small margin, measured with the collision debug view's distance
   readout: lying right against a wall its center is 6.7 from it, and it's
-  only ~10% longer than wide (16 at first let a wall ~9 units off the
-  melon's surface count). (Before: a wall anywhere within
-  `WALL_CONTACT_DISTANCE`, 56, counted once physics had stopped the melon
-  against it, and stayed jumpable for 0.2 s.) A wall bounce also counts as
-  a contact. `WALL_JUMP_COOLDOWN`
+  only ~10% longer than wide (16 would already let a wall ~9 units off the
+  melon's surface count). A wall bounce also counts as a contact. `WALL_JUMP_COOLDOWN`
   between two wall jumps, and one
   wall can't be climbed forever: the next wall jump needs ground contact
   first or a different wall (`WALL_JUMP_SAME_WALL_DOT`) — bouncing between
   two facing walls chains. The same press still counts as wall-bounce
   jump timing — and **while a bounce's timing window
   (`WALL_BOUNCE_PERFECT_JUMP_WINDOW`) is open it's only that**, no wall jump
-  (decided): the bounce already is the reaction to the wall, and a timed
-  press used to also fire a wall jump that cost charge and cut the bounce's
-  upward kick. After the window, a wall jump needs the wall at the melon
+  (decided): the bounce already is the reaction to the wall, and a wall
+  jump on top would cost charge and cut the bounce's upward kick. After the window, a wall jump needs the wall at the melon
   again (it has usually bounced off by then). Lift zones are the exception:
   there a wall jump is free and may follow a bounce at once.
 - **Collision debug view** (`dev/collision-debug.js`, all of it in that one file):
@@ -697,7 +665,7 @@ ambient particle systems (`jump_pad_rings` + `jump_pad_sparks`, lime so
 they don't look like the cyan lift updraft). Constants:
 `zones/jump-pad/constants.js`; rules: `zones/jump-pad/logic.js`, applied by
 `zones/jump-pad/jump-pad.js` (`test/zones/jump-pad.test.mjs`). Details for mappers:
-MAPPING_API.md 4.9.
+[Mapping API: jump pads](docs/mapping-api/12-jump-pads.md).
 
 ## Spawn points (implemented)
 
@@ -813,16 +781,16 @@ read as a hard impact or wall hit.
 
 A trigger named wrong or pointing at a missing destination logs a
 `[melon_drive] melon_teleport: …` console message, and
-`test/map/map-io.test.mjs` fails on it in the .vmap. For sending a melon to the
-hub specifically, the existing `hub_teleport` input still works (it also
-takes the kart out of a running heat).
+`test/map/map-io.test.mjs` fails on it in the .vmap. To send a melon to the
+hub, use `hub_teleport` instead — it also takes the kart out of a running
+heat and restores full health.
 
 ## Heal zones (implemented)
 
 Areas where the melon regains health over time: a `trigger_multiple`
 (filtered to `prop_physics`) whose `OnStartTouch` fires `RunScriptInput`
 `heal_enter` and whose `OnEndTouch` fires `heal_leave`. While inside, the
-melon heals every tick at `HEAL_ZONE_RATE` health/second (`health/damage/constants.js`),
+melon heals every tick at `HEAL_ZONE_RATE` health/second (`health/heal/constants.js`),
 or at the rate in the trigger's name if it's called `heal_zone_<rate>`
 (e.g. `heal_zone_25`) — pure Hammer edit, same name-carries-the-config
 convention as paint triggers. A trigger named exactly `heal_zone_full` is a
@@ -833,8 +801,8 @@ applies inside, and overlapping zones don't stack (the fastest counts).
 Broken or race-locked melons don't heal. Teleports/respawns **keep** the
 melon's zones (heal, lift, camera): landing back inside the same trigger —
 e.g. respawning at a checkpoint inside the zone it broke in — sends no new
-`OnStartTouch`, so clearing them lost the zone (the camera zone's zoom
-reset after such a respawn); leaving a zone by teleport still sends its
+`OnStartTouch`, so clearing them would lose the zone (a camera zone's zoom
+would reset after such a respawn); leaving a zone by teleport still sends its
 `OnEndTouch`. Only a brand-new melon entity (the old one was destroyed)
 starts with no zones — its own `OnStartTouch` re-adds them. Every entry into a heal
 zone plays the `particle_health_template` point_template's particle effect
@@ -867,17 +835,18 @@ over `CAMERA_ZONE_EASE_SECONDS` in and back out, never closer than
 `CAMERA_ZONE_MIN_DISTANCE`; overlapping camera zones don't stack (last
 entered counts), but a lift zone's zoom adds on top. Rules:
 `zones/camera-zone/logic.js` (`test/zones/camera-zone.test.mjs`), applied by
-`camera/zone-zoom.js`. Details for mappers: MAPPING_API.md 4.8.
+`camera/zone-zoom.js`. Details for mappers: [Mapping API: camera zones](docs/mapping-api/11-camera-zones.md).
 
 ## Open design questions (not yet decided — ask before assuming)
 
-- **Respawn-on-death vs. never-die**: given out-of-bounds already teleports
-  back to a checkpoint, does the player ever actually need to die/respawn?
+- **Per-track progress**: should a free-roaming melon that switches tracks
+  keep its progress on the old one (see "Switching tracks while free
+  roaming")? Currently it starts over.
 - **Stragglers**: there's no timeout for a kart that's fallen way behind or
   gotten stuck mid-heat (see "Hub → race → next-track flow" above) other
   than disconnecting — the group is blocked until every racer finishes.
   Worth a "force-finish"/skip vote or a hard timeout once this is actually
   played with real groups.
 - **Winner recognition**: `lapsToWin` decides when a kart is *done* with a
-  heat, but nothing currently records or displays *who got there first* —
+  heat, but nothing records or displays *who got there first* —
   worth a "1st/2nd/3rd" HUD callout once this is played with real groups.

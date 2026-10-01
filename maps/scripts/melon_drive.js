@@ -792,7 +792,7 @@ const BREAK_TINT_FALLBACK = { r: 40, g: 40, b: 40, a: 255 };
 // info_particle_system with "Start Active" set so it plays as soon as it's
 // spawned, no input needed) — same ForceSpawn-from-a-template convention as
 // MELON_TEMPLATE_NAME. Not a tuning value: must match the entity's name in
-// Hammer (renaming means renaming it there too, and in MAPPING_API.md).
+// Hammer (renaming means renaming it there too, and in docs/mapping-api/).
 const BREAK_PARTICLE_TEMPLATE_NAME = "melon_break_template";
 // Second, separate break effect layered on top of the one above — e.g. flying
 // melon chunks, as opposed to the main burst. Same point_template convention,
@@ -1036,7 +1036,7 @@ const LIFT_CAMERA_EXTRA_DISTANCE = 220; // units further back (was 150)
 const LIFT_CAMERA_EXTRA_HEIGHT = 30; // units higher up (was 120 — too high)
 const LIFT_CAMERA_EASE_SECONDS = 0.6; // seconds to zoom fully out (or back in)
 
-// Camera zones (MAPPING_API.md 4.8): a trigger_multiple (filtered to
+// Camera zones (docs/mapping-api/11-camera-zones.md): a trigger_multiple (filtered to
 // prop_physics) with OnStartTouch -> RunScriptInput "camera_enter" and
 // OnEndTouch -> "camera_leave". While the melon is inside, the chase camera
 // eases to the normal offset plus the zone's: further back (negative =

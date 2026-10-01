@@ -15,8 +15,8 @@ This document is the entry point for anyone who wants to **run, understand, or e
 | [README.md](README.md) (this file) | Overview, setup, project structure, how everything fits together |
 | [AGENTS.md](AGENTS.md) | The CS2 `cs_script` engine API, the build pipeline, and hard editing rules for this addon |
 | [GAMEPLAY.md](GAMEPLAY.md) | Game design: concept, race-heat flow, checkpoint/lap logic, moderator powers, melon health, open design questions |
-| [TRACK_CREATION.md](TRACK_CREATION.md) | Step-by-step Hammer guide for adding a new track — no script changes required |
-| [MAPPING_API.md](MAPPING_API.md) | Mapping reference: every entity name, name pattern and script input the map can use, plus the conventions they follow |
+| [TRACK_CREATION.md](docs/TRACK_CREATION.md) | Step-by-step Hammer guide for adding a new track — no script changes required |
+| [docs/mapping-api/](docs/mapping-api/README.md) | Mapping reference, one page per topic: every entity name, name pattern and script input the map can use, plus the conventions they follow |
 
 ## How the game mode works
 
@@ -58,8 +58,9 @@ There is no automated test suite or CLI compiler for this addon (Workshop Tools 
 
 ```
 melon_racer/
-├── AGENTS.md, GAMEPLAY.md, TRACK_CREATION.md,  # detailed docs, see table above
-│   MAPPING_API.md
+├── AGENTS.md, GAMEPLAY.md                      # detailed docs, see table above
+├── docs/TRACK_CREATION.md                      # step-by-step guide for a new track
+├── docs/mapping-api/                           # Mapping API: one page per topic, README.md = index
 ├── build.mjs, package.json                     # Rollup build: src/ -> maps/scripts/
 ├── cfg/melon_racer.cfg                         # server cvars for this map
 ├── maps/
@@ -117,7 +118,7 @@ src/melon_drive/**/*.js        (source of truth — edit these)
 panorama/.../speedometer.xml + .css   (custom_hud_layout — speedometer, menus, banners)
 ```
 
-- **Hammer → script**: trigger volumes fire `RunScriptInput` with a specific parameter string. Track layout itself is config-free — a track's lap count and spawn point are parsed straight out of its start trigger's *name* (`start_<id>_laps<M>`) and transform, its checkpoint count from how many `checkpoint_<id>_<index>` triggers it has, and the finish line is its own input (`finish_<id>`) so a track doesn't have to be a loop. See [TRACK_CREATION.md](TRACK_CREATION.md) for the exact entity/output wiring and [MAPPING_API.md](MAPPING_API.md) for the complete list of names and inputs.
+- **Hammer → script**: trigger volumes fire `RunScriptInput` with a specific parameter string. Track layout itself is config-free — a track's lap count and spawn point are parsed straight out of its start trigger's *name* (`start_<id>_laps<M>`) and transform, its checkpoint count from how many `checkpoint_<id>_<index>` triggers it has, and the finish line is its own input (`finish_<id>`) so a track doesn't have to be a loop. See [TRACK_CREATION.md](docs/TRACK_CREATION.md) for the exact entity/output wiring and the [Mapping API](docs/mapping-api/README.md) for the complete list of names and inputs.
 - **Build step**: Hammer's own JS compiler doesn't resolve local `import`s, so `build.mjs` (Rollup) flattens each `src/<entry>/` tree into the single file its `point_script` entity actually points at. **Always edit under `src/`, never the generated files in `maps/scripts/`** — they're overwritten on the next build and carry an `AUTO-GENERATED` banner.
 - **Script → HUD**: the custom HUD (`speed_hud` entity) is driven entirely from script via `SetDialogVariableStringForPlayer`, `SetHasClassForPlayer`, and click callbacks — the XML/CSS only define static layout and styling, with no logic of their own.
 
@@ -127,7 +128,7 @@ For the full `cs_script` API reference (available `Instance` calls, entity class
 
 Some common ways to build on this repo, and where to start:
 
-- **Add a new track** — pure Hammer work, no script changes. Follow [TRACK_CREATION.md](TRACK_CREATION.md) step by step.
+- **Add a new track** — pure Hammer work, no script changes. Follow [TRACK_CREATION.md](docs/TRACK_CREATION.md) step by step.
 - **Tune physics/feel** (acceleration, top speed, jump height, impact-damage sensitivity, camera offsets, timings) — every tunable lives in the `constants.js` of the folder it belongs to (`movement/driving/`, `movement/jump/`, `camera/`, …), all re-exported by `src/melon_drive/constants/index.js`. Change a value, rebuild, and hot-reload in tools mode to feel the difference immediately.
 - **Add HUD elements or menus** — edit `panorama/layout/custom_game/speedometer.xml` and the matching `speedometer.css`, then wire the new elements from `src/melon_drive/hud/`. Note CS2's custom HUD layouts only support `<Panel>`, `<Label>`, `<Image>`, and `<Button>` — no native sliders/inputs and no inline scripting.
 - **Add gameplay mechanics** (boost pads, new trigger types, new melon behaviors) — follow the existing pattern: a Hammer trigger fires `RunScriptInput` on `melon_drive`, handled by a new feature folder (or an extended one) under the fitting domain in `src/melon_drive/` — `constants.js`, pure rules in `logic.js`, engine side, `inputs.js` for its script inputs — registered through that domain's `Register*Inputs()`.
@@ -145,7 +146,7 @@ These are tracked in more detail in [GAMEPLAY.md](GAMEPLAY.md)'s "Open design qu
 
 ## Contributing
 
-- Keep gameplay-design decisions and rationale in [GAMEPLAY.md](GAMEPLAY.md), engine/build/editing rules in [AGENTS.md](AGENTS.md), and track-authoring steps in [TRACK_CREATION.md](TRACK_CREATION.md) — update the relevant doc alongside any change that affects it.
+- Keep gameplay-design decisions and rationale in [GAMEPLAY.md](GAMEPLAY.md), engine/build/editing rules in [AGENTS.md](AGENTS.md), and track-authoring steps in [TRACK_CREATION.md](docs/TRACK_CREATION.md) — update the relevant doc alongside any change that affects it.
 - `maps/*.vmap`, `postprocess/*.vpost`, and `soundevents/*.vsndevts` are Hammer-authoritative; make those changes in Hammer itself rather than hand-editing the files.
 - Always edit `src/<entry>/*.js`, run `npm run build` (or keep `npm run watch` running), and verify by playing the map — there is no other way to confirm a gameplay change works.
 - There's no CI or automated tests here, so a PR description should note how the change was manually verified (e.g. "tested in-game with `DEBUG = true`, checkpoint 1_2 confirmed advancing progress").

@@ -28,7 +28,7 @@ export const LIFT_CAMERA_EXTRA_DISTANCE = 220; // units further back (was 150)
 export const LIFT_CAMERA_EXTRA_HEIGHT = 30; // units higher up (was 120 — too high)
 export const LIFT_CAMERA_EASE_SECONDS = 0.6; // seconds to zoom fully out (or back in)
 
-// Camera zones (MAPPING_API.md 4.8): a trigger_multiple (filtered to
+// Camera zones (docs/mapping-api/11-camera-zones.md): a trigger_multiple (filtered to
 // prop_physics) with OnStartTouch -> RunScriptInput "camera_enter" and
 // OnEndTouch -> "camera_leave". While the melon is inside, the chase camera
 // eases to the normal offset plus the zone's: further back (negative =

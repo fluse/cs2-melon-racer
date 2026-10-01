@@ -14,15 +14,21 @@ logic, open design questions — lives in [GAMEPLAY.md](GAMEPLAY.md) (imported
 above, so it's always loaded together with this file). Put gameplay-design
 changes there, not here. For the Hammer-side steps to build a new track
 (entity names, triggers, I/O wiring) rather than the design rationale, see
-[TRACK_CREATION.md](TRACK_CREATION.md). The full map↔script contract —
+[TRACK_CREATION.md](docs/TRACK_CREATION.md). The full map↔script contract —
 every entity name, name pattern and `RunScriptInput` parameter the script
-knows — is [MAPPING_API.md](MAPPING_API.md): when you add, rename or remove
-one in `src/`, update it there too (`test/map/mapping-api-doc.test.mjs` checks
-the `*_NAME`/`*_NAME_PATTERN` constants and script inputs are listed).
+knows — is the [Mapping API](docs/mapping-api/README.md), one page per topic
+with tables for names, patterns and values: when you add, rename or remove
+one in `src/`, update its page and the index tables there too, and a changed
+tunable's value in its page's "Values" table (`test/map/mapping-api-doc.test.mjs` checks
+the `*_NAME`/`*_NAME_PATTERN` constants and script inputs are listed, and that
+every link and `#anchor` between the pages resolves).
 
 Current addon contents:
 
 ```
+docs/TRACK_CREATION.md                   # step-by-step Hammer guide for a new track
+docs/mapping-api/*.md                    # Mapping API (map↔script contract): README.md = index of every input/name/pattern,
+                                          #   01-…13-*.md one page per topic, each with setup / name-variant / "Values" tables
 maps/melon_racer.vmap                    # main map (binary DMX, Hammer-authoritative)
 maps/content_examples/lighting_info.vmap
 maps/scripts/*.js                        # AUTO-GENERATED bundle output, see below — don't hand-edit
@@ -56,7 +62,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
 src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
 test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one folder per src/melon_drive/ domain (movement/, race/, …): unit tests
                                           #   for the pure files, engine-side tests against the fake engine (filed under the domain they're mainly about)
-test/map/*.test.mjs                      # checks of the .vmap/.xml/MAPPING_API.md the script relies on, and module-layout.test.mjs (the folder rules below)
+test/map/*.test.mjs                      # checks of the .vmap/.xml/docs/mapping-api/ the script relies on, and module-layout.test.mjs (the folder rules below)
 test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities
 test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
@@ -65,7 +71,7 @@ tools/make-decal.mjs                     # generates materials/melon_racer/<deca
                                           #   (HUD logo, rawDecals/*.png|jpg — JPG via Windows System.Drawing; can key out a baked-in checkerboard, writes <name>_transparent.png)
 rawDecals/*.png                          # new source images for decals (make-decal.mjs input); once done, the tool moves
                                           #   them (+ their _transparent.png) to rawDecals/done/ and reads them from there
-particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3, hand-written): boost_trail + boost_trail_juice (two info_particle_systems in one template, not parent/child);
+particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3, hand-written): boost_trail + boost_trail_juice (two separate info_particle_systems in one template — a child system doesn't render);
                                           #   rising_dust (ambient, not script-driven — a map-placed info_particle_system, Start Active;
                                           #   square specks from materials/melon_racer/particle_square.vtex + .png, a 16x16 white square);
                                           #   lift_updraft + lift_updraft_streaks (ambient, same way: two info_particle_systems at the bottom of a lift shaft —
@@ -129,33 +135,27 @@ submodules), never `maps/scripts/<entry>.js` directly** — the latter is
 overwritten by the next build and carries an `AUTO-GENERATED` banner. Run
 `npm run build` after editing `src/` so the compiled file Hammer/tools-mode
 reads is current; `npm run watch` rebuilds on save for iterating against
-tools-mode hot reload. Rollup (not esbuild) was chosen specifically because
-it preserves this codebase's comments through bundling — esbuild strips
-plain comments even unminified. Tree-shaking is disabled in `build.mjs`
+tools-mode hot reload. The bundler is Rollup because it keeps this
+codebase's comments in the output (esbuild strips plain comments even
+unminified). Tree-shaking is disabled in `build.mjs`
 since each entry is a whole program, not a library with dead exports to
 prune, and shaking risks quietly restructuring constant-folded branches
 (e.g. `if (DEBUG)`) away from what the source says.
 
-## Gameplay logic = `cs_script` (plain JavaScript), not VScript/Squirrel
+## Gameplay logic = `cs_script` (plain JavaScript)
 
-**Correction:** an earlier version of this file assumed CS2 used Squirrel
-VScript (the Dota 2 / Source 2 convention). That's wrong for CS2. The real
-system, confirmed from the local example addon at
-`content/csgo_addons/cs_script_demo/maps/scripts/`, is **`cs_script`**: plain
-JavaScript modules attached to `point_script` entities. That example addon
-is the best local reference — when in doubt, read its `.js` files and
-`point_script.d.ts` rather than guessing.
+CS2's scripting system is **`cs_script`**: plain JavaScript modules attached
+to `point_script` entities (not Squirrel VScript like Dota 2). The local
+example addon at `content/csgo_addons/cs_script_demo/maps/scripts/` is the
+best reference — when in doubt, read its `.js` files and `point_script.d.ts`
+rather than guessing.
 
-Wiki reference (may need the user to paste content — see note below):
-https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API
-
-**Note on the wiki:** developer.valvesoftware.com is behind an Anubis
-anti-bot JS proof-of-work challenge and returns a challenge page to
-automated fetches from this environment. Don't rely on fetching it — the
-local `point_script.d.ts` (copied into `maps/scripts/`) is the authoritative,
-up-to-date type declaration file for this exact API and should be preferred
-over the wiki anyway per its own header comment: *"This file will be
-maintained as the cs_script API changes... Please send feedback..."*
+The API reference is `maps/scripts/point_script.d.ts` (copied from the demo
+addon): Valve maintains it as the API changes, so it's authoritative and
+current. The wiki
+(https://developer.valvesoftware.com/wiki/Counter-Strike_2_Workshop_Tools/Scripting/API)
+sits behind an anti-bot challenge that blocks automated fetches — if
+something is only there, ask the user to paste it.
 
 ### How it fits together
 
@@ -168,11 +168,11 @@ maintained as the cs_script API changes... Please send feedback..."*
   runs once; everything else happens through callbacks registered on
   `Instance`.
 - **Each `point_script` entity gets its own `Instance`, its own globals, and
-  its own set of entity-variable identities.** A multi-file/multi-system map
-  (checkpoints, HUD, prop spawning, ambience) can either share one
-  `point_script` importing everything, or use several `point_script`
-  entities — prefer one per independent subsystem so a script error in one
-  doesn't take down the others.
+  its own set of entity-variable identities.** A script error in one doesn't
+  take down the others, so independent subsystems get their own. This addon
+  has two: `gamemode` (cvars, teams, no damage) and `melon_drive_script`
+  (everything tied to the karts — driving, checkpoints, race flow, HUD,
+  effects — since those share kart state).
 - Entity variables are reference-stable: two JS variables pointing at the
   same game entity are `===`. Extra properties attached to an entity
   variable persist as long as you keep fetching the *same* variable, but a
@@ -191,8 +191,8 @@ maintained as the cs_script API changes... Please send feedback..."*
 - **Logging/debug** (debug draws only work in dev environments):
   `Msg`, `DebugScreenText`, `DebugLine`, `DebugSphere`, `DebugBox`.
 - **Persistence**: `SetSaveData(string)` / `GetSaveData()` — synchronous
-  read/write to disk, scoped to the addon. Good fit for best-lap-time
-  storage.
+  read/write to disk, scoped to the addon. Holds the time trial's best
+  times (`race/time-trial/`).
 - **Scheduling**: `SetThink(fn)` + `SetNextThink(time)` (tick-driven, time
   in `GetGameTime()` units), `Delay(seconds)` (returns a `Promise`),
   `QueueAfterThinks(fn)` (experimental — runs once after all entities'
@@ -202,17 +202,19 @@ maintained as the cs_script API changes... Please send feedback..."*
   Hammer I/O `RunScriptInput` input whose parameter matches `name` — this
   is how Hammer trigger outputs call into script), `OnScriptReload(...)`.
 - **Player lifecycle**: `OnPlayerConnect`, `OnPlayerActivate`,
-  `OnPlayerDisconnect`, `OnPlayerReset` (spawn/team-change/round-restart
-  placement — the natural hook to reset a racer to their last checkpoint).
+  `OnPlayerDisconnect`, `OnPlayerReset` (fires on every spawn, team change
+  and round restart). In this addon `OnPlayerReset` only re-freezes the pawn
+  and re-attaches the camera; it never spawns or moves a melon (see
+  GAMEPLAY.md, "Spawn points").
 - **Round lifecycle**: `OnRoundStart`, `OnRoundEnd`, `OnBeginRoundRestart`
   (experimental).
 - **Combat/movement events** (mostly irrelevant to a pure race map, but
   available): `OnModifyPlayerDamage`, `OnPlayerDamage`, `OnPlayerKill`,
   `OnPlayerJump`, `OnPlayerLand`, `OnPlayerChat`, `OnPlayerPing`,
   `OnGunReload`, `OnGunFire`, `OnBulletImpact`, `OnWeaponDrop/Pickup`,
-  `OnGrenadeThrow/Bounce`, `OnKnifeAttack`, bomb events. Use
-  `OnModifyPlayerDamage` to return `{ abort: true }` if the map should be
-  fall-damage/weapon-damage-free.
+  `OnGrenadeThrow/Bounce`, `OnKnifeAttack`, bomb events. `gamemode`'s
+  `OnModifyPlayerDamage` returns `{ abort: true }`: players take no damage
+  at all.
 - **Entity I/O bridge** (this is the JS equivalent of classic Source
   `EntFire`/`AddOutput`): `EntFireAtName`/`EntFireAtTarget` to fire an
   entity's input from script, `ConnectOutput(target, output, callback)` /
@@ -221,8 +223,12 @@ maintained as the cs_script API changes... Please send feedback..."*
   `FindEntityByClass`/`FindEntitiesByClass`, `GetPlayerController(slot)`,
   `GetAllPlayerControllers()` (includes disconnected players).
 - **Tracing**: `TraceLine`, `TraceSphere`, `TraceBox`, `TracePlayer`,
-  `TraceBullet` — useful for ground checks / respawn placement / custom
-  collision logic beyond what triggers give you.
+  `TraceBullet` — for ground checks, respawn placement and collision logic
+  beyond what triggers give you. Two engine limits: a `TraceSphere` started
+  at a prop's center finds nothing, and no trace can hit the melon's own
+  surface — so contact probes are `TraceLine`s, and contact with the melon
+  is measured from velocity (`movement/contact/`). The fake engine in tests
+  can't reproduce either.
 - **Game state**: `GetGameTime()`, `IsWarmupPeriod()`, `IsFreezePeriod()`,
   `GetRoundRemainingTime()`/`SetRoundRemainingTime()`, `GetRoundsPlayed()`,
   `GetMapName()`.
@@ -248,23 +254,30 @@ input state via `IsInputPressed`/`WasInputJustPressed`/`WasInputJustReleased`
 `CSPlayerController extends Entity` (`GetPlayerSlot`, `GetPlayerName`,
 `GetPlayerPawn`, `GetScore`/`AddScore`, `JoinTeam`, money functions) — the
 persistent per-client identity; **pawn** is the physical body that respawns.
-`PointTemplate extends Entity` — `ForceSpawn(origin?, angle?)`: the scripted
-equivalent of a Hammer `point_template`, good for spawning melon props along
-the track procedurally or respawning a batch after a reset.
-`CustomPlayerCamera` — scripted spectator/vehicle-style camera control via
+`PointTemplate extends Entity` — `ForceSpawn(origin?, angle?)`: spawns a
+Hammer `point_template`'s entities. Each spawned entity keeps its Hammer
+offset from the template, so script moves the copies into place afterwards
+(`fx/particles.js`). Used for every player's melon (`melon_template`) and
+every particle effect.
+`CustomPlayerCamera` — scripted camera control via
 `SetMode`/`SetFollowConfig` (modes: `DISABLED`, `CONTROLLED`,
-`CONTROLLED_POSITION`, `FOLLOW_POSITION`) — worth exploring for a
-kart-racer "chase cam" instead of the default FPS view.
+`CONTROLLED_POSITION`, `FOLLOW_POSITION`). The chase camera is
+`FOLLOW_POSITION` on the melon (`camera/follow.js`).
 `CustomHudLayout extends Entity` — see next section.
 
 ### Custom HUD (`custom_hud_layout`)
 
 CS2 supports a scripted custom UI via Panorama, wired through the same
-`cs_script` system — exactly what a lap timer / checkpoint counter /
-leaderboard needs:
+`cs_script` system. This addon's whole HUD is one layout: `speed_hud` with
+`speedometer.xml`/`.css` (driven from `hud/`).
 
 - Layout: `panorama/layout/custom_game/<name>.xml` (compiles to `.vxml`).
 - Style: `panorama/styles/custom_game/<name>.css` (compiles to `.vcss`).
+- Panorama files (and images only referenced from CSS) are **not**
+  recompiled on save: after an edit, compile them with `resourcecompiler.exe`
+  from `game/bin/win64`
+  (`-game csgo -addon melon_racer -i "<path to the .css/.xml under content/>"`,
+  add `-f` if it reports "skipped"), then reload the map.
 - Supported tags only: `<Panel>`, `<Label>`, `<Image>`, `<Button>`
   (`id`/`class`/`hittest`, plus `text` on Label and `src` on Image). No
   client-side scripting or events inside the layout itself — all
@@ -300,13 +313,13 @@ examples — read these instead of guessing signatures:
 
 ## Generic scripting pattern used throughout this addon
 
-- **Triggers as the backbone**: `trigger_multiple`/`trigger_once` outputs
-  (`OnStartTouch`/`OnEndTouch`) should call `RunScriptInput` on a
-  `point_script` entity, handled via `Instance.OnScriptInput(name, ...)` —
-  this is the standard way Hammer geometry drives script logic (see
-  `mdlchange.js`, `grenadetraining.js`). Race-specific uses of this pattern
-  (checkpoints, boost pads, resets) are documented in
-  [GAMEPLAY.md](GAMEPLAY.md).
+- **Triggers as the backbone**: `trigger_multiple` outputs
+  (`OnStartTouch`/`OnEndTouch`) call `RunScriptInput` on the
+  `melon_drive_script` `point_script`, handled via
+  `Instance.OnScriptInput(name, ...)` — the standard way Hammer geometry
+  drives script logic (see `mdlchange.js`, `grenadetraining.js`). Every
+  input this addon has (checkpoints, zones, teleporters, …) is listed in the
+  [Mapping API](docs/mapping-api/README.md).
 
 ## Editing rules for this addon
 

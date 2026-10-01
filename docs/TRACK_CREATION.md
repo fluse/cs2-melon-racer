@@ -4,11 +4,11 @@ This is a step-by-step guide for building a new race track in Hammer. It
 covers only the Hammer-side setup (entities, names, I/O connections) — no
 script changes are needed to add, remove, or resize a track. For the
 *design* reasoning behind this system (why it works this way), see
-[GAMEPLAY.md](GAMEPLAY.md)'s "Hub → race → next-track flow" and "Multiple
+[GAMEPLAY.md](../GAMEPLAY.md)'s "Hub → race → next-track flow" and "Multiple
 tracks & checkpoints" sections. All script inputs below are handled in
-[maps/scripts/melon_drive.js](maps/scripts/melon_drive.js). For every other
+[maps/scripts/melon_drive.js](../maps/scripts/melon_drive.js). For every other
 entity the map uses (hub, spawns, paint triggers, teleporters, effects) and
-the general conventions, see [MAPPING_API.md](MAPPING_API.md).
+the general conventions, see the [Mapping API](mapping-api/README.md).
 
 ## The core idea
 

@@ -62,7 +62,7 @@ export const BREAK_TINT_FALLBACK = { r: 40, g: 40, b: 40, a: 255 };
 // info_particle_system with "Start Active" set so it plays as soon as it's
 // spawned, no input needed) — same ForceSpawn-from-a-template convention as
 // MELON_TEMPLATE_NAME. Not a tuning value: must match the entity's name in
-// Hammer (renaming means renaming it there too, and in MAPPING_API.md).
+// Hammer (renaming means renaming it there too, and in docs/mapping-api/).
 export const BREAK_PARTICLE_TEMPLATE_NAME = "melon_break_template";
 // Second, separate break effect layered on top of the one above — e.g. flying
 // melon chunks, as opposed to the main burst. Same point_template convention,
