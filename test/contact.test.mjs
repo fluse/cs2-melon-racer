@@ -2,7 +2,7 @@
 // terms of the constants.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { VerticalAccel, IsSupported, IsGrounded, CanGroundJump, CanWallJump, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter, StoppedByWall, InLiftoff } from "../src/melon_drive/movement/contact/logic.js";
+import { VerticalAccel, IsSupported, IsGrounded, CanGroundJump, CanWallJump, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter, IsAtWall, WallContactReach, InLiftoff } from "../src/melon_drive/movement/contact/logic.js";
 import {
     GRAVITY,
     FREE_FALL_FRACTION,
@@ -14,9 +14,8 @@ import {
     WALL_JUMP_CHARGE_COST,
     WALL_JUMP_MIN_CHARGE,
     WALL_JUMP_RECHARGE_SECONDS,
-    WALL_TOUCH_MIN_STOP_SPEED,
+    WALL_JUMP_CONTACT_RADIUS,
     GROUND_LIFTOFF_TIME,
-    WALL_CONTACT_MIN_STOP,
 } from "../src/melon_drive/constants/index.js";
 
 const DT = 1 / 64;
@@ -54,7 +53,14 @@ const wallB = { x: -1, y: 0 };
 
 test("wall jump: in the air, with a fresh wall contact", () => {
     assert.equal(CanWallJump({ now: 10, grounded: false, wallContact: { time: 10, normal: wallA }, charge: 1 }), true);
-    assert.equal(CanWallJump({ now: 10 + WALL_JUMP_WINDOW, grounded: false, wallContact: { time: 10, normal: wallA }, charge: 1 }), true);
+    // (from 0: 10 + WALL_JUMP_WINDOW - 10 isn't exactly WALL_JUMP_WINDOW in floating point)
+    assert.equal(CanWallJump({ now: WALL_JUMP_WINDOW, grounded: false, wallContact: { time: 0, normal: wallA }, charge: 1 }), true);
+});
+
+test("wall jump: a longer window (lift zones) keeps the contact jumpable longer", () => {
+    const s = { now: 10 + WALL_JUMP_WINDOW * 3, grounded: false, wallContact: { time: 10, normal: wallA }, charge: 1 };
+    assert.equal(CanWallJump(s), false);
+    assert.equal(CanWallJump({ ...s, window: WALL_JUMP_WINDOW * 4 }), true);
 });
 
 test("wall jump: not on the ground, not without a wall, not after the window", () => {
@@ -128,22 +134,23 @@ test("the charge refills to full over WALL_JUMP_RECHARGE_SECONDS, and not beyond
     assert.equal(RechargeWallJump(0.4, -1), 0.4, "time never runs backwards");
 });
 
-test("touching a wall: physics stopped the melon's speed into it", () => {
+test("at a wall: within WALL_JUMP_CONTACT_RADIUS of the center, standing still or moving along it", () => {
     const n = { x: -1, y: 0 }; // wall ahead in +x
-    const into = WALL_TOUCH_MIN_STOP_SPEED * 4;
-    assert.ok(StoppedByWall(n, { x: into, y: 50 }, { x: 0, y: 50 }), "stopped dead");
-    assert.ok(StoppedByWall(n, { x: into, y: 0 }, { x: into * (1 - WALL_CONTACT_MIN_STOP), y: 0 }), "just enough stopped");
-    assert.ok(!StoppedByWall(n, { x: into, y: 0 }, { x: into, y: 0 }), "still flying at it: near, not touching");
-    assert.ok(!StoppedByWall(n, { x: -into, y: 0 }, { x: 0, y: 0 }), "moving away from it");
-    assert.ok(!StoppedByWall(n, { x: WALL_TOUCH_MIN_STOP_SPEED / 2, y: 0 }, { x: 0, y: 0 }), "too slow to tell");
+    assert.ok(IsAtWall(WALL_JUMP_CONTACT_RADIUS, n, { x: 0, y: 0 }, DT), "right at the radius");
+    assert.ok(!IsAtWall(WALL_JUMP_CONTACT_RADIUS + 1, n, { x: 0, y: 0 }, DT), "just outside it");
+    assert.ok(!IsAtWall(WALL_JUMP_CONTACT_RADIUS + 1, n, { x: 0, y: 600 }, DT), "flying past in parallel doesn't widen it");
+    assert.ok(!IsAtWall(WALL_JUMP_CONTACT_RADIUS + 1, n, { x: -300, y: 0 }, DT), "moving away doesn't either");
 });
 
-// Regression: flying almost parallel past a nearby wall, physics noise on
-// the few units/sec heading into it counted as "stopped by the wall".
-test("touching a wall: flying past it in parallel with a little noise isn't touching", () => {
+// At speed the melon covers more than the radius between two ticks — a
+// wall it reaches within the next tick already counts.
+test("at a wall: moving at it, one tick's travel is added", () => {
     const n = { x: -1, y: 0 };
-    const intoBefore = WALL_TOUCH_MIN_STOP_SPEED * 0.8;
-    assert.ok(!StoppedByWall(n, { x: intoBefore, y: 600 }, { x: 0, y: 600 }));
+    const speed = 640;
+    assert.equal(WallContactReach(speed, DT), WALL_JUMP_CONTACT_RADIUS + speed * DT);
+    assert.ok(IsAtWall(WALL_JUMP_CONTACT_RADIUS + speed * DT, n, { x: speed, y: 0 }, DT));
+    assert.ok(!IsAtWall(WALL_JUMP_CONTACT_RADIUS + speed * DT + 1, n, { x: speed, y: 0 }, DT));
+    assert.equal(WallContactReach(-speed, DT), WALL_JUMP_CONTACT_RADIUS, "moving away: just the radius");
 });
 
 test("liftoff: ground contact doesn't count right after a ground or wall jump", () => {

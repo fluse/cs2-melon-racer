@@ -14,9 +14,8 @@ import {
     WALL_JUMP_CHARGE_COST,
     WALL_JUMP_MIN_CHARGE,
     WALL_JUMP_RECHARGE_SECONDS,
-    WALL_TOUCH_MIN_STOP_SPEED,
+    WALL_JUMP_CONTACT_RADIUS,
     GROUND_LIFTOFF_TIME,
-    WALL_CONTACT_MIN_STOP,
 } from "../../constants/index.js";
 
 /**
@@ -71,19 +70,27 @@ export function CanGroundJump({ grounded, lastGroundedTime, lastJumpTime }) {
 }
 
 /**
- * Whether physics just stopped the melon against a wall: of the speed into
- * it we commanded last tick, at least WALL_CONTACT_MIN_STOP and at least
- * WALL_TOUCH_MIN_STOP_SPEED is gone now. A wall that's merely near (still a
- * few units ahead, or flown past in parallel) leaves that speed untouched.
- * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal (pointing away from it)
- * @param {{ x: number, y: number }} commanded velocity we set last tick
- * @param {{ x: number, y: number }} actual the melon's velocity now
+ * How far from the melon's center (to the wall's plane) a wall still counts
+ * as at the melon: WALL_JUMP_CONTACT_RADIUS, plus how far the melon gets
+ * towards it in one tick — at speed it would otherwise go from outside the
+ * radius into the wall and off it again between two ticks.
+ * @param {number} speedIntoWall units/sec towards the wall (negative: moving away)
+ * @param {number} dt
  */
-export function StoppedByWall(n, commanded, actual) {
-    const intoBefore = -(commanded.x * n.x + commanded.y * n.y);
-    const intoAfter = -(actual.x * n.x + actual.y * n.y);
-    const stopped = intoBefore - intoAfter;
-    return intoBefore > 0 && stopped >= WALL_TOUCH_MIN_STOP_SPEED && stopped / intoBefore >= WALL_CONTACT_MIN_STOP;
+export function WallContactReach(speedIntoWall, dt) {
+    return WALL_JUMP_CONTACT_RADIUS + Math.max(0, speedIntoWall) * Math.max(0, dt);
+}
+
+/**
+ * Whether a wall `gap` units from the melon's center is at the melon (see
+ * WallContactReach) — the wall jump's contact test.
+ * @param {number} gap center to the wall's plane
+ * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal (pointing away from it)
+ * @param {{ x: number, y: number }} velocity the melon's velocity now
+ * @param {number} dt
+ */
+export function IsAtWall(gap, n, velocity, dt) {
+    return gap <= WallContactReach(-(velocity.x * n.x + velocity.y * n.y), dt);
 }
 
 /**
@@ -109,7 +116,7 @@ export function CanWallJump(s) {
 
 /**
  * Why a jump press right now is *not* a wall jump, or null if it is one —
- * the jump debug log prints this.
+ * the collision debug log prints this.
  * @param {{
  *   now: number,
  *   grounded: boolean,
@@ -118,10 +125,11 @@ export function CanWallJump(s) {
  *   lastGroundedTime?: number,
  *   charge: number,
  *   cooldown?: number, // WALL_JUMP_COOLDOWN, shorter in a lift zone
+ *   window?: number, // WALL_JUMP_WINDOW, longer in a lift zone
  *   bounceTiming?: boolean, // a wall bounce's jump-timing window is still open — this press is its timing, not a wall jump
  * }} s
  */
-export function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN, bounceTiming = false }) {
+export function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN, window = WALL_JUMP_WINDOW, bounceTiming = false }) {
     if (grounded) {
         return "on the ground";
     }
@@ -131,8 +139,8 @@ export function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, 
     if (!wallContact) {
         return "no wall contact yet";
     }
-    if (now - wallContact.time > WALL_JUMP_WINDOW) {
-        return `wall contact too old (${(now - wallContact.time).toFixed(2)}s > WALL_JUMP_WINDOW ${WALL_JUMP_WINDOW}s)`;
+    if (now - wallContact.time > window) {
+        return `not at a wall (last there ${(now - wallContact.time).toFixed(3)}s ago > ${window}s)`;
     }
     if (charge < WALL_JUMP_MIN_CHARGE) {
         return `charge spent (${charge.toFixed(2)} < WALL_JUMP_MIN_CHARGE ${WALL_JUMP_MIN_CHARGE})`; // wait for it to refill

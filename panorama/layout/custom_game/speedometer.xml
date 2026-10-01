@@ -345,15 +345,15 @@
 					</Panel>
 
 					<!-- Per-player debug view of how ground/wall contact and jump
-					     presses are judged (physics/jump-debug.js). Its drawing only
+					     presses are judged (dev/collision-debug.js). Its drawing only
 					     shows in tools mode. -->
 					<Panel class="UserMenuSection">
 						<Panel class="UserMenuSectionHeader">
 							<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/debug.png" />
-							<Label class="UserMenuSectionLabel" text="JUMP DEBUG" />
+							<Label class="UserMenuSectionLabel" text="COLLISION DEBUG" />
 						</Panel>
-						<Button id="usermenu_jumpdebug_button" class="UserMenuOutlineButton">
-							<Label class="UserMenuOutlineLabel" text="JUMP DEBUG: {s:jumpdebug_state}" />
+						<Button id="usermenu_collisiondebug_button" class="UserMenuOutlineButton">
+							<Label class="UserMenuOutlineLabel" text="COLLISION DEBUG: {s:collisiondebug_state}" />
 						</Button>
 					</Panel>
 				</Panel>

@@ -21,16 +21,6 @@ export const WALL_BOUNCE_TRACE_DISTANCE = 160; // ray length from last tick's po
 // so in a small room it finds *some* wall on almost every hard landing or
 // bump, which used to bounce the melon off a wall it never touched.
 export const WALL_CONTACT_DISTANCE = 56; // max units from the melon's center to the wall plane — melon radius plus margin for the tick physics already pushed it back
-// A wall the probes find only counts as touched for a wall jump if physics
-// actually stopped the melon against it, measured like ground contact: of
-// the speed into the wall we commanded last tick, at least
-// WALL_CONTACT_MIN_STOP must be gone now — and at least this much in
-// absolute terms. Without the absolute part, flying almost parallel past a
-// nearby wall (only a few units/sec into it) counted as touching it from
-// small physics noise alone.
-// (WALL_CONTACT_DISTANCE alone is from the melon's center and let a melon
-// still flying towards a wall jump off it before touching it.)
-export const WALL_TOUCH_MIN_STOP_SPEED = 60; // units/sec of speed into the wall that must have been stopped
 export const WALL_CONTACT_MIN_STOP = 0.5; // fraction of the into-the-wall speed the impact must have taken away — a landing or friction leaves it almost untouched, a real wall stops it
 export const WALL_BOUNCE_TRACE_RADIUS = 8; // backup sphere sweep from the current position, for posts/edges the ray slips past
 export const WALL_BOUNCE_SPHERE_TRACE_DISTANCE = 48;

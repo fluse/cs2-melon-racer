@@ -31,8 +31,8 @@ import { predictionDotSet } from "./trace.js";
  *   attackBoosting?: boolean, // the attack boost is on this tick — shows the boost trail, see fx/boost-trail/boost-trail.js
  *   attackGuardUntil?: number, // until when engine pushes from attack are cancelled — see ATTACK_PUSH_GUARD_SECONDS
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
- *   jumpDebug?: boolean, // this player's jump debug view is on (user menu toggle) — see dev/jump-debug.js
- *   contactDebug?: import("../dev/jump-debug.js").ContactDebug, // what this tick's probes saw, for that view
+ *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
+ *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
  *   melonGlow?: boolean, // this player's melon has its outline glow (user menu toggle, on by default) — see kart/look.js

@@ -8,7 +8,7 @@ import { CanGroundJump, WallJumpBlockReason, WallJumpVelocity, RechargeWallJump,
 import { JumpTimingFactor, JumpMultiplier, WallTimingPress } from "../wall-bounce/logic.js";
 import { MomentumMaxSpeed } from "../momentum/logic.js";
 import { JUMP_SPEED } from "../../constants/index.js";
-import { LogJumpPress, LogWallJumpVerdict } from "../../dev/jump-debug.js";
+import { LogJumpPress, LogWallJumpVerdict } from "../../dev/collision-debug.js";
 
 /**
  * Records a jump-button press for wall-bounce timing, separately from the
@@ -176,6 +176,7 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
         lastGroundedTime: kart.lastGroundedTime,
         charge,
         cooldown: rules.wallJumpCooldown,
+        window: rules.wallJumpWindow,
         bounceTiming: !rules.freeWallJumps && kart.pendingBounce !== undefined,
     });
     if (!wallContact || blockedBy !== null) {

@@ -254,7 +254,8 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   to reach the far wall), and wall jumps there cost no charge, are always
   full strength, have a shorter cooldown (`LIFT_ZONE_WALL_JUMP_COOLDOWN`)
   and fire from a press made shortly before touching the wall
-  (`LIFT_ZONE_JUMP_BUFFER`). While in a lift zone the chase camera eases back and
+  (`LIFT_ZONE_JUMP_BUFFER`); a wall contact there also stays jumpable
+  longer (`LIFT_ZONE_WALL_JUMP_WINDOW`, 0.2 s, instead of a tick or two). While in a lift zone the chase camera eases back and
   up (`LIFT_CAMERA_*` in `camera/constants.js`) so the climb stays in view,
   looking through walls instead of being pulled in by them.
 - `WALL_BOUNCE_COOLDOWN` stops one wall contact from bouncing (and
@@ -286,7 +287,7 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   same colors as the HUD panel; white = no wall in range). Uses the same
   angle math as the bounce, so steer until it turns yellow (PERFECT).
   **Off by default**, switched on/off per player in the user menu's
-  "GUIDE LINE" section (above "JUMP DEBUG"; `kart.predictionLine`) — only
+  "GUIDE LINE" section (above "COLLISION DEBUG"; `kart.predictionLine`) — only
   that player's own melon gets a line. `PREDICTION_ENABLED` stays the
   map-wide master switch.
   **Decided: a dev/training aid only** — `PREDICTION_RENDER_MODE =
@@ -618,18 +619,24 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   standing still, race-locked or broken — and is full again whenever the
   melon arrives whole (every spawn that restores full health). A wall jump
   never raises the speed cap — chaining them used to make the melon faster
-  and faster. "Touching" =
-  a line trace in any of `WALL_PROBE_DIRECTIONS` horizontal directions
-  finds a steep, non-prop surface within `WALL_CONTACT_DISTANCE` of the
-  melon's center **and** physics just stopped the melon against it,
-  measured like ground contact: of the speed into that wall commanded last
-  tick, at least `WALL_CONTACT_MIN_STOP` and at least
-  `WALL_TOUCH_MIN_STOP_SPEED` must be gone now (the absolute part keeps
-  flying past a wall in parallel from counting via physics noise). The center distance alone let a
-  melon still flying at a wall jump off it before touching it; a trace back
-  onto the melon's own surface was tried and found nothing in-engine — or a wall
-  bounce just happened (the melon leaves the wall the moment it bounces);
-  either stays jumpable for `WALL_JUMP_WINDOW`. `WALL_JUMP_COOLDOWN`
+  and faster. **The timing is the distance** (decided): a press only
+  counts while the wall is right at the melon — a line trace in any of
+  `WALL_PROBE_DIRECTIONS` (16) horizontal directions finds a steep, non-prop
+  surface whose plane is within `WALL_JUMP_CONTACT_RADIUS` (10 units) of the
+  melon's center, plus the distance it covers towards that wall in one tick
+  (`WallContactReach`; at speed it would otherwise go from outside the
+  radius into the wall and off it again between two ticks). So a press just
+  before the touch counts, one on it too, and the tick after (the melon is
+  pushed off a wall at once) via `WALL_JUMP_WINDOW` (0.035 s) — not some
+  time later. Measured from the center because traces onto the melon's own
+  surface find nothing in-engine; the radius is the melon's half size plus
+  a small margin, measured with the collision debug view's distance
+  readout: lying right against a wall its center is 6.7 from it, and it's
+  only ~10% longer than wide (16 at first let a wall ~9 units off the
+  melon's surface count). (Before: a wall anywhere within
+  `WALL_CONTACT_DISTANCE`, 56, counted once physics had stopped the melon
+  against it, and stayed jumpable for 0.2 s.) A wall bounce also counts as
+  a contact. `WALL_JUMP_COOLDOWN`
   between two wall jumps, and one
   wall can't be climbed forever: the next wall jump needs ground contact
   first or a different wall (`WALL_JUMP_SAME_WALL_DOT`) — bouncing between
@@ -638,32 +645,35 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   (`WALL_BOUNCE_PERFECT_JUMP_WINDOW`) is open it's only that**, no wall jump
   (decided): the bounce already is the reaction to the wall, and a timed
   press used to also fire a wall jump that cost charge and cut the bounce's
-  upward kick. After the window, the bounce's wall stays jumpable for the
-  rest of `WALL_JUMP_WINDOW`. Lift zones are the exception: there a wall
-  jump is free and may follow a bounce at once.
-- **Jump debug view** (`dev/jump-debug.js`, all of it in that one file):
-  toggled per player in the user menu ("Jump debug: ON/OFF", off by
+  upward kick. After the window, a wall jump needs the wall at the melon
+  again (it has usually bounced off by then). Lift zones are the exception:
+  there a wall jump is free and may follow a bounce at once.
+- **Collision debug view** (`dev/collision-debug.js`, all of it in that one file):
+  toggled per player in the user menu ("Collision debug: ON/OFF", off by
   default), only for that player's own melon. While on, the contact state
   is on screen every tick (`GROUND` / `AIR` / `AIR + WALL`, whether it's
   supported, the measured vertical acceleration, what the floor trace saw
-  and how far below, the speed into a nearby wall last tick vs. now,
-  `TOUCH` once it counts), every jump press is logged to the console
-  (`[jump debug] … jump pressed: …` — why it was or wasn't allowed), and
+  and how far below, the nearest wall's distance from the melon's center
+  next to the distance that counts and the speed into it, `AT WALL` once it
+  counts — read that distance off at a wall to tune
+  `WALL_JUMP_CONTACT_RADIUS`), every jump press is logged to the console
+  (`[collision debug] … jump pressed: …` — why it was or wasn't allowed), and
   the probes are drawn into the world (tools mode only), every tick:
   - floor trace straight down: green = ground contact, white = hit
     something but not held up by it, grey = nothing below;
-  - in the air, a grey ring = `WALL_CONTACT_DISTANCE` around the center
-    (walls outside it aren't considered), and the wall probes: grey = hit
-    nothing, purple = hit a floor/ceiling or a prop (ignored), dark blue =
-    wall outside the ring, cyan = wall inside it, orange = the nearest one,
-    the only one checked;
-  - at that wall its normal and a small orange sphere (only *near*), or a
-    big green one when it's *touching* this tick;
-  - from the melon: red = velocity commanded last tick, blue = what
-    physics left of it now — red reaching into the wall while blue is cut
-    short is exactly what counts as touching;
-  - a small green ring around the melon while a touch is still jumpable
-    (`WALL_JUMP_WINDOW`).
+  - a light grey ring = `WALL_JUMP_CONTACT_RADIUS` around the center, at its height and flat on the floor below (also on
+    the ground: the wall probes run every tick while the view is on, there
+    only for the view — a wall jump needs the air)
+    (moving at a wall, one tick's travel is added), and the wall probes:
+    grey = hit nothing, purple = hit a floor/ceiling or a prop (ignored),
+    dark blue = wall too far, cyan = wall at the melon, orange = the
+    nearest one at the melon, the one jumped off;
+  - at the nearest wall its normal and a small orange sphere (found, too
+    far), or a slightly bigger green one when it's *at the melon* this tick;
+  - from the melon: blue = its velocity now (the part towards the wall
+    widens the reach);
+  - a green ring just outside the grey one while a wall jump is possible
+    (at a wall, or within `WALL_JUMP_WINDOW` after).
 - Tests: `test/contact.test.mjs` (rules) and `test/jump.test.mjs` (the real
   `UpdateKart` against the fake engine).
 

@@ -31,5 +31,8 @@ export const LIFT_ZONE_WALL_JUMP_COOLDOWN = 0.1; // seconds
 // ... and a jump pressed up to this long *before* touching the next wall is
 // remembered and fires the wall jump the moment the melon touches it —
 // pressing a little early used to be lost (only presses after the contact
-// counted, within WALL_JUMP_WINDOW).
+// counted, within WALL_JUMP_WINDOW) ...
 export const LIFT_ZONE_JUMP_BUFFER = 0.2; // seconds
+// ... and a wall contact stays jumpable this long, instead of the tick or
+// two of WALL_JUMP_WINDOW outside: shafts stay easy to climb.
+export const LIFT_ZONE_WALL_JUMP_WINDOW = 0.2; // seconds

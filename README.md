@@ -90,7 +90,7 @@ melon_racer/
         ├── camera/           # third-person chase camera and its zooms
         ├── hud/              # one file per HUD panel (speedometer, bounce panel, track, hub modal, user menu), button clicks
         ├── fx/               # particles, boost trail, guide line
-        └── dev/              # debug views (jump debug, attack log)
+        └── dev/              # debug views (collision debug, attack log)
 ```
 
 There is no `addoninfo.txt` — CS2 Workshop Tools identifies this addon purely by its folder name (`melon_racer`) under `csgo_addons/`.

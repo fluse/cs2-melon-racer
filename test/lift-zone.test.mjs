@@ -5,10 +5,12 @@ import { LiftZoneUpSpeed, WallRules } from "../src/melon_drive/zones/lift/logic.
 import {
     WALL_BOUNCE_UP_SPEED,
     WALL_JUMP_COOLDOWN,
+    WALL_JUMP_WINDOW,
     LIFT_ZONE_UP_SPEED,
     LIFT_ZONE_MIN_BOUNCE_SPEED,
     LIFT_ZONE_WALL_JUMP_COOLDOWN,
     LIFT_ZONE_JUMP_BUFFER,
+    LIFT_ZONE_WALL_JUMP_WINDOW,
     PERFECT_BOUNCE_UP_MULTIPLIER,
     BOUNCE_RATINGS,
 } from "../src/melon_drive/constants/index.js";
@@ -57,17 +59,19 @@ test("wall rules outside a lift zone: the normal bounce and wall jump", () => {
         bounceUpSpeed: WALL_BOUNCE_UP_SPEED,
         minBounceSpeed: 0,
         wallJumpCooldown: WALL_JUMP_COOLDOWN,
+        wallJumpWindow: WALL_JUMP_WINDOW,
         freeWallJumps: false,
         jumpBuffer: 0,
     });
 });
 
-test("wall rules in a lift zone: its kick, minimum bounce speed, free wall jumps, short cooldown, jump buffer", () => {
+test("wall rules in a lift zone: its kick, minimum bounce speed, free wall jumps, short cooldown, longer contact window, jump buffer", () => {
     assert.deepEqual(WallRules(LIFT_ZONE_UP_SPEED), {
         inLift: true,
         bounceUpSpeed: Math.max(WALL_BOUNCE_UP_SPEED, LIFT_ZONE_UP_SPEED),
         minBounceSpeed: LIFT_ZONE_MIN_BOUNCE_SPEED,
         wallJumpCooldown: LIFT_ZONE_WALL_JUMP_COOLDOWN,
+        wallJumpWindow: LIFT_ZONE_WALL_JUMP_WINDOW,
         freeWallJumps: true,
         jumpBuffer: LIFT_ZONE_JUMP_BUFFER,
     });

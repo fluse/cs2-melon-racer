@@ -1,5 +1,5 @@
 import { CSInputs } from "cs_script/point_script";
-import { IsJumpDebugOn } from "../dev/jump-debug.js";
+import { IsCollisionDebugOn } from "../dev/collision-debug.js";
 import { IsPredictionOn } from "../fx/prediction/prediction.js";
 import { IsMelonGlowOn } from "../kart/look.js";
 import { CanRestartTimeTrial } from "../race/time-trial/time-trial.js";
@@ -24,7 +24,7 @@ export function SetUserMenuOpen(slot, kart, open) {
         // wipes what was set when the kart spawned.
         UpdateMelonGlowHud(slot, kart);
         UpdatePredictionHud(slot, kart);
-        UpdateJumpDebugHud(slot, kart);
+        UpdateCollisionDebugHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
 }
@@ -59,17 +59,17 @@ export function UpdatePredictionHud(slot, kart) {
 }
 
 /**
- * The user menu's jump debug toggle button: its ON/OFF text and highlight.
+ * The user menu's collision debug toggle button: its ON/OFF text and highlight.
  * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
  */
-export function UpdateJumpDebugHud(slot, kart) {
+export function UpdateCollisionDebugHud(slot, kart) {
     const hud = GetSpeedHud();
     if (!hud) {
         return;
     }
-    const on = IsJumpDebugOn(kart);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_jumpdebug_button", "jumpdebug_state", on ? "ON" : "OFF");
-    hud.SetHasClassForPlayer(slot, "usermenu_jumpdebug_button", "ToggleOn", on);
+    const on = IsCollisionDebugOn(kart);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_collisiondebug_button", "collisiondebug_state", on ? "ON" : "OFF");
+    hud.SetHasClassForPlayer(slot, "usermenu_collisiondebug_button", "ToggleOn", on);
 }
 
 /** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart */

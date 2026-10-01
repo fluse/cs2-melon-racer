@@ -155,7 +155,7 @@ const ICONS = {
             union(...[0, 1, 2, 3].flatMap((row) => [0, 1, 2, 3, 4].filter((col) => (row + col) % 2 === 1).map((col) => rect(18.5 + col * 7.2, 9.5 + row * 6.5, 18.5 + (col + 1) * 7.2, 9.5 + (row + 1) * 6.5)))),
         ),
     ),
-    // Bug — JUMP DEBUG.
+    // Bug — COLLISION DEBUG.
     debug: union(
         cut(ellipse(32, 40, 12, 15), line(32, 29, 32, 56, 1.3)),
         circle(32, 20, 7),

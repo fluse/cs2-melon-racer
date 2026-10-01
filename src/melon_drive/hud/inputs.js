@@ -6,12 +6,12 @@ import { karts, IsModerator } from "../core/kart-registry.js";
 import { RespawnKartAtCheckpoint } from "../kart/teleport.js";
 import { IsMelonGlowOn, SetMelonGlow, SetKartPaintColor } from "../kart/look.js";
 import { IsPredictionOn, SetPrediction } from "../fx/prediction/prediction.js";
-import { IsJumpDebugOn, SetJumpDebug } from "../dev/jump-debug.js";
+import { IsCollisionDebugOn, SetCollisionDebug } from "../dev/collision-debug.js";
 import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial } from "../race/heat/race-flow.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { GetSpeedHud } from "./layout.js";
 import { HideHubModal } from "./hub-modal.js";
-import { SetUserMenuOpen, UpdateJumpDebugHud, UpdateMelonGlowHud, UpdatePredictionHud } from "./user-menu.js";
+import { SetUserMenuOpen, UpdateCollisionDebugHud, UpdateMelonGlowHud, UpdatePredictionHud } from "./user-menu.js";
 import { COLOR_PRESETS } from "../constants/index.js";
 
 export function RegisterHudInputs() {
@@ -111,14 +111,14 @@ export function RegisterHudInputs() {
                 SetPrediction(kart, !IsPredictionOn(kart));
                 UpdatePredictionHud(slot, kart);
             }
-        } else if (event.buttonId === "usermenu_jumpdebug_button") {
+        } else if (event.buttonId === "usermenu_collisiondebug_button") {
             // Per player: only this player's melon is drawn/logged (debug
             // draws themselves only show in tools mode).
             const slot = event.player.GetPlayerSlot();
             const kart = karts.get(slot);
             if (kart) {
-                SetJumpDebug(kart, !IsJumpDebugOn(kart));
-                UpdateJumpDebugHud(slot, kart);
+                SetCollisionDebug(kart, !IsCollisionDebugOn(kart));
+                UpdateCollisionDebugHud(slot, kart);
             }
         } else if (event.buttonId.startsWith("usermenu_color_")) {
             const key = event.buttonId.slice("usermenu_color_".length);

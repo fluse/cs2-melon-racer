@@ -52,7 +52,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              track.js (time trial + checkpoint strip), hub-modal.js, user-menu.js; inputs.js (every button click)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
                                           #              boost-trail/, prediction/ (the guide line)
-                                          #   dev/       jump-debug.js (the user-menu jump debug view), attack-debug.js
+                                          #   dev/       collision-debug.js (the user-menu collision debug view), attack-debug.js
 src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
 test/*.test.mjs                          # node:test unit tests for the pure files (`npm test`), engine-side tests against the fake engine,
                                           #   checks of the .vmap/.xml the script relies on, and module-layout.test.mjs (the folder rules below)

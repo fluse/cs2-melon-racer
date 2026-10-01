@@ -34,7 +34,7 @@ import { Debug } from "../../core/debug.js";
 import { ApplyJump, RechargeWallJumpCharge } from "../jump/jump.js";
 import { UpdatePadFlight, TryPadLaunch } from "../../zones/jump-pad/jump-pad.js";
 import { UpdateGrounded, UpdateWallContact } from "../contact/contact.js";
-import { DrawJumpDebug } from "../../dev/jump-debug.js";
+import { DrawCollisionDebug } from "../../dev/collision-debug.js";
 import { ApplyImpactDamage } from "../../health/damage/damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage } from "../wall-bounce/wall-bounce.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
@@ -105,10 +105,10 @@ export function UpdateKart(slot, kart, dt) {
     const verticalAccel = kart.lastVelocity ? VerticalAccel(kart.lastVelocity.z, currentVelocity.z, dt) : undefined;
     const supported = verticalAccel !== undefined ? IsSupported(verticalAccel) : kart.settled;
     const grounded = UpdateGrounded(kart, origin, now, supported, verticalAccel);
-    const wallNormalNow = grounded ? undefined : UpdateWallContact(kart, origin, now, currentVelocity);
-    DrawJumpDebug(slot, kart, grounded, wallNormalNow);
+    const wallNormalNow = UpdateWallContact(kart, origin, now, currentVelocity, dt, grounded);
     // Wall bounce / wall jump tuning for where the melon is (lift zone or not).
     const wallRules = CurrentWallRules(kart);
+    DrawCollisionDebug(slot, kart, grounded, wallNormalNow, wallRules.wallJumpWindow);
     /** @type {{ x: number, y: number } | undefined} */
     let bounceVelocity = undefined;
     let bounceAngleFactor = 0;

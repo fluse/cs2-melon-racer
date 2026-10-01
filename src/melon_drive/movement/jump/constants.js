@@ -34,11 +34,12 @@ export const GROUND_COYOTE_TIME = 0.08; // seconds a ground contact stays valid 
 // after taking off jumped again in mid-air.
 export const GROUND_LIFTOFF_TIME = 0.15; // seconds
 
-// Wall jump: in the air, touching a wall (a line trace in any of
+// Wall jump: in the air, at a wall (a line trace in any of
 // WALL_PROBE_DIRECTIONS horizontal directions finds a steep surface within
-// WALL_CONTACT_DISTANCE and physics just stopped the melon's motion into
-// it — see WALL_TOUCH_MIN_STOP_SPEED — or a wall impact just happened) and pressing jump
-// pushes the melon off that wall and up. Its strength comes from a charge
+// WALL_JUMP_CONTACT_RADIUS of the melon's center, plus one tick's travel
+// towards it — see WallContactReach — or a wall bounce just happened) and
+// pressing jump pushes the melon off that wall and up. The timing is that
+// distance: press while the wall is right at the melon, not some time after. Its strength comes from a charge
 // (the HUD jump bar): a wall jump is as strong as the charge is full
 // (WALL_JUMP_UP_SPEED / WALL_JUMP_PUSH_SPEED at 100%) and uses up
 // WALL_JUMP_CHARGE_COST of it, so chained wall jumps get weaker and weaker;
@@ -47,8 +48,24 @@ export const GROUND_LIFTOFF_TIME = 0.15; // seconds
 // Can't climb one wall forever: after a wall jump, the next one
 // needs ground contact first or a different wall (normal differing by more
 // than WALL_JUMP_SAME_WALL_DOT) — bouncing between two facing walls chains.
-export const WALL_PROBE_DIRECTIONS = 8;
-export const WALL_JUMP_WINDOW = 0.2; // seconds a wall contact stays jumpable — the melon usually bounces off the wall the moment it hits it
+// Enough directions that the tight contact ring has no gaps: a wall between
+// two probes is hit at up to 1/cos(180°/N) times its real distance (16:
+// +2%, 8 was +8%).
+export const WALL_PROBE_DIRECTIONS = 16;
+// Units from the melon's center to the wall's plane at which the wall is at
+// the melon. Measured from the center: traces onto the melon's own surface
+// find nothing in-engine. Measured in-game with the collision debug view: a
+// melon lying right against a wall has its center 6.7 from it (6.9 above
+// the floor), and it's only ~10% longer than wide, so ~8 at most with its
+// tip at the wall — this is that plus a small margin (was 16: a wall still
+// ~9 units off the melon's surface counted).
+// Higher: more forgiving; lower: the press has to be closer to the touch.
+export const WALL_JUMP_CONTACT_RADIUS = 10; // units
+// Seconds a wall contact stays jumpable after the melon was last at the wall
+// — only a tick or two: a melon that hits a wall is pushed off it at once,
+// so the press on the touch can land a tick late. (Lift zones: longer, see
+// LIFT_ZONE_WALL_JUMP_WINDOW.)
+export const WALL_JUMP_WINDOW = 0.035; // seconds
 export const WALL_JUMP_COOLDOWN = 0.45; // seconds between two wall jumps (was 0.3)
 export const WALL_JUMP_CHARGE_COST = 0.5; // share of a full charge one wall jump uses — 2 in a row, the second at half strength (was 0.34, ~3 in a row)
 export const WALL_JUMP_MIN_CHARGE = 0.15; // below this there's no wall jump at all (was 0.1)

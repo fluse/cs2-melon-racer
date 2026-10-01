@@ -1,15 +1,14 @@
 // Engine side of ground/wall contact: the floor and wall probes (line
 // traces — see UpdateGrounded for why not TraceSphere). The rules are in
-// ../logic/contact.js; what the probes saw goes to jump-debug.js for the
+// ./logic.js; what the probes saw goes to dev/collision-debug.js for the
 // optional debug view.
-import { IsGrounded, InLiftoff, StoppedByWall } from "./logic.js";
+import { IsGrounded, InLiftoff, IsAtWall, WallContactReach } from "./logic.js";
 import { TraceLine } from "../../core/trace.js";
-import { RecordFloorProbe, RecordWallProbes } from "../../dev/jump-debug.js";
+import { RecordFloorProbe, RecordWallProbes, IsCollisionDebugOn } from "../../dev/collision-debug.js";
 import {
     GROUND_CHECK_DISTANCE,
     GROUND_COYOTE_TIME,
     WALL_PROBE_DIRECTIONS,
-    WALL_CONTACT_DISTANCE,
     WALL_NORMAL_MAX_Z,
 } from "../../constants/index.js";
 
@@ -44,27 +43,32 @@ export function UpdateGrounded(kart, origin, now, supported, verticalAccel) {
 }
 
 /**
- * In the air: looks for a wall right next to the melon — a line trace in
- * each of WALL_PROBE_DIRECTIONS horizontal directions (long enough that the
- * gaps between directions don't miss a wall), the steep, non-prop hit whose
- * plane is nearest and within WALL_CONTACT_DISTANCE of the melon's center
- * wins. Being near isn't touching, though: it only counts if physics just
- * stopped the melon against it (StoppedByWall — last tick's commanded
- * velocity vs. `currentVelocity`); then it's recorded as
- * kart.lastWallContact (the wall jump's normal).
- * @param {import("../../core/kart-registry.js").Kart} kart @param {any} origin @param {number} now @param {any} currentVelocity
- * @returns {{ x: number, y: number } | undefined} the touched wall's normal, if any
+ * In the air: whether a wall is right at the melon — a line trace in each of
+ * WALL_PROBE_DIRECTIONS horizontal directions; a steep, non-prop hit counts
+ * if its plane is within WallContactReach of the melon's center (the tight
+ * WALL_JUMP_CONTACT_RADIUS plus one tick's travel towards it, IsAtWall).
+ * The nearest such wall is recorded as kart.lastWallContact (the wall
+ * jump's normal). No physics check on top: being that close *is* the
+ * contact, so a press counts when the wall is at the melon — just before
+ * the touch, on it, or the tick after (WALL_JUMP_WINDOW).
+ * On the ground there's no wall jump: nothing is recorded, and the probes
+ * only run at all for the collision debug view, so it shows them always.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {any} origin @param {number} now
+ * @param {any} currentVelocity @param {number} dt @param {boolean} grounded see UpdateGrounded
+ * @returns {{ x: number, y: number } | undefined} the wall's normal, if one is at the melon (in the air)
  */
-export function UpdateWallContact(kart, origin, now, currentVelocity) {
-    let best = undefined;
-    let bestGap = Infinity;
-    let bestPoint = undefined;
-    let bestProbe = -1;
-    /** @type {{ end: any, state: import("../../dev/jump-debug.js").ProbeState }[]} */
+export function UpdateWallContact(kart, origin, now, currentVelocity, dt, grounded) {
+    if (grounded && !IsCollisionDebugOn(kart)) {
+        return undefined;
+    }
+    /** @type {{ normal: { x: number, y: number }, gap: number, point: any, probe: number, at: boolean } | undefined} */
+    let nearest = undefined;
+    /** @type {{ end: any, state: import("../../dev/collision-debug.js").ProbeState }[]} */
     const probes = [];
-    // A wall between two probe directions is hit at up to 1/cos(half the
-    // angle between them) times its real distance.
-    const reach = WALL_CONTACT_DISTANCE / Math.cos(Math.PI / WALL_PROBE_DIRECTIONS);
+    // Long enough for the widest reach this tick (moving straight at a
+    // wall), and a wall between two probe directions is hit at up to
+    // 1/cos(half the angle between them) times its real distance.
+    const reach = WallContactReach(Math.hypot(currentVelocity.x, currentVelocity.y), dt) / Math.cos(Math.PI / WALL_PROBE_DIRECTIONS);
     for (let i = 0; i < WALL_PROBE_DIRECTIONS; i++) {
         const a = (i / WALL_PROBE_DIRECTIONS) * Math.PI * 2;
         const trace = TraceLine({
@@ -89,24 +93,32 @@ export function UpdateWallContact(kart, origin, now, currentVelocity) {
         const h = Math.hypot(trace.normal.x, trace.normal.y);
         const n = { x: trace.normal.x / h, y: trace.normal.y / h };
         const gap = (origin.x - trace.end.x) * n.x + (origin.y - trace.end.y) * n.y; // center to wall plane
-        probes.push({ end: trace.end, state: gap <= WALL_CONTACT_DISTANCE ? "near" : "far" });
-        if (gap <= WALL_CONTACT_DISTANCE && gap < bestGap) {
-            best = n;
-            bestGap = gap;
-            bestPoint = trace.end;
-            bestProbe = probes.length - 1;
+        const at = IsAtWall(gap, n, currentVelocity, dt);
+        probes.push({ end: trace.end, state: at ? "near" : "far" });
+        // A wall at the melon beats one that isn't; among equals the nearest.
+        if (!nearest || (at && !nearest.at) || (at === nearest.at && gap < nearest.gap)) {
+            nearest = { normal: n, gap, point: trace.end, probe: probes.length - 1, at };
         }
     }
-    if (!best) {
+    if (!nearest) {
         RecordWallProbes(kart, probes);
         return undefined;
     }
-    probes[bestProbe].state = "chosen";
-    const touching = kart.lastVelocity !== undefined && StoppedByWall(best, kart.lastVelocity, currentVelocity);
-    RecordWallProbes(kart, probes, { point: bestPoint, normal: best, commanded: kart.lastVelocity, actual: currentVelocity, touching });
-    if (!touching) {
+    if (nearest.at) {
+        probes[nearest.probe].state = "chosen";
+    }
+    const into = -(currentVelocity.x * nearest.normal.x + currentVelocity.y * nearest.normal.y);
+    RecordWallProbes(kart, probes, {
+        point: nearest.point,
+        normal: nearest.normal,
+        gap: nearest.gap,
+        reach: WallContactReach(into, dt),
+        actual: currentVelocity,
+        touching: nearest.at,
+    });
+    if (!nearest.at || grounded) {
         return undefined;
     }
-    kart.lastWallContact = { time: now, normal: best };
-    return best;
+    kart.lastWallContact = { time: now, normal: nearest.normal };
+    return nearest.normal;
 }

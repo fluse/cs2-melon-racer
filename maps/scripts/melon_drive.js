@@ -4,7 +4,7 @@ import { Instance, CustomCameraMode, PointTemplate, CSMoveType, CSInputs } from 
 // Toggle to false once driving works to quiet the console back down.
 const DEBUG = true;
 // (The jump/contact debug view is separate — toggled per player from the
-// user menu, see dev/jump-debug.js.)
+// user menu, see dev/collision-debug.js.)
 
 /** @param {string} text */
 function Debug(text) {
@@ -84,8 +84,8 @@ function TraceSphere(config) {
  *   attackBoosting?: boolean, // the attack boost is on this tick — shows the boost trail, see fx/boost-trail/boost-trail.js
  *   attackGuardUntil?: number, // until when engine pushes from attack are cancelled — see ATTACK_PUSH_GUARD_SECONDS
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
- *   jumpDebug?: boolean, // this player's jump debug view is on (user menu toggle) — see dev/jump-debug.js
- *   contactDebug?: import("../dev/jump-debug.js").ContactDebug, // what this tick's probes saw, for that view
+ *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
+ *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
  *   melonGlow?: boolean, // this player's melon has its outline glow (user menu toggle, on by default) — see kart/look.js
@@ -262,11 +262,12 @@ const GROUND_COYOTE_TIME = 0.08; // seconds a ground contact stays valid after l
 // after taking off jumped again in mid-air.
 const GROUND_LIFTOFF_TIME = 0.15; // seconds
 
-// Wall jump: in the air, touching a wall (a line trace in any of
+// Wall jump: in the air, at a wall (a line trace in any of
 // WALL_PROBE_DIRECTIONS horizontal directions finds a steep surface within
-// WALL_CONTACT_DISTANCE and physics just stopped the melon's motion into
-// it — see WALL_TOUCH_MIN_STOP_SPEED — or a wall impact just happened) and pressing jump
-// pushes the melon off that wall and up. Its strength comes from a charge
+// WALL_JUMP_CONTACT_RADIUS of the melon's center, plus one tick's travel
+// towards it — see WallContactReach — or a wall bounce just happened) and
+// pressing jump pushes the melon off that wall and up. The timing is that
+// distance: press while the wall is right at the melon, not some time after. Its strength comes from a charge
 // (the HUD jump bar): a wall jump is as strong as the charge is full
 // (WALL_JUMP_UP_SPEED / WALL_JUMP_PUSH_SPEED at 100%) and uses up
 // WALL_JUMP_CHARGE_COST of it, so chained wall jumps get weaker and weaker;
@@ -275,8 +276,24 @@ const GROUND_LIFTOFF_TIME = 0.15; // seconds
 // Can't climb one wall forever: after a wall jump, the next one
 // needs ground contact first or a different wall (normal differing by more
 // than WALL_JUMP_SAME_WALL_DOT) — bouncing between two facing walls chains.
-const WALL_PROBE_DIRECTIONS = 8;
-const WALL_JUMP_WINDOW = 0.2; // seconds a wall contact stays jumpable — the melon usually bounces off the wall the moment it hits it
+// Enough directions that the tight contact ring has no gaps: a wall between
+// two probes is hit at up to 1/cos(180°/N) times its real distance (16:
+// +2%, 8 was +8%).
+const WALL_PROBE_DIRECTIONS = 16;
+// Units from the melon's center to the wall's plane at which the wall is at
+// the melon. Measured from the center: traces onto the melon's own surface
+// find nothing in-engine. Measured in-game with the collision debug view: a
+// melon lying right against a wall has its center 6.7 from it (6.9 above
+// the floor), and it's only ~10% longer than wide, so ~8 at most with its
+// tip at the wall — this is that plus a small margin (was 16: a wall still
+// ~9 units off the melon's surface counted).
+// Higher: more forgiving; lower: the press has to be closer to the touch.
+const WALL_JUMP_CONTACT_RADIUS = 10; // units
+// Seconds a wall contact stays jumpable after the melon was last at the wall
+// — only a tick or two: a melon that hits a wall is pushed off it at once,
+// so the press on the touch can land a tick late. (Lift zones: longer, see
+// LIFT_ZONE_WALL_JUMP_WINDOW.)
+const WALL_JUMP_WINDOW = 0.035; // seconds
 const WALL_JUMP_COOLDOWN = 0.45; // seconds between two wall jumps (was 0.3)
 const WALL_JUMP_CHARGE_COST = 0.5; // share of a full charge one wall jump uses — 2 in a row, the second at half strength (was 0.34, ~3 in a row)
 const WALL_JUMP_MIN_CHARGE = 0.15; // below this there's no wall jump at all (was 0.1)
@@ -445,16 +462,6 @@ const WALL_BOUNCE_TRACE_DISTANCE = 160; // ray length from last tick's position 
 // so in a small room it finds *some* wall on almost every hard landing or
 // bump, which used to bounce the melon off a wall it never touched.
 const WALL_CONTACT_DISTANCE = 56; // max units from the melon's center to the wall plane — melon radius plus margin for the tick physics already pushed it back
-// A wall the probes find only counts as touched for a wall jump if physics
-// actually stopped the melon against it, measured like ground contact: of
-// the speed into the wall we commanded last tick, at least
-// WALL_CONTACT_MIN_STOP must be gone now — and at least this much in
-// absolute terms. Without the absolute part, flying almost parallel past a
-// nearby wall (only a few units/sec into it) counted as touching it from
-// small physics noise alone.
-// (WALL_CONTACT_DISTANCE alone is from the melon's center and let a melon
-// still flying towards a wall jump off it before touching it.)
-const WALL_TOUCH_MIN_STOP_SPEED = 60; // units/sec of speed into the wall that must have been stopped
 const WALL_CONTACT_MIN_STOP = 0.5; // fraction of the into-the-wall speed the impact must have taken away — a landing or friction leaves it almost untouched, a real wall stops it
 const WALL_BOUNCE_TRACE_RADIUS = 8; // backup sphere sweep from the current position, for posts/edges the ray slips past
 const WALL_BOUNCE_SPHERE_TRACE_DISTANCE = 48;
@@ -685,8 +692,11 @@ const LIFT_ZONE_WALL_JUMP_COOLDOWN = 0.1; // seconds
 // ... and a jump pressed up to this long *before* touching the next wall is
 // remembered and fires the wall jump the moment the melon touches it —
 // pressing a little early used to be lost (only presses after the contact
-// counted, within WALL_JUMP_WINDOW).
+// counted, within WALL_JUMP_WINDOW) ...
 const LIFT_ZONE_JUMP_BUFFER = 0.2; // seconds
+// ... and a wall contact stays jumpable this long, instead of the tick or
+// two of WALL_JUMP_WINDOW outside: shafts stay easy to climb.
+const LIFT_ZONE_WALL_JUMP_WINDOW = 0.2; // seconds
 
 // Wall-bounce prediction line (see fx/prediction/prediction.js).
 
@@ -1452,6 +1462,7 @@ function ApplyBreakCameraZoom(kart, elapsed) {
  *   bounceUpSpeed: number, // upward kick of a wall bounce (u/s)
  *   minBounceSpeed: number, // a bounce leaves the wall at least this fast (u/s), 0 = no minimum
  *   wallJumpCooldown: number, // seconds between two wall jumps
+ *   wallJumpWindow: number, // seconds a wall contact stays jumpable
  *   freeWallJumps: boolean, // wall jumps cost no charge, are full strength, may follow a bounce at once
  *   jumpBuffer: number, // seconds a jump press before touching a wall still counts, 0 = none
  * }} WallRules
@@ -1470,6 +1481,7 @@ function WallRules(liftUpSpeed) {
             bounceUpSpeed: WALL_BOUNCE_UP_SPEED,
             minBounceSpeed: 0,
             wallJumpCooldown: WALL_JUMP_COOLDOWN,
+            wallJumpWindow: WALL_JUMP_WINDOW,
             freeWallJumps: false,
             jumpBuffer: 0,
         };
@@ -1480,6 +1492,7 @@ function WallRules(liftUpSpeed) {
         bounceUpSpeed: Math.max(WALL_BOUNCE_UP_SPEED, liftUpSpeed),
         minBounceSpeed: LIFT_ZONE_MIN_BOUNCE_SPEED,
         wallJumpCooldown: LIFT_ZONE_WALL_JUMP_COOLDOWN,
+        wallJumpWindow: LIFT_ZONE_WALL_JUMP_WINDOW,
         freeWallJumps: true,
         jumpBuffer: LIFT_ZONE_JUMP_BUFFER,
     };
@@ -2041,7 +2054,7 @@ function NewKartRecord(pawn, melon, spawnPoint) {
         paintColor: { r: 255, g: 255, b: 255, a: 255 },
         userMenuOpen: false,
         hubModalOpen: false,
-        jumpDebug: false,
+        collisionDebug: false,
         predictionLine: false,
         melonGlow: true,
         pawnAnchor: pawn.GetAbsOrigin(),
@@ -2240,19 +2253,27 @@ function CanGroundJump({ grounded, lastGroundedTime, lastJumpTime }) {
 }
 
 /**
- * Whether physics just stopped the melon against a wall: of the speed into
- * it we commanded last tick, at least WALL_CONTACT_MIN_STOP and at least
- * WALL_TOUCH_MIN_STOP_SPEED is gone now. A wall that's merely near (still a
- * few units ahead, or flown past in parallel) leaves that speed untouched.
- * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal (pointing away from it)
- * @param {{ x: number, y: number }} commanded velocity we set last tick
- * @param {{ x: number, y: number }} actual the melon's velocity now
+ * How far from the melon's center (to the wall's plane) a wall still counts
+ * as at the melon: WALL_JUMP_CONTACT_RADIUS, plus how far the melon gets
+ * towards it in one tick — at speed it would otherwise go from outside the
+ * radius into the wall and off it again between two ticks.
+ * @param {number} speedIntoWall units/sec towards the wall (negative: moving away)
+ * @param {number} dt
  */
-function StoppedByWall(n, commanded, actual) {
-    const intoBefore = -(commanded.x * n.x + commanded.y * n.y);
-    const intoAfter = -(actual.x * n.x + actual.y * n.y);
-    const stopped = intoBefore - intoAfter;
-    return intoBefore > 0 && stopped >= WALL_TOUCH_MIN_STOP_SPEED && stopped / intoBefore >= WALL_CONTACT_MIN_STOP;
+function WallContactReach(speedIntoWall, dt) {
+    return WALL_JUMP_CONTACT_RADIUS + Math.max(0, speedIntoWall) * Math.max(0, dt);
+}
+
+/**
+ * Whether a wall `gap` units from the melon's center is at the melon (see
+ * WallContactReach) — the wall jump's contact test.
+ * @param {number} gap center to the wall's plane
+ * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal (pointing away from it)
+ * @param {{ x: number, y: number }} velocity the melon's velocity now
+ * @param {number} dt
+ */
+function IsAtWall(gap, n, velocity, dt) {
+    return gap <= WallContactReach(-(velocity.x * n.x + velocity.y * n.y), dt);
 }
 
 /**
@@ -2278,7 +2299,7 @@ function CanWallJump(s) {
 
 /**
  * Why a jump press right now is *not* a wall jump, or null if it is one —
- * the jump debug log prints this.
+ * the collision debug log prints this.
  * @param {{
  *   now: number,
  *   grounded: boolean,
@@ -2287,10 +2308,11 @@ function CanWallJump(s) {
  *   lastGroundedTime?: number,
  *   charge: number,
  *   cooldown?: number, // WALL_JUMP_COOLDOWN, shorter in a lift zone
+ *   window?: number, // WALL_JUMP_WINDOW, longer in a lift zone
  *   bounceTiming?: boolean, // a wall bounce's jump-timing window is still open — this press is its timing, not a wall jump
  * }} s
  */
-function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN, bounceTiming = false }) {
+function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN, window = WALL_JUMP_WINDOW, bounceTiming = false }) {
     if (grounded) {
         return "on the ground";
     }
@@ -2300,8 +2322,8 @@ function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGro
     if (!wallContact) {
         return "no wall contact yet";
     }
-    if (now - wallContact.time > WALL_JUMP_WINDOW) {
-        return `wall contact too old (${(now - wallContact.time).toFixed(2)}s > WALL_JUMP_WINDOW ${WALL_JUMP_WINDOW}s)`;
+    if (now - wallContact.time > window) {
+        return `not at a wall (last there ${(now - wallContact.time).toFixed(3)}s ago > ${window}s)`;
     }
     if (charge < WALL_JUMP_MIN_CHARGE) {
         return `charge spent (${charge.toFixed(2)} < WALL_JUMP_MIN_CHARGE ${WALL_JUMP_MIN_CHARGE})`; // wait for it to refill
@@ -2577,10 +2599,10 @@ function UpdateMomentum(momentum, horizSpeed, now, boosted) {
     return { steps, armed: false, lastHitTime: now };
 }
 
-// Jump debug view: everything that shows how ground/wall contact and jump
+// Collision debug view: everything that shows how ground/wall contact and jump
 // presses are judged — the on-screen status line, the probes drawn into the
 // world, and the "Jump pressed" console log. Toggled per player from the
-// user menu (kart.jumpDebug, see SetJumpDebug); off by default. The contact
+// user menu (kart.collisionDebug, see SetCollisionDebug); off by default. The contact
 // code in contact.js/drive.js/jump.js only hands its results to the
 // Record*/Log*/Draw* functions here, so none of this lives in the gameplay
 // code itself. Debug draws only show in dev environments (tools mode).
@@ -2595,18 +2617,20 @@ function UpdateMomentum(momentum, horizSpeed, now, boosted) {
  *   floorEnd: any, floorHit: boolean, floorOk: boolean, floorText: string,
  *   probes: { end: any, state: ProbeState }[],
  *   wallText: string,
- *   wall?: { point: any, normal: { x: number, y: number }, commanded?: any, actual: any, touching: boolean },
+ *   wall?: WallDebug,
  * }} ContactDebug
+ * @typedef {{ point: any, normal: { x: number, y: number }, gap: number, reach: number, actual: any, touching: boolean }} WallDebug
+ *   the nearest wall the probes found: `gap` center to its plane, `reach` how close it had to be (see WallContactReach)
  */
 
 /** @param {import("../core/kart-registry.js").Kart} kart */
-function IsJumpDebugOn(kart) {
-    return Boolean(kart.jumpDebug);
+function IsCollisionDebugOn(kart) {
+    return Boolean(kart.collisionDebug);
 }
 
 /** Turns the view on/off for this kart's player. @param {import("../core/kart-registry.js").Kart} kart @param {boolean} on */
-function SetJumpDebug(kart, on) {
-    kart.jumpDebug = on;
+function SetCollisionDebug(kart, on) {
+    kart.collisionDebug = on;
     if (!on) {
         kart.contactDebug = undefined;
     }
@@ -2619,7 +2643,7 @@ function SetJumpDebug(kart, on) {
  * @param {any} trace the floor TraceLine result @param {boolean} grounded
  */
 function RecordFloorProbe(kart, origin, supported, verticalAccel, trace, grounded) {
-    if (!IsJumpDebugOn(kart)) {
+    if (!IsCollisionDebugOn(kart)) {
         return;
     }
     const floorHit = trace.didHit && !trace.startedInSolid;
@@ -2640,15 +2664,16 @@ function RecordFloorProbe(kart, origin, supported, verticalAccel, trace, grounde
 }
 
 /**
- * The wall probes (in the air only) and, if one was near enough, the
- * physics check on it.
+ * The wall probes (every tick while the view is on, also on the ground) and the nearest wall they found, with
+ * its measured distance from the melon's center — read that off to tune
+ * WALL_JUMP_CONTACT_RADIUS.
  * @param {import("../core/kart-registry.js").Kart} kart
  * @param {{ end: any, state: ProbeState }[]} probes
- * @param {{ point: any, normal: { x: number, y: number }, commanded?: any, actual: any, touching: boolean }} [wall]
+ * @param {WallDebug} [wall]
  */
 function RecordWallProbes(kart, probes, wall) {
     const d = kart.contactDebug;
-    if (!IsJumpDebugOn(kart) || !d) {
+    if (!IsCollisionDebugOn(kart) || !d) {
         return;
     }
     d.probes = probes;
@@ -2657,11 +2682,8 @@ function RecordWallProbes(kart, probes, wall) {
         d.wallText = "no wall";
         return;
     }
-    /** @param {{ x: number, y: number }} v */
-    const into = (v) => -(v.x * wall.normal.x + v.y * wall.normal.y);
-    d.wallText = wall.commanded
-        ? `near, into ${into(wall.commanded).toFixed(0)} -> ${into(wall.actual).toFixed(0)}${wall.touching ? " TOUCH" : ""}`
-        : "near, no command to compare";
+    const into = -(wall.actual.x * wall.normal.x + wall.actual.y * wall.normal.y);
+    d.wallText = `${wall.gap.toFixed(1)} from center (counts <= ${wall.reach.toFixed(1)}), into ${into.toFixed(0)} u/s${wall.touching ? " AT WALL" : ""}`;
 }
 
 /**
@@ -2670,14 +2692,14 @@ function RecordWallProbes(kart, probes, wall) {
  * @param {boolean} grounded @param {boolean} groundJump @param {boolean} timingPress
  */
 function LogJumpPress(slot, kart, now, grounded, groundJump, timingPress) {
-    if (!IsJumpDebugOn(kart)) {
+    if (!IsCollisionDebugOn(kart)) {
         return;
     }
     const d = kart.contactDebug;
     const groundAge = kart.lastGroundedTime === undefined ? "never" : `${(now - kart.lastGroundedTime).toFixed(3)}s ago`;
     const wallAge = kart.lastWallContact === undefined ? "never" : `${(now - kart.lastWallContact.time).toFixed(3)}s ago`;
     Instance.Msg(
-        `[jump debug] slot ${slot} jump pressed: grounded=${grounded} groundJump=${groundJump} ` +
+        `[collision debug] slot ${slot} jump pressed: grounded=${grounded} groundJump=${groundJump} ` +
             `(ground contact ${groundAge}, ${d?.support ?? "—"}, floor: ${d?.floorText ?? "—"}) ` +
             `wall contact ${wallAge} (${d?.wallText ?? "—"}) wallCharge=${(kart.wallJumpCharge ?? 1).toFixed(2)} wallTiming=${timingPress}`
     );
@@ -2689,10 +2711,10 @@ function LogJumpPress(slot, kart, now, grounded, groundJump, timingPress) {
  * @param {string | null} blockedBy see WallJumpBlockReason @param {boolean} inLift
  */
 function LogWallJumpVerdict(slot, kart, blockedBy, inLift) {
-    if (!IsJumpDebugOn(kart)) {
+    if (!IsCollisionDebugOn(kart)) {
         return;
     }
-    Instance.Msg(`[jump debug] slot ${slot} wall jump: ${blockedBy === null ? "YES" : `no — ${blockedBy}`}${inLift ? " (in lift zone)" : " (not in a lift zone)"}`);
+    Instance.Msg(`[collision debug] slot ${slot} wall jump: ${blockedBy === null ? "YES" : `no — ${blockedBy}`}${inLift ? " (in lift zone)" : " (not in a lift zone)"}`);
 }
 
 // Colors — see the legend in GAMEPLAY.md's "Jumping".
@@ -2702,14 +2724,18 @@ const COLOR_FAR = { r: 80, g: 120, b: 200 };
 const COLOR_NEAR = { r: 60, g: 220, b: 230 };
 const COLOR_CHOSEN = { r: 255, g: 180, b: 60 };
 const COLOR_TOUCH = { r: 60, g: 255, b: 60 };
-const COLOR_COMMANDED = { r: 255, g: 70, b: 70 };
 const COLOR_ACTUAL = { r: 80, g: 140, b: 255 };
-const COLOR_RING = { r: 90, g: 90, b: 90 };
+const COLOR_RING = { r: 230, g: 230, b: 230 }; // bright: a dark ring vanished against the floor
 const COLOR_WHITE = { r: 255, g: 255, b: 255 };
 const PROBE_COLORS = { miss: COLOR_MISS, ignored: COLOR_IGNORED, far: COLOR_FAR, near: COLOR_NEAR, chosen: COLOR_CHOSEN };
 const VELOCITY_DRAW_SCALE = 0.15; // units of line per unit/sec
 const RING_SEGMENTS = 24;
-const JUMPABLE_RING_RADIUS = 24;
+const FLOOR_RING_LIFT = 1; // units above the floor trace's hit
+// The marker at the wall's hit point — small: the melon itself is only ~7
+// units in radius, and a bigger sphere (8) hid it close up.
+const WALL_MARKER_RADIUS_AT = 2.5; // at the melon
+const WALL_MARKER_RADIUS_FAR = 1.5; // found, too far
+const JUMPABLE_RING_RADIUS = WALL_JUMP_CONTACT_RADIUS + 8;
 
 /** @param {any} start @param {any} end @param {{ r: number, g: number, b: number }} color */
 function Line(start, end, color) {
@@ -2740,14 +2766,15 @@ function Velocity(from, v, color, dz) {
 
 /**
  * Draws this tick's record: the status line on screen, and in the world
- * the floor trace, the WALL_CONTACT_DISTANCE search ring, every wall probe
- * colored by what it hit, and at the chosen wall the commanded vs. actual
- * velocity that decide "touching".
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {boolean} grounded @param {{ x: number, y: number } | undefined} wallNormal
+ * the floor trace, the WALL_JUMP_CONTACT_RADIUS ring, every wall probe
+ * colored by what it hit, and at the nearest wall its normal and the
+ * melon's velocity.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {boolean} grounded
+ * @param {{ x: number, y: number } | undefined} wallNormal @param {number} jumpWindow seconds a wall contact stays jumpable (WallRules.wallJumpWindow)
  */
-function DrawJumpDebug(slot, kart, grounded, wallNormal) {
+function DrawCollisionDebug(slot, kart, grounded, wallNormal, jumpWindow) {
     const d = kart.contactDebug;
-    if (!IsJumpDebugOn(kart) || !d) {
+    if (!IsCollisionDebugOn(kart) || !d) {
         return;
     }
     Instance.DebugScreenText({
@@ -2762,34 +2789,36 @@ function DrawJumpDebug(slot, kart, grounded, wallNormal) {
     // held up by it (or not floor-like), grey = nothing below.
     Line(o, d.floorEnd, d.floorOk ? COLOR_TOUCH : d.floorHit ? COLOR_WHITE : COLOR_MISS);
     if (d.probes.length === 0) {
-        return; // on the ground — wall probes only run in the air
+        return; // no probes ran (view switched on mid-tick)
     }
-    // How far a wall may be from the center to be considered at all.
-    Circle(o, WALL_CONTACT_DISTANCE, COLOR_RING);
+    // How close a wall must be to the center to count (standing still —
+    // moving at it, one tick's travel is added): at the center's height,
+    // and again flat on the floor below (FLOOR_RING_LIFT up, so it doesn't
+    // sink into it) — from the chase camera the one at center height is
+    // mostly hidden by the melon while it's on the ground.
+    Circle(o, WALL_JUMP_CONTACT_RADIUS, COLOR_RING);
+    if (d.floorHit) {
+        Circle({ x: o.x, y: o.y, z: d.floorEnd.z + FLOOR_RING_LIFT }, WALL_JUMP_CONTACT_RADIUS, COLOR_RING);
+    }
     for (const p of d.probes) {
         Line(o, p.end, PROBE_COLORS[p.state]);
     }
-    // Still jumpable from an earlier touch (WALL_JUMP_WINDOW): a small green
-    // ring around the melon.
-    if (kart.lastWallContact && Instance.GetGameTime() - kart.lastWallContact.time <= WALL_JUMP_WINDOW) {
+    // Jumpable right now (at a wall this tick, or within jumpWindow): a
+    // green ring just outside the contact ring.
+    if (kart.lastWallContact && Instance.GetGameTime() - kart.lastWallContact.time <= jumpWindow) {
         Circle(o, JUMPABLE_RING_RADIUS, COLOR_TOUCH);
     }
     const w = d.wall;
     if (!w) {
         return;
     }
-    // Wall normal at the chosen wall, and a marker: green = touching now
-    // (physics stopped the melon against it), orange = only near.
+    // Wall normal at the nearest wall, and a marker: green = at the melon
+    // now (within reach), orange = found but too far.
     const color = w.touching ? COLOR_TOUCH : COLOR_CHOSEN;
     Line(w.point, { x: w.point.x + w.normal.x * 32, y: w.point.y + w.normal.y * 32, z: w.point.z }, color);
-    Instance.DebugSphere({ center: w.point, radius: w.touching ? 8 : 4, duration: 0, color });
-    // What decides "touching": red = velocity commanded last tick, blue =
-    // what physics left of it now. Red reaching into the wall while blue is
-    // cut short = the wall stopped it.
-    if (w.commanded) {
-        Velocity(o, w.commanded, COLOR_COMMANDED, 4);
-    }
-    Velocity(o, w.actual, COLOR_ACTUAL, -4);
+    Instance.DebugSphere({ center: w.point, radius: w.touching ? WALL_MARKER_RADIUS_AT : WALL_MARKER_RADIUS_FAR, duration: 0, color });
+    // The melon's velocity now: its part towards the wall widens the reach.
+    Velocity(o, w.actual, COLOR_ACTUAL, 0);
 }
 
 // Engine side of jumping: what a jump press does each tick (ground jump,
@@ -2964,6 +2993,7 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
         lastGroundedTime: kart.lastGroundedTime,
         charge,
         cooldown: rules.wallJumpCooldown,
+        window: rules.wallJumpWindow,
         bounceTiming: !rules.freeWallJumps && kart.pendingBounce !== undefined,
     });
     if (!wallContact || blockedBy !== null) {
@@ -3783,7 +3813,7 @@ function SetUserMenuOpen(slot, kart, open) {
         // wipes what was set when the kart spawned.
         UpdateMelonGlowHud(slot, kart);
         UpdatePredictionHud(slot, kart);
-        UpdateJumpDebugHud(slot, kart);
+        UpdateCollisionDebugHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
 }
@@ -3818,17 +3848,17 @@ function UpdatePredictionHud(slot, kart) {
 }
 
 /**
- * The user menu's jump debug toggle button: its ON/OFF text and highlight.
+ * The user menu's collision debug toggle button: its ON/OFF text and highlight.
  * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
  */
-function UpdateJumpDebugHud(slot, kart) {
+function UpdateCollisionDebugHud(slot, kart) {
     const hud = GetSpeedHud();
     if (!hud) {
         return;
     }
-    const on = IsJumpDebugOn(kart);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_jumpdebug_button", "jumpdebug_state", on ? "ON" : "OFF");
-    hud.SetHasClassForPlayer(slot, "usermenu_jumpdebug_button", "ToggleOn", on);
+    const on = IsCollisionDebugOn(kart);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_collisiondebug_button", "collisiondebug_state", on ? "ON" : "OFF");
+    hud.SetHasClassForPlayer(slot, "usermenu_collisiondebug_button", "ToggleOn", on);
 }
 
 /** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart */
@@ -4934,14 +4964,14 @@ function RegisterHudInputs() {
                 SetPrediction(kart, !IsPredictionOn(kart));
                 UpdatePredictionHud(slot, kart);
             }
-        } else if (event.buttonId === "usermenu_jumpdebug_button") {
+        } else if (event.buttonId === "usermenu_collisiondebug_button") {
             // Per player: only this player's melon is drawn/logged (debug
             // draws themselves only show in tools mode).
             const slot = event.player.GetPlayerSlot();
             const kart = karts.get(slot);
             if (kart) {
-                SetJumpDebug(kart, !IsJumpDebugOn(kart));
-                UpdateJumpDebugHud(slot, kart);
+                SetCollisionDebug(kart, !IsCollisionDebugOn(kart));
+                UpdateCollisionDebugHud(slot, kart);
             }
         } else if (event.buttonId.startsWith("usermenu_color_")) {
             const key = event.buttonId.slice("usermenu_color_".length);
@@ -5217,7 +5247,7 @@ function TryPadLaunch(slot, kart, now, jumpPressed, v, lookDir) {
 
 // Engine side of ground/wall contact: the floor and wall probes (line
 // traces — see UpdateGrounded for why not TraceSphere). The rules are in
-// ../logic/contact.js; what the probes saw goes to jump-debug.js for the
+// ./logic.js; what the probes saw goes to dev/collision-debug.js for the
 // optional debug view.
 
 /**
@@ -5251,27 +5281,32 @@ function UpdateGrounded(kart, origin, now, supported, verticalAccel) {
 }
 
 /**
- * In the air: looks for a wall right next to the melon — a line trace in
- * each of WALL_PROBE_DIRECTIONS horizontal directions (long enough that the
- * gaps between directions don't miss a wall), the steep, non-prop hit whose
- * plane is nearest and within WALL_CONTACT_DISTANCE of the melon's center
- * wins. Being near isn't touching, though: it only counts if physics just
- * stopped the melon against it (StoppedByWall — last tick's commanded
- * velocity vs. `currentVelocity`); then it's recorded as
- * kart.lastWallContact (the wall jump's normal).
- * @param {import("../../core/kart-registry.js").Kart} kart @param {any} origin @param {number} now @param {any} currentVelocity
- * @returns {{ x: number, y: number } | undefined} the touched wall's normal, if any
+ * In the air: whether a wall is right at the melon — a line trace in each of
+ * WALL_PROBE_DIRECTIONS horizontal directions; a steep, non-prop hit counts
+ * if its plane is within WallContactReach of the melon's center (the tight
+ * WALL_JUMP_CONTACT_RADIUS plus one tick's travel towards it, IsAtWall).
+ * The nearest such wall is recorded as kart.lastWallContact (the wall
+ * jump's normal). No physics check on top: being that close *is* the
+ * contact, so a press counts when the wall is at the melon — just before
+ * the touch, on it, or the tick after (WALL_JUMP_WINDOW).
+ * On the ground there's no wall jump: nothing is recorded, and the probes
+ * only run at all for the collision debug view, so it shows them always.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {any} origin @param {number} now
+ * @param {any} currentVelocity @param {number} dt @param {boolean} grounded see UpdateGrounded
+ * @returns {{ x: number, y: number } | undefined} the wall's normal, if one is at the melon (in the air)
  */
-function UpdateWallContact(kart, origin, now, currentVelocity) {
-    let best = undefined;
-    let bestGap = Infinity;
-    let bestPoint = undefined;
-    let bestProbe = -1;
-    /** @type {{ end: any, state: import("../../dev/jump-debug.js").ProbeState }[]} */
+function UpdateWallContact(kart, origin, now, currentVelocity, dt, grounded) {
+    if (grounded && !IsCollisionDebugOn(kart)) {
+        return undefined;
+    }
+    /** @type {{ normal: { x: number, y: number }, gap: number, point: any, probe: number, at: boolean } | undefined} */
+    let nearest = undefined;
+    /** @type {{ end: any, state: import("../../dev/collision-debug.js").ProbeState }[]} */
     const probes = [];
-    // A wall between two probe directions is hit at up to 1/cos(half the
-    // angle between them) times its real distance.
-    const reach = WALL_CONTACT_DISTANCE / Math.cos(Math.PI / WALL_PROBE_DIRECTIONS);
+    // Long enough for the widest reach this tick (moving straight at a
+    // wall), and a wall between two probe directions is hit at up to
+    // 1/cos(half the angle between them) times its real distance.
+    const reach = WallContactReach(Math.hypot(currentVelocity.x, currentVelocity.y), dt) / Math.cos(Math.PI / WALL_PROBE_DIRECTIONS);
     for (let i = 0; i < WALL_PROBE_DIRECTIONS; i++) {
         const a = (i / WALL_PROBE_DIRECTIONS) * Math.PI * 2;
         const trace = TraceLine({
@@ -5296,26 +5331,34 @@ function UpdateWallContact(kart, origin, now, currentVelocity) {
         const h = Math.hypot(trace.normal.x, trace.normal.y);
         const n = { x: trace.normal.x / h, y: trace.normal.y / h };
         const gap = (origin.x - trace.end.x) * n.x + (origin.y - trace.end.y) * n.y; // center to wall plane
-        probes.push({ end: trace.end, state: gap <= WALL_CONTACT_DISTANCE ? "near" : "far" });
-        if (gap <= WALL_CONTACT_DISTANCE && gap < bestGap) {
-            best = n;
-            bestGap = gap;
-            bestPoint = trace.end;
-            bestProbe = probes.length - 1;
+        const at = IsAtWall(gap, n, currentVelocity, dt);
+        probes.push({ end: trace.end, state: at ? "near" : "far" });
+        // A wall at the melon beats one that isn't; among equals the nearest.
+        if (!nearest || (at && !nearest.at) || (at === nearest.at && gap < nearest.gap)) {
+            nearest = { normal: n, gap, point: trace.end, probe: probes.length - 1, at };
         }
     }
-    if (!best) {
+    if (!nearest) {
         RecordWallProbes(kart, probes);
         return undefined;
     }
-    probes[bestProbe].state = "chosen";
-    const touching = kart.lastVelocity !== undefined && StoppedByWall(best, kart.lastVelocity, currentVelocity);
-    RecordWallProbes(kart, probes, { point: bestPoint, normal: best, commanded: kart.lastVelocity, actual: currentVelocity, touching });
-    if (!touching) {
+    if (nearest.at) {
+        probes[nearest.probe].state = "chosen";
+    }
+    const into = -(currentVelocity.x * nearest.normal.x + currentVelocity.y * nearest.normal.y);
+    RecordWallProbes(kart, probes, {
+        point: nearest.point,
+        normal: nearest.normal,
+        gap: nearest.gap,
+        reach: WallContactReach(into, dt),
+        actual: currentVelocity,
+        touching: nearest.at,
+    });
+    if (!nearest.at || grounded) {
         return undefined;
     }
-    kart.lastWallContact = { time: now, normal: best };
-    return best;
+    kart.lastWallContact = { time: now, normal: nearest.normal };
+    return nearest.normal;
 }
 
 // Health loss from hard impacts (landings, crashes) — see IMPACT_DAMAGE_*.
@@ -5853,10 +5896,10 @@ function UpdateKart(slot, kart, dt) {
     const verticalAccel = kart.lastVelocity ? VerticalAccel(kart.lastVelocity.z, currentVelocity.z, dt) : undefined;
     const supported = verticalAccel !== undefined ? IsSupported(verticalAccel) : kart.settled;
     const grounded = UpdateGrounded(kart, origin, now, supported, verticalAccel);
-    const wallNormalNow = grounded ? undefined : UpdateWallContact(kart, origin, now, currentVelocity);
-    DrawJumpDebug(slot, kart, grounded, wallNormalNow);
+    const wallNormalNow = UpdateWallContact(kart, origin, now, currentVelocity, dt, grounded);
     // Wall bounce / wall jump tuning for where the melon is (lift zone or not).
     const wallRules = CurrentWallRules(kart);
+    DrawCollisionDebug(slot, kart, grounded, wallNormalNow, wallRules.wallJumpWindow);
     /** @type {{ x: number, y: number } | undefined} */
     let bounceVelocity = undefined;
     let bounceAngleFactor = 0;
@@ -6568,7 +6611,7 @@ function RegisterRaceInputs() {
     RegisterHeatInputs();
 }
 
-// Developer aids only: the user menu's jump debug view (jump-debug.js) and
+// Developer aids only: the user menu's collision debug view (collision-debug.js) and
 // the attack button log (attack-debug.js, with DEBUG on).
 
 Instance.SetThink(Think);
