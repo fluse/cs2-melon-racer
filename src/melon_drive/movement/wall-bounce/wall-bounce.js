@@ -10,6 +10,7 @@ import {
     PickIncomingVelocity,
     ReflectOffWall,
     WallBounceDamage,
+    IsLethalAtImpact,
     IsWallContact,
     GetBounceRating,
 } from "./logic.js";
@@ -23,6 +24,7 @@ import {
     PERFECT_SPARK_LIFETIME,
 } from "../../constants/index.js";
 import { DamageKart } from "../../health/damage/damage.js";
+import { IsPadProtected } from "../../zones/jump-pad/jump-pad.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
 
 /**
@@ -175,6 +177,16 @@ function PlayPerfectSpark(kart) {
     const position = kart.melon.GetAbsOrigin();
     PlayParticleTemplate(PERFECT_SPARK_TEMPLATE_NAME, position, { lifetime: PERFECT_SPARK_LIFETIME });
     PlayParticleTemplate(PERFECT_SPARK_TEMPLATE_NAME, position, { lifetime: PERFECT_SPARK_LIFETIME, parent: kart.melon });
+}
+
+/**
+ * Whether kart.pendingBounce breaks the melon right at the wall — see
+ * IsLethalAtImpact. A jump pad's damage protection still saves it.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+export function WallBounceBreaksAtImpact(kart) {
+    const p = kart.pendingBounce;
+    return p !== undefined && !IsPadProtected(kart) && IsLethalAtImpact(kart.health, p.impactSpeed, p.speedGain, p.angleFactor);
 }
 
 /**

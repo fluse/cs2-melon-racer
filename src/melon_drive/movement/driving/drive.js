@@ -36,7 +36,7 @@ import { UpdatePadFlight, TryPadLaunch } from "../../zones/jump-pad/jump-pad.js"
 import { UpdateGrounded, UpdateWallContact } from "../contact/contact.js";
 import { DrawCollisionDebug } from "../../dev/collision-debug.js";
 import { ApplyImpactDamage } from "../../health/damage/damage.js";
-import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage } from "../wall-bounce/wall-bounce.js";
+import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage, WallBounceBreaksAtImpact } from "../wall-bounce/wall-bounce.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
 import { ApplyHealing } from "../../health/heal/index.js";
 import { CurrentWallRules } from "../../zones/registry.js";
@@ -162,6 +162,12 @@ export function UpdateKart(slot, kart, dt) {
                 jumpFactor: bounce.jumpFactor,
                 speedGain: bounce.speedGain,
             };
+            // ...unless it's lethal already: a late jump could only add
+            // damage, so break right here at the wall instead of mid-air
+            // once the window has closed (the bounce velocity is never applied).
+            if (WallBounceBreaksAtImpact(kart) && SettleWallBounceDamage(slot, kart)) {
+                return;
+            }
         } else if (!inBounceCooldown && impactSpeed > IMPACT_DAMAGE_THRESHOLD) {
             ApplyImpactDamage(slot, kart, impactDelta);
             if (kart.health <= 0) {

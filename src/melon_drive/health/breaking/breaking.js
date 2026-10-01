@@ -49,6 +49,7 @@ function ScheduleRespawnAfterBreak(slot, kart) {
             RespawnDestroyedMelon(slot, kart);
             return;
         }
+        SetMelonMotion(kart.melon, true); // before any respawn teleport below
         ShowMelonPaint(kart);
         // Back from the pulled-out break camera (ApplyBreakCameraZoom) to the
         // player's normal chase offset.
@@ -64,6 +65,20 @@ function ScheduleRespawnAfterBreak(slot, kart) {
         }
         RespawnKartAtCheckpoint(kart);
     });
+}
+
+/**
+ * Switches a melon's physics motion off for the break and back on for the
+ * respawn (prop_physics' DisableMotion/EnableMotion inputs — it has no input
+ * to make it non-solid). While broken the hidden melon stays at the crash
+ * site, and the break's own prop_physics pieces spawn right inside it: with
+ * motion on they shoved it around every physics step, between the ticks that
+ * hold it still, and the chase camera following it shook along. With motion
+ * off it doesn't budge — the pieces bounce off it instead.
+ * @param {any} melon @param {boolean} enabled
+ */
+function SetMelonMotion(melon, enabled) {
+    Instance.EntFireAtTarget({ target: melon, input: enabled ? "EnableMotion" : "DisableMotion" });
 }
 
 /** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart */
@@ -102,6 +117,7 @@ export function BreakMelon(slot, kart, impactDir, impactSpeed) {
     Debug(`slot ${slot}: melon broke at ${JSON.stringify(breakPosition)} — respawning at checkpoint ${kart.checkpointIndex} in ${BREAK_RESPAWN_DELAY}s`);
 
     kart.melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
+    SetMelonMotion(kart.melon, false); // so the break pieces below can't shove it (and the camera) around
     kart.lastVelocity = undefined;
     kart.settled = false;
     // Hidden entirely when the break particle actually spawned — it reads as

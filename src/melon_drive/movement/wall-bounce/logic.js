@@ -166,6 +166,19 @@ export function WallBounceDamage(impactSpeed, speedGain, angleFactor) {
 }
 
 /**
+ * Whether a bounce already breaks the melon at impact. Its damage is only
+ * charged once the jump window has closed, since a jump just after the hit
+ * still counts — but such a late jump can only add speed gain, so only add
+ * damage (the angle is final at impact). If what's known at impact is
+ * already lethal, nothing can save it, and waiting would only let it break
+ * mid-air, after it bounced off the wall.
+ * @param {number} health @param {number} impactSpeed @param {number} speedGain @param {number} angleFactor
+ */
+export function IsLethalAtImpact(health, impactSpeed, speedGain, angleFactor) {
+    return WallBounceDamage(impactSpeed, speedGain, angleFactor) >= health;
+}
+
+/**
  * Vertical velocity right after a wall bounce: at least the kick upward — a
  * fall is cancelled, a melon already rising faster keeps its own speed. Not
  * added on top: chained bounces in a narrow shaft or corridor (less time

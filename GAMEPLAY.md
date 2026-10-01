@@ -102,7 +102,9 @@ spawn it was last sent to, or a respawn teleporter's destination —
 velocity zeroed, health reset to full. The melon entity itself isn't
 destroyed/recreated (keeps the camera's `followEntity` and other references
 valid). Before that reset, the break plays out at the crash site: the melon
-is hidden and frozen there, the `melon_break_template` and
+is hidden and frozen there (physics motion off — `DisableMotion`, back on
+at the respawn — so the break pieces spawning inside it can't shove it and
+the chase camera on it around), the `melon_break_template` and
 `melon_break_chunks_template` point_templates are spawned (their
 `info_particle_system`s get an explicit `Start` input), and the chase camera
 eases back (`BREAK_CAMERA_*`) so the burst is visible. After
@@ -198,8 +200,11 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   angle closeness, and one with no angle bonus pays full price. Jump timing only adds speed
   (and a late jump's extra speed gain is charged too, still waived by a
   perfect angle). The damage is charged once the jump window has closed, not
-  on impact; if it takes health to 0 the melon breaks right then, after the
-  bounce already happened.
+  on impact — a late jump can still add to it. **Except when it's lethal
+  already at impact** (decided): a late jump can only add damage, never take
+  any away, so the melon breaks right there at the wall instead of bouncing
+  off and breaking mid-air (`IsLethalAtImpact`). A hit that only a late
+  jump makes lethal still breaks once the window has closed.
 - **No speed ceiling:** a bounce lifts the kart's speed cap above
   `MAX_SPEED` with no upper limit, so chained bounces stack. The cap then
   decays back at `BOOST_DECAY` and never sits above the melon's actual speed

@@ -25,13 +25,13 @@ export const BREAK_CAMERA_ZOOM_SECONDS = 0.8;
 // Higher: wider view of the burst and the flying pieces, the melon looks small.
 // Lower: stays close — the burst fills the screen, pieces fly out of view;
 //   0 = no pull-back (only BREAK_CAMERA_EXTRA_HEIGHT).
-export const BREAK_CAMERA_EXTRA_DISTANCE = 260;
+export const BREAK_CAMERA_EXTRA_DISTANCE = 130;
 // Units the camera ends up higher than the player's normal height.
 // Higher: looks down onto the crash site from above, pieces on the ground
 //   are easier to see; in low rooms the camera may end up in the ceiling.
 // Lower: flatter view from the side; 0 = no rise (only
 //   BREAK_CAMERA_EXTRA_DISTANCE).
-export const BREAK_CAMERA_EXTRA_HEIGHT = 100;
+export const BREAK_CAMERA_EXTRA_HEIGHT = 50;
 // How long a break's spawned effect entities (both templates below) are
 // kept before being removed — long, so the chunks stay lying at the crash
 // site. Removing the info_particle_system ends its particles, so this is an

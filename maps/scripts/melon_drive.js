@@ -760,13 +760,13 @@ const BREAK_CAMERA_ZOOM_SECONDS = 0.8;
 // Higher: wider view of the burst and the flying pieces, the melon looks small.
 // Lower: stays close — the burst fills the screen, pieces fly out of view;
 //   0 = no pull-back (only BREAK_CAMERA_EXTRA_HEIGHT).
-const BREAK_CAMERA_EXTRA_DISTANCE = 260;
+const BREAK_CAMERA_EXTRA_DISTANCE = 130;
 // Units the camera ends up higher than the player's normal height.
 // Higher: looks down onto the crash site from above, pieces on the ground
 //   are easier to see; in low rooms the camera may end up in the ceiling.
 // Lower: flatter view from the side; 0 = no rise (only
 //   BREAK_CAMERA_EXTRA_DISTANCE).
-const BREAK_CAMERA_EXTRA_HEIGHT = 100;
+const BREAK_CAMERA_EXTRA_HEIGHT = 50;
 // How long a break's spawned effect entities (both templates below) are
 // kept before being removed — long, so the chunks stay lying at the crash
 // site. Removing the info_particle_system ends its particles, so this is an
@@ -2597,6 +2597,19 @@ function WallBounceDamage(impactSpeed, speedGain, angleFactor) {
         Math.max(0, impactSpeed - WALL_IMPACT_DAMAGE_THRESHOLD) * WALL_IMPACT_DAMAGE_SCALE +
         speedGain * WALL_BOUNCE_DAMAGE_PER_SPEED;
     return rawDamage * (1 - angleFactor);
+}
+
+/**
+ * Whether a bounce already breaks the melon at impact. Its damage is only
+ * charged once the jump window has closed, since a jump just after the hit
+ * still counts — but such a late jump can only add speed gain, so only add
+ * damage (the angle is final at impact). If what's known at impact is
+ * already lethal, nothing can save it, and waiting would only let it break
+ * mid-air, after it bounced off the wall.
+ * @param {number} health @param {number} impactSpeed @param {number} speedGain @param {number} angleFactor
+ */
+function IsLethalAtImpact(health, impactSpeed, speedGain, angleFactor) {
+    return WallBounceDamage(impactSpeed, speedGain, angleFactor) >= health;
 }
 
 /**
@@ -5701,6 +5714,7 @@ function ScheduleRespawnAfterBreak(slot, kart) {
             RespawnDestroyedMelon(slot, kart);
             return;
         }
+        SetMelonMotion(kart.melon, true); // before any respawn teleport below
         ShowMelonPaint(kart);
         // Back from the pulled-out break camera (ApplyBreakCameraZoom) to the
         // player's normal chase offset.
@@ -5716,6 +5730,20 @@ function ScheduleRespawnAfterBreak(slot, kart) {
         }
         RespawnKartAtCheckpoint(kart);
     });
+}
+
+/**
+ * Switches a melon's physics motion off for the break and back on for the
+ * respawn (prop_physics' DisableMotion/EnableMotion inputs — it has no input
+ * to make it non-solid). While broken the hidden melon stays at the crash
+ * site, and the break's own prop_physics pieces spawn right inside it: with
+ * motion on they shoved it around every physics step, between the ticks that
+ * hold it still, and the chase camera following it shook along. With motion
+ * off it doesn't budge — the pieces bounce off it instead.
+ * @param {any} melon @param {boolean} enabled
+ */
+function SetMelonMotion(melon, enabled) {
+    Instance.EntFireAtTarget({ target: melon, input: enabled ? "EnableMotion" : "DisableMotion" });
 }
 
 /** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart */
@@ -5754,6 +5782,7 @@ function BreakMelon(slot, kart, impactDir, impactSpeed) {
     Debug(`slot ${slot}: melon broke at ${JSON.stringify(breakPosition)} — respawning at checkpoint ${kart.checkpointIndex} in ${BREAK_RESPAWN_DELAY}s`);
 
     kart.melon.Move({ velocity: { x: 0, y: 0, z: 0 } });
+    SetMelonMotion(kart.melon, false); // so the break pieces below can't shove it (and the camera) around
     kart.lastVelocity = undefined;
     kart.settled = false;
     // Hidden entirely when the break particle actually spawned — it reads as
@@ -5957,6 +5986,16 @@ function PlayPerfectSpark(kart) {
 }
 
 /**
+ * Whether kart.pendingBounce breaks the melon right at the wall — see
+ * IsLethalAtImpact. A jump pad's damage protection still saves it.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function WallBounceBreaksAtImpact(kart) {
+    const p = kart.pendingBounce;
+    return p !== undefined && !IsPadProtected(kart) && IsLethalAtImpact(kart.health, p.impactSpeed, p.speedGain, p.angleFactor);
+}
+
+/**
  * Charges kart.pendingBounce's damage now that its jump window is over (a
  * late jump can still have raised its speed gain): the wall's usual impact +
  * speed-gain damage, reduced by angle closeness — a perfect 45° hit is free.
@@ -6110,6 +6149,12 @@ function UpdateKart(slot, kart, dt) {
                 jumpFactor: bounce.jumpFactor,
                 speedGain: bounce.speedGain,
             };
+            // ...unless it's lethal already: a late jump could only add
+            // damage, so break right here at the wall instead of mid-air
+            // once the window has closed (the bounce velocity is never applied).
+            if (WallBounceBreaksAtImpact(kart) && SettleWallBounceDamage(slot, kart)) {
+                return;
+            }
         } else if (!inBounceCooldown && impactSpeed > IMPACT_DAMAGE_THRESHOLD) {
             ApplyImpactDamage(slot, kart, impactDelta);
             if (kart.health <= 0) {

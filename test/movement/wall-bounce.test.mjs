@@ -12,6 +12,7 @@ import {
     PickIncomingVelocity,
     ReflectOffWall,
     WallBounceDamage,
+    IsLethalAtImpact,
     IsWallContact,
     WallTimingPress,
 } from "../../src/melon_drive/movement/wall-bounce/logic.js";
@@ -209,4 +210,24 @@ test("timing press: soon after a press that did nothing it's mashing, and locks 
 
 test("timing press: an idle press longer ago than the lockout doesn't count against it", () => {
     assert.equal(WallTimingPress(10, 10 - WALL_TIMING_SPAM_LOCKOUT, undefined).counts, true);
+});
+
+test("lethal at impact: as soon as the damage known at the hit reaches the health", () => {
+    const impact = WALL_IMPACT_DAMAGE_THRESHOLD + 500;
+    const damage = WallBounceDamage(impact, 300, 0);
+    assert.ok(damage > EPS, "setup: a costly hit");
+    assert.equal(IsLethalAtImpact(damage, impact, 300, 0), true, "exactly the health left");
+    assert.equal(IsLethalAtImpact(damage / 2, impact, 300, 0), true);
+    assert.equal(IsLethalAtImpact(damage * 2, impact, 300, 0), false, "survives — charged after the jump window as usual");
+});
+
+test("lethal at impact: a late jump can only add damage, so it can't make a lethal hit survivable", () => {
+    const impact = WALL_IMPACT_DAMAGE_THRESHOLD + 500;
+    // A late jump raises the speed gain; damage never drops with it.
+    assert.ok(WallBounceDamage(impact, 600, 0.3) >= WallBounceDamage(impact, 300, 0.3));
+});
+
+test("lethal at impact: a PERFECT hit never is, whatever the health", () => {
+    const impact = WALL_IMPACT_DAMAGE_THRESHOLD + 5000;
+    assert.equal(IsLethalAtImpact(0.01, impact, 1000, BOUNCE_RATINGS[0].minAngleFactor), false);
 });
