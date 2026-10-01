@@ -599,18 +599,19 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   and faster. **The timing is the distance** (decided): a press only
   counts while the wall is right at the melon — a line trace in any of
   `WALL_PROBE_DIRECTIONS` (16) horizontal directions finds a steep, non-prop
-  surface whose plane is within `WALL_JUMP_CONTACT_RADIUS` (10 units) of the
+  surface whose plane is within `WALL_JUMP_CONTACT_RADIUS` (7 units) of the
   melon's center, plus the distance it covers towards that wall in one tick
   (`WallContactReach`; at speed it would otherwise go from outside the
   radius into the wall and off it again between two ticks). So a press just
   before the touch counts, one on it too, and the tick after (the melon is
   pushed off a wall at once) via `WALL_JUMP_WINDOW` (0.035 s) — not some
   time later. Measured from the center because traces onto the melon's own
-  surface find nothing in-engine; the radius is the melon's half size plus
-  a small margin, measured with the collision debug view's distance
-  readout: lying right against a wall its center is 6.7 from it, and it's
-  only ~10% longer than wide (16 would already let a wall ~9 units off the
-  melon's surface count). A wall bounce also counts as a contact. `WALL_JUMP_COOLDOWN`
+  surface find nothing in-engine. The radius is tuned in-game with the
+  collision debug view's distance readout: lying right against a wall the
+  melon's center is 6.7 from it, so 7 just covers that — a melon resting
+  tip-first at a wall (~8) doesn't count, but one moving into it does,
+  thanks to the one tick of travel added (16 would let a wall ~9 units off
+  the melon's surface count). A wall bounce also counts as a contact. `WALL_JUMP_COOLDOWN`
   between two wall jumps, and one
   wall can't be climbed forever: the next wall jump needs ground contact
   first or a different wall (`WALL_JUMP_SAME_WALL_DOT`) — bouncing between

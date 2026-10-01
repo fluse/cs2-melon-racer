@@ -57,10 +57,13 @@ export const WALL_PROBE_DIRECTIONS = 16;
 // find nothing in-engine. Measured in-game with the collision debug view: a
 // melon lying right against a wall has its center 6.7 from it (6.9 above
 // the floor), and it's only ~10% longer than wide, so ~8 at most with its
-// tip at the wall — this is that plus a small margin (was 16: a wall still
-// ~9 units off the melon's surface counted).
-// Higher: more forgiving; lower: the press has to be closer to the touch.
-export const WALL_JUMP_CONTACT_RADIUS = 10; // units
+// tip at the wall. 7 (tuned in-game) is just past lying flat against it: a
+// melon resting tip-first at a wall doesn't count, but one moving into the
+// wall does, since one tick's travel towards it is added (WallContactReach).
+// Much more (16) lets a wall ~9 units off the melon's surface count.
+// Higher: more forgiving; lower: the press has to be closer to the touch —
+// below 6.7 not even a melon lying flat against the wall counts.
+export const WALL_JUMP_CONTACT_RADIUS = 7; // units
 // Seconds a wall contact stays jumpable after the melon was last at the wall
 // — only a tick or two: a melon that hits a wall is pushed off it at once,
 // so the press on the touch can land a tick late. (Lift zones: longer, see
