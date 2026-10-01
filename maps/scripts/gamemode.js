@@ -18,7 +18,6 @@ function IsPlayingTeam(team) {
 // Warmup never ends, so there's never a "round start" that freezes/resets
 // racers mid-run. mp_warmup_pausetimer keeps the warmup clock from ever
 // ticking down to a real match.
-Instance.ServerCommand("sv_cheats 1");
 // Instance.ServerCommand("mp_warmup_enabled 1");
 // mp_warmup_enabled alone isn't reliable on a local/offline listen server
 // (the usual way this map gets tested) — mp_warmup_offline_enabled is the
@@ -34,7 +33,10 @@ Instance.ServerCommand("mp_limitteams 0");
 Instance.ServerCommand("mp_friendlyfire 0");
 Instance.ServerCommand("mp_solid_teammates 0"); // don't block each other on the track
 Instance.ServerCommand("mp_ignore_round_win_conditions 1");
+Instance.ServerCommand("mp_teamcashawards false");
+Instance.ServerCommand("mp_playercashawards false");
 
+/** @param {import("cs_script/point_script").CSPlayerPawn} pawn */
 function PutPlayerInRaceMode(pawn) {
     if (!IsPlayingTeam(pawn.GetTeamNumber())) {
         pawn.GetPlayerController()?.JoinTeam(RACE_TEAM);
@@ -44,25 +46,16 @@ function PutPlayerInRaceMode(pawn) {
 
 // Default CS HUD (ammo, health, money, radar, buy prompt, round timer) has
 // nothing to show in a race — only our own speedometer (custom_hud_layout,
-// see melon_drive.js) should be on screen. cl_drawhud is a leftover from the
-// old vgui HUD and no longer affects CS2's Panorama HUD; cl_draw_only_deathnotices
-// is the one broadcast/demo tools actually use to strip the Panorama HUD down
-// to (basically) nothing, so use that instead. On top of that the pawn's
-// SetHUDVisibility input (tip from the CS2 mapping Discord) turns the HUD off
-// server-side; it belongs to the pawn, so it's fired again for every new pawn
+// see melon_drive.js) should be on screen. The pawn's SetHUDVisibility input
+// (tip from the CS2 mapping Discord) turns the HUD off server-side; it
+// belongs to the pawn, so it's fired again for every new pawn
 // (OnPlayerReset).
-/** @param {number} playerSlot */
-function HideDefaultHud(playerSlot) {
-    Instance.ClientCommand(playerSlot, "cl_draw_only_deathnotices 1");
-}
-
 /** @param {import("cs_script/point_script").CSPlayerPawn} pawn */
 function HidePawnHud(pawn) {
     Instance.EntFireAtTarget({ target: pawn, input: "SetHUDVisibility", value: false });
 }
 
 Instance.OnPlayerActivate(({ player }) => {
-    HideDefaultHud(player.GetPlayerSlot());
     const pawn = player.GetPlayerPawn();
     if (pawn) {
         PutPlayerInRaceMode(pawn);
@@ -76,10 +69,6 @@ Instance.OnPlayerActivate(({ player }) => {
 Instance.OnPlayerReset(({ player }) => {
     PutPlayerInRaceMode(player);
     HidePawnHud(player);
-    const slot = player.GetPlayerController()?.GetPlayerSlot();
-    if (slot !== undefined) {
-        HideDefaultHud(slot);
-    }
 });
 
 // Pure racing: no weapon/fall/any damage at all.
