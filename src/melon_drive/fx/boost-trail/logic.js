@@ -1,5 +1,5 @@
 // When the boost trail is on (see fx/boost-trail/constants.js). Pure rule, no
-// engine import — tested in test/boost-trail.test.mjs.
+// engine import — tested in test/fx/boost-trail.test.mjs.
 import { MAX_SPEED } from "../../movement/driving/constants.js";
 import { BOOST_TRAIL_START_MARGIN, BOOST_TRAIL_STOP_MARGIN } from "./constants.js";
 

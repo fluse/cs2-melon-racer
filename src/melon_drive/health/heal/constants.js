@@ -22,7 +22,7 @@ export const HEAL_ZONE_FULL_RATE = Infinity;
 // point_template placed in Hammer holding the heal effect's
 // info_particle_system: a fresh copy is played at the melon, riding along
 // on it, every time it enters a heal zone (any kind). Must match the name
-// in Hammer; test/map-templates.test.mjs checks it's there.
+// in Hammer; test/map/map-templates.test.mjs checks it's there.
 export const HEAL_PARTICLE_TEMPLATE_NAME = "particle_health_template";
 // Seconds a spawned heal effect is kept before it's removed. Removing the
 // info_particle_system ends its particles, so this is an upper bound.

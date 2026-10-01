@@ -2,7 +2,7 @@
 // melon_drive is spawned: the break burst (health/breaking/effects.js), the
 // PERFECT spark (movement/wall-bounce/wall-bounce.js), the heal sparkle (health/heal/effect.js)
 // and the boost trail (fx/boost-trail/boost-trail.js).
-// Tested against the fake engine in test/particles.test.mjs.
+// Tested against the fake engine in test/fx/particles.test.mjs.
 //
 // Two engine quirks every caller would otherwise have to know about:
 // - ForceSpawn keeps each templated entity's Hammer offset from its

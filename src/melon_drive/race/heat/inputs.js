@@ -24,7 +24,7 @@ export function RegisterHeatInputs() {
         // elsewhere wired to hub_enter by mistake (the intro's pass-through to
         // the hub was — that should be hub_teleport) showed "start race" to
         // players just driving through, and without a matching hub_leave it
-        // never closed again. test/map-io.test.mjs catches this in the .vmap.
+        // never closed again. test/map/map-io.test.mjs catches this in the .vmap.
         // trim(): Hammer happily keeps a stray trailing space in a name (the map's
         // hub trigger had one), which would otherwise reject the real trigger.
         const callerName = caller?.GetEntityName().trim();

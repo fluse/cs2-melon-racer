@@ -1,5 +1,5 @@
 // Pure rules for generic teleporters — no cs_script import, so it's
-// unit-testable in Node (see test/teleport.test.mjs). zones/teleport/inputs.js's
+// unit-testable in Node (see test/zones/teleport.test.mjs). zones/teleport/inputs.js's
 // melon_teleport handler does the entity lookups and the actual teleport.
 import { TELEPORT_TRIGGER_NAME_PATTERN, TELEPORT_KEEP_SPEED } from "../../constants/index.js";
 

@@ -1,5 +1,5 @@
 // Pure health-bar math — no cs_script import, so it's unit-testable in
-// Node (see test/health.test.mjs). hud/ turns the result into HUD classes.
+// Node (see test/health/health.test.mjs). hud/ turns the result into HUD classes.
 import {
     HEALTH_BAR_SEGMENTS,
     HEALTH_LOW_FRACTION,

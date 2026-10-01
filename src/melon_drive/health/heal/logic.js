@@ -1,5 +1,5 @@
 // Pure healing math — no cs_script import, so it's unit-testable in Node
-// (see test/heal.test.mjs). zone.js applies it to karts.
+// (see test/health/heal.test.mjs). zone.js applies it to karts.
 import { MELON_MAX_HEALTH } from "../damage/constants.js";
 import { HEAL_ZONE_RATE, HEAL_ZONE_NAME_PATTERN, HEAL_ZONE_FULL_NAME, HEAL_ZONE_FULL_RATE } from "./constants.js";
 

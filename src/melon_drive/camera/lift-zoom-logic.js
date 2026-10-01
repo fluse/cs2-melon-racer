@@ -1,5 +1,5 @@
 // Pure rules for the lift-zone camera zoom — no cs_script import, so it's
-// unit-testable in Node (see test/lift-camera.test.mjs). camera/ applies
+// unit-testable in Node (see test/camera/lift-camera.test.mjs). camera/ applies
 // the resulting offset.
 import { LIFT_CAMERA_EXTRA_DISTANCE, LIFT_CAMERA_EXTRA_HEIGHT, LIFT_CAMERA_EASE_SECONDS } from "../constants/index.js";
 

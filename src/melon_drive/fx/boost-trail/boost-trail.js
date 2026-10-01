@@ -2,7 +2,7 @@
 // melon while ShouldShowBoostTrail (fx/boost-trail/logic.js) says so. Unlike
 // the other effects in fx/particles.js it isn't played for a fixed lifetime —
 // it runs as long as the boost does, then is stopped so the particles
-// already out fade instead of vanishing. Tested in test/boost-trail.test.mjs.
+// already out fade instead of vanishing. Tested in test/fx/boost-trail.test.mjs.
 import { SpawnFromTemplate, PlaceAll, StartParticles, StopParticles, RemoveAfter } from "../particles.js";
 import { ShouldShowBoostTrail } from "./logic.js";
 import { MomentumMaxSpeed } from "../../movement/momentum/logic.js";

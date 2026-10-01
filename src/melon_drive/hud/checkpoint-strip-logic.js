@@ -1,6 +1,6 @@
 // What the HUD's checkpoint strip shows (start flag -> numbered checkpoints
 // -> finish flag) for a kart's progress — pure, see
-// test/checkpoint-strip.test.mjs; hud/ applies it to the panels.
+// test/hud/checkpoint-strip.test.mjs; hud/ applies it to the panels.
 
 /**
  * @typedef {"reached" | "next" | "pending"} StripState

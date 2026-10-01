@@ -1,5 +1,5 @@
 // Pure rules for the melon-break sequence — no cs_script import, so it's
-// unit-testable in Node (see test/break-sequence.test.mjs). health/breaking/effects.js
+// unit-testable in Node (see test/health/break-sequence.test.mjs). health/breaking/effects.js
 // and camera/ apply the results (camera config, entity removal).
 import {
     BREAK_CAMERA_ZOOM_SECONDS,

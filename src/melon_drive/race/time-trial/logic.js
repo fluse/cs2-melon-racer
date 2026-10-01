@@ -1,5 +1,5 @@
 // Pure time-trial rules — no cs_script import, so they're unit-testable in
-// Node (see test/time-trial.test.mjs). race/time-trial/time-trial.js applies them: starts
+// Node (see test/race/time-trial.test.mjs). race/time-trial/time-trial.js applies them: starts
 // and stops a kart's run clock, and reads/writes the best times through
 // Instance.GetSaveData/SetSaveData.
 import { SAVE_DATA_BEST_TIMES_KEY } from "../../constants/index.js";

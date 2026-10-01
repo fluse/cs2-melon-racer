@@ -1,6 +1,6 @@
 // Momentum — repeatedly reaching the top speed raises it (MOMENTUM_* in
 // movement/momentum/constants.js). Pure rule, no cs_script import; movement/driving/drive.js
-// applies it (test/momentum.test.mjs).
+// applies it (test/movement/momentum.test.mjs).
 import { MAX_SPEED } from "../driving/constants.js";
 import {
     MOMENTUM_STEP,

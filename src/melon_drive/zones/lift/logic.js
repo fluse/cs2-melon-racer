@@ -1,5 +1,5 @@
 // Pure lift-zone rules — no cs_script import, so it's unit-testable in Node
-// (see test/lift-zone.test.mjs). Everything a lift zone changes about wall
+// (see test/zones/lift-zone.test.mjs). Everything a lift zone changes about wall
 // bounces and wall jumps is decided here, in one place: drive.js and jump.js
 // just read the WallRules they're handed.
 import {

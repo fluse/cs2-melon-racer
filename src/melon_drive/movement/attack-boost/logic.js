@@ -1,6 +1,6 @@
 // Attack boost — speed for health (ATTACK_BOOST_* in movement/attack-boost/constants.js).
 // Pure rule, no cs_script import; movement/driving/drive.js applies it
-// (test/attack-boost.test.mjs).
+// (test/movement/attack-boost.test.mjs).
 import { ATTACK_BOOST_HEALTH_PER_SECOND } from "../../constants/index.js";
 
 /**

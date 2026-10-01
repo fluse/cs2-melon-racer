@@ -429,7 +429,7 @@ const HEAL_ZONE_FULL_RATE = Infinity;
 // point_template placed in Hammer holding the heal effect's
 // info_particle_system: a fresh copy is played at the melon, riding along
 // on it, every time it enters a heal zone (any kind). Must match the name
-// in Hammer; test/map-templates.test.mjs checks it's there.
+// in Hammer; test/map/map-templates.test.mjs checks it's there.
 const HEAL_PARTICLE_TEMPLATE_NAME = "particle_health_template";
 // Seconds a spawned heal effect is kept before it's removed. Removing the
 // info_particle_system ends its particles, so this is an upper bound.
@@ -1095,7 +1095,7 @@ const HEARTBEAT_INTERVAL = 1; // seconds
 // core/kart-registry.js, race/heat/race-flow.js, race/track-config.js.
 
 // Pure rules for the lift-zone camera zoom — no cs_script import, so it's
-// unit-testable in Node (see test/lift-camera.test.mjs). camera/ applies
+// unit-testable in Node (see test/camera/lift-camera.test.mjs). camera/ applies
 // the resulting offset.
 
 /**
@@ -1126,7 +1126,7 @@ function LiftCameraOffset(base, blend) {
 }
 
 // Pure rules for camera zones — no cs_script import, so it's unit-testable in
-// Node (see test/camera-zone.test.mjs). camera/zone-zoom.js applies the
+// Node (see test/zones/camera-zone.test.mjs). camera/zone-zoom.js applies the
 // resulting offset.
 
 /**
@@ -1342,7 +1342,7 @@ function SetFollowOffset(kart, cameraOffset, clipToWalls) {
 }
 
 // Pure rules for the melon-break sequence — no cs_script import, so it's
-// unit-testable in Node (see test/break-sequence.test.mjs). health/breaking/effects.js
+// unit-testable in Node (see test/health/break-sequence.test.mjs). health/breaking/effects.js
 // and camera/ apply the results (camera config, entity removal).
 
 /**
@@ -1452,7 +1452,7 @@ function ApplyBreakCameraZoom(kart, elapsed) {
 }
 
 // Pure lift-zone rules — no cs_script import, so it's unit-testable in Node
-// (see test/lift-zone.test.mjs). Everything a lift zone changes about wall
+// (see test/zones/lift-zone.test.mjs). Everything a lift zone changes about wall
 // bounces and wall jumps is decided here, in one place: drive.js and jump.js
 // just read the WallRules they're handed.
 
@@ -1669,7 +1669,7 @@ function UpdateZoneCamera(kart, dt) {
 // (zoom-out in lift zones), zone-zoom.js (zoom in/out in camera zones). Other parts of melon_drive import from here.
 
 // Pure rules for generic teleporters — no cs_script import, so it's
-// unit-testable in Node (see test/teleport.test.mjs). zones/teleport/inputs.js's
+// unit-testable in Node (see test/zones/teleport.test.mjs). zones/teleport/inputs.js's
 // melon_teleport handler does the entity lookups and the actual teleport.
 
 /**
@@ -2198,7 +2198,7 @@ function IsOnPlayingTeam(pawn) {
 
 // Pure jump rules — ground jump, wall jump and the wall-jump charge — no
 // cs_script import, so they're unit-testable in Node (see
-// test/jump-logic.test.mjs). movement/jump/jump.js applies them; whether the
+// test/movement/jump-logic.test.mjs). movement/jump/jump.js applies them; whether the
 // melon is on the ground or at a wall comes from movement/contact/. See the
 // JUMP_SPEED / WALL_PROBE_DIRECTIONS comments in movement/jump/constants.js
 // for the design.
@@ -2300,7 +2300,7 @@ function WallJumpVelocity(v, n, charge) {
 }
 
 // Pure wall-bounce math — no cs_script import, so it's unit-testable in
-// Node (see test/wall-bounce.test.mjs). movement/wall-bounce/wall-bounce.js does the engine side
+// Node (see test/movement/wall-bounce.test.mjs). movement/wall-bounce/wall-bounce.js does the engine side
 // (detecting the wall normal via traces, applying the velocity, debug draws)
 // and calls into these for the numbers. See "Wall bounce — speed for health"
 // in GAMEPLAY.md for the design.
@@ -2483,7 +2483,7 @@ function WithMinSpeed(v, minSpeed) {
 
 // Momentum — repeatedly reaching the top speed raises it (MOMENTUM_* in
 // movement/momentum/constants.js). Pure rule, no cs_script import; movement/driving/drive.js
-// applies it (test/momentum.test.mjs).
+// applies it (test/movement/momentum.test.mjs).
 
 // Reaching the cap exactly: the speed is clamped to it, so allow float noise.
 const REACH_TOLERANCE = 0.5; // units/sec
@@ -2953,7 +2953,7 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
 }
 
 // Pure health-bar math — no cs_script import, so it's unit-testable in
-// Node (see test/health.test.mjs). hud/ turns the result into HUD classes.
+// Node (see test/health/health.test.mjs). hud/ turns the result into HUD classes.
 
 /**
  * What the segmented health bar should show for a given health value.
@@ -3179,7 +3179,7 @@ function GetTrackOrder() {
 }
 
 // Pure time-trial rules — no cs_script import, so they're unit-testable in
-// Node (see test/time-trial.test.mjs). race/time-trial/time-trial.js applies them: starts
+// Node (see test/race/time-trial.test.mjs). race/time-trial/time-trial.js applies them: starts
 // and stops a kart's run clock, and reads/writes the best times through
 // Instance.GetSaveData/SetSaveData.
 
@@ -3357,7 +3357,7 @@ function GetBestTime(kart, trackId) {
 
 // What the HUD's checkpoint strip shows (start flag -> numbered checkpoints
 // -> finish flag) for a kart's progress — pure, see
-// test/checkpoint-strip.test.mjs; hud/ applies it to the panels.
+// test/hud/checkpoint-strip.test.mjs; hud/ applies it to the panels.
 
 /**
  * @typedef {"reached" | "next" | "pending"} StripState
@@ -3815,7 +3815,7 @@ function UpdateUserMenu(slot, kart) {
 }
 
 // Pure healing math — no cs_script import, so it's unit-testable in Node
-// (see test/heal.test.mjs). zone.js applies it to karts.
+// (see test/health/heal.test.mjs). zone.js applies it to karts.
 
 /**
  * Health after healing for dt seconds at rate health/second, never above
@@ -3883,7 +3883,7 @@ function RestoreFullHealth(kart) {
 // melon_drive is spawned: the break burst (health/breaking/effects.js), the
 // PERFECT spark (movement/wall-bounce/wall-bounce.js), the heal sparkle (health/heal/effect.js)
 // and the boost trail (fx/boost-trail/boost-trail.js).
-// Tested against the fake engine in test/particles.test.mjs.
+// Tested against the fake engine in test/fx/particles.test.mjs.
 //
 // Two engine quirks every caller would otherwise have to know about:
 // - ForceSpawn keeps each templated entity's Hammer offset from its
@@ -4011,7 +4011,7 @@ function PlayHealEffect(kart) {
 }
 
 // Everything that heals a melon, in one place: constants.js (HEAL_ZONE_* and
-// the trigger names), logic.js (pure rules, unit-tested in test/heal.test.mjs)
+// the trigger names), logic.js (pure rules, unit-tested in test/health/heal.test.mjs)
 // zone.js (applying them to karts) and effect.js (the particle_health_template
 // played on entering a zone). The heal_enter/heal_leave inputs are
 // registered with the other zones in ../../zones/inputs.js; the constants are
@@ -4448,7 +4448,7 @@ function UpdateRaceFlow(now) {
 }
 
 // Pure checkpoint/lap progression rules — no cs_script import, so they're
-// unit-testable in Node (see test/checkpoint-progress.test.mjs).
+// unit-testable in Node (see test/race/checkpoint-progress.test.mjs).
 // race/checkpoints/checkpoints.js wires these to the start_<trackId> /
 // checkpoint_<trackId>_<index> / finish_<trackId> script inputs and handles
 // the engine side (respawn position, FinishKart, debug logging). See
@@ -4937,7 +4937,7 @@ function RegisterHudInputs() {
 
 // Pure ground/wall contact rules — is the melon on the ground, is a wall
 // right at it — no cs_script import, so it's unit-testable in Node (see
-// test/contact.test.mjs). movement/contact/contact.js runs the traces and
+// test/movement/contact.test.mjs). movement/contact/contact.js runs the traces and
 // feeds the results in here; what a jump does with them is
 // movement/jump/logic.js.
 
@@ -5033,7 +5033,7 @@ function SteerTowards(v, dir, maxTurn, maxAngle) {
 
 // Attack boost — speed for health (ATTACK_BOOST_* in movement/attack-boost/constants.js).
 // Pure rule, no cs_script import; movement/driving/drive.js applies it
-// (test/attack-boost.test.mjs).
+// (test/movement/attack-boost.test.mjs).
 
 /**
  * `velocity`'s horizontal part limited to the horizontal speed of
@@ -5130,7 +5130,7 @@ function RegisterAttackDebug() {
 }
 
 // Jump pads (JUMP_PAD_* in zones/jump-pad/constants.js). Pure rules, no cs_script
-// import; zones/jump-pad/jump-pad.js applies them (test/jump-pad.test.mjs).
+// import; zones/jump-pad/jump-pad.js applies them (test/zones/jump-pad.test.mjs).
 
 /** @typedef {{ up: number, forward: number }} JumpPad upward launch speed, horizontal speed added (units/sec) */
 /** @typedef {{ launchTime: number, landedTime?: number }} PadFlight a launch whose damage protection is still on */
@@ -6182,7 +6182,7 @@ function RegisterBreakInputs() {
 // health on respawn). Other parts of melon_drive import from here.
 
 // When the boost trail is on (see fx/boost-trail/constants.js). Pure rule, no
-// engine import — tested in test/boost-trail.test.mjs.
+// engine import — tested in test/fx/boost-trail.test.mjs.
 
 /**
  * Whether the trail should show this tick. Starts above MAX_SPEED +
@@ -6217,7 +6217,7 @@ function ShouldShowBoostTrail(showing, horizSpeed, blocked, attackBoosting = fal
 // melon while ShouldShowBoostTrail (fx/boost-trail/logic.js) says so. Unlike
 // the other effects in fx/particles.js it isn't played for a fixed lifetime —
 // it runs as long as the boost does, then is stopped so the particles
-// already out fade instead of vanishing. Tested in test/boost-trail.test.mjs.
+// already out fade instead of vanishing. Tested in test/fx/boost-trail.test.mjs.
 
 /**
  * Starts or stops the kart's trail to match its speed and attack boost. Called every tick
@@ -6569,7 +6569,7 @@ function RegisterHeatInputs() {
         // elsewhere wired to hub_enter by mistake (the intro's pass-through to
         // the hub was — that should be hub_teleport) showed "start race" to
         // players just driving through, and without a matching hub_leave it
-        // never closed again. test/map-io.test.mjs catches this in the .vmap.
+        // never closed again. test/map/map-io.test.mjs catches this in the .vmap.
         // trim(): Hammer happily keeps a stray trailing space in a name (the map's
         // hub trigger had one), which would otherwise reject the real trigger.
         const callerName = caller?.GetEntityName().trim();

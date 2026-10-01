@@ -17,7 +17,7 @@ changes there, not here. For the Hammer-side steps to build a new track
 [TRACK_CREATION.md](TRACK_CREATION.md). The full map↔script contract —
 every entity name, name pattern and `RunScriptInput` parameter the script
 knows — is [MAPPING_API.md](MAPPING_API.md): when you add, rename or remove
-one in `src/`, update it there too (`test/mapping-api-doc.test.mjs` checks
+one in `src/`, update it there too (`test/map/mapping-api-doc.test.mjs` checks
 the `*_NAME`/`*_NAME_PATTERN` constants and script inputs are listed).
 
 Current addon contents:
@@ -54,8 +54,9 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              boost-trail/, prediction/ (the guide line)
                                           #   dev/       collision-debug.js (the user-menu collision debug view), attack-debug.js
 src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
-test/*.test.mjs                          # node:test unit tests for the pure files (`npm test`), engine-side tests against the fake engine,
-                                          #   checks of the .vmap/.xml the script relies on, and module-layout.test.mjs (the folder rules below)
+test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one folder per src/melon_drive/ domain (movement/, race/, …): unit tests
+                                          #   for the pure files, engine-side tests against the fake engine (filed under the domain they're mainly about)
+test/map/*.test.mjs                      # checks of the .vmap/.xml/MAPPING_API.md the script relies on, and module-layout.test.mjs (the folder rules below)
 test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities
 test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
@@ -94,7 +95,7 @@ package, so leave it as a bare import. A JSDoc-only type from another file
   domain (`kart/`, `movement/`, `race/`, …, see the tree above); a domain
   that holds several mechanics has one subfolder per feature
   (`movement/wall-bounce/`, `zones/jump-pad/`, …). Nothing but `index.js`
-  sits loose in `src/melon_drive/` (`test/module-layout.test.mjs`).
+  sits loose in `src/melon_drive/` (`test/map/module-layout.test.mjs`).
 - **Every feature folder has the same shape** (`health/heal/` is the
   reference): `constants.js` (tunables, Hammer names), `logic.js` (pure
   rules), engine-side files named by what they do, `inputs.js` exporting a
@@ -327,16 +328,16 @@ examples — read these instead of guessing signatures:
   `constants.js` — must **not** import `cs_script/point_script` (or any
   file that does — only other `constants.js`/`logic.js`/`*-logic.js` files
   and `constants/index.js`), so Node can load them;
-  `test/module-layout.test.mjs` enforces it. The engine-side files next to
+  `test/map/module-layout.test.mjs` enforces it. The engine-side files next to
   them call into them and handle the side effects (e.g.
   `race/checkpoints/checkpoints.js` logs/`FinishKart`s based on the result
-  string `ApplyCheckpointTouch` returns). Each has a `test/<name>.test.mjs`
+  string `ApplyCheckpointTouch` returns). Each has a `test/<domain>/<name>.test.mjs`
   using the built-in `node:test` runner — run `npm test` after touching
   them, and add/adjust a test when changing a rule. Write assertions in
   terms of the constants (`WALL_BOUNCE_OPTIMAL_ANGLE`, ...) rather than
   their current values, so retuning a `constants.js` doesn't break tests.
 - **Engine-side files can be tested against a fake engine** when a rule
-  spans them (e.g. `test/view-facing.test.mjs`: every teleport/spawn path
+  spans them (e.g. `test/kart/view-facing.test.mjs`: every teleport/spawn path
   turns the player's view): `import "./helpers/register-cs-script.mjs"`
   first, then load `src/` files with dynamic `await import(...)` —
   `cs_script/point_script` resolves to `test/helpers/cs-script-mock.mjs`,

@@ -1,6 +1,6 @@
 // Pure jump rules — ground jump, wall jump and the wall-jump charge — no
 // cs_script import, so they're unit-testable in Node (see
-// test/jump-logic.test.mjs). movement/jump/jump.js applies them; whether the
+// test/movement/jump-logic.test.mjs). movement/jump/jump.js applies them; whether the
 // melon is on the ground or at a wall comes from movement/contact/. See the
 // JUMP_SPEED / WALL_PROBE_DIRECTIONS comments in movement/jump/constants.js
 // for the design.

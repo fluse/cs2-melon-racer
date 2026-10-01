@@ -91,8 +91,8 @@ racing against the clock:
 
 Times are `Instance.GetGameTime()` differences, not wall-clock or per-tick
 accumulation. Constants: `race/time-trial/constants.js`; rules:
-`race/time-trial/logic.js` (`test/time-trial.test.mjs`), applied by
-`race/time-trial/time-trial.js` (`test/time-trial-run.test.mjs`).
+`race/time-trial/logic.js` (`test/race/time-trial.test.mjs`), applied by
+`race/time-trial/time-trial.js` (`test/race/time-trial-run.test.mjs`).
 
 ## Melon props & boost pads
 
@@ -142,7 +142,7 @@ matter: `ForceSpawn` would keep each entity's offset from its template, so
 script moves particle systems exactly onto the crash site and centers the
 pieces' group on it (keeping their layout relative to each other). If lying pieces get in the karts' way, mark them as debris.
 
-`test/map-templates.test.mjs` checks the .vmap to make sure both
+`test/map/map-templates.test.mjs` checks the .vmap to make sure both
 templates exist and are wired up, and that no other `melon_break_*`
 template creeps in (the `npm test` failure names whatever's
 missing). There's no break sound yet.
@@ -236,7 +236,7 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   has decayed back to normal speed (a later non-PERFECT bounce or the attack
   boost shows the trail again). Visible to every player, so the
   others see who's boosting. Rule: `fx/boost-trail/logic.js`, applied by
-  `fx/boost-trail/boost-trail.js` (`test/boost-trail.test.mjs`).
+  `fx/boost-trail/boost-trail.js` (`test/fx/boost-trail.test.mjs`).
 - **Upward kick:** every bounce (any rating) also lifts the melon — its
   vertical speed becomes at least `WALL_BOUNCE_UP_SPEED` upward (a fall is
   cancelled; a melon already rising faster keeps its own speed — **not added
@@ -278,7 +278,7 @@ angle next to the look angle (nothing is drawn in the world). There's no global 
   `PERFECT_SPARK_LIFETIME`: one stays at the hit spot on the wall, the other
   is parented to the melon and rides along — the melon leaves the wall too
   fast for its player to see the first one. Fresh copies per hit, so several karts' perfect hits
-  at the same moment each show their own spark; `test/map-templates.test.mjs`
+  at the same moment each show their own spark; `test/map/map-templates.test.mjs`
   checks the template exists in the .vmap and points at a particle system.
 - **Prediction line** (`fx/prediction/prediction.js`, `PREDICTION_*`): a dotted line in
   front of the melon along its current direction of travel up to the next
@@ -367,7 +367,7 @@ ends. Below it "LAP 1/3", only on tracks with more than one lap. The
 checkpoint count (and the laps-to-win count used by the flow below) comes
 from that track's trigger names — see "Hub → race → next-track flow".
 Flag icons: `tools/make-icons.mjs` (`track-start`, `track-finish`); rule:
-`hud/checkpoint-strip-logic.js` (`test/checkpoint-strip.test.mjs`), applied
+`hud/checkpoint-strip-logic.js` (`test/hud/checkpoint-strip.test.mjs`), applied
 in `hud/`.
 
 **Open question this raises**: should different tracks be mutually
@@ -421,7 +421,7 @@ Phases (module-level state machine, `RacePhase` in `melon_drive.js`):
    progress" message instead of the button. Clicking the button only starts
    a heat if the phase is still `HUB`. `hub_enter`/`hub_leave` are accepted
    **only from `hub_start_trigger` itself** (checked by caller name, and in
-   the .vmap by `test/map-io.test.mjs`): any other trigger that should just
+   the .vmap by `test/map/map-io.test.mjs`): any other trigger that should just
    get melons to the hub — e.g. the intro's exit — fires `hub_teleport`
    instead, which sends the touching melon to `hub_spawn` without the modal.
 2. Clicking start: **every kart currently standing in the hub trigger**
@@ -550,7 +550,7 @@ whatever the speed (like Rocket League); letting go it keeps going only as
 long as the melon is still above the usual trail speed (see "Boost trail").
 Works on the ground and in the air, not while broken or race-locked.
 Constants: `movement/attack-boost/constants.js`; rule: `movement/attack-boost/logic.js`,
-applied in `movement/driving/drive.js` (`test/attack-boost.test.mjs`).
+applied in `movement/driving/drive.js` (`test/movement/attack-boost.test.mjs`).
 The pawn must hold no weapon: the engine gives it a knife back after spawn,
 and every knife swing shoved the melon ~140 u/s — a free boost without the
 health cost. `HoldPawn` (`kart/spawn.js`) removes weapons every tick; with
@@ -579,7 +579,7 @@ count, and the run isn't broken either. Standing still, breaking and
 race-locking end the run. Speed earned by momentum isn't a boost: no
 `Boosted` HUD state, no boost trail. Constants: `movement/momentum/constants.js`;
 rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
-(`test/momentum.test.mjs`).
+(`test/movement/momentum.test.mjs`).
 
 ## Jumping (implemented)
 
@@ -675,9 +675,9 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   - a green ring just outside the grey one while a wall jump is possible
     (at a wall, or within `WALL_JUMP_WINDOW` after).
 - Rules: `movement/contact/logic.js` (ground/wall contact,
-  `test/contact.test.mjs`) and `movement/jump/logic.js` (ground jump, wall
-  jump, charge, `test/jump-logic.test.mjs`).
-- Tests: those two and `test/jump.test.mjs` (the real
+  `test/movement/contact.test.mjs`) and `movement/jump/logic.js` (ground jump, wall
+  jump, charge, `test/movement/jump-logic.test.mjs`).
+- Tests: those two and `test/movement/jump.test.mjs` (the real
   `UpdateKart` against the fake engine).
 
 ## Jump pads (implemented)
@@ -696,7 +696,7 @@ boost's cost and `melon_break` still apply. Marked in the map by two
 ambient particle systems (`jump_pad_rings` + `jump_pad_sparks`, lime so
 they don't look like the cyan lift updraft). Constants:
 `zones/jump-pad/constants.js`; rules: `zones/jump-pad/logic.js`, applied by
-`zones/jump-pad/jump-pad.js` (`test/jump-pad.test.mjs`). Details for mappers:
+`zones/jump-pad/jump-pad.js` (`test/zones/jump-pad.test.mjs`). Details for mappers:
 MAPPING_API.md 4.9.
 
 ## Spawn points (implemented)
@@ -729,7 +729,7 @@ long fall lands hard enough for the engine to destroy the melon on impact.
   `hub_teleport`, a heat's start and its end, a checkpoint respawn after a
   break — it arrives with `MELON_MAX_HEALTH`. Only generic teleporters
   (`melon_teleport`) keep the damage (see "Teleporters").
-  `test/spawn-health.test.mjs`.
+  `test/kart/spawn-health.test.mjs`.
 - A later `OnPlayerReset` for a player who already has a kart never spawns
   or moves a melon — it only re-freezes the pawn and re-attaches the camera.
   A lost melon is brought back solely by the break/respawn logic, at the
@@ -813,7 +813,7 @@ read as a hard impact or wall hit.
 
 A trigger named wrong or pointing at a missing destination logs a
 `[melon_drive] melon_teleport: …` console message, and
-`test/map-io.test.mjs` fails on it in the .vmap. For sending a melon to the
+`test/map/map-io.test.mjs` fails on it in the .vmap. For sending a melon to the
 hub specifically, the existing `hub_teleport` input still works (it also
 takes the kart out of a running heat).
 
@@ -844,7 +844,7 @@ a burst of glowing "+" crosses rising off the melon, the same crosses and
 green/mint as the `holo_heal` gate material (`tools/make-holo.mjs`), all
 gone within the 2 s lifetime. All particle effects (break burst, PERFECT spark,
 heal) are spawned through `src/melon_drive/fx/particles.js`
-(`test/particles.test.mjs`).
+(`test/fx/particles.test.mjs`).
 
 ## Camera zones (implemented)
 
@@ -866,7 +866,7 @@ name uses `CAMERA_ZONE_EXTRA_*` (`camera/constants.js`). The camera eases
 over `CAMERA_ZONE_EASE_SECONDS` in and back out, never closer than
 `CAMERA_ZONE_MIN_DISTANCE`; overlapping camera zones don't stack (last
 entered counts), but a lift zone's zoom adds on top. Rules:
-`zones/camera-zone/logic.js` (`test/camera-zone.test.mjs`), applied by
+`zones/camera-zone/logic.js` (`test/zones/camera-zone.test.mjs`), applied by
 `camera/zone-zoom.js`. Details for mappers: MAPPING_API.md 4.8.
 
 ## Open design questions (not yet decided — ask before assuming)

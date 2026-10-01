@@ -1,6 +1,6 @@
 // Pure ground/wall contact rules — is the melon on the ground, is a wall
 // right at it — no cs_script import, so it's unit-testable in Node (see
-// test/contact.test.mjs). movement/contact/contact.js runs the traces and
+// test/movement/contact.test.mjs). movement/contact/contact.js runs the traces and
 // feeds the results in here; what a jump does with them is
 // movement/jump/logic.js.
 import {

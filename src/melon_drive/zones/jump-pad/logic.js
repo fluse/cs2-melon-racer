@@ -1,5 +1,5 @@
 // Jump pads (JUMP_PAD_* in zones/jump-pad/constants.js). Pure rules, no cs_script
-// import; zones/jump-pad/jump-pad.js applies them (test/jump-pad.test.mjs).
+// import; zones/jump-pad/jump-pad.js applies them (test/zones/jump-pad.test.mjs).
 import {
     JUMP_PAD_NAME_PATTERN,
     JUMP_PAD_UP_SPEED,

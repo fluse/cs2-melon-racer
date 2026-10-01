@@ -10,7 +10,7 @@ this file, the script doesn't know about it.
 - For *why* things behave the way they do, see [GAMEPLAY.md](GAMEPLAY.md).
 - All names below are defined in
   the `constants.js` of each folder in [src/melon_drive/](src/melon_drive/) (mostly `kart/`, `race/`, `zones/teleport/`), all re-exported by `constants/index.js`;
-  `test/mapping-api-doc.test.mjs` fails if one is missing from this file.
+  `test/map/mapping-api-doc.test.mjs` fails if one is missing from this file.
 
 ## 1. General conventions
 

@@ -1,5 +1,5 @@
 // Pure checkpoint/lap progression rules — no cs_script import, so they're
-// unit-testable in Node (see test/checkpoint-progress.test.mjs).
+// unit-testable in Node (see test/race/checkpoint-progress.test.mjs).
 // race/checkpoints/checkpoints.js wires these to the start_<trackId> /
 // checkpoint_<trackId>_<index> / finish_<trackId> script inputs and handles
 // the engine side (respawn position, FinishKart, debug logging). See

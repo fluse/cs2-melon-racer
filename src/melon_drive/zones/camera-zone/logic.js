@@ -1,5 +1,5 @@
 // Pure rules for camera zones — no cs_script import, so it's unit-testable in
-// Node (see test/camera-zone.test.mjs). camera/zone-zoom.js applies the
+// Node (see test/zones/camera-zone.test.mjs). camera/zone-zoom.js applies the
 // resulting offset.
 import {
     CAMERA_ZONE_NAME_PATTERN,
