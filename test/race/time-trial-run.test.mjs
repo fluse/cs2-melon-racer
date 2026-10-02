@@ -13,7 +13,7 @@ const { GetIntroSpawnPoint } = await import("../../src/melon_drive/kart/spawn-po
 const { BeginHeat, UpdateRaceFlow, ReturnAllToHub, RestoreRaceFlowSnapshot } = await import("../../src/melon_drive/race/heat/race-flow.js");
 const { GetBestTime } = await import("../../src/melon_drive/race/time-trial/time-trial.js");
 const { ParseSaveData, GetBestTimes } = await import("../../src/melon_drive/race/time-trial/logic.js");
-const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, COUNTDOWN_SECONDS, RacePhase } = await import("../../src/melon_drive/constants/index.js");
+const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, COUNTDOWN_SECONDS, RacePhase, StartSpawnName, SPAWN_UP_OFFSET, MELON_MAX_HEALTH } = await import("../../src/melon_drive/constants/index.js");
 await import("../../src/melon_drive/index.js"); // registers the script inputs
 
 /** @param {string} name */
@@ -63,7 +63,28 @@ test("free roam, point-to-point: the clock runs from the start line to the finis
     assert.equal(kart.runStartTime, undefined, "clock stopped");
     assert.deepEqual(kart.lastRun, { trackId: 2, time: 24.5, newBest: true, at: 34.5 });
     assert.deepEqual(SavedBest(), { 2: { anna: 24.5 } });
-    assert.equal(kart.trackId, undefined, "off the track until its start is crossed again");
+});
+
+test("free roam: the finish sends the melon straight back to the start spawn", () => {
+    const spawn = world.add(new Entity({ name: StartSpawnName(2), className: "info_target", origin: { x: 500, y: 600, z: 10 }, angles: { pitch: 0, yaw: 90, roll: 0 } }));
+    Touch(0, "start_2");
+    Touch(5, "checkpoint_2_1");
+    kart.health = 10;
+    kart.melon.Teleport({ position: { x: 9000, y: 9000, z: 0 }, velocity: { x: 300, y: 0, z: 0 } });
+    Touch(9, "end_of_track_2", "finish_2");
+
+    const origin = spawn.GetAbsOrigin();
+    assert.deepEqual(kart.melon.GetAbsOrigin(), { x: origin.x, y: origin.y, z: origin.z + SPAWN_UP_OFFSET });
+    assert.deepEqual(kart.melon.GetAbsVelocity(), { x: 0, y: 0, z: 0 });
+    assert.equal(kart.melon.GetAbsAngles().yaw, 90);
+    assert.equal(kart.health, MELON_MAX_HEALTH);
+    assert.equal(kart.trackId, 2, "still on the track, at its start");
+    assert.equal(kart.checkpointIndex, 0);
+    assert.equal(kart.runStartTime, undefined, "the clock waits for the start line");
+    assert.equal(kart.lastRun.time, 9, "the finish time stays on the HUD");
+
+    Touch(20, "start_2");
+    assert.equal(kart.runStartTime, 20, "crossing the line starts the next attempt");
 });
 
 test("a slower run keeps the best time, a faster one replaces it", () => {
@@ -76,7 +97,7 @@ test("a slower run keeps the best time, a faster one replaces it", () => {
     assert.deepEqual(SavedBest(), { 2: { anna: 25 } });
 });
 
-test("free roam, loop: the clock covers every lap, and the next attempt starts on the line", () => {
+test("free roam, loop: the clock covers every lap, then back to the start for the next attempt", () => {
     Touch(0, "start_1_laps2", "start_1");
     Touch(10, "checkpoint_1_1");
     Touch(20, "start_1_laps2", "start_1"); // lap 1 (start fires before finish)
@@ -84,13 +105,26 @@ test("free roam, loop: the clock covers every lap, and the next attempt starts o
     assert.equal(kart.runStartTime, 0, "still running after lap 1");
     Touch(30, "checkpoint_1_1");
     Touch(41, "start_1_laps2", "finish_1"); // lap 2 (this time finish fires first)
-    Touch(41, "start_1_laps2", "start_1");
+    Touch(41, "start_1_laps2", "start_1"); // the same touch: the melon is at the start spawn by now
 
     assert.equal(kart.lastRun.time, 41);
-    assert.equal(kart.runStartTime, 41, "a new attempt started on the finish line");
+    assert.equal(kart.runStartTime, undefined, "no clock until the line is crossed again");
     assert.equal(kart.trackId, 1);
     assert.equal(kart.checkpointIndex, 0);
     assert.equal(kart.lapsCompleted, 0);
+
+    Touch(50, "start_1_laps2", "start_1");
+    Touch(50, "start_1_laps2", "finish_1");
+    assert.equal(kart.runStartTime, 50, "the next attempt");
+    Touch(60, "checkpoint_1_1");
+    Touch(70, "start_1_laps2", "start_1");
+    Touch(70, "start_1_laps2", "finish_1");
+    Touch(80, "checkpoint_1_1");
+    Touch(90, "start_1_laps2", "start_1"); // last lap, start fires first this time
+    Touch(90, "start_1_laps2", "finish_1");
+    assert.equal(kart.lastRun.time, 40);
+    assert.equal(kart.runStartTime, undefined);
+    assert.equal(kart.checkpointIndex, 0);
 });
 
 test("a heat's clock starts at GO, and the finish time is recorded", () => {
@@ -131,7 +165,6 @@ test("save data other systems keep survives a new best", () => {
 // The user menu's "Restart Time Trial" (RestartTimeTrial).
 const { RestartTimeTrial } = await import("../../src/melon_drive/race/checkpoints/checkpoints.js");
 const { CanRestartTimeTrial } = await import("../../src/melon_drive/race/time-trial/time-trial.js");
-const { StartSpawnName, SPAWN_UP_OFFSET, MELON_MAX_HEALTH } = await import("../../src/melon_drive/constants/index.js");
 
 test("restart: back to the start spawn, whole and still, clock at zero until the line", () => {
     const spawn = world.add(new Entity({ name: StartSpawnName(2), className: "info_target", origin: { x: 500, y: 600, z: 10 }, angles: { pitch: 0, yaw: 90, roll: 0 } }));
@@ -156,16 +189,11 @@ test("restart: back to the start spawn, whole and still, clock at zero until the
     assert.equal(kart.runStartTime, 20, "crossing the line starts the new attempt");
 });
 
-test("restart only while on the track in a time trial — not after the finish, in a heat or off the track", () => {
+test("restart only while on the track in a time trial — not in a heat or off the track", () => {
     Touch(0, "start_2");
     Touch(5, "checkpoint_2_1");
     Touch(9, "end_of_track_2", "finish_2");
-    assert.equal(kart.trackId, undefined, "finished: off the track");
-    assert.equal(CanRestartTimeTrial(kart), false, "no restart once the race is over");
-    assert.equal(RestartTimeTrial(kart), false);
-
-    Touch(20, "start_2");
-    assert.equal(CanRestartTimeTrial(kart), true, "the next attempt has it again");
+    assert.equal(CanRestartTimeTrial(kart), true, "back at the start after the finish");
 
     kart.racing = true;
     BeginHeat(2);

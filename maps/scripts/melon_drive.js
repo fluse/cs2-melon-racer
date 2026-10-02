@@ -64,6 +64,7 @@ function TraceSphere(config) {
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
  *   runStartTime?: number, // game time this kart's timed run started (unset: no run) — see race/time-trial/time-trial.js
  *   lastRun?: { trackId: number, time: number, newBest: boolean, at: number }, // last finished run, for the HUD
+ *   finishRestartAt?: number, // game time a free-roaming finish sent the melon back to the start — see FINISH_RESTART_START_GUARD
  *   breaking: boolean, breakTime?: number, // game time BreakMelon ran, for the break camera zoom
  *   paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
  *   settled: boolean,
@@ -947,6 +948,14 @@ function CheckpointSpawnName(trackId, index) {
 
 // How long the finish time ("NEW BEST!" or not) stays on the HUD after a run.
 const RUN_RESULT_SECONDS = 5;
+
+// A free-roaming finish sends the melon straight back to the track's start
+// spawn. On a loop the finish line is the start trigger, whose start_ input
+// may fire right after finish_ for the same touch — by then the melon is
+// already at the start spawn, and that stale touch must not start the next
+// attempt's clock there. Start-line touches this soon after such a finish
+// are ignored.
+const FINISH_RESTART_START_GUARD = 0.25;
 
 // Key of the best times inside the addon's save data (Instance.SetSaveData
 // holds one string for the whole addon — a JSON object, so other systems can
@@ -4642,8 +4651,8 @@ function RunElapsed(kart, now) {
 /**
  * Whether the user menu offers "Restart Time Trial" (RestartTimeTrial in
  * race/checkpoints/checkpoints.js): only while the kart is on a track in a free-roaming time
- * trial — gone once a finish takes it off the track, and never in a heat
- * (restarting there would be a free reset mid-race).
+ * trial (a finish puts it back at that track's start, so it stays), and
+ * never in a heat (restarting there would be a free reset mid-race).
  * @param {import("../../core/kart-registry.js").Kart} kart
  */
 function CanRestartTimeTrial(kart) {
@@ -5739,6 +5748,12 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
 
 /** @param {number} trackId @param {import("../../core/kart-registry.js").Kart} kart @param {any} trigger */
 function OnStartTouched(trackId, kart, trigger) {
+    if (kart.finishRestartAt !== undefined && Instance.GetGameTime() - kart.finishRestartAt < FINISH_RESTART_START_GUARD) {
+        // The same loop-finish touch whose finish_ already sent the melon back
+        // to the start spawn (see CompleteRun) — not a new crossing.
+        Debug(`start_${trackId}: right after the finish sent the melon back to the start, ignoring`);
+        return;
+    }
     const config = GetTrackConfig()[trackId];
     const result = ApplyStartTouch(kart, trackId, { activeTrackId, config });
     switch (result) {
@@ -5751,11 +5766,6 @@ function OnStartTouched(trackId, kart, trigger) {
         case "finished":
             LogLapCompleted(trackId, kart, config);
             CompleteRun(trackId, kart);
-            if (!kart.racing) {
-                // A loop's finish line is its start line: the next attempt
-                // starts right here — same as when finish_ fires first.
-                OnStartTouched(trackId, kart, trigger);
-            }
             return;
         case "lap":
             LogLapCompleted(trackId, kart, config);
@@ -5776,8 +5786,9 @@ function OnStartTouched(trackId, kart, trigger) {
 
 /**
  * The kart's last lap is done: stops its run clock (recording a best time),
- * then parks it if it's in a heat — or, free-roaming, takes it off the track
- * until it crosses a start line again.
+ * then parks it if it's in a heat — or, free-roaming, sends it straight back
+ * to the track's start spawn for the next attempt (the finish time stays on
+ * the HUD; the clock starts again on crossing the start line).
  * @param {number} trackId @param {import("../../core/kart-registry.js").Kart} kart
  */
 function CompleteRun(trackId, kart) {
@@ -5786,9 +5797,43 @@ function CompleteRun(trackId, kart) {
         FinishKart(kart);
         return;
     }
+    if (SendToTrackStart(kart, trackId)) {
+        kart.finishRestartAt = Instance.GetGameTime();
+        return;
+    }
+    // No start trigger to go back to (can't happen for a track that was
+    // picked by one): off the track until a start line is crossed again.
     kart.trackId = undefined;
     kart.checkpointIndex = 0;
     kart.lapsCompleted = 0;
+}
+
+/**
+ * Puts the kart back at the start of `trackId` — on the track, no
+ * checkpoints or laps, the start spawn its respawn point — and the melon
+ * there, whole and standing still (a breaking melon is left to its own
+ * respawn, which now goes there too). The run clock isn't touched.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} trackId
+ * @returns {boolean} false if the track has no start trigger
+ */
+function SendToTrackStart(kart, trackId) {
+    const config = GetTrackConfig()[trackId];
+    const trigger = config && Instance.FindEntityByName(config.startEntityName);
+    if (!trigger) {
+        Debug(`SendToTrackStart: track ${trackId} has no start_${trackId} trigger`);
+        return false;
+    }
+    const spawn = GetStartSpawnPoint(trackId, trigger);
+    kart.trackId = trackId;
+    kart.checkpointIndex = 0;
+    kart.lapsCompleted = 0;
+    kart.checkpointPosition = spawn.position;
+    kart.checkpointAngles = spawn.angles;
+    if (!kart.breaking) {
+        kart.teleportGen = (kart.teleportGen ?? 0) + 1;
+        RespawnKartAtCheckpoint(kart);
+    }
+    return true;
 }
 
 // Finish: add an OnStartTouch output, RunScriptInput with parameter
@@ -5845,22 +5890,11 @@ function RestartTimeTrial(kart) {
         Debug(`RestartTimeTrial: not now (trackId=${trackId}, racing=${kart.racing}, breaking=${kart.breaking}, locked=${kart.locked})`);
         return false;
     }
-    const config = GetTrackConfig()[trackId];
-    const trigger = config && Instance.FindEntityByName(config.startEntityName);
-    if (!trigger) {
-        Debug(`RestartTimeTrial: track ${trackId} has no start_${trackId} trigger`);
+    if (!SendToTrackStart(kart, trackId)) {
         return false;
     }
-    const spawn = GetStartSpawnPoint(trackId, trigger);
     CancelRun(kart);
     kart.lastRun = undefined;
-    kart.trackId = trackId;
-    kart.checkpointIndex = 0;
-    kart.lapsCompleted = 0;
-    kart.checkpointPosition = spawn.position;
-    kart.checkpointAngles = spawn.angles;
-    kart.teleportGen = (kart.teleportGen ?? 0) + 1;
-    RespawnKartAtCheckpoint(kart);
     Debug(`RestartTimeTrial: back to the start of track ${trackId}`);
     return true;
 }
@@ -6927,7 +6961,8 @@ function ScheduleKartRebuild(slot, pawn) {
     });
 }
 
-// Player lifecycle (reset, disconnect) and the paint triggers (melon_paint).
+// Player lifecycle (reset, disconnect), the paint triggers (melon_paint) and
+// the respawn triggers (melon_respawn).
 
 function RegisterKartInputs() {
     // A reset keeps an existing kart where it is and just re-attaches it to the
@@ -6970,6 +7005,24 @@ function RegisterKartInputs() {
         const [, r, g, b] = match.map(Number);
         SetKartPaintColor(kart, { r, g, b, a: 255 });
         Debug(`melon_paint: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} painted (${r}, ${g}, ${b})`);
+    });
+
+    // Respawn trigger: any trigger_multiple (filtered to prop_physics) whose
+    // OnStartTouch calls RunScriptInput "melon_respawn" puts the touching melon
+    // straight back at its respawn point (last checkpoint, else start/hub/
+    // tutorial spawn) — for drops off an open track. Unlike melon_break: no
+    // break, no effects, no delay; same as the user menu's respawn button.
+    Instance.OnScriptInput("melon_respawn", ({ activator }) => {
+        const kart = activator && FindKartByMelon(activator);
+        if (!kart) {
+            Debug("melon_respawn: activator wasn't a tracked melon, ignoring");
+            return;
+        }
+        if (kart.breaking || kart.locked) {
+            return; // respawns on its own already, or parked by the race flow (countdown, finished)
+        }
+        Debug(`melon_respawn: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} sent back to its respawn point`);
+        RespawnKartAtCheckpoint(kart);
     });
 }
 

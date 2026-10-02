@@ -29,7 +29,8 @@ Nobody dies: `gamemode` aborts all player damage. Instead the melon breaks
 (health at 0, or a kill trigger) and respawns at its respawn point — see
 "Melon health & breaking". There's no automatic out-of-bounds volume: a
 drop the map shouldn't forgive gets a kill trigger (`melon_break`), one it
-should gets a teleporter.
+should gets a respawn trigger (`melon_respawn`, back to the last checkpoint)
+or a teleporter.
 
 ## Ambience
 
@@ -55,16 +56,19 @@ racing against the clock:
   no separate lap times (decided). Breaking doesn't stop it: the respawn
   costs time, that's the penalty. Leaving the track (hub, tutorial, a new
   heat) cancels the run without a time.
-- Outside a heat, finishing takes the melon off the track until it crosses
-  a start line again — except on a loop, where the finish line *is* the
-  start line: the next attempt starts right there.
+- Outside a heat, the finish sends the melon **straight back to the
+  track's start spawn** (decided) — whole and standing still, still on the
+  track, the clock at zero until it crosses the start line again; the
+  finish time stays on the HUD meanwhile. Point-to-point and loop alike: on
+  a loop the start input firing for the same finish touch is ignored
+  (`FINISH_RESTART_START_GUARD`), so the next attempt's clock doesn't start
+  at the spawn.
 - **Restart:** only while the melon is on a track in a free-roaming time
   trial (decided), the user menu shows "Restart Time Trial" under the
   NAVIGATION buttons: the melon goes back to the track's start spawn, whole
   and standing still, the clock at zero until it crosses the start line
-  again. Gone once a finish takes the melon off the track (a loop's next
-  attempt has it again), in a heat (a free reset mid-race), in the hub or
-  tutorial; ignored while the melon is breaking. `RestartTimeTrial` in
+  again. Not in a heat (a free reset mid-race), in the hub or tutorial;
+  ignored while the melon is breaking. `RestartTimeTrial` in
   `race/checkpoints/checkpoints.js`, `CanRestartTimeTrial` in `race/time-trial/time-trial.js`.
 - Each player's **best time per track** is saved with
   `Instance.SetSaveData` (one JSON object for the addon, best times under
@@ -138,6 +142,13 @@ missing). There's no break sound.
 melon at once, whatever its health — the same break as above (effects at
 the spot, respawn at the last checkpoint). For lava, spikes, a drop that
 shouldn't be survivable, … Broken or race-locked melons ignore it.
+
+**Respawn triggers:** for an open track a melon can fall off, the same
+kind of trigger firing `melon_respawn` instead sends the melon straight
+back to its respawn point — no break, no effects, no delay, full health,
+standing still; the same as the user menu's respawn button
+(`RespawnKartAtCheckpoint`). Progress and a running time trial stay (the
+fall costs time). Broken or race-locked melons ignore it.
 
 Tune via `IMPACT_DAMAGE_THRESHOLD` (units/sec of sudden velocity change
 before damage starts) and `IMPACT_DAMAGE_SCALE` (health lost per unit/sec

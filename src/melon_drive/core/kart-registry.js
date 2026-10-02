@@ -11,6 +11,7 @@ import { predictionDotSet } from "./trace.js";
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
  *   runStartTime?: number, // game time this kart's timed run started (unset: no run) — see race/time-trial/time-trial.js
  *   lastRun?: { trackId: number, time: number, newBest: boolean, at: number }, // last finished run, for the HUD
+ *   finishRestartAt?: number, // game time a free-roaming finish sent the melon back to the start — see FINISH_RESTART_START_GUARD
  *   breaking: boolean, breakTime?: number, // game time BreakMelon ran, for the break camera zoom
  *   paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
  *   settled: boolean,

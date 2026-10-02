@@ -62,3 +62,24 @@ test("melon_break ignores anything that isn't a tracked melon", () => {
     ScriptInput("melon_break")({ caller: trigger, activator: new Entity({ className: "prop_physics" }) });
     assert.ok(!kart.breaking);
 });
+
+// The melon_respawn script input (respawn trigger): sends the melon straight
+// back to its respawn point — no break, full health.
+test("melon_respawn puts the melon back at its respawn point without breaking it", () => {
+    kart.health = 1;
+    kart.melon.Teleport({ position: { x: 5000, y: 5000, z: -3000 }, velocity: { x: 0, y: 0, z: -900 } });
+    ScriptInput("melon_respawn")({ caller: trigger, activator: kart.melon });
+    assert.ok(!kart.breaking, "not broken");
+    assert.equal(kart.health, MELON_MAX_HEALTH);
+    assert.deepEqual(kart.melon.GetAbsOrigin(), kart.checkpointPosition);
+    assert.deepEqual(kart.melon.GetAbsVelocity(), { x: 0, y: 0, z: 0 });
+});
+
+test("melon_respawn ignores a race-locked melon", () => {
+    kart.locked = true;
+    const before = kart.melon.GetAbsOrigin();
+    kart.melon.Teleport({ position: { x: 5000, y: 5000, z: -3000 } });
+    ScriptInput("melon_respawn")({ caller: trigger, activator: kart.melon });
+    assert.notDeepEqual(kart.melon.GetAbsOrigin(), before);
+    assert.deepEqual(kart.melon.GetAbsOrigin(), { x: 5000, y: 5000, z: -3000 });
+});

@@ -28,6 +28,7 @@ const SCRIPT_INPUTS = [
     "melon_paint",
     "melon_teleport",
     "melon_break",
+    "melon_respawn",
     "heal_enter",
     "heal_leave",
     "lift_enter",

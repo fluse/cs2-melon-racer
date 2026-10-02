@@ -23,7 +23,7 @@ this folder, the script doesn't know about it.
 | 5 | [Hub](05-hub.md) | Hub start area, `hub_teleport` |
 | 6 | [Paint triggers](06-paint-triggers.md) | Recolor the melon |
 | 7 | [Teleporters](07-teleporters.md) | Generic teleports, respawn teleporters |
-| 8 | [Kill triggers](08-kill-triggers.md) | Break the melon on the spot |
+| 8 | [Kill & respawn triggers](08-kill-triggers.md) | Break the melon on the spot, or send it back to its checkpoint |
 | 9 | [Heal zones](09-heal-zones.md) | Heal over time, full-heal zones |
 | 10 | [Lift zones](10-lift-zones.md) | Climb shafts by bouncing between walls |
 | 11 | [Camera zones](11-camera-zones.md) | Zoom out/in, front view, close-up |
@@ -48,7 +48,8 @@ script, and `npm test` fails on it.
 | `hub_teleport` | Start | any trigger | — | [Hub](05-hub.md#sending-melons-to-the-hub) |
 | `melon_paint` | Start | `paint_trigger_<r>_<g>_<b>` | name (color) | [Paint triggers](06-paint-triggers.md) |
 | `melon_teleport` | Start | `teleport_[stop_\|keep_][checkpoint_]to_<destination>` | name (mode, respawn, destination) | [Teleporters](07-teleporters.md) |
-| `melon_break` | Start | any trigger | — | [Kill triggers](08-kill-triggers.md) |
+| `melon_break` | Start | any trigger | — | [Kill triggers](08-kill-triggers.md#kill-trigger) |
+| `melon_respawn` | Start | any trigger | — | [Respawn triggers](08-kill-triggers.md#respawn-trigger) |
 | `heal_enter` | Start | any heal trigger | name (rate / `heal_zone_full`) | [Heal zones](09-heal-zones.md) |
 | `heal_leave` | **End** | the same heal trigger | — | [Heal zones](09-heal-zones.md) |
 | `lift_enter` | Start | any lift trigger | name (kick) | [Lift zones](10-lift-zones.md) |

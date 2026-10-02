@@ -167,9 +167,17 @@
     }
 }
 
+/* Full circle width + text-align, not a content-sized label centered by
+   horizontal-align: a narrow glyph like "1" sits off-center that way.
+   The 1px nudge down: the font's line box reserves descender room that
+   digits don't use, so centered digits otherwise sit ~1px high. */
 .StripNumber {
-    horizontal-align: center;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    text-align: center;
     vertical-align: center;
+    transform: translateY(1px);
     font-size: 13px;
     font-weight: bold;
     color: #ffffffaa;

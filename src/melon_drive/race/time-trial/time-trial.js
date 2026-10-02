@@ -84,8 +84,8 @@ export function RunElapsed(kart, now) {
 /**
  * Whether the user menu offers "Restart Time Trial" (RestartTimeTrial in
  * race/checkpoints/checkpoints.js): only while the kart is on a track in a free-roaming time
- * trial — gone once a finish takes it off the track, and never in a heat
- * (restarting there would be a free reset mid-race).
+ * trial (a finish puts it back at that track's start, so it stays), and
+ * never in a heat (restarting there would be a free reset mid-race).
  * @param {import("../../core/kart-registry.js").Kart} kart
  */
 export function CanRestartTimeTrial(kart) {

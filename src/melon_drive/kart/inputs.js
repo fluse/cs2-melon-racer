@@ -1,9 +1,11 @@
-// Player lifecycle (reset, disconnect) and the paint triggers (melon_paint).
+// Player lifecycle (reset, disconnect), the paint triggers (melon_paint) and
+// the respawn triggers (melon_respawn).
 import { Instance } from "cs_script/point_script";
 import { Debug } from "../core/debug.js";
 import { karts, EnsureModerator, FindKartByMelon, DropKart } from "../core/kart-registry.js";
 import { SetUpPlayerKart, ForgetIntroLogo } from "./spawn.js";
 import { SetKartPaintColor } from "./look.js";
+import { RespawnKartAtCheckpoint } from "./teleport.js";
 import { ResetHudForPlayer } from "../hud/layout.js";
 import { PAINT_TRIGGER_NAME_PATTERN } from "../constants/index.js";
 
@@ -48,5 +50,23 @@ export function RegisterKartInputs() {
         const [, r, g, b] = match.map(Number);
         SetKartPaintColor(kart, { r, g, b, a: 255 });
         Debug(`melon_paint: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} painted (${r}, ${g}, ${b})`);
+    });
+
+    // Respawn trigger: any trigger_multiple (filtered to prop_physics) whose
+    // OnStartTouch calls RunScriptInput "melon_respawn" puts the touching melon
+    // straight back at its respawn point (last checkpoint, else start/hub/
+    // tutorial spawn) — for drops off an open track. Unlike melon_break: no
+    // break, no effects, no delay; same as the user menu's respawn button.
+    Instance.OnScriptInput("melon_respawn", ({ activator }) => {
+        const kart = activator && FindKartByMelon(activator);
+        if (!kart) {
+            Debug("melon_respawn: activator wasn't a tracked melon, ignoring");
+            return;
+        }
+        if (kart.breaking || kart.locked) {
+            return; // respawns on its own already, or parked by the race flow (countdown, finished)
+        }
+        Debug(`melon_respawn: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} sent back to its respawn point`);
+        RespawnKartAtCheckpoint(kart);
     });
 }
