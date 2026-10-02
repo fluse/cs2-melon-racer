@@ -409,6 +409,19 @@
 							<Label class="UserMenuOutlineLabel" text="COLLISION DEBUG: {s:collisiondebug_state}" />
 						</Button>
 					</Panel>
+
+					<!-- Per-player free look: fly through the map with WASD, the
+					     melon waits frozen (dev/free-look.js). Off by default;
+					     switched off again here (USE opens the menu). -->
+					<Panel class="UserMenuSection">
+						<Panel class="UserMenuSectionHeader">
+							<Image class="UserMenuSectionIcon" src="file://{images}/custom_game/icons/free-look.png" />
+							<Label class="UserMenuSectionLabel" text="FREE LOOK" />
+						</Panel>
+						<Button id="usermenu_freelook_button" class="UserMenuOutlineButton">
+							<Label class="UserMenuOutlineLabel" text="FREE LOOK: {s:freelook_state}" />
+						</Button>
+					</Panel>
 				</Panel>
 
 				<Image class="UserMenuLogo" src="file://{images}/custom_game/logo_melon_racer.png" />

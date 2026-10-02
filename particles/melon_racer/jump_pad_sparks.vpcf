@@ -10,7 +10,7 @@
 	// Tuning: emit rate = how many, velocity x lifetime = how high
 	// (~1.35 s, ~85 u/s slowing under gravity ≈ 100 units), sphere radius =
 	// pad size.
-	m_nMaxParticles = 40
+	m_nMaxParticles = 60
 	m_flConstantRadius = 1.0
 	m_flPreSimulationTime = 4.0
 	m_ConstantColor = [ 255, 255, 255, 255 ]
@@ -22,7 +22,10 @@
 			m_flDiffuseAmount = 0.0
 			m_flSelfIllumAmount = 1.0
 			m_hTexture = resource:"materials/effects/glows/simple_glow_001.vtex"
-			m_bAdditive = true
+			// Not additive (decided): additive lime on a bright scene washed out
+			// to a faint, see-through shimmer. Alpha-blended it stays solid
+			// and saturated over any background (the texture has alpha, DXT5).
+			m_bAdditive = false
 			m_flMaxLength = 18.0
 			m_flMinLength = 8.0
 			m_flLengthFadeInTime = 0.1
@@ -70,8 +73,8 @@
 			m_InputValue =
 			{
 				m_nType = "PF_TYPE_RANDOM_UNIFORM"
-				m_flRandomMin = 0.8
-				m_flRandomMax = 1.4
+				m_flRandomMin = 1.4
+				m_flRandomMax = 2.2
 				m_nRandomMode = "PF_RANDOM_MODE_CONSTANT"
 			}
 		},
@@ -81,17 +84,17 @@
 			m_InputValue =
 			{
 				m_nType = "PF_TYPE_RANDOM_UNIFORM"
-				m_flRandomMin = 0.6
+				m_flRandomMin = 1.0
 				m_flRandomMax = 1.0
 				m_nRandomMode = "PF_RANDOM_MODE_CONSTANT"
 			}
 			m_nOutputField = 7
 		},
-		// lime to yellow-white, the rings' color with hot centers
+		// strong lime to yellow-lime, the rings' color
 		{
 			_class = "C_INIT_RandomColor"
-			m_ColorMin = [ 150, 255, 60, 255 ]
-			m_ColorMax = [ 240, 255, 180, 255 ]
+			m_ColorMin = [ 90, 230, 20, 255 ]
+			m_ColorMax = [ 200, 255, 60, 255 ]
 		},
 		// fast, mostly straight up, a little spread
 		{
@@ -106,7 +109,7 @@
 		{
 			_class = "C_OP_ContinuousEmitter"
 			// A plain number here — the { m_nType ... } form compiles to 0.
-			m_flEmitRate = 6.0
+			m_flEmitRate = 9.0
 		},
 	]
 }

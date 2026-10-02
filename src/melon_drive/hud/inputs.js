@@ -7,11 +7,12 @@ import { RespawnKartAtCheckpoint } from "../kart/teleport.js";
 import { IsMelonGlowOn, SetMelonGlow, SetKartPaintColor } from "../kart/look.js";
 import { IsPredictionOn, SetPrediction } from "../fx/prediction/prediction.js";
 import { IsCollisionDebugOn, SetCollisionDebug } from "../dev/collision-debug.js";
+import { IsFreeLookOn, SetFreeLook } from "../dev/free-look.js";
 import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial } from "../race/heat/race-flow.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { GetSpeedHud } from "./layout.js";
 import { HideHubModal } from "./hub-modal.js";
-import { SetUserMenuOpen, UpdateCollisionDebugHud, UpdateMelonGlowHud, UpdatePredictionHud } from "./user-menu.js";
+import { SetUserMenuOpen, UpdateCollisionDebugHud, UpdateFreeLookHud, UpdateMelonGlowHud, UpdatePredictionHud } from "./user-menu.js";
 import { COLOR_PRESETS } from "../constants/index.js";
 
 export function RegisterHudInputs() {
@@ -119,6 +120,19 @@ export function RegisterHudInputs() {
             if (kart) {
                 SetCollisionDebug(kart, !IsCollisionDebugOn(kart));
                 UpdateCollisionDebugHud(slot, kart);
+            }
+        } else if (event.buttonId === "usermenu_freelook_button") {
+            // Per player: this player flies their own pawn around, their
+            // melon waits frozen (dev/free-look.js). Switching it on closes
+            // the menu so the mouse looks around right away.
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart) {
+                const on = SetFreeLook(kart, !IsFreeLookOn(kart));
+                UpdateFreeLookHud(slot, kart);
+                if (on) {
+                    SetUserMenuOpen(slot, kart, false);
+                }
             }
         } else if (event.buttonId.startsWith("usermenu_color_")) {
             const key = event.buttonId.slice("usermenu_color_".length);

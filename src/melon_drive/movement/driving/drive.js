@@ -66,6 +66,15 @@ export function UpdateKart(slot, kart, dt) {
         return;
     }
 
+    // Free look (dev/free-look.js): the player is flying their pawn around,
+    // the melon waits where it was, motion off — no driving, no impacts.
+    if (kart.freeLook) {
+        kart.lastVelocity = undefined;
+        kart.settled = false;
+        kart.attackBoosting = false;
+        return;
+    }
+
     // Broken and waiting out BREAK_RESPAWN_DELAY (see BreakMelon) — unlike
     // `locked` above, freeze completely (gravity included). It's already
     // hidden at the crash site, and should just hold still until the delayed

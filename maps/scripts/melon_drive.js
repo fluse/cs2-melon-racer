@@ -88,6 +88,7 @@ function TraceSphere(config) {
  *   attackGuardUntil?: number, // until when engine pushes from attack are cancelled — see ATTACK_PUSH_GUARD_SECONDS
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
  *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
+ *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
@@ -1172,6 +1173,14 @@ const CAMERA_CLOSEUP_EASE_SECONDS = 1.2;
 // Think's debug heartbeat log interval — see core/think.js.
 const HEARTBEAT_INTERVAL = 1; // seconds
 
+// Developer aids (dev/).
+
+// Free look (dev/free-look.js): the player's own pawn flies through the map
+// (it's already NOCLIP, see FreezePawn) and the view switches to its eyes.
+// Switching it on puts those eyes where the chase camera was: the pawn's
+// origin goes FREE_LOOK_EYE_HEIGHT below that spot (CS2's standing eye height).
+const FREE_LOOK_EYE_HEIGHT = 64;
+
 // All tunable numbers and static/Hammer-naming-convention data for
 // melon_drive, one file per system they configure. Import from here, not
 // from the single files. Actual mutable runtime state (kart registry, race
@@ -1487,11 +1496,11 @@ function ApplyCameraFollow(kart) {
 /**
  * Per tick: the chase camera with every zoom and the wall pull-in eased on.
  * Left alone while the melon is breaking — the break camera owns it then,
- * and the respawn re-applies it.
+ * and the respawn re-applies it — and in free look (dev/free-look.js).
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 function UpdateFollowCamera(kart, dt) {
-    if (kart.breaking) {
+    if (kart.breaking || kart.freeLook) {
         return;
     }
     ApplyZonedFollowOffset(kart, dt);
@@ -2155,6 +2164,72 @@ function HideMelonGlow(kart) {
     }
 }
 
+// Free look: fly through the map with the player's own pawn instead of
+// driving. Toggled per player from the user menu (kart.freeLook, see
+// SetFreeLook); off by default. The pawn is NOCLIP anyway (FreezePawn), so
+// while this is on HoldPawn just stops pulling it back to its anchor, WASD
+// flies it along the view, and the camera shows its eyes (DISABLED mode)
+// instead of chasing the melon. The melon waits where it was, frozen
+// (UpdateKart skips it; physics motion off), and switching back puts the
+// pawn back on its anchor and the chase camera back on the melon.
+
+/** @param {import("../core/kart-registry.js").Kart} kart */
+function IsFreeLookOn(kart) {
+    return Boolean(kart.freeLook);
+}
+
+/**
+ * Turns free look on/off for this kart's player. Not while the melon is
+ * breaking: the respawn would switch its motion and the chase camera back on
+ * mid-flight. Returns whether it's on now.
+ * @param {import("../core/kart-registry.js").Kart} kart @param {boolean} on
+ */
+function SetFreeLook(kart, on) {
+    if (on === IsFreeLookOn(kart)) {
+        return on;
+    }
+    if (on && (kart.breaking || !kart.melon.IsValid())) {
+        Debug("SetFreeLook: melon is breaking/gone, not switching free look on");
+        return false;
+    }
+    kart.freeLook = on;
+    if (kart.melon.IsValid()) {
+        kart.melon.Move({ velocity: { x: 0, y: 0, z: 0 }, angularVelocity: { x: 0, y: 0, z: 0 } });
+        Instance.EntFireAtTarget({ target: kart.melon, input: on ? "DisableMotion" : "EnableMotion" });
+    }
+    // Driving starts over from rest — the frozen ticks aren't an impact.
+    kart.lastVelocity = undefined;
+    kart.prevLastVelocity = undefined;
+    kart.settled = false;
+    if (!kart.pawn.IsValid()) {
+        return on;
+    }
+    if (on) {
+        kart.pawn.Teleport({ position: ChaseCameraFeet(kart), velocity: { x: 0, y: 0, z: 0 } });
+        kart.pawn.GetCustomCamera().SetMode(CustomCameraMode.DISABLED);
+    } else {
+        kart.pawn.Teleport({ position: kart.pawnAnchor, velocity: { x: 0, y: 0, z: 0 } });
+        ApplyCameraFollow(kart);
+    }
+    Debug(`SetFreeLook: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} free look ${on ? "on" : "off"}`);
+    return on;
+}
+
+/**
+ * Roughly where the chase camera sits (behind the melon along the view's
+ * yaw), as a pawn origin — so the view doesn't jump when free look starts.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function ChaseCameraFeet(kart) {
+    const melon = kart.melon.GetAbsOrigin();
+    const yaw = (kart.pawn.GetEyeAngles().yaw * Math.PI) / 180;
+    return {
+        x: melon.x - Math.cos(yaw) * CAMERA_DISTANCE,
+        y: melon.y - Math.sin(yaw) * CAMERA_DISTANCE,
+        z: melon.z + FOLLOW_OFFSET.z + CAMERA_HEIGHT - FREE_LOOK_EYE_HEIGHT,
+    };
+}
+
 // Spawn flow, in one sentence: a player without a kart gets a new one at the
 // spawn point the caller picks (the intro on join); a player who already has
 // one keeps it as-is — a lost melon is brought back by the break/respawn
@@ -2234,6 +2309,9 @@ function HoldPawn(kart) {
     if (kart.pawn.GetActiveWeapon()) {
         kart.pawn.DestroyWeapons();
     }
+    if (kart.freeLook) {
+        return; // flying through the map — see dev/free-look.js
+    }
     const anchor = kart.pawnAnchor;
     const at = kart.pawn.GetAbsOrigin();
     if (!anchor || Math.hypot(at.x - anchor.x, at.y - anchor.y, at.z - anchor.z) <= PAWN_DRIFT_TOLERANCE) {
@@ -2270,6 +2348,7 @@ function NewKartRecord(pawn, melon, spawnPoint) {
         userMenuOpen: false,
         hubModalOpen: false,
         collisionDebug: false,
+        freeLook: false,
         predictionLine: false,
         melonGlow: true,
         pawnAnchor: pawn.GetAbsOrigin(),
@@ -2323,6 +2402,8 @@ function SetUpPlayerKart(pawn, newKartSpawnPoint) {
             return undefined;
         }
     }
+    // A new pawn ends free look (the old one was flying, the camera is reset).
+    SetFreeLook(kart, false);
     kart.pawn = pawn;
     FreezePawn(pawn);
     kart.pawnAnchor = pawn.GetAbsOrigin();
@@ -2356,7 +2437,7 @@ function EnsurePlayerKarts() {
         } else if (kart.pawn !== pawn) {
             Debug(`EnsurePlayerKarts: slot ${slot} got a new pawn, moving the kart over`);
             SetUpPlayerKart(pawn, undefined);
-        } else if (kart.melon.IsValid() && !kart.breaking && pawn.GetCustomCamera().GetMode() !== CustomCameraMode.FOLLOW_POSITION) {
+        } else if (kart.melon.IsValid() && !kart.breaking && !kart.freeLook && pawn.GetCustomCamera().GetMode() !== CustomCameraMode.FOLLOW_POSITION) {
             Debug(`EnsurePlayerKarts: slot ${slot} lost the chase camera, re-attaching`);
             SetUpPlayerKart(pawn, undefined);
         }
@@ -5064,6 +5145,7 @@ function SetUserMenuOpen(slot, kart, open) {
         UpdateMelonGlowHud(slot, kart);
         UpdatePredictionHud(slot, kart);
         UpdateCollisionDebugHud(slot, kart);
+        UpdateFreeLookHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
 }
@@ -5109,6 +5191,20 @@ function UpdateCollisionDebugHud(slot, kart) {
     const on = IsCollisionDebugOn(kart);
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_collisiondebug_button", "collisiondebug_state", on ? "ON" : "OFF");
     hud.SetHasClassForPlayer(slot, "usermenu_collisiondebug_button", "ToggleOn", on);
+}
+
+/**
+ * The user menu's free look toggle button: its ON/OFF text and highlight.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+function UpdateFreeLookHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const on = IsFreeLookOn(kart);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_freelook_button", "freelook_state", on ? "ON" : "OFF");
+    hud.SetHasClassForPlayer(slot, "usermenu_freelook_button", "ToggleOn", on);
 }
 
 /** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart */
@@ -5304,6 +5400,7 @@ function BeginHeat(trackId) {
     const racers = CurrentRacers();
     racers.forEach((kart, i) => {
         const position = LineUpPosition(center, angles, i, racers.length);
+        SetFreeLook(kart, false); // a racer flying around would miss the countdown in a frozen melon
         // A melon destroyed mid-BREAK is still pending its respawn (see
         // HandleMelonLost) — skip the teleport rather than throw on a dead
         // entity; that respawn lands it at the checkpointPosition set below.
@@ -6050,6 +6147,19 @@ function RegisterHudInputs() {
                 SetCollisionDebug(kart, !IsCollisionDebugOn(kart));
                 UpdateCollisionDebugHud(slot, kart);
             }
+        } else if (event.buttonId === "usermenu_freelook_button") {
+            // Per player: this player flies their own pawn around, their
+            // melon waits frozen (dev/free-look.js). Switching it on closes
+            // the menu so the mouse looks around right away.
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart) {
+                const on = SetFreeLook(kart, !IsFreeLookOn(kart));
+                UpdateFreeLookHud(slot, kart);
+                if (on) {
+                    SetUserMenuOpen(slot, kart, false);
+                }
+            }
         } else if (event.buttonId.startsWith("usermenu_color_")) {
             const key = event.buttonId.slice("usermenu_color_".length);
             const preset = COLOR_PRESETS[key];
@@ -6411,6 +6521,15 @@ function UpdateKart(slot, kart, dt) {
         kart.attackBoosting = false;
         kart.pendingBounce = undefined; // parked/finished — a bounce's leftover damage no longer matters
         kart.padFlight = undefined;
+        return;
+    }
+
+    // Free look (dev/free-look.js): the player is flying their pawn around,
+    // the melon waits where it was, motion off — no driving, no impacts.
+    if (kart.freeLook) {
+        kart.lastVelocity = undefined;
+        kart.settled = false;
+        kart.attackBoosting = false;
         return;
     }
 
@@ -7243,8 +7362,8 @@ function RegisterRaceInputs() {
     RegisterHeatInputs();
 }
 
-// Developer aids only: the user menu's collision debug view (collision-debug.js) and
-// the attack button log (attack-debug.js, with DEBUG on).
+// Developer aids only: the user menu's collision debug view (collision-debug.js),
+// its free look (free-look.js) and the attack button log (attack-debug.js, with DEBUG on).
 
 Instance.SetThink(Think);
 Instance.SetNextThink(Instance.GetGameTime());

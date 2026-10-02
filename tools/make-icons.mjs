@@ -155,6 +155,11 @@ const ICONS = {
             union(...[0, 1, 2, 3].flatMap((row) => [0, 1, 2, 3, 4].filter((col) => (row + col) % 2 === 1).map((col) => rect(18.5 + col * 7.2, 9.5 + row * 6.5, 18.5 + (col + 1) * 7.2, 9.5 + (row + 1) * 6.5)))),
         ),
     ),
+    // Eye — FREE LOOK.
+    "free-look": union(
+        cut(ellipse(32, 32, 28, 15), ellipse(32, 32, 23.5, 10.5)),
+        cut(circle(32, 32, 10), circle(35, 29, 3.5)),
+    ),
     // Bug — COLLISION DEBUG.
     debug: union(
         cut(ellipse(32, 40, 12, 15), line(32, 29, 32, 56, 1.3)),

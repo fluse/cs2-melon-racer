@@ -15,6 +15,7 @@ import { GetHubSpawnPoint, GetIntroSpawnPoint, GetStartSpawnPoint, FacePlayerVie
 import { RestoreFullHealth } from "../../health/heal/index.js";
 import { StartRun, CancelRun } from "../time-trial/time-trial.js";
 import { BreakCountdownValue, CountdownDigits } from "./logic.js";
+import { SetFreeLook } from "../../dev/free-look.js";
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
 // See GAMEPLAY.md's "Hub -> race -> next-track flow" for the full design.
@@ -173,6 +174,7 @@ export function BeginHeat(trackId) {
     const racers = CurrentRacers();
     racers.forEach((kart, i) => {
         const position = LineUpPosition(center, angles, i, racers.length);
+        SetFreeLook(kart, false); // a racer flying around would miss the countdown in a frozen melon
         // A melon destroyed mid-BREAK is still pending its respawn (see
         // HandleMelonLost) — skip the teleport rather than throw on a dead
         // entity; that respawn lands it at the checkpointPosition set below.

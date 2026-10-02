@@ -1,5 +1,6 @@
 import { CSInputs } from "cs_script/point_script";
 import { IsCollisionDebugOn } from "../dev/collision-debug.js";
+import { IsFreeLookOn } from "../dev/free-look.js";
 import { IsPredictionOn } from "../fx/prediction/prediction.js";
 import { IsMelonGlowOn } from "../kart/look.js";
 import { CanRestartTimeTrial } from "../race/time-trial/time-trial.js";
@@ -25,6 +26,7 @@ export function SetUserMenuOpen(slot, kart, open) {
         UpdateMelonGlowHud(slot, kart);
         UpdatePredictionHud(slot, kart);
         UpdateCollisionDebugHud(slot, kart);
+        UpdateFreeLookHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
 }
@@ -70,6 +72,20 @@ export function UpdateCollisionDebugHud(slot, kart) {
     const on = IsCollisionDebugOn(kart);
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_collisiondebug_button", "collisiondebug_state", on ? "ON" : "OFF");
     hud.SetHasClassForPlayer(slot, "usermenu_collisiondebug_button", "ToggleOn", on);
+}
+
+/**
+ * The user menu's free look toggle button: its ON/OFF text and highlight.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+export function UpdateFreeLookHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const on = IsFreeLookOn(kart);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_freelook_button", "freelook_state", on ? "ON" : "OFF");
+    hud.SetHasClassForPlayer(slot, "usermenu_freelook_button", "ToggleOn", on);
 }
 
 /** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart */

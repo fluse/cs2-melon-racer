@@ -36,11 +36,11 @@ export function ApplyCameraFollow(kart) {
 /**
  * Per tick: the chase camera with every zoom and the wall pull-in eased on.
  * Left alone while the melon is breaking — the break camera owns it then,
- * and the respawn re-applies it.
+ * and the respawn re-applies it — and in free look (dev/free-look.js).
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 export function UpdateFollowCamera(kart, dt) {
-    if (kart.breaking) {
+    if (kart.breaking || kart.freeLook) {
         return;
     }
     ApplyZonedFollowOffset(kart, dt);

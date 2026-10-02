@@ -5,6 +5,7 @@ import { ApplyCameraFollow } from "../camera/index.js";
 import { FacePlayerView, GetIntroSpawnPoint } from "./spawn-points.js";
 import { GetSpeedHud } from "../hud/layout.js";
 import { ShowMelonPaint } from "./look.js";
+import { SetFreeLook } from "../dev/free-look.js";
 import {
     MELON_TEMPLATE_NAME,
     PAWN_DRIFT_TOLERANCE,
@@ -93,6 +94,9 @@ export function HoldPawn(kart) {
     if (kart.pawn.GetActiveWeapon()) {
         kart.pawn.DestroyWeapons();
     }
+    if (kart.freeLook) {
+        return; // flying through the map — see dev/free-look.js
+    }
     const anchor = kart.pawnAnchor;
     const at = kart.pawn.GetAbsOrigin();
     if (!anchor || Math.hypot(at.x - anchor.x, at.y - anchor.y, at.z - anchor.z) <= PAWN_DRIFT_TOLERANCE) {
@@ -129,6 +133,7 @@ function NewKartRecord(pawn, melon, spawnPoint) {
         userMenuOpen: false,
         hubModalOpen: false,
         collisionDebug: false,
+        freeLook: false,
         predictionLine: false,
         melonGlow: true,
         pawnAnchor: pawn.GetAbsOrigin(),
@@ -182,6 +187,8 @@ export function SetUpPlayerKart(pawn, newKartSpawnPoint) {
             return undefined;
         }
     }
+    // A new pawn ends free look (the old one was flying, the camera is reset).
+    SetFreeLook(kart, false);
     kart.pawn = pawn;
     FreezePawn(pawn);
     kart.pawnAnchor = pawn.GetAbsOrigin();
@@ -215,7 +222,7 @@ export function EnsurePlayerKarts() {
         } else if (kart.pawn !== pawn) {
             Debug(`EnsurePlayerKarts: slot ${slot} got a new pawn, moving the kart over`);
             SetUpPlayerKart(pawn, undefined);
-        } else if (kart.melon.IsValid() && !kart.breaking && pawn.GetCustomCamera().GetMode() !== CustomCameraMode.FOLLOW_POSITION) {
+        } else if (kart.melon.IsValid() && !kart.breaking && !kart.freeLook && pawn.GetCustomCamera().GetMode() !== CustomCameraMode.FOLLOW_POSITION) {
             Debug(`EnsurePlayerKarts: slot ${slot} lost the chase camera, re-attaching`);
             SetUpPlayerKart(pawn, undefined);
         }

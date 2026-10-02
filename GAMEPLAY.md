@@ -698,6 +698,19 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
 - Tests: those two and `test/movement/jump.test.mjs` (the real
   `UpdateKart` against the fake engine).
 
+## Free look (implemented, dev aid)
+
+The user menu's "FREE LOOK" section (below "COLLISION DEBUG"; `kart.freeLook`,
+off by default) lets a player fly through the map: their own pawn (NOCLIP
+anyway) is let go — `HoldPawn` stops pulling it back, WASD flies it along
+the view — and the camera switches to its eyes, starting roughly where the
+chase camera was. Switching it on closes the menu. Their melon waits where
+it was, frozen (`UpdateKart` skips it, physics motion off) — no damage, but
+a running time trial's clock keeps going. Switching off (USE → the same
+button) puts the pawn back on its anchor and the chase camera on the melon.
+A heat starting or a new pawn switches it off. Not while the melon is
+breaking. All of it in `dev/free-look.js`.
+
 ## Jump pads (implemented)
 
 A `trigger_multiple` (filtered to `prop_physics`) with `OnStartTouch` →
