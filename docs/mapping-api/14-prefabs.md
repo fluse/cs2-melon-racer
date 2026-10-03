@@ -49,9 +49,12 @@ parameter can't take one. That's why the gates fire the generic
 `start_line`/`finish_line`, which read the track from the trigger's own
 name, instead of a numbered `start_<trackId>`.
 
-**Always set the override**, even where the default happens to be right:
-a copy without one follows the prefab's default, so changing the default
-later silently moves that copy to another track.
+**Every copy needs its override.** The gates' defaults are deliberately no
+track (`start_unset`, `finish_unset`): a copy left on the default fails
+`npm test` (its `start_line`/`finish_line` names no track) and logs in
+game, instead of quietly joining some track. Hammer also doesn't keep an
+override that equals the default — another reason the default is never a
+real value. A set override shows the variable's label in color.
 
 ## Start gate
 
@@ -104,8 +107,8 @@ them — the copy's override, else the default — so every check in
 | Mistake | |
 |---|---|
 | a placed prefab with "Fix Up Entity Names" ticked | ✗ |
-| two start triggers for one track (e.g. a gate copy without its override) | ✗ |
-| `start_line`/`finish_line` from a trigger whose name names no track | ✗ |
+| two start triggers for one track (e.g. two gate copies with the same override) | ✗ |
+| `start_line`/`finish_line` from a trigger whose name names no track (e.g. a gate copy without its override) | ✗ |
 
 ---
 [← Water zones](13-water-zones.md) · [Mapping API](README.md) · [Checking your map →](15-checking.md)

@@ -93,9 +93,9 @@ Per placed copy: select the prefab instance (not inside it) → Map
 Variables → **Override** `track` = the trigger name, e.g. `start_2` or
 `start_3_laps2`. Don't add `finish_line` to the start gate: the same gate
 starts point-to-point tracks too, and on one without checkpoints that would
-finish the run at the start line. A copy left on the prefab's default next
-to another start trigger of that track fails `npm test` (two start triggers
-for one track).
+finish the run at the start line. A copy left on the prefab's default
+(`start_unset`, no track) fails `npm test` — see
+[Prefabs: map variables](14-prefabs.md#map-variables).
 
 ## Finish gate prefab
 
@@ -161,7 +161,7 @@ OnStartTouch → melon_drive_script → RunScriptInput → finish_<trackId>
 |---|---|
 | `start_<t>` fired by a trigger not named `start_<t>[_laps<M>]`, or a `start_*` trigger without it (or `start_line`) | ✗ |
 | `start_line` from a trigger not named `start_<t>[_laps<M>]`, `finish_line` from one not named `finish_<t>` or `start_<t>[_laps<M>]` | ✗ |
-| two start triggers for the same track (e.g. a start gate copy left on its default) | ✗ |
+| two start triggers for the same track (e.g. two gate copies with the same override) | ✗ |
 | `start_spawn_<t>` without a `start_<t>` trigger, or any other `start_*` name (typo) | ✗ |
 | checkpoint trigger named differently from the parameter it fires | ✗ |
 | gap in a track's checkpoint numbers | ✗ |
