@@ -65,7 +65,8 @@ racing against the clock:
   at the spawn.
 - **Restart:** only while the melon is on a track in a free-roaming time
   trial (decided), the user menu shows "Restart Time Trial" under the
-  NAVIGATION buttons: the melon goes back to the track's start spawn, whole
+  NAVIGATION buttons — or, menu open or not, the reload key (**R**,
+  `UpdateUserMenu` in `hud/user-menu.js`): the melon goes back to the track's start spawn, whole
   and standing still, the clock at zero until it crosses the start line
   again. Not in a heat (a free reset mid-race), in the hub or tutorial;
   ignored while the melon is breaking. `RestartTimeTrial` in

@@ -3,6 +3,7 @@ import { IsCollisionDebugOn } from "../dev/collision-debug.js";
 import { IsFreeLookOn } from "../dev/free-look.js";
 import { IsPredictionOn } from "../fx/prediction/prediction.js";
 import { IsMelonGlowOn } from "../kart/look.js";
+import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { CanRestartTimeTrial } from "../race/time-trial/time-trial.js";
 import { GetSpeedHud, SyncInputCapture } from "./layout.js";
 
@@ -92,6 +93,14 @@ export function UpdateFreeLookHud(slot, kart) {
 export function UpdateUserMenu(slot, kart) {
     if (kart.pawn.WasInputJustPressed(CSInputs.USE)) {
         SetUserMenuOpen(slot, kart, !kart.userMenuOpen);
+    }
+    // Shortcut for the menu's "Restart Time Trial" button: reload (R), menu
+    // open or not, so a bad start costs one key instead of USE + a click.
+    // Pressed outside a time trial it does nothing.
+    if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && CanRestartTimeTrial(kart) && RestartTimeTrial(kart)) {
+        if (kart.userMenuOpen) {
+            SetUserMenuOpen(slot, kart, false);
+        }
     }
     if (kart.userMenuOpen) {
         // Every tick while open: the time trial can start or end (finish,

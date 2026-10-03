@@ -203,3 +203,22 @@ test("restart only while on the track in a time trial — not in a heat or off t
     ReturnAllToHub([kart]);
     assert.equal(CanRestartTimeTrial(kart), false, "back in the hub");
 });
+
+// Its keyboard shortcut: reload (R), via the per-tick UpdateUserMenu.
+const { UpdateUserMenu } = await import("../../src/melon_drive/hud/user-menu.js");
+
+test("restart shortcut: R restarts a time trial, does nothing outside one", () => {
+    world.add(new Entity({ name: StartSpawnName(2), className: "info_target", origin: { x: 500, y: 600, z: 10 } }));
+    kart.pawn.justPressed.add("RELOAD");
+    kart.melon.Teleport({ position: { x: 9000, y: 9000, z: 0 } });
+    UpdateUserMenu(0, kart);
+    assert.deepEqual(kart.melon.GetAbsOrigin(), { x: 9000, y: 9000, z: 0 }, "not in a time trial: stays put");
+
+    Touch(0, "start_2");
+    Touch(5, "checkpoint_2_1");
+    kart.userMenuOpen = true;
+    UpdateUserMenu(0, kart);
+    assert.deepEqual(kart.melon.GetAbsOrigin(), { x: 500, y: 600, z: 10 + SPAWN_UP_OFFSET });
+    assert.equal(kart.runStartTime, undefined);
+    assert.equal(kart.userMenuOpen, false, "an open menu closes");
+});

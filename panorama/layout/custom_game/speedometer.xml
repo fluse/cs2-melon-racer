@@ -333,7 +333,7 @@
 							<Button id="usermenu_restart_button" class="UserMenuActionButton UserMenuButtonBlue UserMenuButtonFull">
 								<Panel class="UserMenuButtonContent">
 									<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/restart.png" />
-									<Label class="UserMenuButtonLabel" text="Restart Time Trial" />
+									<Label class="UserMenuButtonLabel" text="Restart Time Trial [R]" />
 								</Panel>
 							</Button>
 						</Panel>
