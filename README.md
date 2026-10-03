@@ -62,6 +62,7 @@ melon_racer/
 ├── docs/TRACK_CREATION.md                      # step-by-step guide for a new track
 ├── docs/mapping-api/                           # Mapping API: one page per topic, README.md = index
 ├── build.mjs, package.json                     # Rollup build: src/ -> maps/scripts/
+├── site/                                       # GitHub Page source (npm run site -> site/dist/, deployed by .github/workflows/pages.yml)
 ├── cfg/melon_racer.cfg                         # server cvars for this map
 ├── maps/
 │   ├── melon_racer.vmap                        # the map (Hammer-authoritative, binary)

@@ -4,3 +4,6 @@ npm-debug.log*
 # Hammer bake caches, regenerated on every map compile
 _bakeresourcecache/
 *_bakeresourcecache.vpk
+
+# GitHub Page build output (node site/build.mjs)
+site/dist/

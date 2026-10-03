@@ -1,0 +1,179 @@
+<!doctype html>
+<!-- Template for the GitHub Page: the double-brace placeholders are filled in by site/build.mjs — edit this file, not site/dist/. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Melon Racer — a kart racer for Counter-Strike 2</title>
+  <meta name="description" content="No guns. No bullets. Just you, a watermelon and the track. Melon Racer turns Counter-Strike 2 into a physics kart racer.">
+  <meta property="og:title" content="Melon Racer">
+  <meta property="og:description" content="No guns. No bullets. Just you, a watermelon and the track. A physics kart racer for Counter-Strike 2.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <nav class="wrap topbar-inner">
+      <a class="brand" href="#top">Melon Racer</a>
+      <ul class="nav-links">
+        <li><a href="#race">How it works</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#controls">Controls</a></li>
+        <li><a href="#changelog">Changelog</a></li>
+        <li><a href="{{REPO_URL}}">GitHub</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap hero-inner">
+        <img class="hero-logo" src="images/logo.png" alt="Melon Racer" width="846" height="295">
+        <p class="hero-tagline">Get ready to roll!</p>
+        <p class="hero-lead"><strong>No guns. No bullets. Just you, a watermelon and the track.</strong>
+          Melon Racer turns Counter-Strike&nbsp;2 into a kart racer: every player gets their own physics melon and races it through
+          checkpoints, over ramps and off walls.</p>
+        <div class="hero-actions">
+          {{WORKSHOP_BUTTON}}
+          <div class="connect">
+            <span class="connect-label">Play on our server — open the console (<kbd>~</kbd>) and type</span>
+            <button class="connect-command" type="button" data-copy="connect {{SERVER_ADDRESS}}" title="Copy to clipboard">
+              <code>connect {{SERVER_ADDRESS}}</code><span class="connect-hint" aria-live="polite">copy</span>
+            </button>
+          </div>
+        </div>
+        <p class="hero-version">Version {{VERSION}} — <a href="#changelog">{{LATEST_NAME}}</a></p>
+      </div>
+    </section>
+
+    <section class="showcase">
+      <div class="wrap">
+        <figure class="gameplay">
+          <img src="images/gameplay.gif" alt="A melon rolling down a neon-lit corridor towards a checkpoint gate" width="480" height="270" loading="lazy">
+          <figcaption>In-game footage — a melon on its way through a checkpoint gate.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="block" id="race">
+      <div class="wrap">
+        <h2>How a race works</h2>
+        <ol class="steps">
+          <li><span class="step-name">Tutorial</span> New players start in a short tutorial area to learn how to drive.</li>
+          <li><span class="step-name">Hub</span> Everyone gathers here. Drive around, pick a color for your melon, and step onto the start area when you're ready.</li>
+          <li><span class="step-name">Countdown</span> <em>3… 2… 1… GO!</em> Everyone on the start area joins the heat.</li>
+          <li><span class="step-name">Race</span> Pass every checkpoint in order and finish the laps. Shortcuts that skip a checkpoint don't count!</li>
+          <li><span class="step-name">Next track</span> A short break, then the next track starts. After the last one everyone goes back to the hub.</li>
+        </ol>
+        <p class="note"><img src="images/track-start.png" alt="" width="20" height="20"> <span><strong>No group? No problem:</strong> drive across any track's start line on your own and the clock starts — that's a time trial. Your best time on every track is saved.</span></p>
+      </div>
+    </section>
+
+    <section class="block block-alt" id="features">
+      <div class="wrap">
+        <h2>Features</h2>
+        <div class="features">
+          <article class="feature"><h3>Physics melons</h3><p>Your melon rolls, bounces and flies for real. It's not a car.</p></article>
+          <article class="feature"><h3>Melon health</h3><p>Hard crashes and big landings damage your melon. At zero it <strong>breaks apart</strong> and you respawn at your last checkpoint.</p></article>
+          <article class="feature feature-gold"><h3>Wall bounces</h3><p>Hit a wall at about 45° for a <strong>PERFECT</strong> bounce: more speed and no damage. Time a jump on the hit for even more. Bounces stack — there's no top speed.</p></article>
+          <article class="feature"><h3>Boost — if you dare</h3><p>Hold the left mouse button for extra speed and a glowing trail. It costs health while you hold it. Too long and your melon breaks!</p></article>
+          <article class="feature"><h3>Momentum</h3><p>Hit your top speed again and again without slowing down too much, and your top speed keeps growing.</p></article>
+          <article class="feature"><h3>Wall jumps</h3><p>Push off walls in mid-air to reach shortcuts or save a bad line. Three charges that refill over time — a PERFECT one leaves faster than you came in.</p></article>
+          <article class="feature"><h3>Jump pads &amp; lift shafts</h3><p>Press jump on a glowing pad to launch high and fast, or bounce between the walls of a shaft to climb up.</p></article>
+          <article class="feature"><h3>Heal zones, teleporters &amp; water</h3><p>Patch up your melon, take the fast way around — and better jump over the water: it eats all your speed.</p></article>
+          <article class="feature"><h3>Paint your melon</h3><p>Drive over a paint pad or choose a color in the menu. Your melon glows in its color, so everyone sees who's who.</p></article>
+          <article class="feature feature-gold"><h3>Time trial</h3><p>Every run is timed, alone or in a heat. Beat your best and you get a gold <strong>NEW BEST</strong>. Messed up the start? Press <kbd>R</kbd>.</p></article>
+          <article class="feature"><h3>Multiple tracks</h3><p>Loops with several laps or A-to-B tracks, raced one after another in a heat.</p></article>
+          <article class="feature"><h3>Custom HUD</h3><p>Speedometer with health bar and wall-jump charges, run clock, checkpoint strip, lap counter, bounce rating and jump timing.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="controls">
+      <div class="wrap">
+        <h2>Controls</h2>
+        <table class="controls">
+          <tbody>
+            <tr><th scope="row"><kbd>Mouse</kbd></th><td>Steer — the melon goes where you look</td></tr>
+            <tr><th scope="row"><kbd>W</kbd> <kbd>S</kbd></th><td>Accelerate / brake</td></tr>
+            <tr><th scope="row"><kbd>A</kbd> <kbd>D</kbd></th><td>Strafe left / right</td></tr>
+            <tr><th scope="row"><kbd>Mouse 1</kbd> <span class="hold">hold</span></th><td>Boost — costs health, too long and the melon breaks</td></tr>
+            <tr><th scope="row"><kbd>Space</kbd></th><td>Jump / wall jump / time a wall bounce</td></tr>
+            <tr><th scope="row"><kbd>R</kbd></th><td>Restart the time trial</td></tr>
+            <tr><th scope="row"><kbd>E</kbd></th><td>Menu: respawn at checkpoint, back to hub, tutorial, melon color and glow, free look</td></tr>
+          </tbody>
+        </table>
+        <h3 class="sub">How to play</h3>
+        <ol class="howto">
+          <li>Subscribe to Melon Racer on the Steam Workshop.</li>
+          <li>Start CS2 → <strong>Play</strong> → <strong>Workshop Maps</strong> → <strong>Melon Racer</strong>.</li>
+          <li>Playing with friends? They need to subscribe too — then invite them to your lobby.</li>
+        </ol>
+        <p class="note">The first player on the map is the <strong>moderator</strong> and can cancel a running race from the hub's start area.</p>
+      </div>
+    </section>
+
+    <section class="block block-alt" id="build">
+      <div class="wrap two-col">
+        <div>
+          <h2>Open source — build your own track</h2>
+          <p>The whole game mode is open source: the <code>cs_script</code> gameplay scripts, the HUD, and the tools around them.
+            Tracks are pure Hammer work — triggers named by convention, no coding needed.</p>
+          <ul class="links">
+            <li><a href="{{REPO_URL}}/blob/main/docs/TRACK_CREATION.md">Track creation guide</a> — step by step in Hammer</li>
+            <li><a href="{{REPO_URL}}/blob/main/docs/mapping-api/README.md">Mapping API</a> — every entity name and script input</li>
+            <li><a href="{{REPO_URL}}/blob/main/GAMEPLAY.md">Game design</a> — how every mechanic works</li>
+            <li><a href="{{REPO_URL}}/issues">Issues</a> — bug reports and ideas welcome</li>
+          </ul>
+        </div>
+        <div>
+          <h2>Work in progress</h2>
+          <p>Melon Racer is still being built. Things will change and there will be bugs. Known gaps right now:</p>
+          <ul>
+            <li>No 1st/2nd/3rd placing yet — the game only knows when a racer has finished.</li>
+            <li>If someone gets stuck, the others have to wait until they finish or leave.</li>
+            <li>No melon sound effects yet.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="changelog">
+      <div class="wrap">
+        <h2>Changelog</h2>
+        <p class="muted">Latest: v{{VERSION}}, {{LATEST_DATE}}. Older releases fold out.</p>
+      {{CHANGELOG}}
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p><strong>AI disclosure:</strong> the game mode's code (the cs_script scripts, HUD logic and build tools) was written with the help of an
+        AI coding assistant (Claude). The idea, map, tracks and game design are the author's own work.</p>
+      <p class="muted">Melon Racer is a fan-made Counter-Strike&nbsp;2 Workshop map and not affiliated with Valve. © {{YEAR}} ·
+        <a href="{{REPO_URL}}">Source on GitHub</a></p>
+    </div>
+  </footer>
+
+  <script>
+    // Copy the connect command to the clipboard.
+    for (const button of document.querySelectorAll("[data-copy]")) {
+      button.addEventListener("click", async () => {
+        const hint = button.querySelector(".connect-hint");
+        try {
+          await navigator.clipboard.writeText(button.dataset.copy);
+          hint.textContent = "copied!";
+        } catch {
+          hint.textContent = "select & copy";
+        }
+        setTimeout(() => { hint.textContent = "copy"; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
