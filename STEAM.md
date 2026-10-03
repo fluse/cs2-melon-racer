@@ -22,11 +22,15 @@ easier to find in search.)
 ## Description (English — default language)
 
 ```
-[h1]🍉 Melon Racer — Get ready to roll![/h1]
+[h1]Melon Racer — Get ready to roll![/h1]
 
 [b]No guns. No bullets. Just you, a watermelon, and the track.[/b]
 
 Melon Racer turns Counter-Strike 2 into a kart racer. Each player gets their own physics melon and races it through checkpoints, over ramps and off walls. Race in heats with your friends and see whose melon makes it to the finish line in one piece, or drive alone against the clock and beat your best time.
+
+[h2]🎮 Play now on server[/h2]
+Open the CS2 console ([b]~[/b]) and type:
+[code]connect tante.io:27015[/code]
 
 [hr][/hr]
 
@@ -53,14 +57,15 @@ The game mode's code (the cs_script scripts, HUD logic and build tools) was writ
 [*][b]Wall bounces[/b] — hit a wall at the right angle (about 45°) for a [b]PERFECT[/b] bounce: more speed and no damage. Time a jump on the hit for even more speed. Bounces stack, so there's no top speed.
 [*][b]Boost — if you dare[/b] — hold the left mouse button for extra speed and a glowing boost trail. It costs your melon health while you hold it. Hold it too long and your melon breaks!
 [*][b]Momentum[/b] — hit your top speed again and again without slowing down too much, and your top speed keeps growing.
-[*][b]Wall jumps[/b] — push off walls in mid-air to reach shortcuts and save a bad line.
+[*][b]Wall jumps[/b] — push off walls in mid-air to reach shortcuts and save a bad line. You have 3 charges that refill over time. Hit the wall at about 45° for a [b]PERFECT[/b] wall jump that leaves with even more speed than you came in with.
 [*][b]Jump pads[/b] — press jump on a glowing pad to launch high and fast. No damage on the way down.
 [*][b]Lift shafts[/b] — bounce between the walls of a shaft to climb up.
 [*][b]Heal zones & teleporters[/b] — patch up your melon and take the fast way around.
+[*][b]Water[/b] — splash down and your melon loses all its speed. Better jump over it.
 [*][b]Paint your melon[/b] — drive over a paint pad in the hub or choose a color in the menu. Your melon glows in its color, so everyone can see who's who.
-[*][b]Time trial[/b] — every run over a track is timed, alone or in a heat. Your best time on each track is saved, and beating it shows a gold [b]NEW BEST[/b]. Messed up the start? Restart the run from the menu.
+[*][b]Time trial[/b] — every run over a track is timed, alone or in a heat. Your best time on each track is saved, and beating it shows a gold [b]NEW BEST[/b]. After the finish you're put straight back at the start for the next try. Messed up the start? Restart the run from the menu.
 [*][b]Multiple tracks[/b] — loops with several laps or A-to-B tracks, raced one after another in a heat.
-[*][b]Custom HUD[/b] — speedometer, run clock with your best time, a checkpoint strip showing which checkpoints you've passed, lap counter, bounce rating and jump timing.
+[*][b]Custom HUD[/b] — speedometer with health bar and wall-jump charges, run clock with your best time, a checkpoint strip showing which checkpoints you've passed, lap counter, bounce rating and jump timing.
 [/list]
 
 [h2]🎮 Controls[/h2]
@@ -71,7 +76,7 @@ The game mode's code (the cs_script scripts, HUD logic and build tools) was writ
 [tr][td]A / D[/td][td]Strafe left / right[/td][/tr]
 [tr][td]Left mouse button (hold)[/td][td]Boost — costs health, too long and the melon breaks[/td][/tr]
 [tr][td]Space[/td][td]Jump / wall jump / time a wall bounce[/td][/tr]
-[tr][td]E[/td][td]Menu: respawn at checkpoint, restart time trial, back to hub, tutorial, melon color and glow[/td][/tr]
+[tr][td]E[/td][td]Menu: respawn at checkpoint, restart time trial, back to hub, tutorial, melon color and glow, free look[/td][/tr]
 [/table]
 
 [h2]▶ How to play[/h2]
@@ -115,6 +120,10 @@ the German version automatically.
 
 Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt seine eigene Physik-Melone und rast damit durch Checkpoints, über Rampen und von Wänden ab. Fahrt Rennen gegen eure Freunde und schaut, wessen Melone heil im Ziel ankommt, oder fahr allein gegen die Uhr und knack deine Bestzeit.
 
+[h2]🎮 Jetzt auf unserem Server spielen[/h2]
+Öffne die CS2-Konsole ([b]~[/b]) und gib ein:
+[code]connect tante.io:27015[/code]
+
 [hr][/hr]
 
 [h2]🏁 So läuft ein Rennen[/h2]
@@ -135,14 +144,15 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [*][b]Wand-Abpraller[/b] — triff eine Wand im richtigen Winkel (etwa 45°) für einen [b]PERFECT[/b]-Abpraller: mehr Tempo und kein Schaden. Springst du genau im richtigen Moment, wirst du noch schneller. Abpraller addieren sich, es gibt also keine Höchstgeschwindigkeit.
 [*][b]Boost — wenn du dich traust[/b] — halte die linke Maustaste für mehr Tempo und eine leuchtende Boost-Spur. Solange du sie hältst, verliert deine Melone Leben. Hältst du zu lange, zerplatzt sie!
 [*][b]Schwung[/b] — erreichst du deine Höchstgeschwindigkeit immer wieder, ohne zu stark abzubremsen, wird sie immer höher.
-[*][b]Wandsprünge[/b] — stoß dich in der Luft von Wänden ab, um Abkürzungen zu erreichen oder eine schlechte Linie zu retten.
+[*][b]Wandsprünge[/b] — stoß dich in der Luft von Wänden ab, um Abkürzungen zu erreichen oder eine schlechte Linie zu retten. Du hast 3 Ladungen, die sich mit der Zeit wieder füllen. Triffst du die Wand in etwa 45°, gibt es einen [b]PERFECT[/b]-Wandsprung, der dich noch schneller wegschießt, als du gekommen bist.
 [*][b]Sprungfelder[/b] — drück auf einem leuchtenden Feld die Sprungtaste und du fliegst hoch und weit. Kein Schaden bei der Landung.
 [*][b]Aufzugschächte[/b] — spring zwischen den Wänden eines Schachts hin und her, um nach oben zu kommen.
 [*][b]Heilzonen & Teleporter[/b] — flick deine Melone und nimm den schnellen Weg.
+[*][b]Wasser[/b] — landest du im Wasser, ist dein ganzer Schwung weg. Spring lieber drüber.
 [*][b]Melone anmalen[/b] — fahr im Hub über ein Farbfeld oder wähl eine Farbe im Menü. Deine Melone leuchtet in ihrer Farbe, so sieht jeder, wer wer ist.
-[*][b]Zeitfahren[/b] — jede Fahrt über eine Strecke wird gestoppt, allein oder im Rennen. Deine Bestzeit pro Strecke wird gespeichert, und schlägst du sie, erscheint ein goldenes [b]NEW BEST[/b]. Start verpatzt? Starte die Fahrt im Menü neu.
+[*][b]Zeitfahren[/b] — jede Fahrt über eine Strecke wird gestoppt, allein oder im Rennen. Deine Bestzeit pro Strecke wird gespeichert, und schlägst du sie, erscheint ein goldenes [b]NEW BEST[/b]. Nach dem Ziel stehst du sofort wieder am Start für den nächsten Versuch. Start verpatzt? Starte die Fahrt im Menü neu.
 [*][b]Mehrere Strecken[/b] — Rundkurse mit mehreren Runden oder Strecken von A nach B, im Rennen nacheinander gefahren.
-[*][b]Eigenes HUD[/b] — Tacho, Fahrzeit mit deiner Bestzeit, eine Checkpoint-Leiste, die zeigt, welche Checkpoints du schon hast, Rundenanzeige, Abpraller-Bewertung und Sprung-Timing.
+[*][b]Eigenes HUD[/b] — Tacho mit Lebensbalken und Wandsprung-Ladungen, Fahrzeit mit deiner Bestzeit, eine Checkpoint-Leiste, die zeigt, welche Checkpoints du schon hast, Rundenanzeige, Abpraller-Bewertung und Sprung-Timing.
 [/list]
 
 [h2]🎮 Steuerung[/h2]
@@ -153,7 +163,7 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [tr][td]A / D[/td][td]Seitlich nach links / rechts[/td][/tr]
 [tr][td]Linke Maustaste (halten)[/td][td]Boost — kostet Leben, zu lange und die Melone zerplatzt[/td][/tr]
 [tr][td]Leertaste[/td][td]Springen / Wandsprung / Timing für den Abpraller[/td][/tr]
-[tr][td]E[/td][td]Menü: am Checkpoint neu starten, Zeitfahren neu starten, zurück zum Hub, Tutorial, Farbe und Leuchten[/td][/tr]
+[tr][td]E[/td][td]Menü: am Checkpoint neu starten, Zeitfahren neu starten, zurück zum Hub, Tutorial, Farbe und Leuchten, freie Kamera[/td][/tr]
 [/table]
 
 [h2]▶ So spielst du[/h2]
@@ -258,6 +268,46 @@ For the boost update:
 [*]Geändert: ein PERFECT-Abpraller zeigt jetzt nur noch seinen Funken, keine Boost-Spur
 [*]Geändert: kleinere Boost-Spur, mit Safttropfen, die von der Melone fliegen
 [*]Behoben: Klicken hat die Melone nicht mehr umsonst nach vorn geschubst
+[/list]
+```
+
+For the wall jump & HUD update:
+
+```
+[b]Update — Wall jumps, water & a new HUD[/b]
+[list]
+[*]New: wall jumps are rated by angle like bounces — hit the wall at about 45° for a PERFECT wall jump that boosts you out faster than you came in
+[*]New: 3 wall-jump charges that refill one after the other, shown as dots next to the speedometer
+[*]New: water — land in it and your melon loses all its speed
+[*]New: fall off an open track and you're put back at your last checkpoint, no break needed
+[*]New: in a time trial the finish puts you straight back at the start for the next try
+[*]New: "Free look" in the menu (E) lets you fly around the map and look at it
+[*]New: green "+" crosses when you heal, glowing rings and sparks on jump pads
+[*]Changed: new speed panel with a health bar, tilted back into the screen
+[*]Changed: PERFECT is a bit easier to hit (±8.5°) and kicks you 20% higher
+[*]Changed: the camera now slides in smoothly at walls instead of jumping
+[*]Changed: the break camera stays closer, and between heats a big countdown shows when the next track starts
+[*]Fixed: a melon breaking no longer gets shoved around by its own pieces
+[*]Fixed: a new player in a slot no longer gets the last player's open menu
+[/list]
+```
+
+```
+[b]Update — Wandsprünge, Wasser & neues HUD[/b]
+[list]
+[*]Neu: Wandsprünge werden wie Abpraller nach dem Winkel bewertet — triffst du die Wand in etwa 45°, schießt dich ein PERFECT-Wandsprung schneller weg, als du gekommen bist
+[*]Neu: 3 Wandsprung-Ladungen, die sich nacheinander wieder füllen, als Punkte neben dem Tacho
+[*]Neu: Wasser — landest du darin, ist dein ganzer Schwung weg
+[*]Neu: fällst du von einer offenen Strecke, stehst du wieder am letzten Checkpoint, ganz ohne Zerplatzen
+[*]Neu: beim Zeitfahren bringt dich das Ziel sofort zurück an den Start für den nächsten Versuch
+[*]Neu: „Free Look“ im Menü (E): flieg frei durch die Karte und schau sie dir an
+[*]Neu: grüne „+“-Kreuze beim Heilen, leuchtende Ringe und Funken auf Sprungfeldern
+[*]Geändert: neuer Tacho mit Lebensbalken, nach hinten in den Bildschirm gekippt
+[*]Geändert: PERFECT ist etwas leichter zu treffen (±8,5°) und wirft dich 20 % höher
+[*]Geändert: die Kamera gleitet an Wänden jetzt sanft heran, statt zu springen
+[*]Geändert: die Kamera beim Zerplatzen bleibt näher dran, und zwischen den Rennen zählt ein großer Countdown bis zur nächsten Strecke
+[*]Behoben: eine zerplatzende Melone wird nicht mehr von ihren eigenen Stücken herumgeschubst
+[*]Behoben: ein neuer Spieler bekommt nicht mehr das offene Menü seines Vorgängers
 [/list]
 ```
 

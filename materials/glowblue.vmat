@@ -33,8 +33,8 @@ Layer0
 	TextureNormal "materials/default/default_normal.tga"
 
 	//---- Self Illum ----
-	g_flSelfIllumAlbedoFactor "0.000"
-	g_flSelfIllumBrightness "-0.622"
+	g_flSelfIllumAlbedoFactor "1.000"
+	g_flSelfIllumBrightness "3.301"
 	g_flSelfIllumScale "1.000"
 	g_vSelfIllumScrollSpeed "[0.000 0.000]"
 	g_vSelfIllumTint "[0.392157 0.984314 0.874510 0.000000]"

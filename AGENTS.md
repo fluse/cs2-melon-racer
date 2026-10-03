@@ -26,6 +26,7 @@ every link and `#anchor` between the pages resolves).
 Current addon contents:
 
 ```
+CHANGELOG.md                             # player-facing changes per release (git tag v<version>), written by the /release skill
 docs/TRACK_CREATION.md                   # step-by-step Hammer guide for a new track
 docs/valve/scripting_api.html            # saved copy of Valve's cs_script API wiki page (the site blocks automated fetches)
 docs/mapping-api/*.md                    # Mapping API (map↔script contract): README.md = index of every input/name/pattern,
