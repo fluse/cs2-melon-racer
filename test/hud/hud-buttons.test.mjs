@@ -1,0 +1,192 @@
+// Every button click in the HUD (hud/inputs.js, OnCustomHudClicked) against
+// the fake engine in helpers/cs-script-mock.mjs: the hub modal's start, close
+// and moderator-only cancel buttons, and the user menu's rows — each acting
+// only for the player who clicked, and refusing what it mustn't do.
+import "../helpers/register-cs-script.mjs";
+import { test, beforeEach } from "node:test";
+import assert from "node:assert/strict";
+import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
+import { FakeHud } from "../helpers/fake-hud.mjs";
+
+const { karts, SetModeratorSlot } = await import("../../src/melon_drive/core/kart-registry.js");
+const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
+const { GetHubSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
+const flow = await import("../../src/melon_drive/race/heat/race-flow.js");
+const { SetUserMenuOpen } = await import("../../src/melon_drive/hud/user-menu.js");
+const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, SPEED_HUD_ENTITY_NAME, RacePhase, COLOR_PRESETS, MELON_MAX_HEALTH } = await import("../../src/melon_drive/constants/index.js");
+await import("../../src/melon_drive/index.js"); // registers OnCustomHudClicked
+
+const HUB = { x: 250, y: -520, z: 16 };
+const INTRO = { x: -2000, y: -900, z: 24 };
+
+/** @type {FakeHud} */
+let hud;
+/** @type {any} */
+let a;
+/** @type {any} */
+let b;
+
+/** Player `slot` clicks the button `buttonId` in `layout` (default: the melon HUD). */
+function Click(slot, buttonId, layout = hud) {
+    const [[onClick]] = world.handlers.OnCustomHudClicked;
+    onClick({ layout, buttonId, player: { GetPlayerSlot: () => slot } });
+}
+
+/** @param {any} kart */
+function HorizontalSpot(kart) {
+    const p = kart.melon.GetAbsOrigin();
+    return [p.x, p.y];
+}
+
+beforeEach(() => {
+    hud?.Remove(); // GetSpeedHud caches the layout while it's valid
+    world.reset();
+    karts.clear();
+    SetModeratorSlot(undefined);
+    flow.RestoreRaceFlowSnapshot({ phase: RacePhase.HUB, activeTrackId: undefined, phaseEndTime: 0 });
+    hud = world.add(new FakeHud(SPEED_HUD_ENTITY_NAME));
+    world.add(new PointTemplate({ name: MELON_TEMPLATE_NAME, spawn: () => [new Entity({ className: "prop_physics_multiplayer" })] }));
+    world.add(new Entity({ name: HUB_SPAWN_NAME, className: "info_player_start", origin: HUB }));
+    world.add(new Entity({ name: INTRO_SPAWN_NAME, className: "info_player_start", origin: INTRO }));
+    world.add(new Entity({ name: "start_1", className: "trigger_multiple", origin: { x: 3000, y: 0, z: 0 } }));
+    a = SetUpPlayerKart(world.add(new CSPlayerPawn({ slot: 0 })), GetHubSpawnPoint()); // the moderator: first in
+    b = SetUpPlayerKart(world.add(new CSPlayerPawn({ slot: 1 })), GetHubSpawnPoint());
+});
+
+test("clicks from another layout are ignored", () => {
+    a.inHub = true;
+    Click(0, "hub_start_button", world.add(new FakeHud("some_other_layout")));
+    assert.equal(flow.phase, RacePhase.HUB);
+});
+
+test("start button: starts a heat with whoever stands in the hub", () => {
+    a.inHub = true;
+    Click(1, "hub_start_button"); // anyone may click it
+    assert.equal(flow.phase, RacePhase.COUNTDOWN);
+    assert.equal(a.racing, true);
+    assert.equal(b.racing, false);
+});
+
+test("close button: hides the modal for that player only, who still stands in the hub", () => {
+    a.inHub = b.inHub = true;
+    a.hubModalOpen = b.hubModalOpen = true;
+    Click(0, "hub_close_button");
+    assert.equal(a.hubModalOpen, false);
+    assert.equal(hud.Has(0, "hub_modal", "Hidden"), true);
+    assert.equal(a.inHub, true, "still pulled into the next heat");
+    assert.equal(b.hubModalOpen, true);
+});
+
+test("cancel button: only the moderator can abort a running heat", () => {
+    a.inHub = b.inHub = true;
+    flow.TryStartRace();
+
+    Click(1, "hub_abort_button");
+    assert.equal(flow.phase, RacePhase.COUNTDOWN, "not the moderator");
+
+    Click(0, "hub_abort_button");
+    assert.equal(flow.phase, RacePhase.HUB);
+    assert.equal(a.racing, false);
+    assert.equal(b.racing, false);
+});
+
+test("user menu close button closes it and gives the mouse back", () => {
+    SetUserMenuOpen(0, a, true);
+    assert.equal(hud.inputCapture.get(0), true);
+    Click(0, "usermenu_close_button");
+    assert.equal(a.userMenuOpen, false);
+    assert.equal(hud.Has(0, "user_menu", "Hidden"), true);
+    assert.equal(hud.inputCapture.get(0), false);
+});
+
+test("respawn button: back at the respawn point, whole — but not while breaking or race-locked", () => {
+    const away = { x: 7000, y: 7000, z: 0 };
+    a.melon.Teleport({ position: away });
+    a.health = 10;
+
+    a.locked = true;
+    Click(0, "usermenu_respawn_button");
+    assert.deepEqual(HorizontalSpot(a), [away.x, away.y], "locked: on the grid or finished");
+    a.locked = false;
+
+    a.breaking = true;
+    Click(0, "usermenu_respawn_button");
+    assert.deepEqual(HorizontalSpot(a), [away.x, away.y], "breaking: respawns on its own");
+    a.breaking = false;
+
+    SetUserMenuOpen(0, a, true);
+    Click(0, "usermenu_respawn_button");
+    assert.deepEqual(HorizontalSpot(a), [a.checkpointPosition.x, a.checkpointPosition.y]);
+    assert.equal(a.health, MELON_MAX_HEALTH);
+    assert.equal(a.userMenuOpen, false, "the menu closes");
+});
+
+test("hub button: just this racer leaves the heat, the others keep racing", () => {
+    a.inHub = b.inHub = true;
+    flow.TryStartRace();
+    SetUserMenuOpen(0, a, true);
+
+    Click(0, "usermenu_hub_button");
+    assert.equal(a.racing, false);
+    assert.equal(a.userMenuOpen, false);
+    assert.deepEqual(HorizontalSpot(a), [HUB.x, HUB.y]);
+    assert.equal(b.racing, true);
+    assert.equal(flow.phase, RacePhase.COUNTDOWN);
+});
+
+test("tutorial button: leaves the heat and goes to intro_spawn, which becomes the respawn point", () => {
+    a.inHub = true;
+    flow.TryStartRace();
+    Click(0, "usermenu_tutorial_button");
+    assert.equal(a.racing, false);
+    assert.equal(a.trackId, undefined);
+    assert.deepEqual(HorizontalSpot(a), [INTRO.x, INTRO.y]);
+    assert.deepEqual([a.checkpointPosition.x, a.checkpointPosition.y], [INTRO.x, INTRO.y]);
+});
+
+test("toggle buttons switch that player's own setting and show ON/OFF", () => {
+    const toggles = [
+        ["usermenu_glow_button", "glow_state", "melonGlow"],
+        ["usermenu_prediction_button", "prediction_state", "predictionLine"],
+        ["usermenu_collisiondebug_button", "collisiondebug_state", "collisionDebug"],
+    ];
+    for (const [button, variable, field] of toggles) {
+        const before = Boolean(a[field]);
+        Click(0, button);
+        assert.equal(Boolean(a[field]), !before, `${button} switches it`);
+        assert.equal(hud.Variable(0, button, variable), before ? "OFF" : "ON");
+        assert.equal(hud.Has(0, button, "ToggleOn"), !before);
+        assert.equal(Boolean(b[field]), field === "melonGlow", `${button} leaves the other player alone`);
+        Click(0, button);
+        assert.equal(Boolean(a[field]), before, `${button} switches it back`);
+    }
+});
+
+test("free look button: switching it on closes the menu, switching it off doesn't open it", () => {
+    SetUserMenuOpen(0, a, true);
+    Click(0, "usermenu_freelook_button");
+    assert.equal(a.freeLook, true);
+    assert.equal(hud.Variable(0, "usermenu_freelook_button", "freelook_state"), "ON");
+    assert.equal(a.userMenuOpen, false, "the mouse looks around right away");
+
+    Click(0, "usermenu_freelook_button");
+    assert.equal(a.freeLook, false);
+    assert.equal(a.userMenuOpen, false);
+});
+
+test("color buttons paint that player's melon in the preset; an unknown color does nothing", () => {
+    const [key, preset] = Object.entries(COLOR_PRESETS)[0];
+    Click(0, `usermenu_color_${key}`);
+    assert.deepEqual(a.paintColor, preset);
+    assert.deepEqual(a.melon.color, preset);
+    assert.notDeepEqual(b.paintColor, preset);
+
+    Click(0, "usermenu_color_no_such_color");
+    assert.deepEqual(a.paintColor, preset);
+});
+
+test("clicks from a player without a kart are ignored", () => {
+    for (const button of ["hub_close_button", "usermenu_close_button", "usermenu_respawn_button", "usermenu_restart_button", "usermenu_hub_button", "usermenu_tutorial_button", "usermenu_glow_button", "usermenu_freelook_button", "usermenu_color_red"]) {
+        assert.doesNotThrow(() => Click(7, button), button);
+    }
+});

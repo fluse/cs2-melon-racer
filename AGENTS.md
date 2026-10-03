@@ -67,6 +67,7 @@ test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one fol
 test/map/*.test.mjs                      # checks of the .vmap/.xml/docs/mapping-api/ the script relies on, and module-layout.test.mjs (the folder rules below)
 test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities
 test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files
+test/helpers/fake-hud.mjs                # fake custom_hud_layout: per-slot classes, dialog variables, input capture
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
 tools/make-icons.mjs                     # generates panorama/images/custom_game/icons/*.png (user menu icons, checkpoint strip flags) — edit shapes there, re-run with node
 tools/png.mjs                            # the PNG encoder make-icons.mjs uses
