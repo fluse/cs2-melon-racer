@@ -1,6 +1,6 @@
 # Melon Racer
 
-![MelonRacer](./assets/melon_racer.jpg)
+![MelonRacer](./docs/gifs/2026-09-29_21-24-54_original.gif)
 
 > **Work in progress.** This mode is still under active development and known to have bugs (see [Known limitations / open questions](#known-limitations--open-questions) below). Contributions, bug reports, and further development are very welcome — see [Extending the mode](#extending-the-mode) and [Contributing](#contributing).
 
