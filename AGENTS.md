@@ -70,8 +70,9 @@ test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests ca
 test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files
 test/helpers/fake-hud.mjs                # fake custom_hud_layout: per-slot classes, dialog variables, input capture
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
-site/index.html, style.css, build.mjs    # GitHub Page: `npm run site` fills in the version + CHANGELOG.md, copies logo/gif/icons
-                                          #   (+ site/images/*) -> site/dist/ (gitignored); .github/workflows/pages.yml deploys it on push to main
+site/*.html, style.css, build.mjs        # GitHub Page: `npm run site` -> site/dist/ (gitignored): index.html (+ version, CHANGELOG.md),
+                                          #   connect/ (steam://connect), mapping-api/ (every docs/mapping-api/*.md + TRACK_CREATION.md,
+                                          #   via site/markdown.mjs — test/site/ checks every link/#anchor); .github/workflows/pages.yml deploys on push to main
 tools/make-icons.mjs                     # generates panorama/images/custom_game/icons/*.png (user menu icons, checkpoint strip flags) — edit shapes there, re-run with node
 tools/png.mjs                            # the PNG encoder make-icons.mjs uses
 tools/make-decal.mjs                     # generates materials/melon_racer/<decal>_{color,trans}.png for every decal in its DECALS list

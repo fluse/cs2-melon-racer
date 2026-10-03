@@ -1,28 +1,50 @@
-// Builds the Melon Racer GitHub Page: site/index.html + site/style.css (the
-// hand-written page) -> site/dist/, filling in the version from package.json
-// and the release history from CHANGELOG.md, and copying the images the page
-// uses out of the addon (logo, gameplay gif, HUD icons) plus everything in
-// site/images/. site/dist/ is gitignored — the GitHub Actions workflow
+// Builds the Melon Racer GitHub Page into site/dist/:
+// - index.html: the hand-written site/index.html, with the version from
+//   package.json and the release history from CHANGELOG.md filled in;
+// - connect/index.html: site/connect.html, straight to Steam's join link;
+// - mapping-api/*.html: every docs/mapping-api/*.md page plus
+//   docs/TRACK_CREATION.md, rendered into site/doc.html with a sidebar. Links
+//   between them stay on the site; links to anything else in the repo go to
+//   GitHub;
+// - style.css, favicon.svg, the images the pages use out of the addon (logo,
+//   gameplay gif, HUD icons) and everything in site/images/.
+// site/dist/ is gitignored — the GitHub Actions workflow
 // (.github/workflows/pages.yml) runs this script and deploys the result.
-//
-// No dependencies on purpose: the changelog only uses a handful of Markdown
-// constructs (## release, ### section, "- " items, `code`, **bold**,
-// [links](…)), so a tiny renderer here beats pulling in a Markdown package.
 //
 // Usage: node site/build.mjs   (or npm run site) — then open site/dist/index.html
 
 import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync, existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { EscapeHtml, RenderInline, RenderMarkdown } from "./markdown.mjs";
 
 const siteDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.dirname(siteDir);
-const distDir = path.join(siteDir, "dist");
 
 const REPO_URL = "https://github.com/fluse/cs2-melon-racer";
 /** Steam Workshop item page; the "Subscribe" button is left out while this is empty. */
 const WORKSHOP_URL = "https://steamcommunity.com/sharedfiles/filedetails/?id=3808250578";
 const SERVER_ADDRESS = "tante.io:27015";
+/** Opens CS2 through Steam and joins the server — the hero's join button and the /connect/ page. */
+const STEAM_CONNECT_URL = `steam://connect/${SERVER_ADDRESS}`;
+
+/** published page (under dist/) -> its template (under site/); "connect/index.html" makes the page's URL …/connect/ */
+const PAGES = {
+    "index.html": "index.html",
+    "connect/index.html": "connect.html",
+};
+
+/** Docs rendered with site/doc.html: source (repo path) -> published page (under dist/), in sidebar order. */
+const DOC_PAGES = {
+    "docs/mapping-api/README.md": "mapping-api/index.html",
+    ...Object.fromEntries(
+        readdirSync(path.join(rootDir, "docs", "mapping-api"))
+            .filter((f) => /^\d+-.+\.md$/.test(f))
+            .sort()
+            .map((f) => [`docs/mapping-api/${f}`, `mapping-api/${f.replace(/\.md$/, ".html")}`]),
+    ),
+    "docs/TRACK_CREATION.md": "mapping-api/track-creation.html",
+};
 
 /** published path (under dist/) -> source path (under the repo root) */
 const COPIED_IMAGES = {
@@ -32,23 +54,36 @@ const COPIED_IMAGES = {
     "images/track-finish.png": "panorama/images/custom_game/icons/track-finish.png",
 };
 
-/** @param {string} text */
-function escapeHtml(text) {
-    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+/**
+ * Where a link written in a repo file points on the site: another published
+ * doc -> relative to the current page; any other repo file/folder -> GitHub.
+ * @param {string} sourceFile repo path of the Markdown file the link is in
+ * @param {string} pagePath published path of the page it ends up on
+ */
+function linkResolverFor(sourceFile, pagePath) {
+    return (/** @type {string} */ href) => {
+        if (/^[a-z]+:/.test(href) || href.startsWith("#")) return href;
+        const [target, anchor] = href.split("#");
+        const repoPath = path.posix.normalize(path.posix.join(path.posix.dirname(sourceFile), target));
+        const hash = anchor ? `#${anchor}` : "";
+        const published = DOC_PAGES[repoPath];
+        if (published) return path.posix.relative(path.posix.dirname(pagePath), published) + hash;
+        const kind = target.endsWith("/") ? "tree" : "blob";
+        return `${REPO_URL}/${kind}/main/${repoPath.replace(/\/$/, "")}${hash}`;
+    };
 }
 
-/** Links in CHANGELOG.md are relative to the repo root; on the page they point at GitHub. */
-function resolveLink(href) {
-    return /^[a-z]+:|^#/.test(href) ? href : `${REPO_URL}/blob/main/${href.replace(/^\.\//, "")}`;
+/** @param {string} templateFile under site/ @param {Record<string, string>} values */
+function fillTemplate(templateFile, values) {
+    const template = readFileSync(path.join(siteDir, templateFile), "utf8");
+    return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+        if (!(key in values)) throw new Error(`site/${templateFile}: unknown placeholder ${match}`);
+        return values[key];
+    });
 }
 
-/** @param {string} text one line of Markdown -> inline HTML */
-function renderInline(text) {
-    return escapeHtml(text)
-        .replace(/`([^`]+)`/g, "<code>$1</code>")
-        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-        .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label, href) => `<a href="${escapeHtml(resolveLink(href))}">${label}</a>`);
-}
+/** @param {string} markdown a heading's Markdown -> plain text */
+const plainText = (markdown) => markdown.replace(/[`*]/g, "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
 
 /**
  * @typedef {{ title: string, items: string[] }} ChangelogSection
@@ -84,25 +119,25 @@ export function ParseChangelog(markdown) {
     return releases;
 }
 
-/** @param {Release[]} releases */
-function renderChangelog(releases) {
+/** @param {Release[]} releases @param {(text: string) => string} inline */
+function renderChangelog(releases, inline) {
     return releases
         .map((release, i) => {
             const sections = release.sections
                 .map((s) => {
                     const dev = /mapping|dev/i.test(s.title);
                     return `<section class="cl-section${dev ? " cl-dev" : ""}">
-            <h4>${renderInline(s.title)}</h4>
-            <ul>${s.items.map((item) => `\n              <li>${renderInline(item)}</li>`).join("")}
+            <h4>${inline(s.title)}</h4>
+            <ul>${s.items.map((item) => `\n              <li>${inline(item)}</li>`).join("")}
             </ul>
           </section>`;
                 })
                 .join("\n          ");
             return `<details class="release"${i === 0 ? " open" : ""}>
         <summary>
-          <span class="release-version">v${escapeHtml(release.version)}</span>
-          <span class="release-name">${renderInline(release.name)}</span>
-          <time datetime="${escapeHtml(release.date)}">${escapeHtml(release.date)}</time>
+          <span class="release-version">v${EscapeHtml(release.version)}</span>
+          <span class="release-name">${inline(release.name)}</span>
+          <time datetime="${EscapeHtml(release.date)}">${EscapeHtml(release.date)}</time>
         </summary>
         <div class="release-body">
           ${sections}
@@ -112,36 +147,68 @@ function renderChangelog(releases) {
         .join("\n      ");
 }
 
-function build() {
+/** Renders every DOC_PAGES entry. @returns {Record<string, string>} published path -> HTML */
+function renderDocs(common) {
+    const docs = Object.entries(DOC_PAGES).map(([source, published]) => {
+        const markdown = readFileSync(path.join(rootDir, source), "utf8");
+        const { html, headings } = RenderMarkdown(markdown, { resolveLink: linkResolverFor(source, published) });
+        const h1 = headings.find((h) => h.level === 1);
+        return { source, published, html, title: plainText(h1?.text ?? path.basename(source, ".md")) };
+    });
+    /** @type {Record<string, string>} */
+    const out = {};
+    for (const doc of docs) {
+        const nav = docs
+            .map((other) => {
+                const label = other.published.endsWith("/index.html") ? "Overview" : other.title.replace(/^Melon Racer — /, "");
+                const href = path.posix.relative(path.posix.dirname(doc.published), other.published);
+                const current = other === doc ? ' aria-current="page"' : "";
+                return `<li><a href="${EscapeHtml(href)}"${current}>${EscapeHtml(label)}</a></li>`;
+            })
+            .join("\n          ");
+        out[doc.published] = fillTemplate("doc.html", {
+            ...common,
+            ROOT: "../".repeat(doc.published.split("/").length - 1),
+            TITLE: EscapeHtml(doc.title),
+            NAV: `<ul>\n          ${nav}\n        </ul>`,
+            CONTENT: doc.html,
+            SOURCE_PATH: EscapeHtml(doc.source),
+            SOURCE_URL: `${REPO_URL}/blob/main/${doc.source}`,
+        });
+    }
+    return out;
+}
+
+/** @param {string} [distDir] where to build (tests build into a temp folder) */
+export function Build(distDir = path.join(siteDir, "dist")) {
     const pkg = JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8"));
     const releases = ParseChangelog(readFileSync(path.join(rootDir, "CHANGELOG.md"), "utf8"));
     const latest = releases[0];
+    const changelogInline = (/** @type {string} */ text) => RenderInline(text, linkResolverFor("CHANGELOG.md", "index.html"));
 
-    const workshopButton = WORKSHOP_URL
-        ? `<a class="button button-primary" href="${escapeHtml(WORKSHOP_URL)}">Subscribe on the Workshop</a>`
-        : "";
-
+    const common = { REPO_URL, YEAR: String(new Date().getFullYear()) };
     /** @type {Record<string, string>} */
     const values = {
-        VERSION: escapeHtml(pkg.version),
-        LATEST_NAME: latest ? renderInline(latest.name) : "",
-        LATEST_DATE: latest ? escapeHtml(latest.date) : "",
-        REPO_URL,
-        SERVER_ADDRESS: escapeHtml(SERVER_ADDRESS),
-        WORKSHOP_BUTTON: workshopButton,
-        CHANGELOG: renderChangelog(releases),
-        YEAR: String(new Date().getFullYear()),
+        ...common,
+        VERSION: EscapeHtml(pkg.version),
+        LATEST_NAME: latest ? changelogInline(latest.name) : "",
+        LATEST_DATE: latest ? EscapeHtml(latest.date) : "",
+        SERVER_ADDRESS: EscapeHtml(SERVER_ADDRESS),
+        STEAM_CONNECT_URL: EscapeHtml(STEAM_CONNECT_URL),
+        WORKSHOP_BUTTON: WORKSHOP_URL ? `<a class="button button-primary" href="${EscapeHtml(WORKSHOP_URL)}">Subscribe on the Workshop</a>` : "",
+        CHANGELOG: renderChangelog(releases, changelogInline),
     };
 
-    const template = readFileSync(path.join(siteDir, "index.html"), "utf8");
-    const html = template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
-        if (!(key in values)) throw new Error(`site/index.html: unknown placeholder ${match}`);
-        return values[key];
-    });
+    /** @type {Record<string, string>} published path -> HTML */
+    const pages = { ...renderDocs(common) };
+    for (const [to, from] of Object.entries(PAGES)) pages[to] = fillTemplate(from, values);
 
     rmSync(distDir, { recursive: true, force: true });
     mkdirSync(path.join(distDir, "images"), { recursive: true });
-    writeFileSync(path.join(distDir, "index.html"), html);
+    for (const [to, html] of Object.entries(pages)) {
+        mkdirSync(path.dirname(path.join(distDir, to)), { recursive: true });
+        writeFileSync(path.join(distDir, to), html);
+    }
     cpSync(path.join(siteDir, "style.css"), path.join(distDir, "style.css"));
     cpSync(path.join(siteDir, "favicon.svg"), path.join(distDir, "favicon.svg"));
     for (const [to, from] of Object.entries(COPIED_IMAGES)) cpSync(path.join(rootDir, from), path.join(distDir, to));
@@ -149,7 +216,10 @@ function build() {
     if (existsSync(ownImages)) cpSync(ownImages, path.join(distDir, "images"), { recursive: true });
     writeFileSync(path.join(distDir, ".nojekyll"), ""); // serve the files as they are, no Jekyll pass
 
-    console.log(`site: built v${pkg.version} with ${releases.length} releases -> ${path.relative(rootDir, distDir)}/ (${readdirSync(distDir).length} entries)`);
+    return { version: pkg.version, releases: releases.length, pages: Object.keys(pages) };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) build();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    const result = Build();
+    console.log(`site: built v${result.version} with ${result.releases} releases, ${result.pages.length} pages -> site/dist/`);
+}

@@ -24,6 +24,7 @@
         <li><a href="#features">Features</a></li>
         <li><a href="#controls">Controls</a></li>
         <li><a href="#changelog">Changelog</a></li>
+        <li><a href="mapping-api/index.html">Mapping API</a></li>
         <li><a href="{{REPO_URL}}">GitHub</a></li>
       </ul>
     </nav>
@@ -40,10 +41,12 @@
         <div class="hero-actions">
           {{WORKSHOP_BUTTON}}
           <div class="connect">
-            <span class="connect-label">Play on our server — open the console (<kbd>~</kbd>) and type</span>
-            <button class="connect-command" type="button" data-copy="connect {{SERVER_ADDRESS}}" title="Copy to clipboard">
-              <code>connect {{SERVER_ADDRESS}}</code><span class="connect-hint" aria-live="polite">copy</span>
-            </button>
+            <span class="connect-label">Play on our server — starts CS2 and joins</span>
+            <a class="connect-command" href="{{STEAM_CONNECT_URL}}" title="Open CS2 via Steam and connect">
+              <code>connect {{SERVER_ADDRESS}}</code><span class="connect-hint">join</span>
+            </a>
+            <span class="connect-fallback">Nothing happens? Open the console (<kbd>~</kbd>) and type the command —
+              <button class="copy-button" type="button" data-copy="connect {{SERVER_ADDRESS}}" aria-live="polite">copy</button></span>
           </div>
         </div>
         <p class="hero-version">Version {{VERSION}} — <a href="#changelog">{{LATEST_NAME}}</a></p>
@@ -124,8 +127,8 @@
           <p>The whole game mode is open source: the <code>cs_script</code> gameplay scripts, the HUD, and the tools around them.
             Tracks are pure Hammer work — triggers named by convention, no coding needed.</p>
           <ul class="links">
-            <li><a href="{{REPO_URL}}/blob/main/docs/TRACK_CREATION.md">Track creation guide</a> — step by step in Hammer</li>
-            <li><a href="{{REPO_URL}}/blob/main/docs/mapping-api/README.md">Mapping API</a> — every entity name and script input</li>
+            <li><a href="mapping-api/track-creation.html">Track creation guide</a> — step by step in Hammer</li>
+            <li><a href="mapping-api/index.html">Mapping API</a> — every entity name and script input</li>
             <li><a href="{{REPO_URL}}/blob/main/GAMEPLAY.md">Game design</a> — how every mechanic works</li>
             <li><a href="{{REPO_URL}}/issues">Issues</a> — bug reports and ideas welcome</li>
           </ul>
@@ -164,14 +167,13 @@
     // Copy the connect command to the clipboard.
     for (const button of document.querySelectorAll("[data-copy]")) {
       button.addEventListener("click", async () => {
-        const hint = button.querySelector(".connect-hint");
         try {
           await navigator.clipboard.writeText(button.dataset.copy);
-          hint.textContent = "copied!";
+          button.textContent = "copied!";
         } catch {
-          hint.textContent = "select & copy";
+          button.textContent = "copy failed";
         }
-        setTimeout(() => { hint.textContent = "copy"; }, 2000);
+        setTimeout(() => { button.textContent = "copy"; }, 2000);
       });
     }
   </script>

@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- /connect/: sends the visitor straight to Steam, which starts CS2 and joins the server. Filled in by site/build.mjs. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Join Melon Racer</title>
+  <meta name="description" content="Join the Melon Racer server in Counter-Strike 2.">
+  <meta http-equiv="refresh" content="0; url={{STEAM_CONNECT_URL}}">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <main class="redirect wrap">
+    <img class="redirect-logo" src="../images/logo.png" alt="Melon Racer" width="846" height="295">
+    <h1>Starting CS2…</h1>
+    <p>Steam should open Counter-Strike&nbsp;2 and join <code>{{SERVER_ADDRESS}}</code>.</p>
+    <p><a class="button button-primary" href="{{STEAM_CONNECT_URL}}">Join server</a></p>
+    <p class="muted">Nothing happens? Open the CS2 console (<kbd>~</kbd>) and type <code>connect {{SERVER_ADDRESS}}</code>.<br>
+      <a href="../">About Melon Racer</a></p>
+  </main>
+  <script>location.href = "{{STEAM_CONNECT_URL}}";</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- Template for every docs page (Mapping API, track guide): the double-brace placeholders are filled in by site/build.mjs. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{TITLE}} — Melon Racer Mapping API</title>
+  <meta name="description" content="Melon Racer Mapping API: every entity name, name pattern and script input a Counter-Strike 2 map can use with the Melon Racer game mode.">
+  <link rel="icon" href="{{ROOT}}favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ROOT}}style.css">
+</head>
+<body>
+  <header class="topbar">
+    <nav class="wrap topbar-inner">
+      <a class="brand" href="{{ROOT}}index.html">Melon Racer</a>
+      <ul class="nav-links">
+        <li><a href="{{ROOT}}index.html#features">Features</a></li>
+        <li><a href="{{ROOT}}index.html#changelog">Changelog</a></li>
+        <li><a href="{{ROOT}}mapping-api/index.html" aria-current="page">Mapping API</a></li>
+        <li><a href="{{REPO_URL}}">GitHub</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div class="wrap docs">
+    <aside class="docs-nav">
+      <details open>
+        <summary>Mapping API</summary>
+        {{NAV}}
+      </details>
+    </aside>
+    <article class="doc">
+      {{CONTENT}}
+      <p class="doc-source muted">This page is generated from <a href="{{SOURCE_URL}}">{{SOURCE_PATH}}</a> in the repository.</p>
+    </article>
+  </div>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p class="muted">Melon Racer is a fan-made Counter-Strike&nbsp;2 Workshop map and not affiliated with Valve. © {{YEAR}} ·
+        <a href="{{REPO_URL}}">Source on GitHub</a></p>
+    </div>
+  </footer>
+</body>
+</html>

@@ -10,7 +10,7 @@ on:
       - "CHANGELOG.md"
       - "package.json"
       - "panorama/images/custom_game/**"
-      - "docs/gifs/**"
+      - "docs/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
