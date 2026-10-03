@@ -21,8 +21,9 @@ Recolor the touching melon — intended for the hub, but usable anywhere.
 
 - The color comes from the trigger's **name**, not the parameter — every
   paint trigger uses the same `melon_paint`.
-- The color (and the melon's outline glow) stays until the melon touches
-  another paint trigger — it survives breaks, heats and hub returns.
+- The color (and the melon's outline glow) stays until another paint
+  trigger or the user menu's color picker changes it — it survives breaks,
+  heats and hub returns.
 
 ---
 [← Hub](05-hub.md) · [Mapping API](README.md) · [Teleporters →](07-teleporters.md)

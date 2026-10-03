@@ -19,7 +19,7 @@ Break the touching melon at once, whatever its health.
 | Setting | Value |
 |---|---|
 | Class | `trigger_multiple` ([standard setup](01-conventions.md#3-every-melon-trigger-is-set-up-the-same-way)) |
-| Name | anything (don't start it with `melon_break`) |
+| Name | anything (not read; avoid `melon_break…`, the break templates' prefix) |
 | `OnStartTouch` | → `melon_drive_script` → `RunScriptInput` → `melon_break` |
 
 - Same break as running out of health: [break effects](03-effect-templates.md#break-burst)

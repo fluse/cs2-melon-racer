@@ -5,7 +5,7 @@ import { activeTrackId, FinishKart } from "../heat/race-flow.js";
 import { GetTrackConfig } from "../track-config.js";
 import { ApplyCheckpointTouch, ApplyLapCompletion, ApplyStartTouch, StartLineTrackId, FinishLineTrackId } from "./logic.js";
 import { MAX_TRACKS, MAX_CHECKPOINTS_PER_TRACK, TELEPORT_UP_OFFSET, FINISH_RESTART_START_GUARD } from "../../constants/index.js";
-import { Lifted, GetCheckpointSpawnPoint, GetStartSpawnPoint } from "../../kart/spawn-points.js";
+import { Lifted, LevelAngles, GetCheckpointSpawnPoint, GetStartSpawnPoint } from "../../kart/spawn-points.js";
 import { StartRun, FinishRun, CancelRun, CanRestartTimeTrial } from "../time-trial/time-trial.js";
 // Straight from teleport.js, not movement/index.js: that index pulls in the
 // whole physics tree, which imports race/heat/race-flow.js — a cycle through here.
@@ -61,7 +61,8 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
         // otherwise make a later respawn (e.g. after BreakMelon) tunnel the
         // melon down through the floor instead of landing on it.
         kart.checkpointPosition = Lifted(trigger.GetAbsOrigin(), TELEPORT_UP_OFFSET);
-        kart.checkpointAngles = trigger.GetAbsAngles();
+        // Only the yaw, like every other spawn: a rotated brush mustn't respawn the melon tilted.
+        kart.checkpointAngles = LevelAngles(trigger.GetAbsAngles().yaw);
     }
     Debug(`checkpoint_${trackId}_${index}: kart advanced to checkpoint ${index} on track ${trackId}`);
 }

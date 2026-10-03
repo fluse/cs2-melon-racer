@@ -1,4 +1,4 @@
-[Mapping API](README.md) › **13. Water zones** · [← Jump pads](12-jump-pads.md) · [Checking your map →](14-checking.md)
+[Mapping API](README.md) › **13. Water zones** · [← Jump pads](12-jump-pads.md) · [Prefabs →](14-prefabs.md)
 
 # 13. Water zones
 
@@ -36,4 +36,4 @@ starts pushing the melon around.
   [heal zones](09-heal-zones.md#rules).
 
 ---
-[← Jump pads](12-jump-pads.md) · [Mapping API](README.md) · [Checking your map →](14-checking.md)
+[← Jump pads](12-jump-pads.md) · [Mapping API](README.md) · [Prefabs →](14-prefabs.md)

@@ -46,6 +46,8 @@ moving). Height ≈ up² / 1600 units — a normal jump reaches ~85.
 - Launches when jump is pressed on the pad, or up to `JUMP_PAD_BUFFER`
   before reaching it. Driving over without pressing does nothing.
 - The forward boost raises the speed cap like a wall bounce; it decays back.
+- A launch never lowers a faster upward speed. Overlapping pads: the one
+  entered last counts.
 - **No damage** on the pad and from the launch until `JUMP_PAD_LANDING_GRACE`
   after landing — landings, crashes and wall hits are free. The attack
   boost still costs health, [kill triggers](08-kill-triggers.md) still break.

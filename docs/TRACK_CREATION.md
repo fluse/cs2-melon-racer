@@ -41,7 +41,8 @@ instance, open Map Variables and set the **Override** of `track` to this
 track's trigger name (`start_2`, `start_1_laps3`, …). The prefab's trigger
 already fires `start_line` (which reads the track from that name) and holds
 a `start_spawn` the script finds next to it — nothing else to set. Details:
-[Mapping API: start gate prefab](mapping-api/04-tracks.md#start-gate-prefab).
+[Mapping API: start gate prefab](mapping-api/04-tracks.md#start-gate-prefab),
+and [Prefabs](mapping-api/14-prefabs.md) for how map variables work.
 The rest of this section is what the prefab contains, for building a start
 by hand.
 
@@ -57,10 +58,11 @@ The racers appear just above the floor below the `info_target`, facing its
 yaw (turn it in Hammer; pitch/roll don't matter), side by side across that
 direction, 120 units apart (`RACE_SPAWN_LATERAL_SPACING`) — make the start
 wide enough (4 racers ≈ 360 units). A melon that breaks before checkpoint 1
-respawns there too. Without the `info_target` the trigger's own origin and
-angles are used instead — no floor trace, and Hammer doesn't always turn a
-brush entity's angles along with its geometry, so the `info_target` is the
-reliable way.
+respawns there too. Without `start_spawn_<trackId>` the `info_target` named
+just `start_spawn` nearest to the trigger is used (within 1024 units — the
+start gate prefab's), and without that the trigger's own origin and angles
+— no floor trace, and Hammer doesn't always turn a brush entity's angles
+along with its geometry, so an `info_target` is the reliable way.
 
 Name the trigger:
 
@@ -83,8 +85,9 @@ Or the parameter `start_line` instead: same effect, but the track is read
 from the trigger's own name, so the output is the same for every track.
 
 Crossing it is what makes a kart "pick" this track (outside a heat; in a
-heat, racers are put on their track the moment it starts) and makes
-`start_spawn_<trackId>` its respawn point until checkpoint 1.
+heat, racers are put on their track the moment it starts) and makes the
+start spawn (`start_spawn_<trackId>`, else the nearest `start_spawn`, else
+the trigger) its respawn point until checkpoint 1.
 
 ## 2. Checkpoint triggers
 
@@ -140,6 +143,13 @@ holo_checkpoint`), the same way `holo_heal` marks heal gates.
 
 ## 3. The finish signal
 
+**Quickest way: the finish gate prefab.** Place
+`maps/prefabs/finish_gate.vmap` on the finish line and set the **Override**
+of its `track` variable to `finish_<trackId>` (e.g. `finish_2`). On a loop
+track place it on the start line, overlapping the start gate. Details:
+[Mapping API: finish gate prefab](mapping-api/04-tracks.md#finish-gate-prefab).
+The rest of this section is building a finish by hand.
+
 Add one more Output, **`finish_<trackId>`**, that fires whenever a racer
 crosses this track's finish line:
 
@@ -155,7 +165,8 @@ fires it, only that *some* trigger on the finish line does:
   **second** Output on the **start trigger** from step 1. Whichever of the
   two outputs Hammer fires first, the lap counts exactly once.
 - **Point-to-point track**: place its own `trigger_multiple` where the track
-  ends (any name), filtered to `prop_physics` like the others, with just
+  ends (any name with `finish_<trackId>`; named `finish_<trackId>` with
+  `finish_line`), filtered to `prop_physics` like the others, with just
   this one Output.
 
 `finish_line` works like `start_line`: the track comes from the firing

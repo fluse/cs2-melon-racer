@@ -7,10 +7,11 @@ this folder, the script doesn't know about it.
 
 - Building a track step by step: [TRACK_CREATION.md](../TRACK_CREATION.md).
 - *Why* things behave the way they do: [GAMEPLAY.md](../../GAMEPLAY.md).
-- Every name here is defined in a `constants.js` under
+- Every name the script looks up is defined in a `constants.js` under
   [src/melon_drive/](../../src/melon_drive/), all re-exported by
   `constants/index.js`. `test/map/mapping-api-doc.test.mjs` fails if one is
-  missing from this folder.
+  missing from this folder. (`melon_drive_script` and `gamemode` are fixed
+  by convention instead: outputs target the one by name in Hammer.)
 
 ## Pages
 
@@ -29,7 +30,8 @@ this folder, the script doesn't know about it.
 | 11 | [Camera zones](11-camera-zones.md) | Zoom out/in, front view, close-up |
 | 12 | [Jump pads](12-jump-pads.md) | Timed launch pads, no damage |
 | 13 | [Water zones](13-water-zones.md) | Landing in water stops the melon, no bounces in it |
-| 14 | [Checking your map](14-checking.md) | What `npm test` catches, debug log, minimal checklist |
+| 14 | [Prefabs](14-prefabs.md) | Hub, routes, start/finish/heal gates; map variables, rules |
+| 15 | [Checking your map](15-checking.md) | What `npm test` catches, debug log, minimal checklist |
 
 ## All script inputs
 
@@ -40,8 +42,8 @@ script, and `npm test` fails on it.
 
 | Parameter | Output | Fired by | Read from the trigger | Page |
 |---|---|---|---|---|
-| `start_<trackId>` | Start | the track's `start_<trackId>[_laps<M>]` trigger | name (laps) | [Tracks](04-tracks.md#start-line) |
-| `start_line` | Start | a `start_<trackId>[_laps<M>]` trigger | name (track, laps) | [Tracks](04-tracks.md#start-gate-prefab) |
+| `start_<trackId>` | Start | the track's `start_<trackId>[_laps<M>]` trigger | — | [Tracks](04-tracks.md#start-line) |
+| `start_line` | Start | a `start_<trackId>[_laps<M>]` trigger | name (track) | [Tracks](04-tracks.md#start-gate-prefab) |
 | `checkpoint_<trackId>_<index>` | Start | the checkpoint's trigger, **named like the parameter** | name (counted) | [Tracks](04-tracks.md#checkpoints) |
 | `finish_<trackId>` | Start | any trigger on the finish line | — | [Tracks](04-tracks.md#finish-line) |
 | `finish_line` | Start | a `finish_<trackId>` trigger, or a loop's start trigger | name (track) | [Tracks](04-tracks.md#finish-line) |
@@ -65,7 +67,9 @@ script, and `npm test` fails on it.
 
 ## All entity names
 
-Fixed names the script looks up.
+Fixed names the script looks up (and the two `point_script` names every
+output relies on). Laps and checkpoint counts are read from the trigger
+names once, when the script first needs the track list.
 
 | Name | Class | Required | Page |
 |---|---|---|---|
@@ -73,7 +77,7 @@ Fixed names the script looks up.
 | `gamemode` | `point_script` | yes | [Core entities](02-core-entities.md) |
 | `speed_hud` | `custom_hud_layout` | yes | [Core entities](02-core-entities.md) |
 | `melon_template` | `point_template` | yes | [Core entities](02-core-entities.md) |
-| `hub_spawn` | `info_player_start` | yes | [Core entities](02-core-entities.md#spawn-points) |
+| `hub_spawn` | any named point entity (e.g. `info_player_start`) | yes | [Core entities](02-core-entities.md#spawn-points) |
 | `hub_start_trigger` | `trigger_multiple` | yes | [Hub](05-hub.md) |
 | `intro_spawn` | `info_player_start` | — | [Core entities](02-core-entities.md#spawn-points) |
 | `hub_spawn_facing` | `info_target` | — | [Core entities](02-core-entities.md#spawn-points) |

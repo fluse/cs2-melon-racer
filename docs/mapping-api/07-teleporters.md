@@ -45,9 +45,15 @@ Example: `teleport_stop_to_tp_dest_hub_back` → arrives at the entity
   checkpoints.
 - **Respawn teleporter** (`checkpoint_` variants): the destination also
   becomes the melon's respawn point after a break — for the tutorial, so a
-  break doesn't send it back to its start. The next checkpoint, respawn
-  teleporter, hub or tutorial button replaces it.
+  break doesn't send it back to its start. Anything else that sets a
+  respawn point replaces it: the next checkpoint or respawn teleporter,
+  crossing a start line, a heat start, `hub_teleport`, the time trial's
+  finish/restart, the user menu's hub or tutorial button.
 - Ignored for broken melons and race-locked melons (countdown, finished).
+- A wiring mistake always logs (`DEBUG` or not): `[melon_drive]
+  melon_teleport: trigger "<name>" isn't named
+  teleport_[stop_|keep_][checkpoint_]to_<destination>, ignoring`, or
+  `… points at "<dest>", but no entity has that name`.
 - To send a melon to the hub and out of a heat, use
   [`hub_teleport`](05-hub.md#sending-melons-to-the-hub) instead.
 

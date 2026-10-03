@@ -13,7 +13,7 @@ Areas where the melon regains health over time.
 | `OnEndTouch` | → `melon_drive_script` → `RunScriptInput` → `heal_leave` |
 
 **Both outputs are required** — without `heal_leave` the melon keeps
-healing after leaving (until its next teleport/respawn).
+healing after leaving; teleports and respawns don't clear it.
 
 ## Name variants
 

@@ -2,7 +2,12 @@
 
 # 3. Effect templates
 
-All optional `point_template`s the script spawns for visual effects. Where a
+All optional `point_template`s the script spawns for visual effects —
+optional for the script, which just skips a missing effect. `npm test` is
+stricter: `melon_break_template`, `melon_break_chunks_template`,
+`perfect_hit_particle_template` and `particle_health_template` must each
+exist exactly once, spawning an `info_particle_system` with a `.vpcf`; the
+boost trail is only checked once placed, the prediction dots not at all. Where a
 template and its entities sit in Hammer doesn't matter — the script moves
 the spawned copies onto the melon / crash site. Particle systems should have
 **"Start Active" off**; the script starts them.

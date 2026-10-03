@@ -30,10 +30,10 @@ CHANGELOG.md                             # player-facing changes per release (gi
 docs/TRACK_CREATION.md                   # step-by-step Hammer guide for a new track
 docs/valve/scripting_api.html            # saved copy of Valve's cs_script API wiki page (the site blocks automated fetches)
 docs/mapping-api/*.md                    # Mapping API (map↔script contract): README.md = index of every input/name/pattern,
-                                          #   01-…14-*.md one page per topic, each with setup / name-variant / "Values" tables
+                                          #   01-…15-*.md one page per topic, each with setup / name-variant / "Values" tables
 maps/melon_racer.vmap                    # main map (binary DMX, Hammer-authoritative)
 maps/prefabs/*.vmap                      # prefabs placed in melon_racer.vmap (hub, routes, gates); start_gate.vmap is set to a track by its
-                                          #   `track` map variable (docs/mapping-api/04-tracks.md) — test/helpers/vmap.mjs reads prefabs, overrides resolved
+                                          #   `track` map variable (docs/mapping-api/14-prefabs.md) — test/helpers/vmap.mjs reads prefabs, overrides resolved
 maps/content_examples/lighting_info.vmap
 maps/scripts/*.js                        # AUTO-GENERATED bundle output, see below — don't hand-edit
 maps/scripts/point_script.d.ts           # cs_script API type declarations (copied from cs_script_demo)

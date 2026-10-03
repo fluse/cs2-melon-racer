@@ -50,8 +50,12 @@ gained ≈ kick² / 1600 units (gravity 800).
 - A shaft must be wide enough for the melon to gather `WALL_BOUNCE_MIN_IMPACT`
   between walls. Inside the zone every bounce leaves the wall with at least
   `LIFT_ZONE_MIN_BOUNCE_SPEED` sideways, so the chain doesn't die.
+- A `lift_zone_<speed>` below `WALL_BOUNCE_UP_SPEED` kicks with
+  `WALL_BOUNCE_UP_SPEED` — a lift zone never kicks weaker than outside one.
 - Wall jumps inside cost no wall-jump charge, are always full strength and
-  don't cut a bounce's kick short (still alternating walls).
+  don't cut a bounce's kick short (still alternating walls). They aren't
+  rated by angle: no PERFECT/GOOD speed bonus, spark or bounce-panel
+  feedback — the shaft is climbed, not raced.
 - The camera looks through the shaft walls instead of being pulled in.
 - Overlapping zones don't stack (the strongest counts). Teleports and
   respawns keep the melon in its zones, like [heal zones](09-heal-zones.md#rules).

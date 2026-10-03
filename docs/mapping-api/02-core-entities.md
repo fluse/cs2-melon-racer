@@ -22,7 +22,7 @@ from the entity, facing its yaw ([conventions §5](01-conventions.md#5-transform
 
 | Name | Class | Required | Used for | Without it |
 |---|---|---|---|---|
-| `hub_spawn` | `info_player_start` | **yes** | Returning to the hub: heat over, abort, menu button, `hub_teleport` | No fallback — melons have nowhere to go. |
+| `hub_spawn` | any named point entity (e.g. `info_player_start`) | **yes** | Returning to the hub: heat over, abort, menu button, `hub_teleport` | No fallback — melons have nowhere to go. |
 | `hub_spawn_facing` | `info_target` | — | Only its angle counts: which way a melon at `hub_spawn` faces | `hub_spawn`'s own angle. |
 | `intro_spawn` | `info_player_start` | — | A player's very first melon (tutorial area); also the user menu's "Play Tutorial" target and that kart's first respawn point | `hub_spawn` is used. |
 

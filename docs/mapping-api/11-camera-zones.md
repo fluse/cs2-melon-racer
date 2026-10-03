@@ -32,7 +32,9 @@ Values are units, decimals allowed. The normal chase camera sits
 
 Normal zones are **added** to the normal offset (negative = closer /
 lower); front and close-up zones are the camera's **spot** relative to the
-melon's center (~7 units above the floor).
+melon's center (~7 units above the floor). The slower close-up ease applies
+going into a close-up and from it back to no zone; from a close-up straight
+into another camera zone it's 0.6 s.
 
 Name patterns:
 

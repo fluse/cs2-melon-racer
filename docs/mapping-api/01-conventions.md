@@ -20,8 +20,8 @@ Lower case, `_` as separator, case-sensitive, no leading/trailing spaces
 | Setting | Value | Why |
 |---|---|---|
 | Class | `trigger_multiple` | fires on every touch |
-| Spawnflag | **Physics Objects** ticked | the melon is a `prop_physics`; without it the trigger never fires for it |
-| Filter | `filter_activator_class` → `prop_physics` | player pawns and other entities can't fire it |
+| Spawnflag | **Physics Objects** ticked | the melon is a `prop_physics`; without it the trigger never fires for it (`npm test` checks it) |
+| Filter | `filter_activator_class` → `prop_physics` (recommended) | keeps player pawns and other entities out; the script ignores any activator that isn't a melon anyway |
 | Thickness | thick (≥ one tick of travel) | melons go well above `MAX_SPEED` (650 u/s) after bounces; a thin trigger is tunneled through |
 
 ## 4. Every output goes to the same place
@@ -47,7 +47,7 @@ it's fine — even recommended — to sink trigger brushes into the floor.
 | Constant | Value | Applies to | Defined in |
 |---|---|---|---|
 | `TELEPORT_UP_OFFSET` | 40 units | above a trigger's origin / a teleport destination (no floor trace) | `zones/teleport/constants.js` |
-| `SPAWN_UP_OFFSET` | 40 units | above the floor traced straight down from a spawn entity (`hub_spawn`, `intro_spawn`, `start_spawn_*`, `checkpoint_spawn_*`) | `kart/constants.js` |
+| `SPAWN_UP_OFFSET` | 40 units | above the floor traced straight down from a spawn entity (`hub_spawn`, `intro_spawn`, `start_spawn_*`, `start_spawn`, `checkpoint_spawn_*`) | `kart/constants.js` |
 
 Keep spawn entities near the floor — a long drop can break the melon on
 landing.
@@ -69,10 +69,10 @@ or the tests pick them up:
 
 | Prefix | Page |
 |---|---|
-| `start_`, `checkpoint_` | [Tracks](04-tracks.md) |
+| `start_`, `checkpoint_`, `finish_` | [Tracks](04-tracks.md) |
 | `hub_` | [Hub](05-hub.md), [Core entities](02-core-entities.md) |
 | `paint_trigger_` | [Paint triggers](06-paint-triggers.md) |
-| `teleport_to_`, `teleport_stop_to_`, `teleport_keep_to_` | [Teleporters](07-teleporters.md) |
+| `teleport_` | [Teleporters](07-teleporters.md) |
 | `melon_break` | [Kill triggers](08-kill-triggers.md), [Effect templates](03-effect-templates.md) |
 | `heal_zone_` | [Heal zones](09-heal-zones.md) |
 | `lift_zone_` | [Lift zones](10-lift-zones.md) |

@@ -41,7 +41,8 @@ Step-by-step build guide: [TRACK_CREATION.md](../TRACK_CREATION.md).
 | spawn | `^start_spawn_(\d+)$` | `start_spawn_1` | where track 1's racers line up |
 | shared spawn | `start_spawn` | `start_spawn` | the start spawn of whichever start trigger it's nearest to |
 
-- Parsed once at map start from every `trigger_multiple`. Only this trigger
+- Parsed from every `trigger_multiple` the first time the script needs the
+  track list, then cached. Only this trigger
   may fire `start_<trackId>` or `start_line` (`npm test` checks it), and
   only one trigger per track may carry the name.
 - **`start_line`** — the generic form of the output: the script takes the
@@ -60,30 +61,41 @@ Step-by-step build guide: [TRACK_CREATION.md](../TRACK_CREATION.md).
   copy of a start gate prefab carries its own; keep two gates further apart
   than each gate's spawn is from its own trigger.
 - **Without a start spawn:** the start trigger's own origin (lifted
-  `TELEPORT_UP_OFFSET`, no floor trace) and yaw are used, and the heat logs
-  `no info_target "start_spawn_…"`.
+  `TELEPORT_UP_OFFSET`, no floor trace) and yaw are used. With `DEBUG` on,
+  every start crossing, heat start and time-trial restart logs
+  `GetStartSpawnPoint: no info_target "start_spawn_<t>" or "start_spawn" nearby`
+  — plus `FindSharedStartSpawnPoint: no "start_spawn" within 1024 units of
+  "<trigger>"` when there are `start_spawn`s, just all too far.
 - Crossing the trigger puts a free-roaming melon on that track and starts
   its [time trial](../../GAMEPLAY.md#time-trial-decided-implemented).
-- A track without a start trigger doesn't exist for the race flow (the HUD
-  shows "?").
+- A track without a start trigger doesn't exist for the race flow.
+- `start_line`/`finish_line` from a trigger whose name gives no track
+  1 … `MAX_TRACKS` always logs (`DEBUG` or not) `[melon_drive] start_line
+  fired by "<name>", which names no track 1..8 — ignoring.`
+- Keep `trackId` ≤ `MAX_TRACKS`: a `start_9` trigger would still join the
+  heat order, but no `start_9`/`checkpoint_9_*` input exists.
 
 ## Start gate prefab
+
+How prefabs and their map variables work: [Prefabs](14-prefabs.md).
 
 `maps/prefabs/start_gate.vmap` is a whole start line — trigger, spawn and
 outputs — that's set to a track by a single value:
 
 | Inside the prefab | Set to |
 |---|---|
-| start trigger's **Name** | bound to the prefab variable `track` (type `target_source`, default `start_1`) |
+| start trigger's **Name** | bound to the prefab variable `track` (type `target_source`) |
 | its output | `OnStartTouch` → `start_line` |
 | `info_target` | `start_spawn` (shared name) |
+| `trigger_multiple` | `heal_zone_full` — every start is a [full-heal zone](09-heal-zones.md#full-heal-zone) |
 
 Per placed copy: select the prefab instance (not inside it) → Map
 Variables → **Override** `track` = the trigger name, e.g. `start_2` or
 `start_3_laps2`. Don't add `finish_line` to the start gate: the same gate
 starts point-to-point tracks too, and on one without checkpoints that would
-finish the run at the start line. A copy left on the default `start_1` next
-to another `start_1` fails `npm test` (two start triggers for one track).
+finish the run at the start line. A copy left on the prefab's default next
+to another start trigger of that track fails `npm test` (two start triggers
+for one track).
 
 ## Finish gate prefab
 
@@ -91,7 +103,7 @@ to another `start_1` fails `npm test` (two start triggers for one track).
 
 | Inside the prefab | Set to |
 |---|---|
-| finish trigger's **Name** | bound to the prefab variable `track` (type `target_source`, default `finish_1`) |
+| finish trigger's **Name** | bound to the prefab variable `track` (type `target_source`) |
 | its output | `OnStartTouch` → `finish_line` |
 
 Per placed copy: **Override** `track` = `finish_<trackId>`, e.g. `finish_2`.
@@ -140,7 +152,8 @@ OnStartTouch → melon_drive_script → RunScriptInput → finish_<trackId>
   is a prefab variable — see [Finish gate prefab](#finish-gate-prefab).
 - Counts a lap only if the melon has reached the track's last checkpoint
   since the lap started; the last lap (`_laps<M>`) finishes the melon.
-- Only the melon is read, not which trigger fired it.
+- With `finish_<trackId>` only the melon is read, not which trigger fired
+  it; `finish_line` reads the trigger's name.
 
 ## Checked by `npm test`
 
@@ -153,6 +166,10 @@ OnStartTouch → melon_drive_script → RunScriptInput → finish_<trackId>
 | checkpoint trigger named differently from the parameter it fires | ✗ |
 | gap in a track's checkpoint numbers | ✗ |
 | `checkpoint_spawn_<t>_<i>` whose checkpoint no trigger fires | ✗ |
+| a placed prefab with "Fix Up Entity Names" ticked ([Prefabs](14-prefabs.md#rules)) | ✗ |
+
+Not checked: whether a shared `start_spawn` is within
+`START_SPAWN_SHARED_MAX_DISTANCE` of its start trigger.
 
 ---
 [← Effect templates](03-effect-templates.md) · [Mapping API](README.md) · [Hub →](05-hub.md)

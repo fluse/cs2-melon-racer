@@ -75,6 +75,15 @@ test("without a checkpoint_spawn info_target the checkpoint trigger itself is th
     assert.deepEqual(kart.melon.GetAbsOrigin(), { x: origin.x, y: origin.y, z: origin.z + TELEPORT_UP_OFFSET });
 });
 
+test("a tilted checkpoint trigger respawns the melon level, facing its yaw", () => {
+    const tilted = world.add(new Entity({ name: "checkpoint_1_1", className: "trigger_multiple", origin: { x: 0, y: 0, z: 0 }, angles: { pitch: 15, yaw: 60, roll: 10 } }));
+    ScriptInput("start_1")({ caller: start, activator: kart.melon });
+    ScriptInput("checkpoint_1_1")({ caller: tilted, activator: kart.melon });
+
+    RespawnKartAtCheckpoint(kart);
+    assert.deepEqual(kart.melon.GetAbsAngles(), { pitch: 0, yaw: 60, roll: 0 });
+});
+
 test("crossing the start line makes it the respawn point", () => {
     ScriptInput("start_1")({ caller: start, activator: kart.melon });
     assert.equal(kart.trackId, 1);

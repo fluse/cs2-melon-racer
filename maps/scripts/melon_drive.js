@@ -5843,7 +5843,8 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
         // otherwise make a later respawn (e.g. after BreakMelon) tunnel the
         // melon down through the floor instead of landing on it.
         kart.checkpointPosition = Lifted(trigger.GetAbsOrigin(), TELEPORT_UP_OFFSET);
-        kart.checkpointAngles = trigger.GetAbsAngles();
+        // Only the yaw, like every other spawn: a rotated brush mustn't respawn the melon tilted.
+        kart.checkpointAngles = LevelAngles(trigger.GetAbsAngles().yaw);
     }
     Debug(`checkpoint_${trackId}_${index}: kart advanced to checkpoint ${index} on track ${trackId}`);
 }
