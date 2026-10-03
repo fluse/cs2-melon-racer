@@ -73,6 +73,29 @@ function linkResolverFor(sourceFile, pagePath) {
     };
 }
 
+/** The top bar's menu, the same on every page: label -> link from the site root. */
+const NAV_LINKS = {
+    "How it works": "index.html#race",
+    Features: "index.html#features",
+    Controls: "index.html#controls",
+    Changelog: "index.html#changelog",
+    "Mapping API": "mapping-api/index.html",
+    GitHub: REPO_URL,
+};
+
+/** @param {string} pagePath published path of the page the menu is on */
+function navLinksFor(pagePath) {
+    const root = "../".repeat(pagePath.split("/").length - 1);
+    const items = Object.entries(NAV_LINKS).map(([label, target]) => {
+        const external = /^[a-z]+:/.test(target);
+        // On the home page its own sections are plain #anchors.
+        const href = external ? target : pagePath === "index.html" ? target.replace(/^index\.html(?=#)/, "") : root + target;
+        const current = !external && target.startsWith("mapping-api/") && pagePath.startsWith("mapping-api/") ? ' aria-current="page"' : "";
+        return `<li><a href="${EscapeHtml(href)}"${current}>${EscapeHtml(label)}</a></li>`;
+    });
+    return `<ul class="nav-links">\n        ${items.join("\n        ")}\n      </ul>`;
+}
+
 /** @param {string} templateFile under site/ @param {Record<string, string>} values */
 function fillTemplate(templateFile, values) {
     const template = readFileSync(path.join(siteDir, templateFile), "utf8");
@@ -168,6 +191,7 @@ function renderDocs(common) {
             .join("\n          ");
         out[doc.published] = fillTemplate("doc.html", {
             ...common,
+            NAV_LINKS: navLinksFor(doc.published),
             ROOT: "../".repeat(doc.published.split("/").length - 1),
             TITLE: EscapeHtml(doc.title),
             NAV: `<ul>\n          ${nav}\n        </ul>`,
@@ -201,7 +225,7 @@ export function Build(distDir = path.join(siteDir, "dist")) {
 
     /** @type {Record<string, string>} published path -> HTML */
     const pages = { ...renderDocs(common) };
-    for (const [to, from] of Object.entries(PAGES)) pages[to] = fillTemplate(from, values);
+    for (const [to, from] of Object.entries(PAGES)) pages[to] = fillTemplate(from, { ...values, NAV_LINKS: navLinksFor(to) });
 
     rmSync(distDir, { recursive: true, force: true });
     mkdirSync(path.join(distDir, "images"), { recursive: true });
