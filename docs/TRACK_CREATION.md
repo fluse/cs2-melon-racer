@@ -35,6 +35,16 @@ track also decides where it falls in that sequence.
 
 ## 1. The start trigger
 
+**Quickest way: the start gate prefab.** Place
+`maps/prefabs/start_gate.vmap` on the start line, select the placed
+instance, open Map Variables and set the **Override** of `track` to this
+track's trigger name (`start_2`, `start_1_laps3`, …). The prefab's trigger
+already fires `start_line` (which reads the track from that name) and holds
+a `start_spawn` the script finds next to it — nothing else to set. Details:
+[Mapping API: start gate prefab](mapping-api/04-tracks.md#start-gate-prefab).
+The rest of this section is what the prefab contains, for building a start
+by hand.
+
 Place a `trigger_multiple` on the start line, plus an `info_target` just
 behind it where racers line up when this track's heat begins:
 
@@ -68,6 +78,9 @@ start_<trackId>_laps<lapsToWin>  e.g. start_1_laps3  (3 laps)
 | Output | Target entity | Via this input | Parameter |
 |---|---|---|---|
 | `OnStartTouch` | the map's `point_script` entity | `RunScriptInput` | `start_<trackId>` |
+
+Or the parameter `start_line` instead: same effect, but the track is read
+from the trigger's own name, so the output is the same for every track.
 
 Crossing it is what makes a kart "pick" this track (outside a heat; in a
 heat, racers are put on their track the moment it starts) and makes
@@ -144,6 +157,10 @@ fires it, only that *some* trigger on the finish line does:
 - **Point-to-point track**: place its own `trigger_multiple` where the track
   ends (any name), filtered to `prop_physics` like the others, with just
   this one Output.
+
+`finish_line` works like `start_line`: the track comes from the firing
+trigger's name — `finish_<trackId>` at the end of a point-to-point track,
+or the start trigger's own name on a loop.
 
 A lap only counts if the racer already reached the last checkpoint since
 their last lap started — crossing the finish line early (e.g. cutting the
@@ -226,9 +243,11 @@ parameter name, not a script problem. Run `npm test` too: it checks the
 ## Checklist
 
 - [ ] Start trigger named `start_<trackId>` or `start_<trackId>_laps<M>`,
-      firing `start_<trackId>`.
-- [ ] `info_target` `start_spawn_<trackId>` behind the start line, facing
-      down the track, with room for the racers side by side.
+      firing `start_line` (or `start_<trackId>`) — or a start gate prefab
+      with its `track` override set.
+- [ ] `info_target` `start_spawn_<trackId>` (or `start_spawn` right at the
+      start trigger) behind the start line, facing down the track, with room
+      for the racers side by side.
 - [ ] One `checkpoint_<trackId>_<index>` trigger per checkpoint, `1..N`, each
       named exactly like the parameter it fires.
 - [ ] A `finish_<trackId>` output — on the start trigger (loop) or on a

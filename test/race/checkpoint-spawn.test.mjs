@@ -17,7 +17,7 @@ const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
 const { GetIntroSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
 const { RespawnKartAtCheckpoint } = await import("../../src/melon_drive/kart/index.js");
 const { BeginHeat } = await import("../../src/melon_drive/race/heat/race-flow.js");
-const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, TELEPORT_UP_OFFSET, CheckpointSpawnName, StartSpawnName } = await import("../../src/melon_drive/constants/index.js");
+const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, TELEPORT_UP_OFFSET, START_SPAWN_SHARED_NAME, START_SPAWN_SHARED_MAX_DISTANCE, CheckpointSpawnName, StartSpawnName } = await import("../../src/melon_drive/constants/index.js");
 await import("../../src/melon_drive/index.js"); // registers the script inputs
 
 /** @param {string} name */
@@ -115,6 +115,82 @@ test("a heat lines racers up at start_spawn, facing its yaw", () => {
     assert.deepEqual(kart.melon.GetAbsOrigin(), { x: origin.x, y: origin.y, z: origin.z + SPAWN_UP_OFFSET }); // a lone racer stands in the middle
     assert.equal(kart.melon.GetAbsAngles().yaw, 180);
     assert.equal(kart.pawn.GetEyeAngles().yaw, 180, "the player's view turns with it");
+});
+
+/** A start_spawn (shared name, as in the start gate prefab) `offset` units along x from the start trigger. @param {number} offset @param {number} yaw */
+function AddSharedStartSpawn(offset, yaw) {
+    const origin = start.GetAbsOrigin();
+    return world.add(new Entity({
+        name: START_SPAWN_SHARED_NAME,
+        className: "info_target",
+        origin: { x: origin.x + offset, y: origin.y, z: origin.z },
+        angles: { pitch: 0, yaw, roll: 0 },
+    }));
+}
+
+test("without start_spawn_<trackId>, the start uses the nearest shared start_spawn", () => {
+    AddSharedStartSpawn(600, 0); // another gate's
+    const own = AddSharedStartSpawn(-200, 45);
+    ScriptInput("start_1")({ caller: start, activator: kart.melon });
+
+    RespawnKartAtCheckpoint(kart);
+    const origin = own.GetAbsOrigin();
+    assert.deepEqual(kart.melon.GetAbsOrigin(), { x: origin.x, y: origin.y, z: origin.z + SPAWN_UP_OFFSET });
+    assert.equal(kart.melon.GetAbsAngles().yaw, 45);
+});
+
+test("start_spawn_<trackId> wins over a shared start_spawn", () => {
+    AddSharedStartSpawn(-10, 45);
+    const target = AddStartSpawn();
+    ScriptInput("start_1")({ caller: start, activator: kart.melon });
+
+    RespawnKartAtCheckpoint(kart);
+    assert.equal(kart.melon.GetAbsOrigin().x, target.GetAbsOrigin().x);
+});
+
+test("a shared start_spawn too far from the start trigger isn't used", () => {
+    AddSharedStartSpawn(START_SPAWN_SHARED_MAX_DISTANCE + 1, 45);
+    ScriptInput("start_1")({ caller: start, activator: kart.melon });
+
+    RespawnKartAtCheckpoint(kart);
+    const origin = start.GetAbsOrigin();
+    assert.deepEqual(kart.melon.GetAbsOrigin(), { x: origin.x, y: origin.y, z: origin.z + TELEPORT_UP_OFFSET });
+});
+
+test("a heat lines racers up at the shared start_spawn too", () => {
+    const own = AddSharedStartSpawn(-200, 45);
+    kart.racing = true;
+    BeginHeat(1);
+    assert.equal(kart.melon.GetAbsOrigin().x, own.GetAbsOrigin().x);
+    assert.equal(kart.melon.GetAbsAngles().yaw, 45);
+});
+
+test("start_line puts the melon on the track its trigger is named after", () => {
+    const gate = world.add(new Entity({ name: "start_2_laps3", className: "trigger_multiple", origin: { x: 0, y: 0, z: 0 } }));
+    ScriptInput("start_line")({ caller: gate, activator: kart.melon });
+    assert.equal(kart.trackId, 2);
+});
+
+test("start_line from a trigger named after no track is ignored", () => {
+    const gate = world.add(new Entity({ name: "start_gate", className: "trigger_multiple" }));
+    ScriptInput("start_line")({ caller: gate, activator: kart.melon });
+    assert.equal(kart.trackId, undefined);
+});
+
+test("finish_line counts the lap of the track its trigger is named after", () => {
+    const finish = world.add(new Entity({ name: "finish_1", className: "trigger_multiple" }));
+    ScriptInput("start_1")({ caller: start, activator: kart.melon });
+    ScriptInput("checkpoint_1_1")({ caller: trigger, activator: kart.melon });
+    ScriptInput("finish_line")({ caller: finish, activator: kart.melon });
+    assert.equal(kart.lapsCompleted, 1);
+});
+
+test("finish_line from a trigger named after no track is ignored", () => {
+    const finish = world.add(new Entity({ name: "finish_gate", className: "trigger_multiple" }));
+    ScriptInput("start_1")({ caller: start, activator: kart.melon });
+    ScriptInput("checkpoint_1_1")({ caller: trigger, activator: kart.melon });
+    ScriptInput("finish_line")({ caller: finish, activator: kart.melon });
+    assert.equal(kart.lapsCompleted, 0);
 });
 
 test("a checkpoint before the start line is crossed doesn't count", () => {

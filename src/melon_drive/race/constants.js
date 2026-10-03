@@ -37,19 +37,34 @@ export const RACE_SPAWN_LATERAL_SPACING = 120;
 // line up when a heat starts. The finish is the separate "finish_<trackId>"
 // input — on the same trigger for a loop track, at the end of the track
 // for a point-to-point one. See GetTrackConfig() in race/track-config.js.
+// Instead of "start_<trackId>" the output may fire the generic "start_line",
+// which reads the track from the firing trigger's own name — so a start
+// gate prefab only needs its trigger's name set per track (a prefab
+// variable), not its output too.
 export const START_TRIGGER_NAME_PATTERN = /^start_(\d+)(?:_laps(\d+))?$/;
 export const DEFAULT_LAPS_TO_WIN = 1;
+
+// A point-to-point track's finish trigger may be named "finish_<trackId>"
+// (e.g. "finish_2") and fire the generic "finish_line", which reads the
+// track from that name — like start_line, for a finish gate prefab. A
+// finish_line from a start_<trackId>[_laps<M>] trigger (a loop track's
+// shared start/finish line) works too.
+export const FINISH_TRIGGER_NAME_PATTERN = /^finish_(\d+)$/;
 
 // Spawn point of a track's start: an info_target named
 // "start_spawn_<trackId>" (e.g. "start_spawn_1"). Racers line up there when
 // a heat starts (on the floor under it, facing its yaw), and a melon that
-// breaks before checkpoint 1 respawns there. Without one, the start
-// trigger's own transform is used instead.
+// breaks before checkpoint 1 respawns there. Without one, the nearest
+// info_target named just "start_spawn" within START_SPAWN_SHARED_MAX_DISTANCE
+// of the start trigger is used (every copy of a start gate prefab carries
+// one), and without that the start trigger's own transform.
 export const START_SPAWN_NAME_PATTERN = /^start_spawn_(\d+)$/;
 /** @param {number} trackId */
 export function StartSpawnName(trackId) {
     return `start_spawn_${trackId}`;
 }
+export const START_SPAWN_SHARED_NAME = "start_spawn";
+export const START_SPAWN_SHARED_MAX_DISTANCE = 1024;
 
 // Checkpoint triggers are named like their script input,
 // "checkpoint_<trackId>_<index>" — GetTrackConfig() counts a track's

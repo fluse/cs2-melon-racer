@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { ReadVmapConnections, ReadVmapEntities } from "../helpers/vmap.mjs";
 import { ParseTeleportTarget } from "../../src/melon_drive/zones/teleport/logic.js";
-import { HUB_TRIGGER_NAME, CHECKPOINT_SPAWN_NAME_PATTERN, START_TRIGGER_NAME_PATTERN, START_SPAWN_NAME_PATTERN, CHECKPOINT_TRIGGER_NAME_PATTERN } from "../../src/melon_drive/constants/index.js";
+import { HUB_TRIGGER_NAME, CHECKPOINT_SPAWN_NAME_PATTERN, START_TRIGGER_NAME_PATTERN, START_SPAWN_NAME_PATTERN, START_SPAWN_SHARED_NAME, CHECKPOINT_TRIGGER_NAME_PATTERN } from "../../src/melon_drive/constants/index.js";
+import { StartLineTrackId, FinishLineTrackId } from "../../src/melon_drive/race/checkpoints/logic.js";
 
 const vmapPath = fileURLToPath(new URL("../../maps/melon_racer.vmap", import.meta.url));
 const connections = ReadVmapConnections(vmapPath);
@@ -21,7 +22,7 @@ function Describe(c) {
 }
 
 // Everything src/melon_drive/ registers via Instance.OnScriptInput.
-const KNOWN_INPUT = /^(start_\d+|checkpoint_\d+_\d+|finish_\d+|hub_enter|hub_leave|hub_teleport|melon_paint|melon_teleport|melon_break|melon_respawn|heal_enter|heal_leave|lift_enter|lift_leave|camera_enter|camera_leave|jump_pad_enter|jump_pad_leave|water_enter|water_leave)$/;
+const KNOWN_INPUT = /^(start_\d+|start_line|checkpoint_\d+_\d+|finish_\d+|finish_line|hub_enter|hub_leave|hub_teleport|melon_paint|melon_teleport|melon_break|melon_respawn|heal_enter|heal_leave|lift_enter|lift_leave|camera_enter|camera_leave|jump_pad_enter|jump_pad_leave|water_enter|water_leave)$/;
 
 test("every RunScriptInput names an input the script registers", () => {
     const unknown = scriptInputs.filter((c) => !KNOWN_INPUT.test(c.param)).map((c) => `${Describe(c)} -> "${c.param}"`);
@@ -101,13 +102,46 @@ test("start_<trackId> is fired only by the start_<trackId>[_laps<M>] trigger", (
     assert.deepEqual(bad, []);
 });
 
-test("every start_<trackId> trigger fires start_<trackId>", () => {
+test("every start_<trackId> trigger fires start_<trackId> or start_line", () => {
     const fired = new Set(scriptInputs.map((c) => `${c.targetname.trim()} -> ${c.param}`));
     const silent = [...entityNames]
         .map((name) => [name, START_TRIGGER_NAME_PATTERN.exec(name)])
-        .filter(([name, m]) => m && !fired.has(`${name} -> start_${m[1]}`))
-        .map(([name, m]) => `"${name}" — add OnStartTouch -> RunScriptInput start_${m[1]}`);
+        .filter(([name, m]) => m && !fired.has(`${name} -> start_${m[1]}`) && !fired.has(`${name} -> start_line`))
+        .map(([name, m]) => `"${name}" — add OnStartTouch -> RunScriptInput start_line (or start_${m[1]})`);
     assert.deepEqual(silent, []);
+});
+
+// The generic inputs read the track from the firing trigger's name — any
+// other name makes them do nothing in-game (a start gate prefab whose
+// "track" variable wasn't set on the instance, ...).
+test("start_line is fired only by a start_<trackId>[_laps<M>] trigger", () => {
+    const bad = scriptInputs
+        .filter((c) => c.param === "start_line" && StartLineTrackId(c.targetname) === undefined)
+        .map((c) => `${Describe(c)} fires start_line — name it start_<trackId>[_laps<M>]`);
+    assert.deepEqual(bad, []);
+});
+
+test("finish_line is fired only by a finish_<trackId> or start_<trackId>[_laps<M>] trigger", () => {
+    const bad = scriptInputs
+        .filter((c) => c.param === "finish_line" && FinishLineTrackId(c.targetname) === undefined)
+        .map((c) => `${Describe(c)} fires finish_line — name it finish_<trackId> (or, on a loop, it's the start trigger)`);
+    assert.deepEqual(bad, []);
+});
+
+// One start trigger per track — e.g. a second copy of the start gate prefab
+// whose "track" variable still has the default.
+test("no two start triggers name the same track", () => {
+    /** @type {Map<string, string[]>} */
+    const perTrack = new Map();
+    for (const e of ReadVmapEntities(vmapPath).filter((e) => e.classname === "trigger_multiple")) {
+        const name = String(e.targetname ?? "").trim();
+        const m = START_TRIGGER_NAME_PATTERN.exec(name);
+        if (m) {
+            perTrack.set(m[1], [...(perTrack.get(m[1]) ?? []), name]);
+        }
+    }
+    const doubled = [...perTrack].filter(([, names]) => names.length > 1).map(([track, names]) => `track ${track}: ${names.join(", ")}`);
+    assert.deepEqual(doubled, []);
 });
 
 // start_spawn_<t> is only used for a track that has a start_<t> trigger — a
@@ -122,11 +156,11 @@ test("every start_spawn_<trackId> belongs to a track with a start trigger", () =
 });
 
 // start_ is a reserved prefix: anything else named start_* is a typo of one
-// of the two (found in the map: "start_pawn_1").
+// of these (found in the map: "start_pawn_1").
 test("every start_* entity is a start trigger or a start_spawn", () => {
     const bad = [...entityNames]
-        .filter((name) => name.startsWith("start_") && !START_TRIGGER_NAME_PATTERN.test(name) && !START_SPAWN_NAME_PATTERN.test(name))
-        .map((name) => `"${name}" — start_<trackId>[_laps<M>] (trigger) or start_spawn_<trackId> (info_target)?`);
+        .filter((name) => name.startsWith("start_") && !START_TRIGGER_NAME_PATTERN.test(name) && !START_SPAWN_NAME_PATTERN.test(name) && name !== START_SPAWN_SHARED_NAME)
+        .map((name) => `"${name}" — start_<trackId>[_laps<M>] (trigger), start_spawn_<trackId> or start_spawn (info_target)?`);
     assert.deepEqual(bad, []);
 });
 

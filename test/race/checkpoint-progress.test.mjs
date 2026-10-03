@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ApplyCheckpointTouch, ApplyLapCompletion, ApplyStartTouch } from "../../src/melon_drive/race/checkpoints/logic.js";
+import { ApplyCheckpointTouch, ApplyLapCompletion, ApplyStartTouch, StartLineTrackId, FinishLineTrackId } from "../../src/melon_drive/race/checkpoints/logic.js";
 
 const TRACK = 1;
 const OTHER_TRACK = 2;
@@ -208,4 +208,20 @@ test("a finished kart ignores every further touch", () => {
     assert.equal(ApplyStartTouch(kart, TRACK, RACE), "ignored-finished");
     assert.equal(ApplyCheckpointTouch(kart, TRACK, 1), "ignored-finished");
     assert.equal(ApplyLapCompletion(kart, TRACK, RACE), "ignored-finished");
+});
+
+test("start_line reads the track from a start trigger's name", () => {
+    assert.equal(StartLineTrackId("start_2"), 2);
+    assert.equal(StartLineTrackId("start_3_laps4"), 3);
+    assert.equal(StartLineTrackId(" start_1 "), 1);
+    assert.equal(StartLineTrackId("start_spawn"), undefined);
+    assert.equal(StartLineTrackId("finish_2"), undefined);
+    assert.equal(StartLineTrackId(""), undefined);
+});
+
+test("finish_line reads the track from a finish trigger's name, or a loop's start trigger", () => {
+    assert.equal(FinishLineTrackId("finish_2"), 2);
+    assert.equal(FinishLineTrackId("start_1_laps3"), 1);
+    assert.equal(FinishLineTrackId("finish_line"), undefined);
+    assert.equal(FinishLineTrackId("finish_2_laps3"), undefined);
 });

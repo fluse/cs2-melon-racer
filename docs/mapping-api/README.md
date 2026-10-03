@@ -41,8 +41,10 @@ script, and `npm test` fails on it.
 | Parameter | Output | Fired by | Read from the trigger | Page |
 |---|---|---|---|---|
 | `start_<trackId>` | Start | the track's `start_<trackId>[_laps<M>]` trigger | name (laps) | [Tracks](04-tracks.md#start-line) |
+| `start_line` | Start | a `start_<trackId>[_laps<M>]` trigger | name (track, laps) | [Tracks](04-tracks.md#start-gate-prefab) |
 | `checkpoint_<trackId>_<index>` | Start | the checkpoint's trigger, **named like the parameter** | name (counted) | [Tracks](04-tracks.md#checkpoints) |
 | `finish_<trackId>` | Start | any trigger on the finish line | — | [Tracks](04-tracks.md#finish-line) |
+| `finish_line` | Start | a `finish_<trackId>` trigger, or a loop's start trigger | name (track) | [Tracks](04-tracks.md#finish-line) |
 | `hub_enter` | Start | **only** `hub_start_trigger` | name (checked) | [Hub](05-hub.md) |
 | `hub_leave` | **End** | **only** `hub_start_trigger` | — | [Hub](05-hub.md) |
 | `hub_teleport` | Start | any trigger | — | [Hub](05-hub.md#sending-melons-to-the-hub) |
@@ -76,6 +78,7 @@ Fixed names the script looks up.
 | `intro_spawn` | `info_player_start` | — | [Core entities](02-core-entities.md#spawn-points) |
 | `hub_spawn_facing` | `info_target` | — | [Core entities](02-core-entities.md#spawn-points) |
 | `heal_zone_full` | `trigger_multiple` | — | [Heal zones](09-heal-zones.md#full-heal-zone) |
+| `start_spawn` | `info_target` | — | [Tracks](04-tracks.md#start-gate-prefab) |
 | `melon_break_template` | `point_template` | — | [Effect templates](03-effect-templates.md#break-burst) |
 | `melon_break_chunks_template` | `point_template` | — | [Effect templates](03-effect-templates.md#break-chunks) |
 | `perfect_hit_particle_template` | `point_template` | — | [Effect templates](03-effect-templates.md#perfect-spark) |
@@ -91,6 +94,7 @@ Names the script parses — the name carries the config.
 |---|---|---|---|
 | `start_<trackId>[_laps<M>]` | `start_1_laps3` | `trigger_multiple` | [Tracks](04-tracks.md#start-line) |
 | `start_spawn_<trackId>` | `start_spawn_1` | `info_target` | [Tracks](04-tracks.md#start-line) |
+| `finish_<trackId>` | `finish_2` | `trigger_multiple` | [Tracks](04-tracks.md#finish-line) |
 | `checkpoint_<trackId>_<index>` | `checkpoint_1_3` | `trigger_multiple` | [Tracks](04-tracks.md#checkpoints) |
 | `checkpoint_spawn_<trackId>_<index>` | `checkpoint_spawn_1_3` | `info_target` | [Tracks](04-tracks.md#checkpoints) |
 | `paint_trigger_<r>_<g>_<b>` | `paint_trigger_255_0_0` | `trigger_multiple` | [Paint triggers](06-paint-triggers.md) |

@@ -20,8 +20,10 @@ const doc = Object.values(pages).join("\n");
 // Same list as KNOWN_INPUT in map-io.test.mjs, in the form the doc writes them.
 const SCRIPT_INPUTS = [
     "start_<trackId>",
+    "start_line",
     "checkpoint_<trackId>_<index>",
     "finish_<trackId>",
+    "finish_line",
     "hub_enter",
     "hub_leave",
     "hub_teleport",

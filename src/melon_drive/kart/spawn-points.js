@@ -2,7 +2,8 @@ import { Instance } from "cs_script/point_script";
 import { Debug } from "../core/debug.js";
 import { TraceLine } from "../core/trace.js";
 import { ViewAnglesFacing } from "../zones/teleport/logic.js";
-import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, TELEPORT_UP_OFFSET, FLOOR_TRACE_UP, FLOOR_TRACE_DOWN, CheckpointSpawnName, StartSpawnName } from "../constants/index.js";
+import { NearestWithin } from "./spawn-points-logic.js";
+import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, TELEPORT_UP_OFFSET, FLOOR_TRACE_UP, FLOOR_TRACE_DOWN, START_SPAWN_SHARED_NAME, START_SPAWN_SHARED_MAX_DISTANCE, CheckpointSpawnName, StartSpawnName } from "../constants/index.js";
 
 // The one place that turns a Hammer spawn entity into a melon position.
 // Every caller that puts a melon at the hub or the intro goes through here,
@@ -79,6 +80,32 @@ function FindSpawnPoint(name, facingName) {
     };
 }
 
+/**
+ * Spawn point of the entity named START_SPAWN_SHARED_NAME nearest to
+ * `trigger`, within START_SPAWN_SHARED_MAX_DISTANCE — a start gate prefab's
+ * own spawn (every copy of the gate has one by that name). Undefined if none
+ * is that close.
+ * @param {any} trigger
+ * @returns {SpawnPoint | undefined}
+ */
+function FindSharedStartSpawnPoint(trigger) {
+    const candidates = Instance.FindEntitiesByName(START_SPAWN_SHARED_NAME);
+    if (candidates.length === 0) {
+        return undefined;
+    }
+    const origin = trigger.GetAbsOrigin();
+    const nearest = NearestWithin(candidates.map((e) => e.GetAbsOrigin()), origin, START_SPAWN_SHARED_MAX_DISTANCE);
+    if (nearest === undefined) {
+        Debug(`FindSharedStartSpawnPoint: no "${START_SPAWN_SHARED_NAME}" within ${START_SPAWN_SHARED_MAX_DISTANCE} units of "${trigger.GetEntityName()}"`);
+        return undefined;
+    }
+    const entity = candidates[nearest];
+    return {
+        position: PositionAboveFloor(entity.GetAbsOrigin()),
+        angles: LevelAngles(entity.GetAbsAngles().yaw),
+    };
+}
+
 /** Where karts go in the hub: the hub_spawn info_player_start, facing hub_spawn_facing. */
 export function GetHubSpawnPoint() {
     const spawn = FindSpawnPoint(HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME);
@@ -111,17 +138,18 @@ export function GetCheckpointSpawnPoint(trackId, index) {
 
 /**
  * Where track `trackId` starts: the start_spawn_<trackId> info_target,
- * facing its yaw — or, without one, the start trigger `trigger` itself
- * (lifted TELEPORT_UP_OFFSET, since its brush may be sunk into the floor).
+ * facing its yaw — else the nearest "start_spawn" to the start trigger (a
+ * start gate prefab's), else the start trigger `trigger` itself (lifted
+ * TELEPORT_UP_OFFSET, since its brush may be sunk into the floor).
  * @param {number} trackId @param {any} trigger
  * @returns {SpawnPoint}
  */
 export function GetStartSpawnPoint(trackId, trigger) {
-    const spawn = FindSpawnPoint(StartSpawnName(trackId));
+    const spawn = FindSpawnPoint(StartSpawnName(trackId)) ?? FindSharedStartSpawnPoint(trigger);
     if (spawn) {
         return spawn;
     }
-    Debug(`GetStartSpawnPoint: no info_target "${StartSpawnName(trackId)}", starting at the start trigger itself`);
+    Debug(`GetStartSpawnPoint: no info_target "${StartSpawnName(trackId)}" or "${START_SPAWN_SHARED_NAME}" nearby, starting at the start trigger itself`);
     return {
         position: Lifted(trigger.GetAbsOrigin(), TELEPORT_UP_OFFSET),
         angles: LevelAngles(trigger.GetAbsAngles().yaw),

@@ -5,8 +5,33 @@
 // the engine side (respawn position, FinishKart, debug logging). See
 // "Multiple tracks & checkpoints" in GAMEPLAY.md for the design.
 //
-// All three functions mutate the kart's progress fields in place and return
-// what happened, so the caller can log it and react (e.g. call FinishKart).
+// The three Apply* functions mutate the kart's progress fields in place and
+// return what happened, so the caller can log it and react (e.g. call FinishKart).
+
+import { START_TRIGGER_NAME_PATTERN, FINISH_TRIGGER_NAME_PATTERN } from "../../constants/index.js";
+
+/**
+ * start_line: the track a start trigger belongs to, from its name
+ * ("start_2", "start_2_laps3" -> 2). Undefined for any other name.
+ * @param {string} triggerName
+ * @returns {number | undefined}
+ */
+export function StartLineTrackId(triggerName) {
+    const m = START_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
+    return m ? Number(m[1]) : undefined;
+}
+
+/**
+ * finish_line: the track a finish line belongs to, from the firing
+ * trigger's name — "finish_2" (point-to-point), or a start trigger's name
+ * (a loop track's shared start/finish line). Undefined for any other name.
+ * @param {string} triggerName
+ * @returns {number | undefined}
+ */
+export function FinishLineTrackId(triggerName) {
+    const m = FINISH_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
+    return m ? Number(m[1]) : StartLineTrackId(triggerName);
+}
 
 /**
  * @typedef {{ trackId: number | undefined, checkpointIndex: number, lapsCompleted: number, racing: boolean, finished: boolean }} KartProgress

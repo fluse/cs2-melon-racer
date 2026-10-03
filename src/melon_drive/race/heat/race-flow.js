@@ -168,7 +168,7 @@ export function BeginHeat(trackId) {
         return;
     }
     activeTrackId = trackId;
-    // start_spawn_<trackId> if placed, else the start trigger itself.
+    // start_spawn_<trackId> if placed, else the nearest start_spawn, else the start trigger itself.
     const { position: center, angles } = GetStartSpawnPoint(trackId, start);
 
     const racers = CurrentRacers();

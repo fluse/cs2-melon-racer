@@ -3,7 +3,7 @@ import { Debug } from "../../core/debug.js";
 import { FindKartByMelon } from "../../core/kart-registry.js";
 import { activeTrackId, FinishKart } from "../heat/race-flow.js";
 import { GetTrackConfig } from "../track-config.js";
-import { ApplyCheckpointTouch, ApplyLapCompletion, ApplyStartTouch } from "./logic.js";
+import { ApplyCheckpointTouch, ApplyLapCompletion, ApplyStartTouch, StartLineTrackId, FinishLineTrackId } from "./logic.js";
 import { MAX_TRACKS, MAX_CHECKPOINTS_PER_TRACK, TELEPORT_UP_OFFSET, FINISH_RESTART_START_GUARD } from "../../constants/index.js";
 import { Lifted, GetCheckpointSpawnPoint, GetStartSpawnPoint } from "../../kart/spawn-points.js";
 import { StartRun, FinishRun, CancelRun, CanRestartTimeTrial } from "../time-trial/time-trial.js";
@@ -16,8 +16,11 @@ import { RespawnKartAtCheckpoint } from "../../kart/teleport.js";
 // trigger it, with its OnStartTouch calling this point_script's
 // RunScriptInput with parameter "start_<trackId>" — puts the melon on that
 // track and makes the start its respawn point: the info_target named
-// "start_spawn_<trackId>" (also where a heat lines racers up), or, without
-// one, the trigger's own position/angles.
+// "start_spawn_<trackId>" (also where a heat lines racers up), else the
+// nearest "start_spawn", else the trigger's own position/angles (see
+// GetStartSpawnPoint). The output may fire the generic "start_line" instead,
+// which takes the track from the trigger's name — for a start gate prefab,
+// whose trigger name is a prefab variable but whose output is fixed.
 //
 // Checkpoints: a trigger_multiple per checkpoint along the track, named
 // like its parameter, OnStartTouch -> RunScriptInput
@@ -159,6 +162,9 @@ function SendToTrackStart(kart, trackId) {
 // itself (start and finish are the same line), on a point-to-point track its
 // own trigger at the end; only the activator (the melon) is read here, not
 // which entity fired it. Filtered to prop_physics like the checkpoints.
+// Or the generic "finish_line", which takes the track from the firing
+// trigger's name instead: "finish_<trackId>", or the start trigger's own
+// name on a loop track — for a finish gate prefab.
 // Kept a separate input from start_<trackId> so a track can end somewhere
 // else than it starts; on a shared trigger either one may fire first (see
 // ApplyStartTouch). See "Hub -> race -> next-track flow" in GAMEPLAY.md.
@@ -216,8 +222,47 @@ export function RestartTimeTrial(kart) {
     return true;
 }
 
-/** Registers the start_<trackId>, checkpoint_<trackId>_<index> and finish_<trackId> OnScriptInput handlers for every track/checkpoint slot the map is allowed to use. Called once from index.js. */
+/**
+ * The track a start_line / finish_line input is for, from the firing
+ * trigger's name — undefined (logged) for a name that names no track or one
+ * beyond MAX_TRACKS (the numbered inputs don't go further either).
+ * @param {string} input @param {any} caller @param {(name: string) => number | undefined} parse
+ */
+function TrackIdFromCaller(input, caller, parse) {
+    const name = caller?.GetEntityName() ?? "";
+    const trackId = parse(name);
+    if (trackId === undefined || trackId < 1 || trackId > MAX_TRACKS) {
+        Instance.Msg(`[melon_drive] ${input} fired by "${name}", which names no track 1..${MAX_TRACKS} — ignoring. See docs/mapping-api/04-tracks.md.`);
+        return undefined;
+    }
+    return trackId;
+}
+
+/** Registers the start_<trackId>, checkpoint_<trackId>_<index> and finish_<trackId> OnScriptInput handlers for every track/checkpoint slot the map is allowed to use, plus the generic start_line / finish_line. Called once from index.js. */
 export function RegisterCheckpointAndFinishInputs() {
+    Instance.OnScriptInput("start_line", ({ caller, activator }) => {
+        const kart = activator && FindKartByMelon(activator);
+        if (!kart || !caller) {
+            Debug("start_line: activator wasn't a tracked melon, ignoring");
+            return;
+        }
+        const trackId = TrackIdFromCaller("start_line", caller, StartLineTrackId);
+        if (trackId !== undefined) {
+            OnStartTouched(trackId, kart, caller);
+        }
+    });
+    Instance.OnScriptInput("finish_line", ({ caller, activator }) => {
+        const kart = activator && FindKartByMelon(activator);
+        if (!kart) {
+            Debug("finish_line: activator wasn't a tracked melon, ignoring");
+            return;
+        }
+        const trackId = TrackIdFromCaller("finish_line", caller, FinishLineTrackId);
+        if (trackId !== undefined) {
+            OnFinishTouched(trackId, kart);
+        }
+    });
+
     for (let t = 1; t <= MAX_TRACKS; t++) {
         const trackId = t;
         Instance.OnScriptInput(`start_${trackId}`, ({ caller, activator }) => {

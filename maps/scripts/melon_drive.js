@@ -913,19 +913,34 @@ const RACE_SPAWN_LATERAL_SPACING = 120;
 // line up when a heat starts. The finish is the separate "finish_<trackId>"
 // input — on the same trigger for a loop track, at the end of the track
 // for a point-to-point one. See GetTrackConfig() in race/track-config.js.
+// Instead of "start_<trackId>" the output may fire the generic "start_line",
+// which reads the track from the firing trigger's own name — so a start
+// gate prefab only needs its trigger's name set per track (a prefab
+// variable), not its output too.
 const START_TRIGGER_NAME_PATTERN = /^start_(\d+)(?:_laps(\d+))?$/;
 const DEFAULT_LAPS_TO_WIN = 1;
+
+// A point-to-point track's finish trigger may be named "finish_<trackId>"
+// (e.g. "finish_2") and fire the generic "finish_line", which reads the
+// track from that name — like start_line, for a finish gate prefab. A
+// finish_line from a start_<trackId>[_laps<M>] trigger (a loop track's
+// shared start/finish line) works too.
+const FINISH_TRIGGER_NAME_PATTERN = /^finish_(\d+)$/;
 
 // Spawn point of a track's start: an info_target named
 // "start_spawn_<trackId>" (e.g. "start_spawn_1"). Racers line up there when
 // a heat starts (on the floor under it, facing its yaw), and a melon that
-// breaks before checkpoint 1 respawns there. Without one, the start
-// trigger's own transform is used instead.
+// breaks before checkpoint 1 respawns there. Without one, the nearest
+// info_target named just "start_spawn" within START_SPAWN_SHARED_MAX_DISTANCE
+// of the start trigger is used (every copy of a start gate prefab carries
+// one), and without that the start trigger's own transform.
 const START_SPAWN_NAME_PATTERN = /^start_spawn_(\d+)$/;
 /** @param {number} trackId */
 function StartSpawnName(trackId) {
     return `start_spawn_${trackId}`;
 }
+const START_SPAWN_SHARED_NAME = "start_spawn";
+const START_SPAWN_SHARED_MAX_DISTANCE = 1024;
 
 // Checkpoint triggers are named like their script input,
 // "checkpoint_<trackId>_<index>" — GetTrackConfig() counts a track's
@@ -1938,6 +1953,36 @@ function TeleportExitVelocity(velocity, destinationYaw, keepSpeed = TELEPORT_KEE
     return { x: Math.cos(rad) * speed, y: Math.sin(rad) * speed, z: 0 };
 }
 
+// Pure spawn-point rules — no cs_script import, so they're unit-testable in
+// Node (test/kart/spawn-points-logic.test.mjs). Applied by kart/spawn-points.js.
+
+/**
+ * Index of the point in `points` nearest to `origin`, if it's within
+ * `maxDistance` — undefined if there's none that close. Picks a start gate
+ * prefab's own shared-name "start_spawn" for its start trigger: every copy
+ * of the gate carries one, and its own is the one right next to it.
+ * @param {Array<{ x: number, y: number, z: number }>} points
+ * @param {{ x: number, y: number, z: number }} origin
+ * @param {number} maxDistance
+ * @returns {number | undefined}
+ */
+function NearestWithin(points, origin, maxDistance) {
+    const maxDistanceSq = maxDistance * maxDistance;
+    let best;
+    let bestDistanceSq = Infinity;
+    points.forEach((p, i) => {
+        const dx = p.x - origin.x;
+        const dy = p.y - origin.y;
+        const dz = p.z - origin.z;
+        const distanceSq = dx * dx + dy * dy + dz * dz;
+        if (distanceSq <= maxDistanceSq && distanceSq < bestDistanceSq) {
+            best = i;
+            bestDistanceSq = distanceSq;
+        }
+    });
+    return best;
+}
+
 // The one place that turns a Hammer spawn entity into a melon position.
 // Every caller that puts a melon at the hub or the intro goes through here,
 // so they all agree on where exactly that is.
@@ -2013,6 +2058,32 @@ function FindSpawnPoint(name, facingName) {
     };
 }
 
+/**
+ * Spawn point of the entity named START_SPAWN_SHARED_NAME nearest to
+ * `trigger`, within START_SPAWN_SHARED_MAX_DISTANCE — a start gate prefab's
+ * own spawn (every copy of the gate has one by that name). Undefined if none
+ * is that close.
+ * @param {any} trigger
+ * @returns {SpawnPoint | undefined}
+ */
+function FindSharedStartSpawnPoint(trigger) {
+    const candidates = Instance.FindEntitiesByName(START_SPAWN_SHARED_NAME);
+    if (candidates.length === 0) {
+        return undefined;
+    }
+    const origin = trigger.GetAbsOrigin();
+    const nearest = NearestWithin(candidates.map((e) => e.GetAbsOrigin()), origin, START_SPAWN_SHARED_MAX_DISTANCE);
+    if (nearest === undefined) {
+        Debug(`FindSharedStartSpawnPoint: no "${START_SPAWN_SHARED_NAME}" within ${START_SPAWN_SHARED_MAX_DISTANCE} units of "${trigger.GetEntityName()}"`);
+        return undefined;
+    }
+    const entity = candidates[nearest];
+    return {
+        position: PositionAboveFloor(entity.GetAbsOrigin()),
+        angles: LevelAngles(entity.GetAbsAngles().yaw),
+    };
+}
+
 /** Where karts go in the hub: the hub_spawn info_player_start, facing hub_spawn_facing. */
 function GetHubSpawnPoint() {
     const spawn = FindSpawnPoint(HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME);
@@ -2045,17 +2116,18 @@ function GetCheckpointSpawnPoint(trackId, index) {
 
 /**
  * Where track `trackId` starts: the start_spawn_<trackId> info_target,
- * facing its yaw — or, without one, the start trigger `trigger` itself
- * (lifted TELEPORT_UP_OFFSET, since its brush may be sunk into the floor).
+ * facing its yaw — else the nearest "start_spawn" to the start trigger (a
+ * start gate prefab's), else the start trigger `trigger` itself (lifted
+ * TELEPORT_UP_OFFSET, since its brush may be sunk into the floor).
  * @param {number} trackId @param {any} trigger
  * @returns {SpawnPoint}
  */
 function GetStartSpawnPoint(trackId, trigger) {
-    const spawn = FindSpawnPoint(StartSpawnName(trackId));
+    const spawn = FindSpawnPoint(StartSpawnName(trackId)) ?? FindSharedStartSpawnPoint(trigger);
     if (spawn) {
         return spawn;
     }
-    Debug(`GetStartSpawnPoint: no info_target "${StartSpawnName(trackId)}", starting at the start trigger itself`);
+    Debug(`GetStartSpawnPoint: no info_target "${StartSpawnName(trackId)}" or "${START_SPAWN_SHARED_NAME}" nearby, starting at the start trigger itself`);
     return {
         position: Lifted(trigger.GetAbsOrigin(), TELEPORT_UP_OFFSET),
         angles: LevelAngles(trigger.GetAbsAngles().yaw),
@@ -5300,7 +5372,7 @@ function BeginHeat(trackId) {
         return;
     }
     activeTrackId = trackId;
-    // start_spawn_<trackId> if placed, else the start trigger itself.
+    // start_spawn_<trackId> if placed, else the nearest start_spawn, else the start trigger itself.
     const { position: center, angles } = GetStartSpawnPoint(trackId, start);
 
     const racers = CurrentRacers();
@@ -5568,8 +5640,32 @@ function UpdateRaceFlow(now) {
 // the engine side (respawn position, FinishKart, debug logging). See
 // "Multiple tracks & checkpoints" in GAMEPLAY.md for the design.
 //
-// All three functions mutate the kart's progress fields in place and return
-// what happened, so the caller can log it and react (e.g. call FinishKart).
+// The three Apply* functions mutate the kart's progress fields in place and
+// return what happened, so the caller can log it and react (e.g. call FinishKart).
+
+
+/**
+ * start_line: the track a start trigger belongs to, from its name
+ * ("start_2", "start_2_laps3" -> 2). Undefined for any other name.
+ * @param {string} triggerName
+ * @returns {number | undefined}
+ */
+function StartLineTrackId(triggerName) {
+    const m = START_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
+    return m ? Number(m[1]) : undefined;
+}
+
+/**
+ * finish_line: the track a finish line belongs to, from the firing
+ * trigger's name — "finish_2" (point-to-point), or a start trigger's name
+ * (a loop track's shared start/finish line). Undefined for any other name.
+ * @param {string} triggerName
+ * @returns {number | undefined}
+ */
+function FinishLineTrackId(triggerName) {
+    const m = FINISH_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
+    return m ? Number(m[1]) : StartLineTrackId(triggerName);
+}
 
 /**
  * @typedef {{ trackId: number | undefined, checkpointIndex: number, lapsCompleted: number, racing: boolean, finished: boolean }} KartProgress
@@ -5702,8 +5798,11 @@ function ApplyCheckpointTouch(kart, trackId, index) {
 // trigger it, with its OnStartTouch calling this point_script's
 // RunScriptInput with parameter "start_<trackId>" — puts the melon on that
 // track and makes the start its respawn point: the info_target named
-// "start_spawn_<trackId>" (also where a heat lines racers up), or, without
-// one, the trigger's own position/angles.
+// "start_spawn_<trackId>" (also where a heat lines racers up), else the
+// nearest "start_spawn", else the trigger's own position/angles (see
+// GetStartSpawnPoint). The output may fire the generic "start_line" instead,
+// which takes the track from the trigger's name — for a start gate prefab,
+// whose trigger name is a prefab variable but whose output is fixed.
 //
 // Checkpoints: a trigger_multiple per checkpoint along the track, named
 // like its parameter, OnStartTouch -> RunScriptInput
@@ -5845,6 +5944,9 @@ function SendToTrackStart(kart, trackId) {
 // itself (start and finish are the same line), on a point-to-point track its
 // own trigger at the end; only the activator (the melon) is read here, not
 // which entity fired it. Filtered to prop_physics like the checkpoints.
+// Or the generic "finish_line", which takes the track from the firing
+// trigger's name instead: "finish_<trackId>", or the start trigger's own
+// name on a loop track — for a finish gate prefab.
 // Kept a separate input from start_<trackId> so a track can end somewhere
 // else than it starts; on a shared trigger either one may fire first (see
 // ApplyStartTouch). See "Hub -> race -> next-track flow" in GAMEPLAY.md.
@@ -5902,8 +6004,47 @@ function RestartTimeTrial(kart) {
     return true;
 }
 
-/** Registers the start_<trackId>, checkpoint_<trackId>_<index> and finish_<trackId> OnScriptInput handlers for every track/checkpoint slot the map is allowed to use. Called once from index.js. */
+/**
+ * The track a start_line / finish_line input is for, from the firing
+ * trigger's name — undefined (logged) for a name that names no track or one
+ * beyond MAX_TRACKS (the numbered inputs don't go further either).
+ * @param {string} input @param {any} caller @param {(name: string) => number | undefined} parse
+ */
+function TrackIdFromCaller(input, caller, parse) {
+    const name = caller?.GetEntityName() ?? "";
+    const trackId = parse(name);
+    if (trackId === undefined || trackId < 1 || trackId > MAX_TRACKS) {
+        Instance.Msg(`[melon_drive] ${input} fired by "${name}", which names no track 1..${MAX_TRACKS} — ignoring. See docs/mapping-api/04-tracks.md.`);
+        return undefined;
+    }
+    return trackId;
+}
+
+/** Registers the start_<trackId>, checkpoint_<trackId>_<index> and finish_<trackId> OnScriptInput handlers for every track/checkpoint slot the map is allowed to use, plus the generic start_line / finish_line. Called once from index.js. */
 function RegisterCheckpointAndFinishInputs() {
+    Instance.OnScriptInput("start_line", ({ caller, activator }) => {
+        const kart = activator && FindKartByMelon(activator);
+        if (!kart || !caller) {
+            Debug("start_line: activator wasn't a tracked melon, ignoring");
+            return;
+        }
+        const trackId = TrackIdFromCaller("start_line", caller, StartLineTrackId);
+        if (trackId !== undefined) {
+            OnStartTouched(trackId, kart, caller);
+        }
+    });
+    Instance.OnScriptInput("finish_line", ({ caller, activator }) => {
+        const kart = activator && FindKartByMelon(activator);
+        if (!kart) {
+            Debug("finish_line: activator wasn't a tracked melon, ignoring");
+            return;
+        }
+        const trackId = TrackIdFromCaller("finish_line", caller, FinishLineTrackId);
+        if (trackId !== undefined) {
+            OnFinishTouched(trackId, kart);
+        }
+    });
+
     for (let t = 1; t <= MAX_TRACKS; t++) {
         const trackId = t;
         Instance.OnScriptInput(`start_${trackId}`, ({ caller, activator }) => {
