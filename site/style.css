@@ -111,17 +111,40 @@ h3 { font-size: 1.3rem; margin: 0 0 0.4rem; }
 .connect-command code { background: none; padding: 0; font-size: 1.05rem; }
 .connect-hint { font-size: 0.8rem; color: var(--rind); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; }
 
-/* ---- gameplay ---- */
+/* ---- gameplay slider ---- */
 .showcase { padding: 8px 0 48px; }
-.gameplay { margin: 0; text-align: center; }
-.gameplay img {
-  width: min(800px, 100%); height: auto;
+.slider { position: relative; width: min(800px, 100%); margin-inline: auto; container-type: inline-size; }
+.slider-track {
+  display: flex; overflow-x: auto;
+  scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none;
+  border-radius: var(--radius);
+}
+.slider-track::-webkit-scrollbar { display: none; }
+.slider-track:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
+.slide { flex: 0 0 100%; margin: 0; scroll-snap-align: center; text-align: center; padding-bottom: 20px; }
+.slide img {
+  display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover;
   border-radius: var(--radius);
   border: 3px solid var(--rind-dark);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-  image-rendering: auto;
+  background: var(--surface);
 }
-.gameplay figcaption { color: var(--muted); font-size: 0.9rem; margin-top: 10px; }
+.slider { filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.45)); }
+.slide figcaption { color: var(--muted); font-size: 0.9rem; margin-top: 10px; padding-inline: 16px; }
+/* Centered on the 16:9 image (half its height), not on image + caption. */
+.slider-arrow {
+  position: absolute; top: calc(100cqw * 9 / 32 - 22px);
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid var(--border); background: rgba(15, 26, 18, 0.8); color: var(--text);
+  font: 700 1.8rem/1 var(--font-body); cursor: pointer;
+  display: grid; place-items: center; padding: 0 0 4px;
+}
+.slider-arrow:hover { border-color: var(--rind); color: var(--rind); }
+.slider-prev { left: 12px; }
+.slider-next { right: 12px; }
+.slider-dots { display: flex; justify-content: center; gap: 10px; }
+.slider-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--border); }
+.slider-dot:hover { background: var(--muted); }
+.slider-dot[aria-current] { background: var(--rind); }
 
 /* ---- content blocks ---- */
 .block { padding: 64px 0; }
@@ -244,5 +267,5 @@ h3 { font-size: 1.3rem; margin: 0 0 0.4rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
+  html, .slider-track { scroll-behavior: auto; }
 }

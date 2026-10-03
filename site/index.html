@@ -48,10 +48,7 @@
 
     <section class="showcase">
       <div class="wrap">
-        <figure class="gameplay">
-          <img src="images/gameplay.gif" alt="A melon rolling down a neon-lit corridor towards a checkpoint gate" width="480" height="270" loading="lazy">
-          <figcaption>In-game footage — a melon on its way through a checkpoint gate.</figcaption>
-        </figure>
+      {{GAMEPLAY}}
       </div>
     </section>
 
@@ -168,6 +165,29 @@
         }
         setTimeout(() => { button.textContent = "copy"; }, 2000);
       });
+    }
+
+    // Gameplay slider: the track scrolls (swipe works without this), the arrows and dots step through it.
+    for (const slider of document.querySelectorAll("[data-slider]")) {
+      const track = slider.querySelector(".slider-track");
+      const slides = [...track.children];
+      const dots = [...slider.querySelectorAll(".slider-dot")];
+      const current = () => Math.round(track.scrollLeft / track.clientWidth);
+      const show = (i) => track.scrollTo({ left: ((i + slides.length) % slides.length) * track.clientWidth });
+      for (const arrow of slider.querySelectorAll("[data-step]")) {
+        arrow.addEventListener("click", () => show(current() + Number(arrow.dataset.step)));
+      }
+      dots.forEach((dot, i) => dot.addEventListener("click", (event) => { event.preventDefault(); show(i); }));
+      track.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          event.preventDefault();
+          show(current() + (event.key === "ArrowRight" ? 1 : -1));
+        }
+      });
+      track.addEventListener("scroll", () => {
+        const i = current();
+        dots.forEach((dot, j) => dot.toggleAttribute("aria-current", i === j));
+      }, { passive: true });
     }
   </script>
 </body>

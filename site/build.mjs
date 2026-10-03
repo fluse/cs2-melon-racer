@@ -7,7 +7,7 @@
 //   between them stay on the site; links to anything else in the repo go to
 //   GitHub;
 // - style.css, favicon.svg, the images the pages use out of the addon (logo,
-//   gameplay gif, HUD icons) and everything in site/images/.
+//   gameplay gifs for the slider, HUD icons) and everything in site/images/.
 // site/dist/ is gitignored — the GitHub Actions workflow
 // (.github/workflows/pages.yml) runs this script and deploys the result.
 //
@@ -49,10 +49,51 @@ const DOC_PAGES = {
 /** published path (under dist/) -> source path (under the repo root) */
 const COPIED_IMAGES = {
     "images/logo.png": "panorama/images/custom_game/logo_melon_racer.png",
-    "images/gameplay.gif": "docs/gifs/2026-09-29_21-24-54.gif",
     "images/track-start.png": "panorama/images/custom_game/icons/track-start.png",
     "images/track-finish.png": "panorama/images/custom_game/icons/track-finish.png",
 };
+
+/**
+ * The home page's gameplay slider, in order: the full-quality GIFs from
+ * docs/gifs/ (not the *_steam.gif copies, those are for the Workshop's 2 MB
+ * limit), each published as images/gameplay-<n>.gif.
+ * @type {{ source: string, alt: string, caption: string }[]}
+ */
+const GAMEPLAY_GIFS = [
+    {
+        source: "docs/gifs/2026-10-03_14-01-55.gif",
+        alt: "A melon crossing water, climbing ramps, rolling through a heal gate and bouncing between two walls",
+        caption: "A time trial run — over the water, up the ramps, through a heal gate and between the walls.",
+    },
+    {
+        source: "docs/gifs/2026-09-29_21-24-54.gif",
+        alt: "A melon rolling down a neon-lit corridor towards a checkpoint gate",
+        caption: "In-game footage — a melon on its way through a checkpoint gate.",
+    },
+];
+
+/** The slides plus, with more than one GIF, prev/next buttons and one dot per slide (driven by the script in index.html). */
+function renderGameplay() {
+    const slides = GAMEPLAY_GIFS.map(
+        (gif, i) => `<figure class="slide" id="gameplay-${i + 1}">
+            <img src="images/gameplay-${i + 1}.gif" alt="${EscapeHtml(gif.alt)}" width="480" height="270" loading="lazy">
+            <figcaption>${EscapeHtml(gif.caption)}</figcaption>
+          </figure>`,
+    ).join("\n          ");
+    const track = `<div class="slider-track" tabindex="0" aria-label="Gameplay clips">
+          ${slides}
+        </div>`;
+    if (GAMEPLAY_GIFS.length < 2) return `<div class="slider">\n        ${track}\n      </div>`;
+    const dots = GAMEPLAY_GIFS.map(
+        (_, i) => `<a class="slider-dot" href="#gameplay-${i + 1}" aria-label="Clip ${i + 1}"${i === 0 ? ' aria-current="true"' : ""}></a>`,
+    ).join("");
+    return `<div class="slider" data-slider>
+        ${track}
+        <button class="slider-arrow slider-prev" type="button" aria-label="Previous clip" data-step="-1">‹</button>
+        <button class="slider-arrow slider-next" type="button" aria-label="Next clip" data-step="1">›</button>
+        <div class="slider-dots">${dots}</div>
+      </div>`;
+}
 
 /**
  * Where a link written in a repo file points on the site: another published
@@ -221,6 +262,7 @@ export function Build(distDir = path.join(siteDir, "dist")) {
         STEAM_CONNECT_URL: EscapeHtml(STEAM_CONNECT_URL),
         WORKSHOP_BUTTON: WORKSHOP_URL ? `<a class="button button-primary" href="${EscapeHtml(WORKSHOP_URL)}">Subscribe on the Workshop</a>` : "",
         CHANGELOG: renderChangelog(releases, changelogInline),
+        GAMEPLAY: renderGameplay(),
     };
 
     /** @type {Record<string, string>} published path -> HTML */
@@ -236,6 +278,7 @@ export function Build(distDir = path.join(siteDir, "dist")) {
     cpSync(path.join(siteDir, "style.css"), path.join(distDir, "style.css"));
     cpSync(path.join(siteDir, "favicon.svg"), path.join(distDir, "favicon.svg"));
     for (const [to, from] of Object.entries(COPIED_IMAGES)) cpSync(path.join(rootDir, from), path.join(distDir, to));
+    GAMEPLAY_GIFS.forEach((gif, i) => cpSync(path.join(rootDir, gif.source), path.join(distDir, "images", `gameplay-${i + 1}.gif`)));
     const ownImages = path.join(siteDir, "images");
     if (existsSync(ownImages)) cpSync(ownImages, path.join(distDir, "images"), { recursive: true });
     writeFileSync(path.join(distDir, ".nojekyll"), ""); // serve the files as they are, no Jekyll pass
