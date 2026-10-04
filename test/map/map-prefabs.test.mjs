@@ -22,7 +22,7 @@ test('no prefab instance has "Fix Up Entity Names" ticked', () => {
         .map((p) => {
             const at = p.attrs.origin ? ` at (${p.attrs.origin.map((v) => Math.round(v)).join(", ")})` : "";
             const name = p.attrs.targetName ? ` "${p.attrs.targetName}"` : "";
-            return `${p.attrs.targetMapPath}${name}${at} in ${p.placedIn} — untick "Fix Up Entity Names", it renames the entities the script looks up`;
+            return `${p.attrs.targetMapPath}${name}${at} [${p.node}] in ${p.placedIn} — untick "Fix Up Entity Names", it renames the entities the script looks up`;
         });
     assert.deepEqual(fixedUp, []);
 });

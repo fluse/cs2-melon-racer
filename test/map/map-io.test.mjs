@@ -12,13 +12,20 @@ import { StartLineTrackId, FinishLineTrackId } from "../../src/melon_drive/race/
 
 const vmapPath = fileURLToPath(new URL("../../maps/melon_racer.vmap", import.meta.url));
 const connections = ReadVmapConnections(vmapPath);
-const entityNames = new Set(ReadVmapEntities(vmapPath).map((e) => String(e.targetname ?? "").trim()));
+const entities = ReadVmapEntities(vmapPath);
+const entityNames = new Set(entities.map((e) => String(e.targetname ?? "").trim()));
 const scriptInputs = connections.filter((c) => c.input === "RunScriptInput");
 
-/** @param {{ classname: string, targetname: string, origin: number[] | undefined }} c */
+/** @param {{ classname: string, targetname: string, origin: number[] | undefined, node: string }} c */
 function Describe(c) {
     const at = c.origin ? ` at (${c.origin.map((v) => Math.round(v)).join(", ")})` : "";
-    return `${c.classname} "${c.targetname || "<unnamed>"}"${at}`;
+    return `${c.classname} "${c.targetname || "<unnamed>"}"${at} [${c.node}]`;
+}
+
+/** `"name" [node …]` — every entity with that name, so a failure says where to look in Hammer. @param {string} name */
+function Named(name) {
+    const nodes = entities.filter((e) => String(e.targetname ?? "").trim() === name).map((e) => e.node);
+    return `"${name}" [${nodes.join("; ")}]`;
 }
 
 // Everything src/melon_drive/ registers via Instance.OnScriptInput.
@@ -41,8 +48,8 @@ test(`only "${HUB_TRIGGER_NAME}" fires hub_enter / hub_leave`, () => {
 
 test(`"${HUB_TRIGGER_NAME}" fires hub_enter on touch and hub_leave on untouch`, () => {
     const own = scriptInputs.filter((c) => c.targetname.trim() === HUB_TRIGGER_NAME);
-    assert.ok(own.some((c) => c.output === "OnStartTouch" && c.param === "hub_enter"), "missing OnStartTouch -> hub_enter");
-    assert.ok(own.some((c) => c.output === "OnEndTouch" && c.param === "hub_leave"), "missing OnEndTouch -> hub_leave");
+    assert.ok(own.some((c) => c.output === "OnStartTouch" && c.param === "hub_enter"), `${Named(HUB_TRIGGER_NAME)} is missing OnStartTouch -> hub_enter`);
+    assert.ok(own.some((c) => c.output === "OnEndTouch" && c.param === "hub_leave"), `${Named(HUB_TRIGGER_NAME)} is missing OnEndTouch -> hub_leave`);
 });
 
 // Generic teleporters: the destination lives in the trigger's name
@@ -63,7 +70,7 @@ test("every melon_teleport comes from a teleport_to_<destination> trigger whose 
 
 test("every teleport_to_* trigger actually fires melon_teleport", () => {
     const firing = new Set(scriptInputs.filter((c) => c.param === "melon_teleport").map((c) => c.targetname.trim()));
-    const silent = [...entityNames].filter((name) => ParseTeleportTarget(name) && !firing.has(name));
+    const silent = [...entityNames].filter((name) => ParseTeleportTarget(name) && !firing.has(name)).map(Named);
     assert.deepEqual(silent, []);
 });
 
@@ -73,7 +80,7 @@ test("every teleport_to_* trigger actually fires melon_teleport", () => {
 const SPAWNFLAG_PHYSICS_OBJECTS = 8;
 test('every trigger that feeds the script melon inputs has "Physics Objects" ticked', () => {
     const triggers = new Map(
-        ReadVmapEntities(vmapPath)
+        entities
             .filter((e) => String(e.classname).startsWith("trigger_"))
             .map((e) => [String(e.targetname ?? ""), e])
     );
@@ -107,7 +114,7 @@ test("every start_<trackId> trigger fires start_<trackId> or start_line", () => 
     const silent = [...entityNames]
         .map((name) => [name, START_TRIGGER_NAME_PATTERN.exec(name)])
         .filter(([name, m]) => m && !fired.has(`${name} -> start_${m[1]}`) && !fired.has(`${name} -> start_line`))
-        .map(([name, m]) => `"${name}" — add OnStartTouch -> RunScriptInput start_line (or start_${m[1]})`);
+        .map(([name, m]) => `${Named(name)} — add OnStartTouch -> RunScriptInput start_line (or start_${m[1]})`);
     assert.deepEqual(silent, []);
 });
 
@@ -133,11 +140,11 @@ test("finish_line is fired only by a finish_<trackId> or start_<trackId>[_laps<M
 test("no two start triggers name the same track", () => {
     /** @type {Map<string, string[]>} */
     const perTrack = new Map();
-    for (const e of ReadVmapEntities(vmapPath).filter((e) => e.classname === "trigger_multiple")) {
+    for (const e of entities.filter((e) => e.classname === "trigger_multiple")) {
         const name = String(e.targetname ?? "").trim();
         const m = START_TRIGGER_NAME_PATTERN.exec(name);
         if (m) {
-            perTrack.set(m[1], [...(perTrack.get(m[1]) ?? []), name]);
+            perTrack.set(m[1], [...(perTrack.get(m[1]) ?? []), `"${name}" [${e.node}]`]);
         }
     }
     const doubled = [...perTrack].filter(([, names]) => names.length > 1).map(([track, names]) => `track ${track}: ${names.join(", ")}`);
@@ -151,7 +158,7 @@ test("every start_spawn_<trackId> belongs to a track with a start trigger", () =
     const orphans = [...entityNames]
         .map((name) => START_SPAWN_NAME_PATTERN.exec(name))
         .filter((m) => m && !tracks.has(m[1]))
-        .map((m) => `"${m[0]}" — no trigger named start_${m[1]} or start_${m[1]}_laps<M>`);
+        .map((m) => `${Named(m[0])} — no trigger named start_${m[1]} or start_${m[1]}_laps<M>`);
     assert.deepEqual(orphans, []);
 });
 
@@ -160,14 +167,14 @@ test("every start_spawn_<trackId> belongs to a track with a start trigger", () =
 test("every start_* entity is a start trigger or a start_spawn", () => {
     const bad = [...entityNames]
         .filter((name) => name.startsWith("start_") && !START_TRIGGER_NAME_PATTERN.test(name) && !START_SPAWN_NAME_PATTERN.test(name) && name !== START_SPAWN_SHARED_NAME)
-        .map((name) => `"${name}" — start_<trackId>[_laps<M>] (trigger), start_spawn_<trackId> or start_spawn (info_target)?`);
+        .map((name) => `${Named(name)} — start_<trackId>[_laps<M>] (trigger), start_spawn_<trackId> or start_spawn (info_target)?`);
     assert.deepEqual(bad, []);
 });
 
 test("every checkpoint* entity is a checkpoint trigger or a checkpoint_spawn", () => {
     const bad = [...entityNames]
         .filter((name) => name.startsWith("checkpoint") && !CHECKPOINT_TRIGGER_NAME_PATTERN.test(name) && !CHECKPOINT_SPAWN_NAME_PATTERN.test(name) && name !== CHECKPOINT_SPAWN_SHARED_NAME)
-        .map((name) => `"${name}" — checkpoint_<trackId>_<index> (trigger), checkpoint_spawn_<trackId>_<index> or checkpoint_spawn (info_target)?`);
+        .map((name) => `${Named(name)} — checkpoint_<trackId>_<index> (trigger), checkpoint_spawn_<trackId>_<index> or checkpoint_spawn (info_target)?`);
     assert.deepEqual(bad, []);
 });
 
@@ -180,11 +187,11 @@ test("checkpoint is fired only by a checkpoint_<trackId>_<index> trigger", () =>
 
 test("every checkpoint_<trackId>_<index> trigger fires checkpoint", () => {
     const firing = new Set(scriptInputs.filter((c) => c.param === "checkpoint").map((c) => c.targetname.trim()));
-    const silent = ReadVmapEntities(vmapPath)
+    const silent = entities
         .filter((e) => e.classname === "trigger_multiple" && CHECKPOINT_TRIGGER_NAME_PATTERN.test(String(e.targetname ?? "").trim()))
         .map((e) => String(e.targetname).trim())
         .filter((name) => !firing.has(name))
-        .map((name) => `"${name}" — set its OnStartTouch -> RunScriptInput parameter to checkpoint`);
+        .map((name) => `${Named(name)} — set its OnStartTouch -> RunScriptInput parameter to checkpoint`);
     assert.deepEqual([...new Set(silent)], []);
 });
 
@@ -217,6 +224,6 @@ test("every checkpoint_spawn_<trackId>_<index> belongs to a checkpoint the map f
     const orphans = [...entityNames]
         .map((name) => name.match(CHECKPOINT_SPAWN_NAME_PATTERN))
         .filter((m) => m && !fired.has(`checkpoint_${m[1]}_${m[2]}`))
-        .map((m) => `"${m[0]}" — no trigger checkpoint_${m[1]}_${m[2]} fires RunScriptInput checkpoint`);
+        .map((m) => `${Named(m[0])} — no trigger checkpoint_${m[1]}_${m[2]} fires RunScriptInput checkpoint`);
     assert.deepEqual(orphans, []);
 });

@@ -89,41 +89,59 @@ export function ReadDmxElements(path) {
  * prefab variable (Map Variables, e.g. the start gate's trigger name) are
  * resolved the way Hammer compiles them: the instance's override, else the
  * variable's default. Element refs (`{ elem }`) point into the same array.
+ * Each array comes with the file it's from (relative to the addon's content
+ * root) and the node IDs of the prefab instances it was placed through, from
+ * the outermost map in, so a test failure can name where to look in Hammer.
  * @param {string} path
  * @param {Record<string, string>} [overrides] variable values set on the prefab instance
  * @param {string[]} [stack] prefab files being read, to stop on a cycle
- * @returns {Array<ReturnType<typeof ReadDmxElements>>}
+ * @param {number[]} [via] node IDs of the prefab instances that placed this file
+ * @returns {Array<{ file: string, via: number[], elements: ReturnType<typeof ReadDmxElements> }>}
  */
-function ReadVmapWithPrefabs(path, overrides = {}, stack = []) {
+function ReadVmapWithPrefabs(path, overrides = {}, stack = [], via = []) {
     const normalized = resolve(path).replace(/\\/g, "/");
     if (stack.includes(normalized)) {
         return [];
     }
     const elements = ResolveVariables(ReadDmxElementsCached(normalized), overrides);
-    const files = [elements];
     // targetMapPath is relative to the addon's content root ("maps/prefabs/hub.vmap").
     const root = normalized.slice(0, normalized.lastIndexOf("/maps/"));
+    const files = [{ file: normalized.slice(root.length + 1), via, elements }];
     for (const e of elements) {
         if (e.type === "CMapPrefab" && typeof e.attrs.targetMapPath === "string" && e.attrs.targetMapPath) {
             const names = e.attrs.variableOverrideNames ?? [];
             const values = e.attrs.variableOverrideValues ?? [];
             const childOverrides = Object.fromEntries(names.map((name, i) => [name, values[i]]));
-            files.push(...ReadVmapWithPrefabs(join(root, e.attrs.targetMapPath), childOverrides, [...stack, normalized]));
+            files.push(...ReadVmapWithPrefabs(join(root, e.attrs.targetMapPath), childOverrides, [...stack, normalized], [...via, e.attrs.nodeID]));
         }
     }
     return files;
 }
 
 /**
+ * Where a node sits, for a test failure message: "node 2797" in the map
+ * itself, or "node 12 in maps/prefabs/hub.vmap, prefab node 3558" for one
+ * inside a prefab (nested prefabs: "prefab node 3558 › 40", outermost first).
+ * @param {number | undefined} nodeID
+ * @param {string} file
+ * @param {number[]} via
+ */
+function NodeLocation(nodeID, file, via) {
+    const node = `node ${nodeID ?? "?"}`;
+    return via.length === 0 ? node : `${node} in ${file}, prefab node ${via.join(" › ")}`;
+}
+
+/**
  * Every prefab instance placed in a .vmap or, nested, in the prefabs it
  * references — with the file it's placed in (relative to the addon's
- * content root) and its CMapPrefab attributes (targetMapPath,
- * fixupEntityNames, variableOverrideNames, ...).
+ * content root), its node (`NodeLocation`) and its CMapPrefab attributes
+ * (targetMapPath, fixupEntityNames, variableOverrideNames, ...).
  * @param {string} path
  * @param {string[]} [stack] prefab files being read, to stop on a cycle
- * @returns {Array<{ placedIn: string, attrs: Record<string, any> }>}
+ * @param {number[]} [via] node IDs of the prefab instances that placed this file
+ * @returns {Array<{ placedIn: string, node: string, attrs: Record<string, any> }>}
  */
-export function ReadVmapPrefabs(path, stack = []) {
+export function ReadVmapPrefabs(path, stack = [], via = []) {
     const normalized = resolve(path).replace(/\\/g, "/");
     if (stack.includes(normalized)) {
         return [];
@@ -133,8 +151,8 @@ export function ReadVmapPrefabs(path, stack = []) {
     const result = [];
     for (const e of ReadDmxElementsCached(normalized)) {
         if (e.type === "CMapPrefab" && typeof e.attrs.targetMapPath === "string" && e.attrs.targetMapPath) {
-            result.push({ placedIn, attrs: e.attrs });
-            result.push(...ReadVmapPrefabs(join(root, e.attrs.targetMapPath), [...stack, normalized]));
+            result.push({ placedIn, node: NodeLocation(e.attrs.nodeID, placedIn, via), attrs: e.attrs });
+            result.push(...ReadVmapPrefabs(join(root, e.attrs.targetMapPath), [...stack, normalized], [...via, e.attrs.nodeID]));
         }
     }
     return result;
@@ -188,25 +206,37 @@ function ResolveVariables(elements, overrides) {
 
 /**
  * Every entity's keyvalues (classname, targetname, ...) in a .vmap —
- * including ones inside instances collapsed into it and referenced prefabs.
+ * including ones inside instances collapsed into it and referenced prefabs —
+ * plus `node`, where it sits in Hammer (`NodeLocation`; "node ?" for the
+ * world's own keyvalues, which have no entity node).
  * @param {string} path
  * @returns {Array<Record<string, any>>}
  */
 export function ReadVmapEntities(path) {
-    return ReadVmapWithPrefabs(path).flat()
-        .filter((e) => e.type === "EditGameClassProps" && typeof e.attrs.classname === "string")
-        .map((e) => e.attrs);
+    return ReadVmapWithPrefabs(path).flatMap(({ file, via, elements }) => {
+        /** @type {Map<number, number>} keyvalues element index -> its entity's node ID */
+        const owners = new Map();
+        for (const e of elements) {
+            if (e.type === "CMapEntity" && e.attrs.entity_properties) {
+                owners.set(e.attrs.entity_properties.elem, e.attrs.nodeID);
+            }
+        }
+        return elements
+            .map((e, index) => ({ e, index }))
+            .filter(({ e }) => e.type === "EditGameClassProps" && typeof e.attrs.classname === "string")
+            .map(({ e, index }) => ({ ...e.attrs, node: NodeLocation(owners.get(index), file, via) }));
+    });
 }
 
 /**
  * Every entity's Hammer I/O connections (its Outputs tab), e.g. a trigger's
  * OnStartTouch -> melon_drive_script RunScriptInput "hub_enter".
  * @param {string} path
- * @returns {Array<{ classname: string, targetname: string, origin: number[] | undefined, output: string, target: string, input: string, param: string }>}
+ * @returns {Array<{ classname: string, targetname: string, origin: number[] | undefined, node: string, output: string, target: string, input: string, param: string }>}
  */
 export function ReadVmapConnections(path) {
     const result = [];
-    for (const elements of ReadVmapWithPrefabs(path)) {
+    for (const { file, via, elements } of ReadVmapWithPrefabs(path)) {
         for (const e of elements) {
             if (e.type !== "CMapEntity") {
                 continue;
@@ -221,6 +251,7 @@ export function ReadVmapConnections(path) {
                     classname: props.classname,
                     targetname: props.targetname ?? "",
                     origin: e.attrs.origin,
+                    node: NodeLocation(e.attrs.nodeID, file, via),
                     output: c.outputName,
                     target: c.targetName,
                     input: c.inputName,

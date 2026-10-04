@@ -27,16 +27,16 @@ function ByName(name) {
 /** @param {string} name */
 function TemplateTargets(name) {
     const matches = ByName(name);
-    assert.equal(matches.length, 1, `expected exactly one entity named "${name}", found ${matches.length}`);
+    assert.equal(matches.length, 1, `expected exactly one entity named "${name}", found ${matches.length}${matches.length > 1 ? ` [${matches.map((e) => e.node).join("; ")}]` : ""}`);
     const template = matches[0];
-    assert.equal(template.classname, "point_template", `"${name}" must be a point_template`);
+    assert.equal(template.classname, "point_template", `"${name}" [${template.node}] must be a point_template`);
     const targets = Object.entries(template)
         .filter(([key, value]) => /^Template\d+$/.test(key) && value)
         .map(([, value]) => value);
-    assert.ok(targets.length > 0, `point_template "${name}" has no Template01.. entries`);
+    assert.ok(targets.length > 0, `point_template "${name}" [${template.node}] has no Template01.. entries`);
     return targets.map((target) => {
         const found = ByName(target);
-        assert.ok(found.length > 0, `point_template "${name}" references "${target}", which doesn't exist in the map`);
+        assert.ok(found.length > 0, `point_template "${name}" [${template.node}] references "${target}", which doesn't exist in the map`);
         return found[0];
     });
 }
@@ -57,7 +57,7 @@ for (const name of PARTICLE_TEMPLATES) {
         const particles = TemplateTargets(name).filter((e) => e.classname === "info_particle_system");
         assert.ok(particles.length > 0, `"${name}" doesn't spawn any info_particle_system`);
         for (const particle of particles) {
-            assert.match(particle.effect_name, /\.vpcf$/, `"${particle.targetname}" has no .vpcf effect_name`);
+            assert.match(particle.effect_name, /\.vpcf$/, `"${particle.targetname}" [${particle.node}] has no .vpcf effect_name`);
         }
     });
 }
@@ -69,7 +69,7 @@ const BOOST_TRAIL_EFFECTS = ["particles/melon_racer/boost_trail.vpcf", "particle
 test(`"${BOOST_TRAIL_TEMPLATE_NAME}" spawns the boost trail's band and juice particle systems`, { skip: ByName(BOOST_TRAIL_TEMPLATE_NAME).length === 0 && "not placed in the map yet" }, () => {
     const particles = TemplateTargets(BOOST_TRAIL_TEMPLATE_NAME).filter((e) => e.classname === "info_particle_system");
     for (const particle of particles) {
-        assert.ok(BOOST_TRAIL_EFFECTS.includes(particle.effect_name), `"${particle.targetname}" plays the wrong effect (${particle.effect_name})`);
+        assert.ok(BOOST_TRAIL_EFFECTS.includes(particle.effect_name), `"${particle.targetname}" [${particle.node}] plays the wrong effect (${particle.effect_name})`);
     }
     for (const effect of BOOST_TRAIL_EFFECTS) {
         assert.ok(particles.some((p) => p.effect_name === effect), `"${BOOST_TRAIL_TEMPLATE_NAME}" has no info_particle_system playing ${effect}`);
@@ -86,7 +86,7 @@ test("no two particle templates spawn the same entity", () => {
     for (const name of [...PARTICLE_TEMPLATES, ...placedBoostTrail]) {
         for (const target of TemplateTargets(name)) {
             if (owner.has(target.targetname)) {
-                shared.push(`"${target.targetname}" is in both "${owner.get(target.targetname)}" and "${name}"`);
+                shared.push(`"${target.targetname}" [${target.node}] is in both "${owner.get(target.targetname)}" and "${name}"`);
             }
             owner.set(target.targetname, name);
         }
@@ -97,11 +97,10 @@ test("no two particle templates spawn the same entity", () => {
 // Decided: exactly these two break templates, no others — extra chunks go
 // into one of them as prop_physics (see GAMEPLAY.md, "Melon health & breaking").
 test("there are no break templates besides the two the script spawns", () => {
-    const breakTemplates = entities
-        .filter((e) => e.classname === "point_template" && String(e.targetname ?? "").startsWith("melon_break"))
-        .map((e) => e.targetname)
-        .sort();
-    assert.deepEqual(breakTemplates, [BREAK_PARTICLE_TEMPLATE_NAME, BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME].sort());
+    const found = entities.filter((e) => e.classname === "point_template" && String(e.targetname ?? "").startsWith("melon_break"));
+    const breakTemplates = found.map((e) => e.targetname).sort();
+    const where = found.map((e) => `"${e.targetname}" [${e.node}]`).join(", ");
+    assert.deepEqual(breakTemplates, [BREAK_PARTICLE_TEMPLATE_NAME, BREAK_CHUNKS_PARTICLE_TEMPLATE_NAME].sort(), `break templates in the map: ${where}`);
 });
 
 // Found in the map: "hub_start_trigger " with a trailing space. The script
@@ -110,6 +109,6 @@ test("there are no break templates besides the two the script spawns", () => {
 test("no entity name has leading or trailing whitespace", () => {
     const bad = entities
         .filter((e) => typeof e.targetname === "string" && e.targetname !== e.targetname.trim())
-        .map((e) => `${e.classname} ${JSON.stringify(e.targetname)}`);
+        .map((e) => `${e.classname} ${JSON.stringify(e.targetname)} [${e.node}]`);
     assert.deepEqual(bad, []);
 });
