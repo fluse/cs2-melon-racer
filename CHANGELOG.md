@@ -2,6 +2,33 @@
 
 Player-facing changes per release. Versions are semver, tagged `v<version>` in git.
 
+## [0.6.0] — 2026-10-04 — Side Slice
+
+Tag `v0.6.0`.
+
+### New
+- New route "Side Slice": a 2D jump & run. The camera watches from the side and can't be turned, A/D drive left and right on screen, W/S along the melon's facing.
+- Wall jumps in 2D sections aren't rated by angle, but go higher and further, cost no charge and chain from wall to wall.
+- Jump recharge zones: all wall-jump charges refill at once and stay full while you're inside, marked by blue rings and sparks.
+- Moving obstacles: blocks and platforms sliding back and forth.
+- Press R to restart a time trial — no need to open the menu.
+
+### Changed
+- The Canals route was reworked.
+- Respawning at a checkpoint without its own spawn point puts the melon level, facing down the track, instead of tilted.
+
+### Fixed
+- Teleported out of a 2D section (hub, checkpoint, teleporter), the camera no longer stays stuck in side view or swings across the map — it cuts straight back to the chase camera.
+- A camera zone on the Bridge route didn't let go of the camera when you left it.
+
+### Mapping/Dev
+- The map is split into prefabs (hub, routes, start/finish/checkpoint/heal gates, jump pad, mover, jump refill); a gate's track is set by one map variable per copy. Mapping API page 14.
+- Every checkpoint trigger fires the same input, `checkpoint`; track and index come from the trigger's name `checkpoint_<trackId>_<index>`. `start_line`/`finish_line` read the track from the trigger name the same way.
+- Shared spawn markers: an `info_target` named just `start_spawn` / `checkpoint_spawn` within 1024 units of its trigger is used when there's no numbered one.
+- New: `side_view_<yaw>[_<distance>[_<height>]]` zones (`side_view_enter`/`_leave`), `jump_recharge_enter`/`_leave` (page 17), `func_movelinear` named `mover`, `mover_<anything>` or `mover_wait<seconds>[_…]` (page 16).
+- `npm test` names the Hammer node ID of anything it flags, checks every zone's `_enter` is on `OnStartTouch` with its `_leave` on `OnEndTouch` of the same trigger, and fails on gates whose track was never set.
+- GitHub Page: Mapping API docs, gameplay GIF slider, steam://connect join link (`/connect/`).
+
 ## [0.5.0] — 2026-10-02 — Wall jumps, water & a new HUD
 
 Commit `45ff6aa`.

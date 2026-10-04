@@ -60,10 +60,13 @@ The game mode's code (the cs_script scripts, HUD logic and build tools) was writ
 [*][b]Wall jumps[/b] — push off walls in mid-air to reach shortcuts and save a bad line. You have 3 charges that refill over time. Hit the wall at about 45° for a [b]PERFECT[/b] wall jump that leaves with even more speed than you came in with.
 [*][b]Jump pads[/b] — press jump on a glowing pad to launch high and fast. No damage on the way down.
 [*][b]Lift shafts[/b] — bounce between the walls of a shaft to climb up.
+[*][b]2D sections[/b] — on the Side Slice route the camera locks to the side and the track turns into a jump & run: A/D drive left and right, and wall jumps chain from wall to wall.
+[*][b]Jump refills[/b] — blue rings refill all your wall-jump charges and keep them full while you're inside.
+[*][b]Moving obstacles[/b] — blocks that slide across the track. Time your pass.
 [*][b]Heal zones & teleporters[/b] — patch up your melon and take the fast way around.
 [*][b]Water[/b] — splash down and your melon loses all its speed. Better jump over it.
 [*][b]Paint your melon[/b] — drive over a paint pad in the hub or choose a color in the menu. Your melon glows in its color, so everyone can see who's who.
-[*][b]Time trial[/b] — every run over a track is timed, alone or in a heat. Your best time on each track is saved, and beating it shows a gold [b]NEW BEST[/b]. After the finish you're put straight back at the start for the next try. Messed up the start? Restart the run from the menu.
+[*][b]Time trial[/b] — every run over a track is timed, alone or in a heat. Your best time on each track is saved, and beating it shows a gold [b]NEW BEST[/b]. After the finish you're put straight back at the start for the next try. Messed up the start? Press [b]R[/b] to restart the run.
 [*][b]Multiple tracks[/b] — loops with several laps or A-to-B tracks, raced one after another in a heat.
 [*][b]Custom HUD[/b] — speedometer with health bar and wall-jump charges, run clock with your best time, a checkpoint strip showing which checkpoints you've passed, lap counter, bounce rating and jump timing.
 [/list]
@@ -76,6 +79,7 @@ The game mode's code (the cs_script scripts, HUD logic and build tools) was writ
 [tr][td]A / D[/td][td]Strafe left / right[/td][/tr]
 [tr][td]Left mouse button (hold)[/td][td]Boost — costs health, too long and the melon breaks[/td][/tr]
 [tr][td]Space[/td][td]Jump / wall jump / time a wall bounce[/td][/tr]
+[tr][td]R[/td][td]Restart the time trial (on a track, outside a heat)[/td][/tr]
 [tr][td]E[/td][td]Menu: respawn at checkpoint, restart time trial, back to hub, tutorial, melon color and glow, free look[/td][/tr]
 [/table]
 
@@ -147,10 +151,13 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [*][b]Wandsprünge[/b] — stoß dich in der Luft von Wänden ab, um Abkürzungen zu erreichen oder eine schlechte Linie zu retten. Du hast 3 Ladungen, die sich mit der Zeit wieder füllen. Triffst du die Wand in etwa 45°, gibt es einen [b]PERFECT[/b]-Wandsprung, der dich noch schneller wegschießt, als du gekommen bist.
 [*][b]Sprungfelder[/b] — drück auf einem leuchtenden Feld die Sprungtaste und du fliegst hoch und weit. Kein Schaden bei der Landung.
 [*][b]Aufzugschächte[/b] — spring zwischen den Wänden eines Schachts hin und her, um nach oben zu kommen.
+[*][b]2D-Abschnitte[/b] — auf der Strecke Side Slice schaut die Kamera fest von der Seite und die Strecke wird zum Jump & Run: A/D fahren nach links und rechts, und Wandsprünge gehen von Wand zu Wand.
+[*][b]Sprung-Aufladung[/b] — blaue Ringe füllen alle Wandsprung-Ladungen auf und halten sie voll, solange du drin bist.
+[*][b]Bewegliche Hindernisse[/b] — Blöcke, die quer über die Strecke gleiten. Pass den richtigen Moment ab.
 [*][b]Heilzonen & Teleporter[/b] — flick deine Melone und nimm den schnellen Weg.
 [*][b]Wasser[/b] — landest du im Wasser, ist dein ganzer Schwung weg. Spring lieber drüber.
 [*][b]Melone anmalen[/b] — fahr im Hub über ein Farbfeld oder wähl eine Farbe im Menü. Deine Melone leuchtet in ihrer Farbe, so sieht jeder, wer wer ist.
-[*][b]Zeitfahren[/b] — jede Fahrt über eine Strecke wird gestoppt, allein oder im Rennen. Deine Bestzeit pro Strecke wird gespeichert, und schlägst du sie, erscheint ein goldenes [b]NEW BEST[/b]. Nach dem Ziel stehst du sofort wieder am Start für den nächsten Versuch. Start verpatzt? Starte die Fahrt im Menü neu.
+[*][b]Zeitfahren[/b] — jede Fahrt über eine Strecke wird gestoppt, allein oder im Rennen. Deine Bestzeit pro Strecke wird gespeichert, und schlägst du sie, erscheint ein goldenes [b]NEW BEST[/b]. Nach dem Ziel stehst du sofort wieder am Start für den nächsten Versuch. Start verpatzt? Drück [b]R[/b] und die Fahrt beginnt von vorn.
 [*][b]Mehrere Strecken[/b] — Rundkurse mit mehreren Runden oder Strecken von A nach B, im Rennen nacheinander gefahren.
 [*][b]Eigenes HUD[/b] — Tacho mit Lebensbalken und Wandsprung-Ladungen, Fahrzeit mit deiner Bestzeit, eine Checkpoint-Leiste, die zeigt, welche Checkpoints du schon hast, Rundenanzeige, Abpraller-Bewertung und Sprung-Timing.
 [/list]
@@ -163,6 +170,7 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [tr][td]A / D[/td][td]Seitlich nach links / rechts[/td][/tr]
 [tr][td]Linke Maustaste (halten)[/td][td]Boost — kostet Leben, zu lange und die Melone zerplatzt[/td][/tr]
 [tr][td]Leertaste[/td][td]Springen / Wandsprung / Timing für den Abpraller[/td][/tr]
+[tr][td]R[/td][td]Zeitfahren neu starten (auf einer Strecke, außerhalb eines Rennens)[/td][/tr]
 [tr][td]E[/td][td]Menü: am Checkpoint neu starten, Zeitfahren neu starten, zurück zum Hub, Tutorial, Farbe und Leuchten, freie Kamera[/td][/tr]
 [/table]
 
@@ -308,6 +316,32 @@ For the wall jump & HUD update:
 [*]Geändert: die Kamera beim Zerplatzen bleibt näher dran, und zwischen den Rennen zählt ein großer Countdown bis zur nächsten Strecke
 [*]Behoben: eine zerplatzende Melone wird nicht mehr von ihren eigenen Stücken herumgeschubst
 [*]Behoben: ein neuer Spieler bekommt nicht mehr das offene Menü seines Vorgängers
+[/list]
+```
+
+For the Side Slice update (v0.6.0):
+
+```
+[b]Update — Side Slice[/b]
+[list]
+[*]New: the Side Slice route — a 2D jump & run with a fixed side camera. A/D drive left and right on screen, and wall jumps there chain from wall to wall for free
+[*]New: jump recharge zones (blue rings) refill all your wall-jump charges and keep them full while you're inside
+[*]New: moving obstacles that slide back and forth
+[*]New: press R to restart a time trial, no menu needed
+[*]Changed: the Canals route was reworked
+[*]Fixed: teleported out of a 2D section, the camera no longer stays stuck in side view
+[/list]
+```
+
+```
+[b]Update — Side Slice[/b]
+[list]
+[*]Neu: die Strecke Side Slice — ein 2D-Jump-&-Run mit fester Kamera von der Seite. A/D fahren auf dem Bildschirm nach links und rechts, und Wandsprünge gehen dort kostenlos von Wand zu Wand
+[*]Neu: Sprung-Auflade-Zonen (blaue Ringe) füllen alle Wandsprung-Ladungen auf und halten sie voll, solange du drin bist
+[*]Neu: bewegliche Hindernisse, die hin und her gleiten
+[*]Neu: mit R startest du ein Zeitfahren neu, ganz ohne Menü
+[*]Geändert: die Strecke Canals wurde umgebaut
+[*]Behoben: wirst du aus einem 2D-Abschnitt teleportiert, bleibt die Kamera nicht mehr in der Seitenansicht hängen
 [/list]
 ```
 

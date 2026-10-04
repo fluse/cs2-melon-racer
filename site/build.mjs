@@ -61,6 +61,11 @@ const COPIED_IMAGES = {
  */
 const GAMEPLAY_GIFS = [
     {
+        source: "docs/gifs/2026-10-04_21-05-46.gif",
+        alt: "A side view of a melon wall-jumping up a narrow shaft between neon-edged concrete walls, a time trial clock running top left",
+        caption: "The new Side Slice route — a 2D jump & run, wall-jumping up the shaft.",
+    },
+    {
         source: "docs/gifs/2026-10-03_14-01-55.gif",
         alt: "A melon crossing water, climbing ramps, rolling through a heal gate and bouncing between two walls",
         caption: "A time trial run — over the water, up the ramps, through a heal gate and between the walls.",
