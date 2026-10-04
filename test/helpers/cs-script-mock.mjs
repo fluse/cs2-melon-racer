@@ -2,7 +2,8 @@
 // just enough for the engine-side files in src/ to load and for tests to
 // drive specific functions with fake entities. Not a simulation: traces
 // hit nothing unless a test sets world.traceLine/traceSphere, Delay() resolves on the next microtask (its
-// seconds recorded in world.delays), EntFireAtTarget/EntFireAtName calls are recorded in world.fired, and every
+// seconds recorded in world.delays), EntFireAtTarget/EntFireAtName calls are recorded in world.fired, ConnectOutput
+// callbacks in world.outputs (world.fireOutput calls them), and every
 // Instance.OnXxx/SetXxx registration is only recorded (see `world.handlers`).
 //
 // Tests set up the world through `world` (exported below): add entities
@@ -72,7 +73,7 @@ export class CSPlayerPawn extends Entity {
         this.justPressed = new Set();
         /** @type {Entity[]} weapons held, the first is the active one */
         this.weapons = [];
-        this.camera = { mode: 0, config: undefined, SetMode(m) { this.mode = m; }, GetMode() { return this.mode; }, SetFollowConfig(c) { this.config = c; } };
+        this.camera = { mode: 0, config: undefined, SetMode(m) { this.mode = m; }, GetMode() { return this.mode; }, SetFollowConfig(c) { this.config = c; }, Move(v) { this.pose = v; } };
     }
     Teleport(values = {}) {
         super.Teleport(values);
@@ -120,6 +121,14 @@ export const world = {
     messages: [],
     /** Every EntFireAtTarget/EntFireAtName call's argument. @type {any[]} */
     fired: [],
+    /** Every live Instance.ConnectOutput connection, by id. @type {Map<number, { target: Entity, output: string, callback: Function }>} */
+    outputs: new Map(),
+    /** Fires an entity output: calls every callback connected to it. @param {Entity} target @param {string} output */
+    fireOutput(target, output) {
+        for (const c of [...this.outputs.values()]) {
+            if (c.target === target && c.output === output) c.callback({ caller: target });
+        }
+    },
     /** Seconds passed to each Instance.Delay call. @type {number[]} */
     delays: [],
     /** What GetAllPlayerControllers returns: one fake controller per pawn listed here. @type {CSPlayerPawn[]} */
@@ -133,10 +142,12 @@ export const world = {
     saveData: "",
     /** @template {Entity} T @param {T} e @returns {T} */
     add(e) { this.entities.push(e); return e; },
-    reset() { this.time = 0; this.entities = []; this.playerPawns = []; this.messages = []; this.fired = []; this.delays = []; this.traceLine = undefined; this.traceSphere = undefined; this.debugLines = []; this.saveData = ""; },
+    reset() { this.time = 0; this.entities = []; this.playerPawns = []; this.messages = []; this.fired = []; this.outputs = new Map(); this.delays = []; this.traceLine = undefined; this.traceSphere = undefined; this.debugLines = []; this.saveData = ""; },
 };
 
 const noHit = (config) => ({ didHit: false, startedInSolid: false, end: clone(config.end), normal: { x: 0, y: 0, z: 1 }, fraction: 1 });
+
+let nextOutputId = 1;
 
 const instanceMethods = {
     GetGameTime: () => world.time,
@@ -151,6 +162,8 @@ const instanceMethods = {
     Delay: (seconds) => { world.delays.push(seconds); return Promise.resolve(); },
     EntFireAtTarget: (args) => { world.fired.push(args); },
     EntFireAtName: (args) => { world.fired.push(args); },
+    ConnectOutput: (target, output, callback) => { const id = nextOutputId++; world.outputs.set(id, { target, output, callback }); return id; },
+    DisconnectOutput: (id) => { world.outputs.delete(id); },
     DebugLine: (args) => { world.debugLines.push(args); },
     DebugSphere: () => {},
     DebugBox: () => {},

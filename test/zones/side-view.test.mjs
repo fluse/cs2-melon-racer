@@ -1,0 +1,145 @@
+// Side-view zones (zones/side-view/, camera/side-view/): the pure rules, then
+// the real UpdateKart and side camera against the fake engine — A/D drive
+// along the screen axis whatever the mouse does, the melon stays on its
+// plane, and the camera swings to the side and back.
+import "../helpers/register-cs-script.mjs";
+import { test, beforeEach } from "node:test";
+import assert from "node:assert/strict";
+import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
+import { SideViewFromName, SideViewAxes, InitialFacing, SideViewInput, KeepOnPlane } from "../../src/melon_drive/zones/side-view/logic.js";
+import { StepSideViewBlend, SideViewPose, ChaseCameraPose, BlendPose } from "../../src/melon_drive/camera/side-view/logic.js";
+import {
+    SIDE_VIEW_DEFAULT_YAW,
+    SIDE_VIEW_DISTANCE,
+    SIDE_VIEW_HEIGHT,
+    SIDE_VIEW_PLANE_PULL,
+    SIDE_VIEW_PLANE_MAX_SPEED,
+    SIDE_VIEW_EASE_SECONDS,
+    MELON_TEMPLATE_NAME,
+    HUB_SPAWN_NAME,
+} from "../../src/melon_drive/constants/index.js";
+
+const { karts } = await import("../../src/melon_drive/core/kart-registry.js");
+const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
+const { GetHubSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
+const { UpdateKart } = await import("../../src/melon_drive/movement/index.js");
+const { UpdateSideViewCamera, UpdateFollowCamera } = await import("../../src/melon_drive/camera/index.js");
+await import("../../src/melon_drive/index.js"); // registers the script inputs
+
+const close = (/** @type {number} */ a, /** @type {number} */ b) => Math.abs(a - b) < 1e-6;
+
+test("side view from the name: yaw, distance and height, defaults for the rest", () => {
+    assert.deepEqual(SideViewFromName("side_view_90_400_60"), { yaw: 90, distance: 400, height: 60 });
+    assert.deepEqual(SideViewFromName("side_view_-90_250"), { yaw: -90, distance: 250, height: SIDE_VIEW_HEIGHT });
+    assert.deepEqual(SideViewFromName("side_view_180"), { yaw: 180, distance: SIDE_VIEW_DISTANCE, height: SIDE_VIEW_HEIGHT });
+    assert.deepEqual(SideViewFromName("2d_section"), { yaw: SIDE_VIEW_DEFAULT_YAW, distance: SIDE_VIEW_DISTANCE, height: SIDE_VIEW_HEIGHT });
+});
+
+test("looking north (yaw 90), screen right is east", () => {
+    const { view, right } = SideViewAxes(90);
+    assert.ok(close(view.x, 0) && close(view.y, 1));
+    assert.ok(close(right.x, 1) && close(right.y, 0));
+});
+
+test("A/D drive and turn the melon on screen, W follows its facing, S drives back without turning", () => {
+    assert.deepEqual(SideViewInput(0, 1, -1), { axis: 1, facing: 1 });
+    assert.deepEqual(SideViewInput(0, -1, 1), { axis: -1, facing: -1 });
+    assert.deepEqual(SideViewInput(1, 0, -1), { axis: -1, facing: -1 });
+    assert.deepEqual(SideViewInput(-1, 0, 1), { axis: -1, facing: 1 });
+    assert.equal(InitialFacing({ x: -100, y: 0 }, { x: 1, y: 0 }), -1);
+    assert.equal(InitialFacing({ x: 0, y: 0 }, { x: 1, y: 0 }), 1);
+});
+
+test("on the plane: no speed towards the camera, a drift is pulled back, capped", () => {
+    const view = { x: 0, y: 1 };
+    assert.deepEqual(KeepOnPlane({ x: 300, y: 120 }, view, 0), { x: 300, y: 0 });
+    assert.ok(close(KeepOnPlane({ x: 300, y: 0 }, view, 10).y, 10 * SIDE_VIEW_PLANE_PULL));
+    assert.equal(KeepOnPlane({ x: 0, y: 0 }, view, -1e6).y, -SIDE_VIEW_PLANE_MAX_SPEED);
+});
+
+test("side camera: distance back against the view, height up, looking down at the melon", () => {
+    const pose = SideViewPose({ x: 0, y: 0, z: 0 }, { yaw: 90, distance: 300, height: 300 });
+    assert.ok(close(pose.position.x, 0) && close(pose.position.y, -300) && pose.position.z === 300);
+    assert.ok(close(pose.angles.pitch, 45));
+    assert.equal(pose.angles.yaw, 90);
+});
+
+test("the swing to the side eases over SIDE_VIEW_EASE_SECONDS, the yaw the short way round", () => {
+    assert.equal(StepSideViewBlend(0, true, SIDE_VIEW_EASE_SECONDS / 2), 0.5);
+    assert.equal(StepSideViewBlend(0.5, true, SIDE_VIEW_EASE_SECONDS), 1);
+    assert.equal(StepSideViewBlend(1, false, SIDE_VIEW_EASE_SECONDS * 2), 0);
+    const from = { position: { x: 0, y: 0, z: 0 }, angles: { pitch: 0, yaw: 170, roll: 0 } };
+    const to = { position: { x: 10, y: 0, z: 0 }, angles: { pitch: 0, yaw: -170, roll: 0 } };
+    assert.ok(close(BlendPose(from, to, 0.5).angles.yaw, 180));
+    assert.ok(close(BlendPose(from, to, 0.5).position.x, 5));
+    const chase = ChaseCameraPose({ x: 0, y: 0, z: 20 }, { x: -50, y: 0, z: 0 }, { pitch: 0, yaw: 0 });
+    assert.ok(close(chase.position.x, -50) && close(chase.position.z, 20));
+});
+
+/** @type {CSPlayerPawn} */
+let pawn;
+/** @type {any} */
+let kart;
+/** @type {Entity} */
+let trigger;
+
+beforeEach(() => {
+    world.reset();
+    karts.clear();
+    world.add(new PointTemplate({ name: MELON_TEMPLATE_NAME, spawn: () => [new Entity({ className: "prop_physics_multiplayer" })] }));
+    world.add(new Entity({ name: HUB_SPAWN_NAME, className: "info_player_start", origin: { x: 0, y: 0, z: 16 } }));
+    pawn = world.add(new CSPlayerPawn({ slot: 0 }));
+    kart = SetUpPlayerKart(pawn, GetHubSpawnPoint());
+    trigger = world.add(new Entity({ name: "side_view_90_300_0", className: "trigger_multiple" }));
+});
+
+/** @param {string} kind */
+function ScriptInput(kind) {
+    const registration = (world.handlers.OnScriptInput ?? []).find(([input]) => input === kind);
+    assert.ok(registration, `${kind} input is registered`);
+    return registration[1];
+}
+
+/** One tick: the melon rolls on as commanded, `keys` held. @param {string[]} keys */
+function Tick(keys) {
+    const dt = 1 / 64;
+    world.time += dt;
+    pawn.pressed = new Set(keys);
+    kart.lastVelocity = kart.melon.GetAbsVelocity();
+    UpdateKart(0, kart, dt);
+    UpdateSideViewCamera(kart, dt);
+    UpdateFollowCamera(kart, dt);
+}
+
+test("in a side view, D drives screen right (east) whatever way the player looks, and nothing towards the camera", () => {
+    pawn.eyeAngles = { pitch: 0, yaw: 90, roll: 0 }; // looking north, into the screen
+    kart.melon.velocity = { x: 0, y: 80, z: 0 };
+    ScriptInput("side_view_enter")({ caller: trigger, activator: kart.melon });
+    for (let i = 0; i < 10; i++) {
+        Tick(["RIGHT"]);
+    }
+    const v = kart.melon.GetAbsVelocity();
+    assert.ok(v.x > 0, `drives east, got ${JSON.stringify(v)}`);
+    assert.ok(Math.abs(v.y) < 1e-6, `no speed towards the camera, got ${v.y}`);
+});
+
+test("the camera takes over in CONTROLLED mode at the side and hands back to the chase camera after leaving", () => {
+    kart.melon.origin = { x: 100, y: 50, z: 10 };
+    ScriptInput("side_view_enter")({ caller: trigger, activator: kart.melon });
+    for (let i = 0; i < 64 * SIDE_VIEW_EASE_SECONDS + 2; i++) {
+        Tick([]);
+    }
+    const camera = pawn.GetCustomCamera();
+    assert.equal(camera.GetMode(), 1); // CONTROLLED
+    const melon = kart.melon.GetAbsOrigin();
+    assert.ok(close(camera.pose.position.x, melon.x) && close(camera.pose.position.y, melon.y - 300));
+    assert.equal(camera.pose.angles.yaw, 90);
+
+    Tick(["LEFT"]); // facing left on screen (west) when leaving
+    ScriptInput("side_view_leave")({ caller: trigger, activator: kart.melon });
+    for (let i = 0; i < 64 * SIDE_VIEW_EASE_SECONDS + 2; i++) {
+        Tick([]);
+    }
+    assert.equal(camera.GetMode(), 3); // FOLLOW_POSITION
+    assert.ok(close(Math.abs(pawn.GetEyeAngles().yaw), 180), `view turned west, got ${pawn.GetEyeAngles().yaw}`);
+});

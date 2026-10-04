@@ -37,6 +37,8 @@ const SCRIPT_INPUTS = [
     "lift_leave",
     "camera_enter",
     "camera_leave",
+    "side_view_enter",
+    "side_view_leave",
     "jump_pad_enter",
     "jump_pad_leave",
     "water_enter",

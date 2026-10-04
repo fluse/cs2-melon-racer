@@ -27,11 +27,12 @@ this folder, the script doesn't know about it.
 | 8 | [Kill & respawn triggers](08-kill-triggers.md) | Break the melon on the spot, or send it back to its checkpoint |
 | 9 | [Heal zones](09-heal-zones.md) | Heal over time, full-heal zones |
 | 10 | [Lift zones](10-lift-zones.md) | Climb shafts by bouncing between walls |
-| 11 | [Camera zones](11-camera-zones.md) | Zoom out/in, front view, close-up |
+| 11 | [Camera zones](11-camera-zones.md) | Zoom out/in, front view, close-up, side view (2D) |
 | 12 | [Jump pads](12-jump-pads.md) | Timed launch pads, no damage |
 | 13 | [Water zones](13-water-zones.md) | Landing in water stops the melon, no bounces in it |
 | 14 | [Prefabs](14-prefabs.md) | Hub, routes, start/finish/heal gates; map variables, rules |
 | 15 | [Checking your map](15-checking.md) | What `npm test` catches, debug log, minimal checklist |
+| 16 | [Movers](16-movers.md) | `func_movelinear`s the script keeps going back and forth |
 
 ## All script inputs
 
@@ -60,6 +61,8 @@ script, and `npm test` fails on it.
 | `lift_leave` | **End** | the same lift trigger | — | [Lift zones](10-lift-zones.md) |
 | `camera_enter` | Start | any camera trigger | name (zoom) | [Camera zones](11-camera-zones.md) |
 | `camera_leave` | **End** | the same camera trigger | — | [Camera zones](11-camera-zones.md) |
+| `side_view_enter` | Start | any side-view trigger | name (yaw, distance, height) | [Camera zones](11-camera-zones.md#side-view-zones) |
+| `side_view_leave` | **End** | the same side-view trigger | — | [Camera zones](11-camera-zones.md#side-view-zones) |
 | `jump_pad_enter` | Start | any jump pad trigger | name (launch) | [Jump pads](12-jump-pads.md) |
 | `jump_pad_leave` | **End** | the same jump pad trigger | — | [Jump pads](12-jump-pads.md) |
 | `water_enter` | Start | any trigger around a `func_water` | — | [Water zones](13-water-zones.md) |
@@ -108,4 +111,6 @@ Names the script parses — the name carries the config.
 | `lift_zone_<speed>` | `lift_zone_600` | `trigger_multiple` | [Lift zones](10-lift-zones.md) |
 | `camera_zone_[noclip_][front_]<a>[_<h>]` | `camera_zone_250_40` | `trigger_multiple` | [Camera zones](11-camera-zones.md) |
 | `camera_zone_[noclip_]close[_<b>[_<h>]]` | `camera_zone_close_12_2` | `trigger_multiple` | [Camera zones](11-camera-zones.md#close-up-zones) |
+| `side_view_<yaw>[_<distance>[_<height>]]` | `side_view_90_300_40` | `trigger_multiple` | [Camera zones](11-camera-zones.md#side-view-zones) |
 | `jump_pad_<up>[_<forward>]` | `jump_pad_1000_400` | `trigger_multiple` | [Jump pads](12-jump-pads.md) |
+| `mover[_wait<seconds>][_<anything>]` | `mover_wait1.5_left` | `func_movelinear` | [Movers](16-movers.md) |

@@ -54,6 +54,10 @@ import { predictionDotSet } from "./trace.js";
  *   padFlight?: import("../zones/jump-pad/logic.js").PadFlight, // a jump pad launch's damage protection, still on — see zones/jump-pad/jump-pad.js
  *   cameraZones?: Map<any, import("../zones/camera-zone/logic.js").CameraZone>, // camera triggers the melon is inside -> their zoom, see zones/registry.js
  *   zoneCamera?: import("../zones/camera-zone/logic.js").ZoneCameraState, // the camera-zone zoom being eased in/out — see UpdateZoneCamera
+ *   sideViews?: Map<any, import("../zones/side-view/logic.js").SideView>, // side-view triggers the melon is inside -> their view, see zones/registry.js
+ *   sideViewDrive?: { zone: import("../zones/side-view/logic.js").SideView, plane: number, facing: 1 | -1 }, // the side view being driven in: its plane and which way the melon faces on screen — see UpdateKart
+ *   sideViewBlend?: number, // 0..1, how far the camera has swung to the side — see UpdateSideViewCamera
+ *   sideViewZone?: import("../zones/side-view/logic.js").SideView, sideViewLast?: import("../zones/side-view/logic.js").SideView, // the side view the camera is in / swinging out of — see UpdateSideViewCamera
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
  * }} Kart
  */

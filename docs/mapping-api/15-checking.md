@@ -1,4 +1,4 @@
-[Mapping API](README.md) › **15. Checking your map** · [← Prefabs](14-prefabs.md)
+[Mapping API](README.md) › **15. Checking your map** · [← Prefabs](14-prefabs.md) · [Movers →](16-movers.md)
 
 # 15. Checking your map
 
@@ -61,4 +61,4 @@ broken or race-locked melon, and every `*_leave`.
 - [ ] `npm test` passes
 
 ---
-[← Prefabs](14-prefabs.md) · [Mapping API](README.md)
+[← Prefabs](14-prefabs.md) · [Mapping API](README.md) · [Movers →](16-movers.md)

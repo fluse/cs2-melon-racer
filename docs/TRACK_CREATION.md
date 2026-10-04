@@ -244,7 +244,8 @@ if you ever need more).
 
 ## Testing your track
 
-`melon_drive.js` currently runs with `DEBUG = true`, which logs every
+Set `DEBUG = true` in `src/melon_drive/core/debug.js` (off by default) and
+`npm run build` while testing a track: the script then logs every
 start/checkpoint/finish touch and race-flow transition to the console
 (`[melon_drive] ...`). While testing a new track, watch for lines like:
 

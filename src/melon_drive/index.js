@@ -24,6 +24,7 @@ import { Instance } from "cs_script/point_script";
 //   hud/       one file per HUD panel, button clicks
 //   fx/        particles, boost trail, guide line
 //   dev/       debug views
+//   world/     map entities kept running on their own (movers)
 // Tunables: each folder's constants.js, all re-exported by constants/index.js.
 
 import { Debug } from "./core/debug.js";
@@ -35,6 +36,7 @@ import { RegisterZoneInputs } from "./zones/index.js";
 import { phase, activeTrackId, phaseEndTime, RestoreRaceFlowSnapshot, RegisterRaceInputs } from "./race/index.js";
 import { RegisterHudInputs } from "./hud/index.js";
 import { RegisterAttackDebug } from "./dev/index.js";
+import { movers, RestoreMovers, RegisterMoverInputs } from "./world/index.js";
 
 Instance.SetThink(Think);
 Instance.SetNextThink(Instance.GetGameTime());
@@ -48,7 +50,7 @@ Instance.SetNextThink(Instance.GetGameTime());
 // reloading mid-heat during dev iteration doesn't strand locked racers in a
 // phase that's forgotten it's supposed to unlock/advance them.
 Instance.OnScriptReload({
-    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot }),
+    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers }),
     after: (memory) => {
         if (memory?.karts) {
             for (const [slot, kart] of memory.karts) {
@@ -56,6 +58,7 @@ Instance.OnScriptReload({
             }
             RestoreRaceFlowSnapshot(memory);
             SetModeratorSlot(memory.moderatorSlot);
+            RestoreMovers(memory.movers);
             Debug(`OnScriptReload: restored ${karts.size} kart(s), phase=${phase}, activeTrackId=${activeTrackId}, moderatorSlot=${moderatorSlot}`);
         }
     },
@@ -67,3 +70,4 @@ RegisterZoneInputs(); // heal/lift/camera/jump pad *_enter/*_leave, melon_telepo
 RegisterBreakInputs(); // melon_break
 RegisterHudInputs(); // OnCustomHudClicked
 RegisterAttackDebug();
+RegisterMoverInputs(); // OnActivate/OnRoundStart: start the func_movelinear movers

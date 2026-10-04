@@ -1,4 +1,4 @@
-// Script inputs of the zone triggers — heal, lift, camera and water zones, jump pads,
+// Script inputs of the zone triggers — heal, lift, camera, side-view and water zones, jump pads,
 // plus the teleporters (teleport/inputs.js). The zones all work
 // the same way: OnStartTouch -> "<kind>_enter", OnEndTouch -> "<kind>_leave",
 // and the touched trigger's own name may carry its value (heal_zone_<rate>,
@@ -10,6 +10,7 @@ import { FindKartByMelon } from "../core/kart-registry.js";
 import { HealZoneRate, PlayHealEffect } from "../health/heal/index.js";
 import { LiftZoneUpSpeed } from "./lift/logic.js";
 import { CameraZoneFromName } from "./camera-zone/logic.js";
+import { SideViewFromName } from "./side-view/logic.js";
 import { JumpPadFromName } from "./jump-pad/logic.js";
 import { StopInWater } from "./water/water.js";
 import { EnterZone, LeaveZone } from "./registry.js";
@@ -49,6 +50,8 @@ export function RegisterZoneInputs() {
     RegisterZone("lift_enter", "lift_leave", "liftZones", LiftZoneUpSpeed, "u/s up per bounce");
     // Camera zones — see CAMERA_ZONE_* in camera-zone/constants.js. Read by the zone camera (camera/zone-zoom/).
     RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
+    // Side-view zones — see side-view/constants.js. Read by UpdateKart (2D driving) and the side camera (camera/side-view/).
+    RegisterZone("side_view_enter", "side_view_leave", "sideViews", SideViewFromName, "yaw/distance/height");
     // Jump pads — see jump-pad/constants.js. Read by jump-pad/jump-pad.js (launch, no damage).
     RegisterZone("jump_pad_enter", "jump_pad_leave", "jumpPads", JumpPadFromName, "up/forward u/s");
     // Water zones (a trigger around a func_water) — see water/constants.js:

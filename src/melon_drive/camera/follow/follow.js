@@ -30,17 +30,23 @@ export function ApplyCameraFollow(kart) {
     kart.cameraWallScale = undefined;
     kart.appliedFollowKey = undefined;
     ApplyZonedFollowOffset(kart, 0);
+    // In a side-view zone the side camera (../side-view/) keeps the camera —
+    // the follow config above is only ready for when it hands back.
+    if ((kart.sideViewBlend ?? 0) > 0) {
+        camera.SetMode(CustomCameraMode.CONTROLLED);
+    }
     Debug(`ApplyCameraFollow: mode=${camera.GetMode()} for slot=${kart.pawn.GetPlayerController()?.GetPlayerSlot()}`);
 }
 
 /**
  * Per tick: the chase camera with every zoom and the wall pull-in eased on.
  * Left alone while the melon is breaking — the break camera owns it then,
- * and the respawn re-applies it — and in free look (dev/free-look.js).
+ * and the respawn re-applies it — in free look (dev/free-look.js) and while
+ * the side-view camera has it (../side-view/).
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 export function UpdateFollowCamera(kart, dt) {
-    if (kart.breaking || kart.freeLook) {
+    if (kart.breaking || kart.freeLook || (kart.sideViewBlend ?? 0) > 0) {
         return;
     }
     ApplyZonedFollowOffset(kart, dt);
@@ -55,7 +61,7 @@ export function UpdateFollowCamera(kart, dt) {
  */
 export function ApplyZonedFollowOffset(kart, dt) {
     const liftBlend = kart.liftCameraBlend ?? 0;
-    const offset = ZoneCameraOffset(LiftCameraOffset(GetCameraOffsetFor(kart), liftBlend), kart.zoneCamera);
+    const offset = ZonedFollowOffset(kart);
     const clips = liftBlend === 0 && ZoneCameraClips(kart.zoneCamera);
     if (!clips) {
         kart.cameraWallScale = undefined; // no wall pull-in out here; starts over once it's back on
@@ -67,6 +73,14 @@ export function ApplyZonedFollowOffset(kart, dt) {
     }
     SetFollowOffset(kart, placed, false);
     kart.appliedFollowKey = key;
+}
+
+/**
+ * The normal offset with both zone zooms on top, before the wall pull-in.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+export function ZonedFollowOffset(kart) {
+    return ZoneCameraOffset(LiftCameraOffset(GetCameraOffsetFor(kart), kart.liftCameraBlend ?? 0), kart.zoneCamera);
 }
 
 /**

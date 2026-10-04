@@ -30,7 +30,7 @@ CHANGELOG.md                             # player-facing changes per release (gi
 docs/TRACK_CREATION.md                   # step-by-step Hammer guide for a new track
 docs/valve/scripting_api.html            # saved copy of Valve's cs_script API wiki page (the site blocks automated fetches)
 docs/mapping-api/*.md                    # Mapping API (map↔script contract): README.md = index of every input/name/pattern,
-                                          #   01-…15-*.md one page per topic, each with setup / name-variant / "Values" tables
+                                          #   01-…16-*.md one page per topic, each with setup / name-variant / "Values" tables
 maps/melon_racer.vmap                    # main map (binary DMX, Hammer-authoritative)
 maps/prefabs/*.vmap                      # prefabs placed in melon_racer.vmap (hub, routes, gates, jump pads); the start/checkpoint/finish gates and jump_pad are set up by a
                                           #   map variable per copy (docs/mapping-api/14-prefabs.md) — test/helpers/vmap.mjs reads prefabs, overrides resolved
@@ -54,16 +54,19 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #   health/    damage/ (impacts, flat landings), breaking/ (break, effects at the crash site, respawn, melon_break),
                                           #              heal/ (heal zones, full health on respawn)
                                           #   zones/     registry.js (which zones a melon is in, the WallRules that follow), inputs.js (every *_enter/*_leave),
-                                          #              lift/, jump-pad/ (launch + no-damage flight), camera-zone/, water/ (stop on entry, no impacts inside),
+                                          #              lift/, jump-pad/ (launch + no-damage flight), camera-zone/, side-view/ (2D: screen-axis driving, plane lock),
+                                          #              water/ (stop on entry, no impacts inside),
                                           #              teleport/ (melon_teleport)
                                           #   race/      track-config.js (tracks from trigger names), checkpoints/ (progress, start_/checkpoint_/finish_ inputs),
                                           #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs)
-                                          #   camera/    follow/ (chase camera, the only SetFollowConfig), wall-clip/ (eased pull-in at walls), break-zoom/, lift-zoom/, zone-zoom/
+                                          #   camera/    follow/ (chase camera, the only SetFollowConfig), wall-clip/ (eased pull-in at walls), break-zoom/, lift-zoom/, zone-zoom/,
+                                          #              side-view/ (fixed side camera, CONTROLLED mode)
                                           #   hud/       layout.js (the custom_hud_layout), one file per panel: speedometer.js (speed panel: km/h, health bar, jump dots), bounce-panel.js,
                                           #              track.js (time trial + checkpoint strip), hub-modal.js, user-menu.js; inputs.js (every button click)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
                                           #              boost-trail/, prediction/ (the guide line)
                                           #   dev/       collision-debug.js (the user-menu collision debug view), free-look.js (the user-menu free look), attack-debug.js
+                                          #   world/     mover/ (func_movelinear "mover…" started and kept going back and forth)
 src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
 test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one folder per src/melon_drive/ domain (movement/, race/, …): unit tests
                                           #   for the pure files, engine-side tests against the fake engine (filed under the domain they're mainly about)

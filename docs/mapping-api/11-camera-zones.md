@@ -4,7 +4,8 @@
 
 Areas where the chase camera zooms out (overview of a big jump, an open
 hall), in (tight tunnels), moves in front of the melon or right up behind
-it.
+it — or, in a [side-view zone](#side-view-zones), looks at it from one side
+like a 2D jump & run.
 
 | Setting | Value |
 |---|---|
@@ -78,6 +79,57 @@ floor keep pulling it back in, use `camera_zone_noclip_front_…`.
   [lift zone](10-lift-zones.md)'s zoom does add on top.
 - Teleports and respawns keep the melon in its zones — respawning inside a
   camera zone keeps its zoom.
+
+## Side-view zones
+
+A 2D jump & run section: the camera stops following the mouse and looks at
+the melon from one fixed side, at a set distance. A/D drive left/right on
+screen, W drives the way the melon faces, S the other way, Space jumps. The
+melon stays on the plane it entered on — nothing moves it towards or away
+from the camera.
+
+| Setting | Value |
+|---|---|
+| Class | `trigger_multiple` ([standard setup](01-conventions.md#3-every-melon-trigger-is-set-up-the-same-way)) |
+| Name | `side_view_<yaw>[_<distance>[_<height>]]`, or anything for the defaults |
+| Pattern | `^side_view_(-?\d+(?:\.\d+)?)(?:_(\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?)?$` |
+| `OnStartTouch` | → `melon_drive_script` → `RunScriptInput` → `side_view_enter` |
+| `OnEndTouch` | → `melon_drive_script` → `RunScriptInput` → `side_view_leave` |
+
+Both outputs are required.
+
+| Name | Example | Camera |
+|---|---|---|
+| `side_view_<yaw>` | `side_view_90` | looks north (Hammer yaw 90), 300 away, 40 above the melon's center — D drives east |
+| `side_view_<yaw>_<distance>` | `side_view_0_500` | looks east from 500 away — D drives south |
+| `side_view_<yaw>_<distance>_<height>` | `side_view_180_250_0` | looks west from 250 away, level with the melon |
+| any other name | — | yaw 90, 300 away, 40 above |
+
+`<yaw>` is the way the camera **looks** (Hammer's yaw: 0 = +x, 90 = +y);
+screen right is `<yaw>` − 90. The camera always aims at the melon, so a
+`<height>` looks down at it (negative: up from below). Build the section
+along the screen axis — the trigger should cover the whole of it, with a
+bit of room above for jumps.
+
+- Entering, the camera swings from behind the melon to the side over
+  `SIDE_VIEW_EASE_SECONDS`; leaving, the player's view is turned the way the
+  melon was facing on screen and the camera swings back behind it.
+- Walls don't pull the side camera in: keep the space between the track and
+  the camera clear (or let it look through a wall on purpose).
+- Overlapping side-view zones: the one entered last counts; entering a new
+  one starts on the plane the melon is on right then. Normal camera and lift
+  zones have no effect while the side view is on.
+- While the melon breaks, the camera stays put watching the crash site;
+  respawning inside the zone keeps the side view.
+
+| Constant | Value | Meaning | Defined in |
+|---|---|---|---|
+| `SIDE_VIEW_DEFAULT_YAW` | 90° | yaw for a name without numbers | `zones/side-view/constants.js` |
+| `SIDE_VIEW_DISTANCE` | 300 units | distance without a number | `zones/side-view/constants.js` |
+| `SIDE_VIEW_HEIGHT` | 40 units | height without a number | `zones/side-view/constants.js` |
+| `SIDE_VIEW_PLANE_PULL` | 6 /s | how fast a drift off the plane is pulled back | `zones/side-view/constants.js` |
+| `SIDE_VIEW_PLANE_MAX_SPEED` | 200 u/s | that pull at most | `zones/side-view/constants.js` |
+| `SIDE_VIEW_EASE_SECONDS` | 0.8 s | swing to the side and back | `camera/side-view/constants.js` |
 
 ---
 [← Lift zones](10-lift-zones.md) · [Mapping API](README.md) · [Jump pads →](12-jump-pads.md)

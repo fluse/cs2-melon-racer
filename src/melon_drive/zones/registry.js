@@ -2,7 +2,8 @@
 // read by ../heal/), lift zones (lift_enter/lift_leave, zones/lift/constants.js) and
 // camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in camera-zone/constants.js)
 // jump pads (jump_pad_enter/jump_pad_leave, zones/jump-pad/constants.js)
-// and water zones (water_enter/water_leave, zones/water/constants.js):
+// water zones (water_enter/water_leave, zones/water/constants.js)
+// and side-view zones (side_view_enter/side_view_leave, zones/side-view/constants.js):
 // entering/leaving them (registered in inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.
 // Each kind is a Map on the kart: trigger entity -> its value (heal rate in
@@ -10,7 +11,7 @@
 // tracked separately.
 import { WallRules } from "./lift/logic.js";
 
-/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones"} ZoneKind */
+/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews"} ZoneKind */
 
 /**
  * The melon entered a zone trigger of this kind, worth `value`.
@@ -40,6 +41,7 @@ export function LeaveZones(kart) {
     kart.cameraZones?.clear();
     kart.jumpPads?.clear();
     kart.waterZones?.clear();
+    kart.sideViews?.clear();
 }
 
 /**
@@ -98,6 +100,16 @@ export function CurrentJumpPad(kart) {
  */
 export function CurrentCameraZone(kart) {
     return LatestZone(kart, "cameraZones");
+}
+
+/**
+ * The side view of the side-view zone the melon entered last (of those it's
+ * still inside), or undefined if none.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ * @returns {import("./side-view/logic.js").SideView | undefined}
+ */
+export function CurrentSideView(kart) {
+    return LatestZone(kart, "sideViews");
 }
 
 /**

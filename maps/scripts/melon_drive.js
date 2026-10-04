@@ -2,7 +2,7 @@
 import { Instance, CustomCameraMode, PointTemplate, CSMoveType, CSInputs } from 'cs_script/point_script';
 
 // Toggle to false once driving works to quiet the console back down.
-const DEBUG = true;
+const DEBUG = false;
 // (The jump/contact debug view is separate — toggled per player from the
 // user menu, see dev/collision-debug.js.)
 
@@ -107,6 +107,10 @@ function TraceSphere(config) {
  *   padFlight?: import("../zones/jump-pad/logic.js").PadFlight, // a jump pad launch's damage protection, still on — see zones/jump-pad/jump-pad.js
  *   cameraZones?: Map<any, import("../zones/camera-zone/logic.js").CameraZone>, // camera triggers the melon is inside -> their zoom, see zones/registry.js
  *   zoneCamera?: import("../zones/camera-zone/logic.js").ZoneCameraState, // the camera-zone zoom being eased in/out — see UpdateZoneCamera
+ *   sideViews?: Map<any, import("../zones/side-view/logic.js").SideView>, // side-view triggers the melon is inside -> their view, see zones/registry.js
+ *   sideViewDrive?: { zone: import("../zones/side-view/logic.js").SideView, plane: number, facing: 1 | -1 }, // the side view being driven in: its plane and which way the melon faces on screen — see UpdateKart
+ *   sideViewBlend?: number, // 0..1, how far the camera has swung to the side — see UpdateSideViewCamera
+ *   sideViewZone?: import("../zones/side-view/logic.js").SideView, sideViewLast?: import("../zones/side-view/logic.js").SideView, // the side view the camera is in / swinging out of — see UpdateSideViewCamera
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
  * }} Kart
  */
@@ -1190,6 +1194,44 @@ const CAMERA_CLOSEUP_HEIGHT = 4;
 // Higher: a slow, dramatic push-in. Lower: snaps in.
 const CAMERA_CLOSEUP_EASE_SECONDS = 1.2;
 
+// Side-view zones (docs/mapping-api/11-camera-zones.md#side-view-zones): a
+// trigger_multiple (filtered to prop_physics) with OnStartTouch ->
+// RunScriptInput "side_view_enter" and OnEndTouch -> "side_view_leave". While
+// the melon is inside, it's played like a 2D jump & run: the camera stops
+// following the mouse and looks at the melon from one side, A/D drive
+// left/right on screen, and the melon stays on the plane it entered on (no
+// movement towards or away from the camera). The camera part is in
+// camera/side-view/. The values come from the name:
+//   side_view_<yaw>                       camera looks along <yaw> (Hammer yaw: 0 = +x/east,
+//                                         90 = +y/north) — screen right is then <yaw> - 90,
+//                                         e.g. side_view_90: looks north, D drives east
+//   side_view_<yaw>_<distance>            ... from <distance> units away
+//   side_view_<yaw>_<distance>_<height>   ... and <height> units above the melon's center,
+//                                         looking down at it (negative: from below)
+// Any other name: SIDE_VIEW_DEFAULT_YAW, SIDE_VIEW_DISTANCE, SIDE_VIEW_HEIGHT.
+// Overlapping zones: the one entered last counts.
+const SIDE_VIEW_NAME_PATTERN = /^side_view_(-?\d+(?:\.\d+)?)(?:_(\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?)?$/;
+const SIDE_VIEW_DEFAULT_YAW = 90; // degrees, for a zone without values in its name
+// How far from the melon the camera sits, without a distance in the name.
+// Higher: more of the level in view, the melon gets smaller on screen.
+const SIDE_VIEW_DISTANCE = 300; // units
+// How high above the melon's center it sits, without a height in the name —
+// it always looks at the melon, so higher = looking down at it more.
+const SIDE_VIEW_HEIGHT = 40; // units
+// Keeping the melon on its plane: whatever pushes it towards or away from the
+// camera (a slanted wall, a bump) is cancelled every tick, and a melon that
+// has drifted off the plane anyway is pulled back at this rate (1/s: the
+// drift is gone to ~1/e after 1/SIDE_VIEW_PLANE_PULL seconds) ...
+const SIDE_VIEW_PLANE_PULL = 6;
+// ... but never faster than this.
+const SIDE_VIEW_PLANE_MAX_SPEED = 200; // units/sec
+
+// Side-view camera (zones/side-view/constants.js): how it takes over from the
+// chase camera and hands back.
+// Seconds the camera takes to swing from behind the melon to the side (and
+// back after leaving). Higher: a slower, smoother swing. 0: cuts.
+const SIDE_VIEW_EASE_SECONDS = 0.8;
+
 // Debug output timing.
 
 // Think's debug heartbeat log interval — see core/think.js.
@@ -1202,6 +1244,22 @@ const HEARTBEAT_INTERVAL = 1; // seconds
 // Switching it on puts those eyes where the chase camera was: the pawn's
 // origin goes FREE_LOOK_EYE_HEIGHT below that spot (CS2's standing eye height).
 const FREE_LOOK_EYE_HEIGHT = 64;
+
+// Movers: a func_movelinear whose name starts with "mover" goes back and
+// forth on its own — the script starts it (Open) when the map loads and
+// after every round restart, and turns it round at each end (OnFullyOpen ->
+// Close, OnFullyClosed -> Open). No logic_auto or outputs in Hammer needed:
+// direction, distance and speed are the func_movelinear's own keyvalues.
+// Rule: world/mover/logic.js, applied by world/mover/mover.js.
+
+// The class the script looks for movers in.
+const MOVER_CLASS = "func_movelinear";
+// "mover", "mover_<anything>" or "mover_wait<seconds>[_<anything>]"
+// (e.g. "mover_wait1.5_left"): the wait is how long it stands still at each
+// end before turning round; without one, MOVER_DEFAULT_WAIT.
+const MOVER_NAME_PATTERN = /^mover(?:_wait(\d+(?:\.\d+)?))?(?:_.*)?$/;
+// Seconds a mover without "_wait<seconds>" in its name stands at each end.
+const MOVER_DEFAULT_WAIT = 0;
 
 // All tunable numbers and static/Hammer-naming-convention data for
 // melon_drive, one file per system they configure. Import from here, not
@@ -1512,17 +1570,23 @@ function ApplyCameraFollow(kart) {
     kart.cameraWallScale = undefined;
     kart.appliedFollowKey = undefined;
     ApplyZonedFollowOffset(kart, 0);
+    // In a side-view zone the side camera (../side-view/) keeps the camera —
+    // the follow config above is only ready for when it hands back.
+    if ((kart.sideViewBlend ?? 0) > 0) {
+        camera.SetMode(CustomCameraMode.CONTROLLED);
+    }
     Debug(`ApplyCameraFollow: mode=${camera.GetMode()} for slot=${kart.pawn.GetPlayerController()?.GetPlayerSlot()}`);
 }
 
 /**
  * Per tick: the chase camera with every zoom and the wall pull-in eased on.
  * Left alone while the melon is breaking — the break camera owns it then,
- * and the respawn re-applies it — and in free look (dev/free-look.js).
+ * and the respawn re-applies it — in free look (dev/free-look.js) and while
+ * the side-view camera has it (../side-view/).
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 function UpdateFollowCamera(kart, dt) {
-    if (kart.breaking || kart.freeLook) {
+    if (kart.breaking || kart.freeLook || (kart.sideViewBlend ?? 0) > 0) {
         return;
     }
     ApplyZonedFollowOffset(kart, dt);
@@ -1537,7 +1601,7 @@ function UpdateFollowCamera(kart, dt) {
  */
 function ApplyZonedFollowOffset(kart, dt) {
     const liftBlend = kart.liftCameraBlend ?? 0;
-    const offset = ZoneCameraOffset(LiftCameraOffset(GetCameraOffsetFor(kart), liftBlend), kart.zoneCamera);
+    const offset = ZonedFollowOffset(kart);
     const clips = liftBlend === 0 && ZoneCameraClips(kart.zoneCamera);
     if (!clips) {
         kart.cameraWallScale = undefined; // no wall pull-in out here; starts over once it's back on
@@ -1549,6 +1613,14 @@ function ApplyZonedFollowOffset(kart, dt) {
     }
     SetFollowOffset(kart, placed, false);
     kart.appliedFollowKey = key;
+}
+
+/**
+ * The normal offset with both zone zooms on top, before the wall pull-in.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function ZonedFollowOffset(kart) {
+    return ZoneCameraOffset(LiftCameraOffset(GetCameraOffsetFor(kart), kart.liftCameraBlend ?? 0), kart.zoneCamera);
 }
 
 /**
@@ -1740,14 +1812,15 @@ function LiftZoneUpSpeed(triggerName) {
 // read by ../heal/), lift zones (lift_enter/lift_leave, zones/lift/constants.js) and
 // camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in camera-zone/constants.js)
 // jump pads (jump_pad_enter/jump_pad_leave, zones/jump-pad/constants.js)
-// and water zones (water_enter/water_leave, zones/water/constants.js):
+// water zones (water_enter/water_leave, zones/water/constants.js)
+// and side-view zones (side_view_enter/side_view_leave, zones/side-view/constants.js):
 // entering/leaving them (registered in inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.
 // Each kind is a Map on the kart: trigger entity -> its value (heal rate in
 // health/s, lift kick in u/s, camera zoom), so overlapping zones and their leaves are
 // tracked separately.
 
-/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones"} ZoneKind */
+/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews"} ZoneKind */
 
 /**
  * The melon entered a zone trigger of this kind, worth `value`.
@@ -1777,6 +1850,7 @@ function LeaveZones(kart) {
     kart.cameraZones?.clear();
     kart.jumpPads?.clear();
     kart.waterZones?.clear();
+    kart.sideViews?.clear();
 }
 
 /**
@@ -1838,6 +1912,16 @@ function CurrentCameraZone(kart) {
 }
 
 /**
+ * The side view of the side-view zone the melon entered last (of those it's
+ * still inside), or undefined if none.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ * @returns {import("./side-view/logic.js").SideView | undefined}
+ */
+function CurrentSideView(kart) {
+    return LatestZone(kart, "sideViews");
+}
+
+/**
  * The value of the zone of this kind the melon entered last (of those it's
  * still inside), or undefined if none. Zone entities that no longer exist
  * are dropped.
@@ -1891,11 +1975,156 @@ function UpdateZoneCamera(kart, dt) {
     kart.zoneCamera = StepZoneCamera(kart.zoneCamera, CurrentCameraZone(kart) ?? NO_CAMERA_ZONE, dt);
 }
 
-// Chase camera — one folder per feature: follow/ (the normal chase camera and
-// the one place that writes the follow config), wall-clip/ (eased pull-in at
-// walls), break-zoom/ (pull-back on a break), lift-zoom/ (zoom-out in lift
-// zones), zone-zoom/ (zoom in/out in camera zones). Other parts of
-// melon_drive import from here.
+// Pure rules for side-view zones — no cs_script import, so it's unit-testable
+// in Node (see test/zones/side-view.test.mjs). movement/driving/drive.js
+// applies the driving part, camera/side-view/ the camera.
+
+/** @typedef {{ yaw: number, distance: number, height: number }} SideView where the camera looks from */
+/** @typedef {{ x: number, y: number }} Dir2 a horizontal unit direction */
+
+/**
+ * The side view a trigger sets up, from its name (see SIDE_VIEW_NAME_PATTERN),
+ * else the SIDE_VIEW_* defaults.
+ * @param {string} triggerName @returns {SideView}
+ */
+function SideViewFromName(triggerName) {
+    const match = SIDE_VIEW_NAME_PATTERN.exec(triggerName.trim());
+    if (!match) {
+        return { yaw: SIDE_VIEW_DEFAULT_YAW, distance: SIDE_VIEW_DISTANCE, height: SIDE_VIEW_HEIGHT };
+    }
+    return {
+        yaw: Number(match[1]),
+        distance: match[2] === undefined ? SIDE_VIEW_DISTANCE : Number(match[2]),
+        height: match[3] === undefined ? SIDE_VIEW_HEIGHT : Number(match[3]),
+    };
+}
+
+/**
+ * The side view's two horizontal axes: `view` = the way the camera looks
+ * (into the screen), `right` = screen right, the way D drives.
+ * @param {number} yaw @returns {{ view: Dir2, right: Dir2 }}
+ */
+function SideViewAxes(yaw) {
+    const rad = (yaw * Math.PI) / 180;
+    return {
+        view: { x: Math.cos(rad), y: Math.sin(rad) },
+        right: { x: Math.sin(rad), y: -Math.cos(rad) },
+    };
+}
+
+/**
+ * Which way the melon faces on screen when it enters a side view: the way
+ * it's moving along the screen axis, right if it isn't.
+ * @param {{ x: number, y: number }} velocity @param {Dir2} right @returns {1 | -1}
+ */
+function InitialFacing(velocity, right) {
+    return velocity.x * right.x + velocity.y * right.y < 0 ? -1 : 1;
+}
+
+/**
+ * Driving input in a side view. A/D drive left/right on screen and turn the
+ * melon that way; W drives the way it faces, S the other way (without
+ * turning it). The mouse does nothing.
+ * @param {number} forwardInput W/S, -1..1 @param {number} strafeInput D/A, -1..1 @param {1 | -1} facing
+ * @returns {{ axis: number, facing: 1 | -1 }} axis: -1..1 along screen right (0 = no input)
+ */
+function SideViewInput(forwardInput, strafeInput, facing) {
+    if (strafeInput !== 0) {
+        return { axis: strafeInput, facing: strafeInput < 0 ? -1 : 1 };
+    }
+    return { axis: forwardInput * facing, facing };
+}
+
+/** How far along `view` (towards the camera's far side) a point is. @param {{ x: number, y: number }} origin @param {Dir2} view */
+function PlaneDepth(origin, view) {
+    return origin.x * view.x + origin.y * view.y;
+}
+
+/**
+ * Horizontal velocity `v` kept on the side view's plane: its part towards or
+ * away from the camera is dropped, replaced by a pull back onto the plane
+ * (SIDE_VIEW_PLANE_PULL, at most SIDE_VIEW_PLANE_MAX_SPEED).
+ * @param {{ x: number, y: number }} v @param {Dir2} view
+ * @param {number} depthError plane depth minus the melon's depth (see PlaneDepth)
+ * @returns {{ x: number, y: number }}
+ */
+function KeepOnPlane(v, view, depthError) {
+    const depth = v.x * view.x + v.y * view.y;
+    const pull = Math.max(-SIDE_VIEW_PLANE_MAX_SPEED, Math.min(SIDE_VIEW_PLANE_MAX_SPEED, depthError * SIDE_VIEW_PLANE_PULL));
+    return { x: v.x + view.x * (pull - depth), y: v.y + view.y * (pull - depth) };
+}
+
+// Pure rules for the side-view camera — no cs_script import, so it's
+// unit-testable in Node (see test/camera/side-view.test.mjs). side-view.js
+// next to it places the camera.
+
+/**
+ * @typedef {{ position: { x: number, y: number, z: number }, angles: { pitch: number, yaw: number, roll: number } }} CameraPose
+ */
+
+/**
+ * How far the camera has swung to the side after `dt` more seconds, 0 (chase
+ * camera) to 1 (side view): linearly towards 1 inside a side-view zone and
+ * towards 0 outside, SIDE_VIEW_EASE_SECONDS for the whole way.
+ * @param {number} blend @param {boolean} inSideView @param {number} dt
+ */
+function StepSideViewBlend(blend, inSideView, dt) {
+    const step = SIDE_VIEW_EASE_SECONDS > 0 ? Math.max(0, dt) / SIDE_VIEW_EASE_SECONDS : 1;
+    return inSideView ? Math.min(1, blend + step) : Math.max(0, blend - step);
+}
+
+/**
+ * The side camera: `distance` back from `target` against the view direction
+ * and `height` above it, looking at it.
+ * @param {{ x: number, y: number, z: number }} target the melon's center
+ * @param {import("../../zones/side-view/logic.js").SideView} sideView @returns {CameraPose}
+ */
+function SideViewPose(target, sideView) {
+    const { view } = SideViewAxes(sideView.yaw);
+    return {
+        position: {
+            x: target.x - view.x * sideView.distance,
+            y: target.y - view.y * sideView.distance,
+            z: target.z + sideView.height,
+        },
+        // Pitch positive = looking down, as in Source.
+        angles: { pitch: (Math.atan2(sideView.height, sideView.distance) * 180) / Math.PI, yaw: sideView.yaw, roll: 0 },
+    };
+}
+
+/**
+ * Where the chase camera (FOLLOW_POSITION) is: `offset` from `pivot`, turned
+ * by the eye angles, looking along them.
+ * @param {{ x: number, y: number, z: number }} pivot the melon + FOLLOW_OFFSET
+ * @param {{ x: number, y: number, z: number }} offset @param {{ pitch: number, yaw: number }} eyeAngles
+ * @returns {CameraPose}
+ */
+function ChaseCameraPose(pivot, offset, eyeAngles) {
+    const d = RotateCameraOffset(offset, eyeAngles);
+    return {
+        position: { x: pivot.x + d.x, y: pivot.y + d.y, z: pivot.z + d.z },
+        angles: { pitch: eyeAngles.pitch, yaw: eyeAngles.yaw, roll: 0 },
+    };
+}
+
+/**
+ * `from` -> `to` at `t` (0..1, smoothstep-eased); the yaw turns the short way round.
+ * @param {CameraPose} from @param {CameraPose} to @param {number} t @returns {CameraPose}
+ */
+function BlendPose(from, to, t) {
+    const c = Math.max(0, Math.min(1, t));
+    const e = c * c * (3 - 2 * c);
+    const lerp = (/** @type {number} */ a, /** @type {number} */ b) => a + (b - a) * e;
+    const yawDiff = ((((to.angles.yaw - from.angles.yaw) % 360) + 540) % 360) - 180;
+    return {
+        position: {
+            x: lerp(from.position.x, to.position.x),
+            y: lerp(from.position.y, to.position.y),
+            z: lerp(from.position.z, to.position.z),
+        },
+        angles: { pitch: lerp(from.angles.pitch, to.angles.pitch), yaw: from.angles.yaw + yawDiff * e, roll: 0 },
+    };
+}
 
 // Pure rules for generic teleporters — no cs_script import, so it's
 // unit-testable in Node (see test/zones/teleport.test.mjs). zones/teleport/inputs.js's
@@ -1959,6 +2188,98 @@ function TeleportExitVelocity(velocity, destinationYaw, keepSpeed = TELEPORT_KEE
     const rad = (destinationYaw * Math.PI) / 180;
     return { x: Math.cos(rad) * speed, y: Math.sin(rad) * speed, z: 0 };
 }
+
+// Side-view camera: while the melon is in a side-view zone
+// (zones/side-view/), the camera stops chasing it along the mouse and looks
+// at it from one side, like a 2D jump & run. The camera is switched to
+// CONTROLLED mode and placed by script every tick; it swings over from the
+// chase camera and back (SIDE_VIEW_EASE_SECONDS, the math in logic.js).
+
+/** Whether the side-view camera has the camera (also while swinging in or out). @param {import("../../core/kart-registry.js").Kart} kart */
+function SideViewCameraOn(kart) {
+    return (kart.sideViewBlend ?? 0) > 0;
+}
+
+/**
+ * Per tick: swings the camera to the side while the melon is in a side-view
+ * zone and back to the chase camera after it leaves. Left alone while the
+ * melon is breaking — the camera just stays where it was, watching the crash
+ * site — and in free look (dev/free-look.js).
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
+ */
+function UpdateSideViewCamera(kart, dt) {
+    if (kart.breaking || kart.freeLook) {
+        return;
+    }
+    const zone = CurrentSideView(kart);
+    if (!zone && kart.sideViewZone) {
+        LookAlongTravel(kart, kart.sideViewZone);
+    }
+    if (zone) {
+        kart.sideViewZone = zone;
+    }
+    const before = kart.sideViewBlend ?? 0;
+    const blend = StepSideViewBlend(before, Boolean(zone), dt);
+    kart.sideViewBlend = blend;
+    if (!zone) {
+        kart.sideViewZone = undefined;
+    }
+    if (blend === 0) {
+        if (before > 0) {
+            kart.sideViewLast = undefined;
+            ApplyCameraFollow(kart); // back to the chase camera
+        }
+        return;
+    }
+    const sideView = kart.sideViewZone ?? kart.sideViewLast;
+    if (!sideView) {
+        return;
+    }
+    kart.sideViewLast = sideView; // swinging back out: from the zone just left
+    const camera = kart.pawn.GetCustomCamera();
+    if (camera.GetMode() !== CustomCameraMode.CONTROLLED) {
+        camera.SetMode(CustomCameraMode.CONTROLLED);
+        Debug(`side view: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} camera to the side (yaw ${sideView.yaw})`);
+    }
+    const origin = kart.melon.GetAbsOrigin();
+    const side = SideViewPose(origin, sideView);
+    const pose =
+        blend >= 1
+            ? side
+            : BlendPose(
+                  ChaseCameraPose(
+                      { x: origin.x + FOLLOW_OFFSET.x, y: origin.y + FOLLOW_OFFSET.y, z: origin.z + FOLLOW_OFFSET.z },
+                      ZonedFollowOffset(kart),
+                      kart.pawn.GetEyeAngles()
+                  ),
+                  side,
+                  blend
+              );
+    camera.Move({ position: pose.position, angles: pose.angles });
+}
+
+/**
+ * Leaving a side view: turns the player's view the way the melon goes on
+ * screen — steering follows the view again, and the mouse may have pointed
+ * anywhere meanwhile. The chase camera then swings in behind it.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {import("../../zones/side-view/logic.js").SideView} sideView
+ */
+function LookAlongTravel(kart, sideView) {
+    if (!kart.pawn.IsValid()) {
+        return;
+    }
+    const { right } = SideViewAxes(sideView.yaw);
+    const facing = kart.sideViewDrive?.facing ?? 1;
+    const yaw = (Math.atan2(right.y * facing, right.x * facing) * 180) / Math.PI;
+    kart.pawn.Teleport({ angles: ViewAnglesFacing(kart.pawn.GetEyeAngles(), yaw) });
+}
+
+// Chase camera — one folder per feature: follow/ (the normal chase camera and
+// the one place that writes the follow config), wall-clip/ (eased pull-in at
+// walls), break-zoom/ (pull-back on a break), lift-zoom/ (zoom-out in lift
+// zones), zone-zoom/ (zoom in/out in camera zones), side-view/ (the fixed
+// side camera in side-view zones). Other parts of
+// melon_drive import from here.
 
 // Pure spawn-point rules — no cs_script import, so they're unit-testable in
 // Node (test/kart/spawn-points-logic.test.mjs). Applied by kart/spawn-points.js.
@@ -6891,9 +7212,13 @@ function UpdateKart(slot, kart, dt) {
 
     // Direction comes from the player's look direction (mouse), not a
     // separate turn control — this is what makes it "free-look" driving.
+    // In a side-view zone (2D jump & run) it's the screen axis instead.
+    const sideView = SideViewDriving(kart, origin, currentVelocity, forwardInput, strafeInput);
     const rad = (pawn.GetEyeAngles().yaw * Math.PI) / 180;
-    const forwardDir = { x: Math.cos(rad), y: Math.sin(rad) };
+    const forwardDir = sideView ? sideView.forwardDir : { x: Math.cos(rad), y: Math.sin(rad) };
     const rightDir = { x: Math.sin(rad), y: -Math.cos(rad) };
+    const driveForward = sideView ? sideView.forwardInput : forwardInput;
+    const driveStrafe = sideView ? 0 : strafeInput;
 
     // After a wall bounce, steering/friction apply on top of the reflected
     // velocity rather than whatever vphysics left behind — so the player can
@@ -6918,17 +7243,17 @@ function UpdateKart(slot, kart, dt) {
     // towards the look direction — on the ground and (at STEER_AIR_GRIP_RATE)
     // in the air. Not on a bounce tick — the reflected velocity is the
     // bounce's result and stays as computed.
-    if (forwardInput > 0 && !bounceVelocity) {
+    if (driveForward > 0 && !bounceVelocity) {
         const gripRate = grounded ? STEER_GRIP_RATE : STEER_AIR_GRIP_RATE;
         const steered = SteerTowards({ x: vx, y: vy }, forwardDir, gripRate * dt, STEER_GRIP_MAX_ANGLE);
         vx = steered.x;
         vy = steered.y;
     }
 
-    if (forwardInput !== 0 || strafeInput !== 0) {
-        const forwardAccel = forwardInput > 0 ? FORWARD_ACCEL : REVERSE_ACCEL;
-        let ax = forwardDir.x * forwardInput * forwardAccel + rightDir.x * strafeInput * STRAFE_ACCEL;
-        let ay = forwardDir.y * forwardInput * forwardAccel + rightDir.y * strafeInput * STRAFE_ACCEL;
+    if (driveForward !== 0 || driveStrafe !== 0) {
+        const forwardAccel = driveForward > 0 ? FORWARD_ACCEL : REVERSE_ACCEL;
+        let ax = forwardDir.x * driveForward * forwardAccel + rightDir.x * driveStrafe * STRAFE_ACCEL;
+        let ay = forwardDir.y * driveForward * forwardAccel + rightDir.y * driveStrafe * STRAFE_ACCEL;
         vx += ax * dt;
         vy += ay * dt;
     } else if (!boost.boosting) {
@@ -6964,6 +7289,12 @@ function UpdateKart(slot, kart, dt) {
     vx = v.x;
     vy = v.y;
     const vz = v.z;
+    // Side view: nothing moves the melon towards or away from the camera.
+    if (sideView) {
+        const kept = KeepOnPlane({ x: vx, y: vy }, sideView.view, sideView.depthError);
+        vx = kept.x;
+        vy = kept.y;
+    }
 
     // Normally the melon's momentum top speed (MAX_SPEED plus whatever
     // repeatedly reaching it has earned, see MOMENTUM_*), but a wall bounce
@@ -6994,6 +7325,36 @@ function UpdateKart(slot, kart, dt) {
     kart.prevLastVelocity = kart.lastVelocity;
     kart.prevOrigin = origin;
     kart.lastVelocity = { x: vx, y: vy, z: vz };
+}
+
+/**
+ * Driving in a side-view zone (zones/side-view/): the screen axis instead of
+ * the look direction, A/D left/right on screen, W the way the melon faces
+ * (see SideViewInput), and how far it's off the plane it entered on.
+ * undefined outside one. Entering a (new) zone starts on the plane the melon
+ * is on, facing the way it moves.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @param {{ x: number, y: number, z: number }} origin @param {{ x: number, y: number, z: number }} velocity
+ * @param {number} forwardInput @param {number} strafeInput
+ */
+function SideViewDriving(kart, origin, velocity, forwardInput, strafeInput) {
+    const zone = CurrentSideView(kart);
+    if (!zone) {
+        return undefined; // kart.sideViewDrive stays: the camera turns the view along its facing on the way out
+    }
+    const { view, right } = SideViewAxes(zone.yaw);
+    if (kart.sideViewDrive?.zone !== zone) {
+        kart.sideViewDrive = { zone, plane: PlaneDepth(origin, view), facing: InitialFacing(velocity, right) };
+    }
+    const input = SideViewInput(forwardInput, strafeInput, kart.sideViewDrive.facing);
+    kart.sideViewDrive.facing = input.facing;
+    const dir = input.axis !== 0 ? Math.sign(input.axis) : input.facing;
+    return {
+        forwardDir: { x: right.x * dir, y: right.y * dir },
+        forwardInput: Math.abs(input.axis),
+        view,
+        depthError: kart.sideViewDrive.plane - PlaneDepth(origin, view),
+    };
 }
 
 // Everything that moves a kart's melon each tick, one folder per mechanic:
@@ -7184,6 +7545,7 @@ function Think() {
             UpdateKart(slot, kart, dt);
             UpdateLiftCamera(kart, dt);
             UpdateZoneCamera(kart, dt);
+            UpdateSideViewCamera(kart, dt);
             UpdateFollowCamera(kart, dt);
             UpdatePrediction(kart, dt);
             UpdateBoostTrail(kart);
@@ -7409,7 +7771,7 @@ function RegisterTeleportInput() {
     });
 }
 
-// Script inputs of the zone triggers — heal, lift, camera and water zones, jump pads,
+// Script inputs of the zone triggers — heal, lift, camera, side-view and water zones, jump pads,
 // plus the teleporters (teleport/inputs.js). The zones all work
 // the same way: OnStartTouch -> "<kind>_enter", OnEndTouch -> "<kind>_leave",
 // and the touched trigger's own name may carry its value (heal_zone_<rate>,
@@ -7450,6 +7812,8 @@ function RegisterZoneInputs() {
     RegisterZone("lift_enter", "lift_leave", "liftZones", LiftZoneUpSpeed, "u/s up per bounce");
     // Camera zones — see CAMERA_ZONE_* in camera-zone/constants.js. Read by the zone camera (camera/zone-zoom/).
     RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
+    // Side-view zones — see side-view/constants.js. Read by UpdateKart (2D driving) and the side camera (camera/side-view/).
+    RegisterZone("side_view_enter", "side_view_leave", "sideViews", SideViewFromName, "yaw/distance/height");
     // Jump pads — see jump-pad/constants.js. Read by jump-pad/jump-pad.js (launch, no damage).
     RegisterZone("jump_pad_enter", "jump_pad_leave", "jumpPads", JumpPadFromName, "up/forward u/s");
     // Water zones (a trigger around a func_water) — see water/constants.js:
@@ -7459,7 +7823,7 @@ function RegisterZoneInputs() {
 }
 
 // Map triggers that change what a melon does while it's inside: lift/,
-// jump-pad/, camera-zone/, water/ (heal zones are in health/heal/), plus the
+// jump-pad/, camera-zone/, side-view/, water/ (heal zones are in health/heal/), plus the
 // teleporters (teleport/). registry.js tracks which zones a melon is in;
 // inputs.js registers every *_enter/*_leave and melon_teleport input.
 
@@ -7537,6 +7901,103 @@ function RegisterRaceInputs() {
 // Developer aids only: the user menu's collision debug view (collision-debug.js),
 // its free look (free-look.js) and the attack button log (attack-debug.js, with DEBUG on).
 
+// Movers (MOVER_* in world/mover/constants.js). Pure rules, no cs_script
+// import; world/mover/mover.js applies them (test/world/mover.test.mjs).
+
+/**
+ * A mover's config from its entity name, or undefined if the name doesn't
+ * make it one.
+ * @param {string} name
+ * @returns {{ wait: number } | undefined} wait: seconds it stands at each end
+ */
+function ParseMoverName(name) {
+    const match = MOVER_NAME_PATTERN.exec(name);
+    if (!match) {
+        return undefined;
+    }
+    return { wait: match[1] === undefined ? MOVER_DEFAULT_WAIT : Number(match[1]) };
+}
+
+// Starting the map's movers and keeping them going back and forth (see
+// world/mover/constants.js). Each mover's output connections are kept here,
+// by entity, so one is never set up twice and a hot reload can swap them
+// for its new callbacks.
+
+/** @typedef {import("cs_script/point_script").Entity} Entity */
+
+/** mover entity -> its OnFullyOpen/OnFullyClosed connection ids. @type {Map<Entity, (number | undefined)[]>} */
+const movers = new Map();
+
+/** @param {Entity} mover @param {number} wait */
+function Connect(mover, wait) {
+    const turn = (/** @type {string} */ input) => () => {
+        Instance.EntFireAtTarget({ target: mover, input, delay: wait });
+    };
+    movers.set(mover, [
+        Instance.ConnectOutput(mover, "OnFullyOpen", turn("Close")),
+        Instance.ConnectOutput(mover, "OnFullyClosed", turn("Open")),
+    ]);
+}
+
+/** Drops a mover's connections (and the entry). @param {Entity} mover */
+function Disconnect(mover) {
+    for (const id of movers.get(mover) ?? []) {
+        if (id !== undefined) {
+            Instance.DisconnectOutput(id);
+        }
+    }
+    movers.delete(mover);
+}
+
+/**
+ * Sets up and starts every mover that isn't going yet: on activation, and
+ * after a round restart (which may have respawned them). One already
+ * running is left alone — an Open would turn it round mid-way.
+ */
+function StartMovers() {
+    for (const mover of [...movers.keys()]) {
+        if (!mover.IsValid()) {
+            Disconnect(mover);
+        }
+    }
+    for (const mover of Instance.FindEntitiesByClass(MOVER_CLASS)) {
+        const config = ParseMoverName(mover.GetEntityName());
+        if (!config || movers.has(mover)) {
+            continue;
+        }
+        Connect(mover, config.wait);
+        Instance.EntFireAtTarget({ target: mover, input: "Open" });
+        Debug(`StartMovers: ${mover.GetEntityName()} started, wait ${config.wait}s`);
+    }
+}
+
+/**
+ * After a hot reload: the movers carried over from before keep moving, but
+ * their connections point at the old script's callbacks — swap them for
+ * new ones (no Open, they're already on their way).
+ * @param {Map<Entity, (number | undefined)[]> | undefined} previous
+ */
+function RestoreMovers(previous) {
+    // A copy: `previous` may be `movers` itself, which this loop changes.
+    for (const [mover, ids] of [...(previous ?? [])]) {
+        movers.set(mover, ids);
+        Disconnect(mover);
+        const config = mover.IsValid() ? ParseMoverName(mover.GetEntityName()) : undefined;
+        if (config) {
+            Connect(mover, config.wait);
+        }
+    }
+}
+
+/** Starts the movers when the script activates and after every round restart. */
+function RegisterMoverInputs() {
+    Instance.OnActivate(StartMovers);
+    Instance.OnRoundStart(StartMovers);
+}
+
+// Map entities the script keeps running on their own, not tied to a kart:
+// mover/ (func_movelinears going back and forth).
+
 Instance.SetThink(Think);
 Instance.SetNextThink(Instance.GetGameTime());
 
@@ -7549,7 +8010,7 @@ Instance.SetNextThink(Instance.GetGameTime());
 // reloading mid-heat during dev iteration doesn't strand locked racers in a
 // phase that's forgotten it's supposed to unlock/advance them.
 Instance.OnScriptReload({
-    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot }),
+    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers }),
     after: (memory) => {
         if (memory?.karts) {
             for (const [slot, kart] of memory.karts) {
@@ -7557,6 +8018,7 @@ Instance.OnScriptReload({
             }
             RestoreRaceFlowSnapshot(memory);
             SetModeratorSlot(memory.moderatorSlot);
+            RestoreMovers(memory.movers);
             Debug(`OnScriptReload: restored ${karts.size} kart(s), phase=${phase}, activeTrackId=${activeTrackId}, moderatorSlot=${moderatorSlot}`);
         }
     },
@@ -7568,3 +8030,4 @@ RegisterZoneInputs(); // heal/lift/camera/jump pad *_enter/*_leave, melon_telepo
 RegisterBreakInputs(); // melon_break
 RegisterHudInputs(); // OnCustomHudClicked
 RegisterAttackDebug();
+RegisterMoverInputs(); // OnActivate/OnRoundStart: start the func_movelinear movers

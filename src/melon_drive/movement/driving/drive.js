@@ -40,7 +40,8 @@ import { ApplyImpactDamage } from "../../health/damage/damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage, WallBounceBreaksAtImpact } from "../wall-bounce/wall-bounce.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
 import { ApplyHealing } from "../../health/heal/index.js";
-import { CurrentWallRules, InWater } from "../../zones/registry.js";
+import { CurrentWallRules, CurrentSideView, InWater } from "../../zones/registry.js";
+import { SideViewAxes, InitialFacing, SideViewInput, PlaneDepth, KeepOnPlane } from "../../zones/side-view/logic.js";
 
 /** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt */
 export function UpdateKart(slot, kart, dt) {
@@ -261,9 +262,13 @@ export function UpdateKart(slot, kart, dt) {
 
     // Direction comes from the player's look direction (mouse), not a
     // separate turn control — this is what makes it "free-look" driving.
+    // In a side-view zone (2D jump & run) it's the screen axis instead.
+    const sideView = SideViewDriving(kart, origin, currentVelocity, forwardInput, strafeInput);
     const rad = (pawn.GetEyeAngles().yaw * Math.PI) / 180;
-    const forwardDir = { x: Math.cos(rad), y: Math.sin(rad) };
+    const forwardDir = sideView ? sideView.forwardDir : { x: Math.cos(rad), y: Math.sin(rad) };
     const rightDir = { x: Math.sin(rad), y: -Math.cos(rad) };
+    const driveForward = sideView ? sideView.forwardInput : forwardInput;
+    const driveStrafe = sideView ? 0 : strafeInput;
 
     // After a wall bounce, steering/friction apply on top of the reflected
     // velocity rather than whatever vphysics left behind — so the player can
@@ -288,17 +293,17 @@ export function UpdateKart(slot, kart, dt) {
     // towards the look direction — on the ground and (at STEER_AIR_GRIP_RATE)
     // in the air. Not on a bounce tick — the reflected velocity is the
     // bounce's result and stays as computed.
-    if (forwardInput > 0 && !bounceVelocity) {
+    if (driveForward > 0 && !bounceVelocity) {
         const gripRate = grounded ? STEER_GRIP_RATE : STEER_AIR_GRIP_RATE;
         const steered = SteerTowards({ x: vx, y: vy }, forwardDir, gripRate * dt, STEER_GRIP_MAX_ANGLE);
         vx = steered.x;
         vy = steered.y;
     }
 
-    if (forwardInput !== 0 || strafeInput !== 0) {
-        const forwardAccel = forwardInput > 0 ? FORWARD_ACCEL : REVERSE_ACCEL;
-        let ax = forwardDir.x * forwardInput * forwardAccel + rightDir.x * strafeInput * STRAFE_ACCEL;
-        let ay = forwardDir.y * forwardInput * forwardAccel + rightDir.y * strafeInput * STRAFE_ACCEL;
+    if (driveForward !== 0 || driveStrafe !== 0) {
+        const forwardAccel = driveForward > 0 ? FORWARD_ACCEL : REVERSE_ACCEL;
+        let ax = forwardDir.x * driveForward * forwardAccel + rightDir.x * driveStrafe * STRAFE_ACCEL;
+        let ay = forwardDir.y * driveForward * forwardAccel + rightDir.y * driveStrafe * STRAFE_ACCEL;
         vx += ax * dt;
         vy += ay * dt;
     } else if (!boost.boosting) {
@@ -334,6 +339,12 @@ export function UpdateKart(slot, kart, dt) {
     vx = v.x;
     vy = v.y;
     const vz = v.z;
+    // Side view: nothing moves the melon towards or away from the camera.
+    if (sideView) {
+        const kept = KeepOnPlane({ x: vx, y: vy }, sideView.view, sideView.depthError);
+        vx = kept.x;
+        vy = kept.y;
+    }
 
     // Normally the melon's momentum top speed (MAX_SPEED plus whatever
     // repeatedly reaching it has earned, see MOMENTUM_*), but a wall bounce
@@ -364,4 +375,34 @@ export function UpdateKart(slot, kart, dt) {
     kart.prevLastVelocity = kart.lastVelocity;
     kart.prevOrigin = origin;
     kart.lastVelocity = { x: vx, y: vy, z: vz };
+}
+
+/**
+ * Driving in a side-view zone (zones/side-view/): the screen axis instead of
+ * the look direction, A/D left/right on screen, W the way the melon faces
+ * (see SideViewInput), and how far it's off the plane it entered on.
+ * undefined outside one. Entering a (new) zone starts on the plane the melon
+ * is on, facing the way it moves.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @param {{ x: number, y: number, z: number }} origin @param {{ x: number, y: number, z: number }} velocity
+ * @param {number} forwardInput @param {number} strafeInput
+ */
+function SideViewDriving(kart, origin, velocity, forwardInput, strafeInput) {
+    const zone = CurrentSideView(kart);
+    if (!zone) {
+        return undefined; // kart.sideViewDrive stays: the camera turns the view along its facing on the way out
+    }
+    const { view, right } = SideViewAxes(zone.yaw);
+    if (kart.sideViewDrive?.zone !== zone) {
+        kart.sideViewDrive = { zone, plane: PlaneDepth(origin, view), facing: InitialFacing(velocity, right) };
+    }
+    const input = SideViewInput(forwardInput, strafeInput, kart.sideViewDrive.facing);
+    kart.sideViewDrive.facing = input.facing;
+    const dir = input.axis !== 0 ? Math.sign(input.axis) : input.facing;
+    return {
+        forwardDir: { x: right.x * dir, y: right.y * dir },
+        forwardInput: Math.abs(input.axis),
+        view,
+        depthError: kart.sideViewDrive.plane - PlaneDepth(origin, view),
+    };
 }

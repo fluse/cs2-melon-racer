@@ -922,6 +922,50 @@ entered counts), but a lift zone's zoom adds on top. Rules:
 `zones/camera-zone/logic.js` (`test/zones/camera-zone.test.mjs`), applied by
 `camera/zone-zoom/`. Details for mappers: [Mapping API: camera zones](docs/mapping-api/11-camera-zones.md).
 
+## Side-view zones — 2D jump & run (implemented)
+
+A `trigger_multiple` (filtered to `prop_physics`) with `OnStartTouch` →
+`RunScriptInput` `side_view_enter` and `OnEndTouch` → `side_view_leave`
+turns its area into a 2D jump & run: the camera **can't be turned** — it
+looks at the melon from one fixed side, at a set distance — and the name
+carries the setup: `side_view_<yaw>[_<distance>[_<height>]]` (the way the
+camera looks, Hammer yaw; defaults `SIDE_VIEW_*`). Inside:
+
+- The camera is switched to `CONTROLLED` mode and placed by script every
+  tick, aiming at the melon; it swings over from the chase camera and back
+  over `SIDE_VIEW_EASE_SECONDS`. Walls don't pull it in.
+- The mouse doesn't steer: A/D drive left/right on screen (and turn the
+  melon that way), W the way it faces, S the other way; jumps, wall jumps,
+  bounces and the attack boost (along the facing) work as usual.
+- The melon stays on the plane it entered on: speed towards/away from the
+  camera is dropped every tick and a drift pulled back
+  (`SIDE_VIEW_PLANE_PULL`).
+- Leaving, the player's view is turned the way the melon faced on screen,
+  so driving carries on in that direction behind the chase camera.
+
+Constants: `zones/side-view/constants.js`, `camera/side-view/constants.js`;
+rules: `zones/side-view/logic.js` and `camera/side-view/logic.js`, applied
+by `movement/driving/drive.js` and `camera/side-view/side-view.js`
+(`test/zones/side-view.test.mjs`). Details for mappers:
+[Mapping API: side-view zones](docs/mapping-api/11-camera-zones.md#side-view-zones).
+
+## Movers (implemented)
+
+Moving obstacles and platforms, e.g. a block sliding left and right across
+the track: a `func_movelinear` named `mover`, `mover_<anything>` or
+`mover_wait<seconds>[_<anything>]`. The script starts every one when it
+activates and after each round restart (`OnActivate`/`OnRoundStart`) and
+turns it round at each end (`ConnectOutput` on `OnFullyOpen`/`OnFullyClosed`,
+after the name's wait, default `MOVER_DEFAULT_WAIT`) — no `logic_auto` or
+outputs in Hammer. Direction, distance and speed are the entity's own
+keyvalues. A mover is a wall like any other (bounces, wall jumps), and being
+hit by one is an impact like any other; a mover that should break the melon
+on touch gets a `melon_break` kill trigger parented to it (a Hammer edit, no
+script). Constants:
+`world/mover/constants.js`; rule: `world/mover/logic.js`, applied by
+`world/mover/mover.js` (`test/world/mover.test.mjs`). Details for mappers:
+[Mapping API: movers](docs/mapping-api/16-movers.md).
+
 ## Open design questions (not yet decided — ask before assuming)
 
 - **Per-track progress**: should a free-roaming melon that switches tracks
