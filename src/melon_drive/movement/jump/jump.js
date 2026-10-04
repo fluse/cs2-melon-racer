@@ -167,7 +167,7 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
  * a bounce's kick or a jump pad launch keeps the faster one).
  * While a wall bounce's jump-timing window is open (kart.pendingBounce),
  * the press is that bounce's timing and no wall jump — otherwise every
- * well-timed bounce also used up charge. Not in lift zones
+ * well-timed bounce also used up charge. Not in lift and side-view zones
  * (rules.freeWallJumps): there it costs no charge (none needed either),
  * may follow a bounce at once, and the cooldown is rules.wallJumpCooldown.
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
@@ -229,6 +229,6 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
     if (!rules.freeWallJumps) {
         kart.wallJumpCharge = WallJumpChargeAfter(charge);
     }
-    Debug(`wall jump: slot ${slot}, ${rated ? `${rated.rating.label} ${rated.angle.toFixed(0)}° (×${bonus.speed})` : "not rated"}, charges ${charge.toFixed(2)}${rules.freeWallJumps ? " (lift zone, free)" : ""}, off wall normal (${wallContact.normal.x.toFixed(2)}, ${wallContact.normal.y.toFixed(2)})`);
+    Debug(`wall jump: slot ${slot}, ${rated ? `${rated.rating.label} ${rated.angle.toFixed(0)}° (×${bonus.speed})` : "not rated"}, charges ${charge.toFixed(2)}${rules.freeWallJumps ? " (lift/side-view zone, free)" : ""}, off wall normal (${wallContact.normal.x.toFixed(2)}, ${wallContact.normal.y.toFixed(2)})`);
     return null;
 }

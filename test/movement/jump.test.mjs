@@ -350,6 +350,16 @@ test("in a side-view zone a wall jump isn't rated, but goes higher and further: 
     assert.equal(v.z, C.SIDE_VIEW_WALL_JUMP_UP_SPEED, "the side view's kick, no PERFECT multiplier");
 });
 
+test("in a side-view zone a wall jump costs no charge and needs none", () => {
+    const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
+    Geometry({ floorBelow: false, wallX });
+    kart.sideViews = new Map([[new Entity({ name: "side_view_90" }), { yaw: 90, distance: C.SIDE_VIEW_DISTANCE, height: C.SIDE_VIEW_HEIGHT }]]);
+    kart.wallJumpCharge = 0; // none charged — outside a zone no wall jump
+    Tick({ commanded: { x: 300, y: 0, z: -100 }, actual: { x: 0, y: 0, z: -100 - C.GRAVITY * DT }, jump: true });
+    assert.ok(kart.lastWallJump, "the wall jump happened without a charge");
+    assert.ok(kart.wallJumpCharge >= 0 && kart.wallJumpCharge < 1, `nothing used up (charge ${kart.wallJumpCharge})`);
+});
+
 // Regression: a press a couple of ticks after the touch only saw the melon
 // sliding along the wall (physics had stopped it there) — read as 90°, MISS.
 test("wall jump pressed a couple of ticks after the touch still gets the approach's rating", () => {

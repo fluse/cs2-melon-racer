@@ -1784,8 +1784,8 @@ function ApplyBreakCameraZoom(kart, elapsed) {
  * side-view zone — there wall jumps aren't rated either (a 2D jump & run's
  * walls are jumped at whatever angle the plane allows) but go higher and
  * further (SIDE_VIEW_WALL_JUMP_*), with a lift zone's timing (short cooldown,
- * longer contact window, jump buffer) so wall-to-wall jumps chain; they still
- * cost charge.
+ * longer contact window, jump buffer) so wall-to-wall jumps chain, and like
+ * there they cost no charge (freeWallJumps).
  * @param {number | undefined} liftUpSpeed @param {boolean} [inSideView]
  * @returns {WallRules}
  */
@@ -1797,7 +1797,7 @@ function WallRules(liftUpSpeed, inSideView = false) {
             minBounceSpeed: 0,
             wallJumpCooldown: inSideView ? LIFT_ZONE_WALL_JUMP_COOLDOWN : WALL_JUMP_COOLDOWN,
             wallJumpWindow: inSideView ? LIFT_ZONE_WALL_JUMP_WINDOW : WALL_JUMP_WINDOW,
-            freeWallJumps: false,
+            freeWallJumps: inSideView,
             jumpBuffer: inSideView ? LIFT_ZONE_JUMP_BUFFER : 0,
             ratedWallJumps: !inSideView,
             wallJumpUpSpeed: inSideView ? SIDE_VIEW_WALL_JUMP_UP_SPEED : WALL_JUMP_UP_SPEED,
@@ -4709,7 +4709,7 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
  * a bounce's kick or a jump pad launch keeps the faster one).
  * While a wall bounce's jump-timing window is open (kart.pendingBounce),
  * the press is that bounce's timing and no wall jump — otherwise every
- * well-timed bounce also used up charge. Not in lift zones
+ * well-timed bounce also used up charge. Not in lift and side-view zones
  * (rules.freeWallJumps): there it costs no charge (none needed either),
  * may follow a bounce at once, and the cooldown is rules.wallJumpCooldown.
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
@@ -4771,7 +4771,7 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
     if (!rules.freeWallJumps) {
         kart.wallJumpCharge = WallJumpChargeAfter(charge);
     }
-    Debug(`wall jump: slot ${slot}, ${rated ? `${rated.rating.label} ${rated.angle.toFixed(0)}° (×${bonus.speed})` : "not rated"}, charges ${charge.toFixed(2)}${rules.freeWallJumps ? " (lift zone, free)" : ""}, off wall normal (${wallContact.normal.x.toFixed(2)}, ${wallContact.normal.y.toFixed(2)})`);
+    Debug(`wall jump: slot ${slot}, ${rated ? `${rated.rating.label} ${rated.angle.toFixed(0)}° (×${bonus.speed})` : "not rated"}, charges ${charge.toFixed(2)}${rules.freeWallJumps ? " (lift/side-view zone, free)" : ""}, off wall normal (${wallContact.normal.x.toFixed(2)}, ${wallContact.normal.y.toFixed(2)})`);
     return null;
 }
 

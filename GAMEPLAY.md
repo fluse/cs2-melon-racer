@@ -959,7 +959,8 @@ camera looks, Hammer yaw; defaults `SIDE_VIEW_*`). Inside:
   jumps from wall to wall chain: the shorter `LIFT_ZONE_WALL_JUMP_COOLDOWN`,
   the longer `LIFT_ZONE_WALL_JUMP_WINDOW` and a press up to
   `LIFT_ZONE_JUMP_BUFFER` before touching the wall fires on the touch.
-  Unlike in a lift zone they still cost charge.
+  As in a lift zone they cost no charge (and need none, decided) and may
+  follow a bounce at once.
 - The melon stays on the plane it entered on: speed towards/away from the
   camera is dropped every tick and a drift pulled back
   (`SIDE_VIEW_PLANE_PULL`).

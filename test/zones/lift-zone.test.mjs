@@ -87,12 +87,13 @@ test("wall rules in a lift zone: its kick, minimum bounce speed, free wall jumps
     });
 });
 
-test("wall rules in a side-view zone: wall jumps not rated but higher and further, with a lift zone's timing, still costing charge", () => {
+test("wall rules in a side-view zone: wall jumps not rated but higher and further, with a lift zone's timing, costing no charge", () => {
     assert.deepEqual(WallRules(undefined, true), {
         ...WallRules(undefined),
         wallJumpCooldown: LIFT_ZONE_WALL_JUMP_COOLDOWN,
         wallJumpWindow: LIFT_ZONE_WALL_JUMP_WINDOW,
         jumpBuffer: LIFT_ZONE_JUMP_BUFFER,
+        freeWallJumps: true,
         ratedWallJumps: false,
         wallJumpUpSpeed: SIDE_VIEW_WALL_JUMP_UP_SPEED,
         wallJumpPushSpeed: SIDE_VIEW_WALL_JUMP_PUSH_SPEED,

@@ -39,8 +39,8 @@ import {
  * side-view zone — there wall jumps aren't rated either (a 2D jump & run's
  * walls are jumped at whatever angle the plane allows) but go higher and
  * further (SIDE_VIEW_WALL_JUMP_*), with a lift zone's timing (short cooldown,
- * longer contact window, jump buffer) so wall-to-wall jumps chain; they still
- * cost charge.
+ * longer contact window, jump buffer) so wall-to-wall jumps chain, and like
+ * there they cost no charge (freeWallJumps).
  * @param {number | undefined} liftUpSpeed @param {boolean} [inSideView]
  * @returns {WallRules}
  */
@@ -52,7 +52,7 @@ export function WallRules(liftUpSpeed, inSideView = false) {
             minBounceSpeed: 0,
             wallJumpCooldown: inSideView ? LIFT_ZONE_WALL_JUMP_COOLDOWN : WALL_JUMP_COOLDOWN,
             wallJumpWindow: inSideView ? LIFT_ZONE_WALL_JUMP_WINDOW : WALL_JUMP_WINDOW,
-            freeWallJumps: false,
+            freeWallJumps: inSideView,
             jumpBuffer: inSideView ? LIFT_ZONE_JUMP_BUFFER : 0,
             ratedWallJumps: !inSideView,
             wallJumpUpSpeed: inSideView ? SIDE_VIEW_WALL_JUMP_UP_SPEED : WALL_JUMP_UP_SPEED,
