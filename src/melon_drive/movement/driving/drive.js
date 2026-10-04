@@ -32,7 +32,7 @@ import { AttackBoost, WithoutEnginePush } from "../attack-boost/logic.js";
 import { MomentumMaxSpeed, UpdateMomentum } from "../momentum/logic.js";
 import { LogAttackHeld } from "../../dev/attack-debug.js";
 import { Debug } from "../../core/debug.js";
-import { ApplyJump, RechargeWallJumpCharge } from "../jump/jump.js";
+import { ApplyJump, RechargeWallJumpCharge, GetWallJumpCharges } from "../jump/jump.js";
 import { UpdatePadFlight, TryPadLaunch } from "../../zones/jump-pad/jump-pad.js";
 import { UpdateGrounded, UpdateWallContact } from "../contact/contact.js";
 import { DrawCollisionDebug } from "../../dev/collision-debug.js";
@@ -40,7 +40,8 @@ import { ApplyImpactDamage } from "../../health/damage/damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage, WallBounceBreaksAtImpact } from "../wall-bounce/wall-bounce.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
 import { ApplyHealing } from "../../health/heal/index.js";
-import { CurrentWallRules, CurrentSideView, InWater } from "../../zones/registry.js";
+import { CurrentWallRules, CurrentSideView, InWater, InJumpRechargeZone } from "../../zones/registry.js";
+import { ChargeInRechargeZone } from "../../zones/jump-recharge/logic.js";
 import { SideViewAxes, InitialFacing, SideViewInput, PlaneDepth, KeepOnPlane } from "../../zones/side-view/logic.js";
 
 /** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt */
@@ -49,6 +50,7 @@ export function UpdateKart(slot, kart, dt) {
     // Before every early return below: the charge refills standing still,
     // race-locked or broken too.
     RechargeWallJumpCharge(kart, dt);
+    kart.wallJumpCharge = ChargeInRechargeZone(GetWallJumpCharges(kart), InJumpRechargeZone(kart));
 
     // Locked during the pre-race countdown, and again once a kart has
     // finished its heat (parked so it stops re-triggering checkpoints).

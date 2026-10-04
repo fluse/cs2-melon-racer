@@ -109,15 +109,17 @@ export function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, 
  * wall is kept, the part across it points away from the wall at
  * WALL_JUMP_PUSH_SPEED (or faster, if it already was — e.g. just after a
  * wall bounce), plus WALL_JUMP_UP_SPEED up (the caller keeps a faster
- * upward speed the melon already has, see TryWallJump).
+ * upward speed the melon already has, see TryWallJump). A zone can change
+ * both (WallRules: a side-view zone's are higher).
  * @param {{ x: number, y: number }} v current horizontal velocity @param {{ x: number, y: number }} n wall normal (horizontal, unit length, pointing away from the wall)
+ * @param {number} [pushSpeed] @param {number} [upSpeed]
  */
-export function WallJumpVelocity(v, n) {
+export function WallJumpVelocity(v, n, pushSpeed = WALL_JUMP_PUSH_SPEED, upSpeed = WALL_JUMP_UP_SPEED) {
     const across = v.x * n.x + v.y * n.y;
     const alongX = v.x - across * n.x;
     const alongY = v.y - across * n.y;
-    const away = Math.max(across, WALL_JUMP_PUSH_SPEED);
-    return { x: alongX + away * n.x, y: alongY + away * n.y, z: WALL_JUMP_UP_SPEED };
+    const away = Math.max(across, pushSpeed);
+    return { x: alongX + away * n.x, y: alongY + away * n.y, z: upSpeed };
 }
 
 /**

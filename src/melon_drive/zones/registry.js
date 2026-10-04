@@ -3,7 +3,8 @@
 // camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in camera-zone/constants.js)
 // jump pads (jump_pad_enter/jump_pad_leave, zones/jump-pad/constants.js)
 // water zones (water_enter/water_leave, zones/water/constants.js)
-// and side-view zones (side_view_enter/side_view_leave, zones/side-view/constants.js):
+// side-view zones (side_view_enter/side_view_leave, zones/side-view/constants.js)
+// and jump recharge zones (jump_recharge_enter/jump_recharge_leave, zones/jump-recharge/logic.js):
 // entering/leaving them (registered in inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.
 // Each kind is a Map on the kart: trigger entity -> its value (heal rate in
@@ -11,7 +12,7 @@
 // tracked separately.
 import { WallRules } from "./lift/logic.js";
 
-/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews"} ZoneKind */
+/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews" | "jumpRecharges"} ZoneKind */
 
 /**
  * The melon entered a zone trigger of this kind, worth `value`.
@@ -42,6 +43,7 @@ export function LeaveZones(kart) {
     kart.jumpPads?.clear();
     kart.waterZones?.clear();
     kart.sideViews?.clear();
+    kart.jumpRecharges?.clear();
 }
 
 /**
@@ -77,9 +79,18 @@ export function InWater(kart) {
     return StrongestZone(kart, "waterZones") !== undefined;
 }
 
+/**
+ * Whether the melon is inside a jump recharge zone — its wall-jump charges
+ * are kept full there.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+export function InJumpRechargeZone(kart) {
+    return StrongestZone(kart, "jumpRecharges") !== undefined;
+}
+
 /** The wall bounce / wall jump rules for where the melon is now (see WallRules). @param {import("../core/kart-registry.js").Kart} kart */
 export function CurrentWallRules(kart) {
-    return WallRules(StrongestZone(kart, "liftZones"));
+    return WallRules(StrongestZone(kart, "liftZones"), CurrentSideView(kart) !== undefined);
 }
 
 /**

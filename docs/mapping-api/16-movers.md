@@ -1,4 +1,4 @@
-[Mapping API](README.md) › **16. Movers** · [← Checking your map](15-checking.md)
+[Mapping API](README.md) › **16. Movers** · [← Checking your map](15-checking.md) · [Jump recharge zones →](17-jump-recharge-zones.md)
 
 # 16. Movers
 
@@ -43,4 +43,4 @@ and set its `Parent` to the mover; give the mover's brush
   mover, with its `Parent` set to the mover so it moves along.
 
 ---
-[← Checking your map](15-checking.md) · [Mapping API](README.md)
+[← Checking your map](15-checking.md) · [Mapping API](README.md) · [Jump recharge zones →](17-jump-recharge-zones.md)

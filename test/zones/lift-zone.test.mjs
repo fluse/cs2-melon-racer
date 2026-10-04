@@ -6,6 +6,10 @@ import {
     WALL_BOUNCE_UP_SPEED,
     WALL_JUMP_COOLDOWN,
     WALL_JUMP_WINDOW,
+    WALL_JUMP_UP_SPEED,
+    WALL_JUMP_PUSH_SPEED,
+    SIDE_VIEW_WALL_JUMP_UP_SPEED,
+    SIDE_VIEW_WALL_JUMP_PUSH_SPEED,
     LIFT_ZONE_UP_SPEED,
     LIFT_ZONE_MIN_BOUNCE_SPEED,
     LIFT_ZONE_WALL_JUMP_COOLDOWN,
@@ -62,6 +66,9 @@ test("wall rules outside a lift zone: the normal bounce and wall jump", () => {
         wallJumpWindow: WALL_JUMP_WINDOW,
         freeWallJumps: false,
         jumpBuffer: 0,
+        ratedWallJumps: true,
+        wallJumpUpSpeed: WALL_JUMP_UP_SPEED,
+        wallJumpPushSpeed: WALL_JUMP_PUSH_SPEED,
     });
 });
 
@@ -74,7 +81,24 @@ test("wall rules in a lift zone: its kick, minimum bounce speed, free wall jumps
         wallJumpWindow: LIFT_ZONE_WALL_JUMP_WINDOW,
         freeWallJumps: true,
         jumpBuffer: LIFT_ZONE_JUMP_BUFFER,
+        ratedWallJumps: false,
+        wallJumpUpSpeed: WALL_JUMP_UP_SPEED,
+        wallJumpPushSpeed: WALL_JUMP_PUSH_SPEED,
     });
+});
+
+test("wall rules in a side-view zone: wall jumps not rated but higher and further, with a lift zone's timing, still costing charge", () => {
+    assert.deepEqual(WallRules(undefined, true), {
+        ...WallRules(undefined),
+        wallJumpCooldown: LIFT_ZONE_WALL_JUMP_COOLDOWN,
+        wallJumpWindow: LIFT_ZONE_WALL_JUMP_WINDOW,
+        jumpBuffer: LIFT_ZONE_JUMP_BUFFER,
+        ratedWallJumps: false,
+        wallJumpUpSpeed: SIDE_VIEW_WALL_JUMP_UP_SPEED,
+        wallJumpPushSpeed: SIDE_VIEW_WALL_JUMP_PUSH_SPEED,
+    });
+    assert.ok(SIDE_VIEW_WALL_JUMP_UP_SPEED > WALL_JUMP_UP_SPEED && SIDE_VIEW_WALL_JUMP_PUSH_SPEED > WALL_JUMP_PUSH_SPEED, "higher and further than outside");
+    assert.deepEqual(WallRules(LIFT_ZONE_UP_SPEED, true), WallRules(LIFT_ZONE_UP_SPEED), "in a lift zone too: the lift's rules");
 });
 
 test("a lift zone never kicks weaker than outside one", () => {

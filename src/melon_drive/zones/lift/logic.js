@@ -6,6 +6,10 @@ import {
     WALL_BOUNCE_UP_SPEED,
     WALL_JUMP_COOLDOWN,
     WALL_JUMP_WINDOW,
+    WALL_JUMP_UP_SPEED,
+    WALL_JUMP_PUSH_SPEED,
+    SIDE_VIEW_WALL_JUMP_UP_SPEED,
+    SIDE_VIEW_WALL_JUMP_PUSH_SPEED,
     LIFT_ZONE_UP_SPEED,
     LIFT_ZONE_NAME_PATTERN,
     LIFT_ZONE_MIN_BOUNCE_SPEED,
@@ -23,25 +27,36 @@ import {
  *   wallJumpWindow: number, // seconds a wall contact stays jumpable
  *   freeWallJumps: boolean, // wall jumps cost no charge, are full strength, may follow a bounce at once
  *   jumpBuffer: number, // seconds a jump press before touching a wall still counts, 0 = none
+ *   ratedWallJumps: boolean, // wall jumps are rated by angle (boost, PERFECT kick, feedback) — not in lift or side-view zones
+ *   wallJumpUpSpeed: number, // a wall jump's upward speed (u/s)
+ *   wallJumpPushSpeed: number, // a wall jump's push away from the wall, at least (u/s)
  * }} WallRules
  */
 
 /**
  * The wall bounce / wall jump rules for a melon, given the kick of the
- * strongest lift zone it's in (undefined = not in one).
- * @param {number | undefined} liftUpSpeed
+ * strongest lift zone it's in (undefined = not in one) and whether it's in a
+ * side-view zone — there wall jumps aren't rated either (a 2D jump & run's
+ * walls are jumped at whatever angle the plane allows) but go higher and
+ * further (SIDE_VIEW_WALL_JUMP_*), with a lift zone's timing (short cooldown,
+ * longer contact window, jump buffer) so wall-to-wall jumps chain; they still
+ * cost charge.
+ * @param {number | undefined} liftUpSpeed @param {boolean} [inSideView]
  * @returns {WallRules}
  */
-export function WallRules(liftUpSpeed) {
+export function WallRules(liftUpSpeed, inSideView = false) {
     if (liftUpSpeed === undefined) {
         return {
             inLift: false,
             bounceUpSpeed: WALL_BOUNCE_UP_SPEED,
             minBounceSpeed: 0,
-            wallJumpCooldown: WALL_JUMP_COOLDOWN,
-            wallJumpWindow: WALL_JUMP_WINDOW,
+            wallJumpCooldown: inSideView ? LIFT_ZONE_WALL_JUMP_COOLDOWN : WALL_JUMP_COOLDOWN,
+            wallJumpWindow: inSideView ? LIFT_ZONE_WALL_JUMP_WINDOW : WALL_JUMP_WINDOW,
             freeWallJumps: false,
-            jumpBuffer: 0,
+            jumpBuffer: inSideView ? LIFT_ZONE_JUMP_BUFFER : 0,
+            ratedWallJumps: !inSideView,
+            wallJumpUpSpeed: inSideView ? SIDE_VIEW_WALL_JUMP_UP_SPEED : WALL_JUMP_UP_SPEED,
+            wallJumpPushSpeed: inSideView ? SIDE_VIEW_WALL_JUMP_PUSH_SPEED : WALL_JUMP_PUSH_SPEED,
         };
     }
     return {
@@ -53,6 +68,9 @@ export function WallRules(liftUpSpeed) {
         wallJumpWindow: LIFT_ZONE_WALL_JUMP_WINDOW,
         freeWallJumps: true,
         jumpBuffer: LIFT_ZONE_JUMP_BUFFER,
+        ratedWallJumps: false,
+        wallJumpUpSpeed: WALL_JUMP_UP_SPEED,
+        wallJumpPushSpeed: WALL_JUMP_PUSH_SPEED,
     };
 }
 

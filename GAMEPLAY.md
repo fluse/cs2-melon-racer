@@ -641,7 +641,8 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   shows the perfect spark; every wall jump shows on the bounce panel and the
   speedometer's `PerfectBounce` flash like a bounce. **Not in a lift zone**
   (decided): there the shaft is climbed, not raced — a wall jump is a plain
-  one, no rating, boost or feedback. No health cost. Only
+  one, no rating, boost or feedback. **Nor in a side-view zone** (decided,
+  see "Side-view zones"). No health cost. Only
   that bonus raises the speed cap (decaying at `BOOST_DECAY`); a plain wall
   jump never does, and charge plus the same-wall rule still keep chaining
   in check. Rules: `WallJumpAngle`, `WallJumpRatingMultipliers`, `WallJumpBoostedVelocity` in
@@ -734,6 +735,20 @@ they don't look like the cyan lift updraft). Constants:
 `zones/jump-pad/constants.js`; rules: `zones/jump-pad/logic.js`, applied by
 `zones/jump-pad/jump-pad.js` (`test/zones/jump-pad.test.mjs`). Details for mappers:
 [Mapping API: jump pads](docs/mapping-api/12-jump-pads.md).
+
+## Jump recharge zones (implemented)
+
+A `trigger_multiple` (filtered to `prop_physics`) with `OnStartTouch` →
+`RunScriptInput` `jump_recharge_enter` and `OnEndTouch` →
+`jump_recharge_leave`: entering it, all `WALL_JUMP_CHARGES` wall jumps are
+ready again **at once**, and they stay full while the melon is inside
+(decided) — so wall jumps there cost nothing, and leaving it the melon takes
+a full set along. Only the charges change; cooldown, contact window and the
+same-wall rule stay. Marked in the map by two ambient particle systems
+(`jump_recharge_rings` + `jump_recharge_sparks`: the jump pad's rings and
+sparks in health blue). Rule: `zones/jump-recharge/logic.js`, applied in
+`movement/driving/drive.js` (`test/zones/jump-recharge.test.mjs`). Details
+for mappers: [Mapping API: jump recharge zones](docs/mapping-api/17-jump-recharge-zones.md).
 
 ## Water zones (implemented)
 
@@ -936,7 +951,15 @@ camera looks, Hammer yaw; defaults `SIDE_VIEW_*`). Inside:
   over `SIDE_VIEW_EASE_SECONDS`. Walls don't pull it in.
 - The mouse doesn't steer: A/D drive left/right on screen (and turn the
   melon that way), W the way it faces, S the other way; jumps, wall jumps,
-  bounces and the attack boost (along the facing) work as usual.
+  bounces and the attack boost (along the facing) work as usual — except
+  that a wall jump **isn't rated** (decided): no angle rating, boost or
+  feedback, as in a lift zone — instead it always goes a bit higher and
+  further (`SIDE_VIEW_WALL_JUMP_UP_SPEED`/`_PUSH_SPEED` instead of
+  `WALL_JUMP_UP_SPEED`/`_PUSH_SPEED`), and with a lift zone's timing so
+  jumps from wall to wall chain: the shorter `LIFT_ZONE_WALL_JUMP_COOLDOWN`,
+  the longer `LIFT_ZONE_WALL_JUMP_WINDOW` and a press up to
+  `LIFT_ZONE_JUMP_BUFFER` before touching the wall fires on the touch.
+  Unlike in a lift zone they still cost charge.
 - The melon stays on the plane it entered on: speed towards/away from the
   camera is dropped every tick and a drift pulled back
   (`SIDE_VIEW_PLANE_PULL`).

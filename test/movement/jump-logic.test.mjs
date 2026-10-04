@@ -54,14 +54,14 @@ test("wall jump: not while a wall bounce's jump-timing window is open", () => {
 
 test("wall jump velocity: pushes away from the wall and up, keeps speed along it", () => {
     // moving into the wall (normal +x) at -300, along it at +200
-    const v = WallJumpVelocity({ x: -300, y: 200 }, wallA, 1);
+    const v = WallJumpVelocity({ x: -300, y: 200 }, wallA);
     assert.equal(v.x, WALL_JUMP_PUSH_SPEED);
     assert.equal(v.y, 200);
     assert.equal(v.z, WALL_JUMP_UP_SPEED);
 });
 
 test("wall jump velocity: an already faster push away (e.g. after a bounce) is kept", () => {
-    const v = WallJumpVelocity({ x: WALL_JUMP_PUSH_SPEED + 400, y: 0 }, wallA, 1);
+    const v = WallJumpVelocity({ x: WALL_JUMP_PUSH_SPEED + 400, y: 0 }, wallA);
     assert.equal(v.x, WALL_JUMP_PUSH_SPEED + 400);
 });
 

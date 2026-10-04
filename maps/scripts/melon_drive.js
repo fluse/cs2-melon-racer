@@ -104,6 +104,7 @@ function TraceSphere(config) {
  *   jumpPads?: Map<any, import("../zones/jump-pad/logic.js").JumpPad>, // jump pad triggers the melon is on -> their launch, see zones/registry.js
  *   lastPadLaunchTime?: number, // last jump pad launch — see ShouldPadLaunch
  *   waterZones?: Map<any, number>, // water triggers the melon is inside (value unused), see zones/water/
+ *   jumpRecharges?: Map<any, number>, // jump recharge triggers the melon is inside (value unused), see zones/jump-recharge/
  *   padFlight?: import("../zones/jump-pad/logic.js").PadFlight, // a jump pad launch's damage protection, still on — see zones/jump-pad/jump-pad.js
  *   cameraZones?: Map<any, import("../zones/camera-zone/logic.js").CameraZone>, // camera triggers the melon is inside -> their zoom, see zones/registry.js
  *   zoneCamera?: import("../zones/camera-zone/logic.js").ZoneCameraState, // the camera-zone zoom being eased in/out — see UpdateZoneCamera
@@ -1225,6 +1226,12 @@ const SIDE_VIEW_HEIGHT = 40; // units
 const SIDE_VIEW_PLANE_PULL = 6;
 // ... but never faster than this.
 const SIDE_VIEW_PLANE_MAX_SPEED = 200; // units/sec
+// Wall jumps in a side-view zone aren't rated (no angle bonus, see
+// zones/lift/logic.js WallRules) but go a bit higher and further than
+// outside one (WALL_JUMP_UP_SPEED / WALL_JUMP_PUSH_SPEED), for jump & run
+// sections. Same rules otherwise (charges, cooldown, never slower upward).
+const SIDE_VIEW_WALL_JUMP_UP_SPEED = 300; // units/sec upward
+const SIDE_VIEW_WALL_JUMP_PUSH_SPEED = 220; // units/sec at least away from the wall
 
 // Side-view camera (zones/side-view/constants.js): how it takes over from the
 // chase camera and hands back.
@@ -1765,25 +1772,36 @@ function ApplyBreakCameraZoom(kart, elapsed) {
  *   wallJumpWindow: number, // seconds a wall contact stays jumpable
  *   freeWallJumps: boolean, // wall jumps cost no charge, are full strength, may follow a bounce at once
  *   jumpBuffer: number, // seconds a jump press before touching a wall still counts, 0 = none
+ *   ratedWallJumps: boolean, // wall jumps are rated by angle (boost, PERFECT kick, feedback) — not in lift or side-view zones
+ *   wallJumpUpSpeed: number, // a wall jump's upward speed (u/s)
+ *   wallJumpPushSpeed: number, // a wall jump's push away from the wall, at least (u/s)
  * }} WallRules
  */
 
 /**
  * The wall bounce / wall jump rules for a melon, given the kick of the
- * strongest lift zone it's in (undefined = not in one).
- * @param {number | undefined} liftUpSpeed
+ * strongest lift zone it's in (undefined = not in one) and whether it's in a
+ * side-view zone — there wall jumps aren't rated either (a 2D jump & run's
+ * walls are jumped at whatever angle the plane allows) but go higher and
+ * further (SIDE_VIEW_WALL_JUMP_*), with a lift zone's timing (short cooldown,
+ * longer contact window, jump buffer) so wall-to-wall jumps chain; they still
+ * cost charge.
+ * @param {number | undefined} liftUpSpeed @param {boolean} [inSideView]
  * @returns {WallRules}
  */
-function WallRules(liftUpSpeed) {
+function WallRules(liftUpSpeed, inSideView = false) {
     if (liftUpSpeed === undefined) {
         return {
             inLift: false,
             bounceUpSpeed: WALL_BOUNCE_UP_SPEED,
             minBounceSpeed: 0,
-            wallJumpCooldown: WALL_JUMP_COOLDOWN,
-            wallJumpWindow: WALL_JUMP_WINDOW,
+            wallJumpCooldown: inSideView ? LIFT_ZONE_WALL_JUMP_COOLDOWN : WALL_JUMP_COOLDOWN,
+            wallJumpWindow: inSideView ? LIFT_ZONE_WALL_JUMP_WINDOW : WALL_JUMP_WINDOW,
             freeWallJumps: false,
-            jumpBuffer: 0,
+            jumpBuffer: inSideView ? LIFT_ZONE_JUMP_BUFFER : 0,
+            ratedWallJumps: !inSideView,
+            wallJumpUpSpeed: inSideView ? SIDE_VIEW_WALL_JUMP_UP_SPEED : WALL_JUMP_UP_SPEED,
+            wallJumpPushSpeed: inSideView ? SIDE_VIEW_WALL_JUMP_PUSH_SPEED : WALL_JUMP_PUSH_SPEED,
         };
     }
     return {
@@ -1795,6 +1813,9 @@ function WallRules(liftUpSpeed) {
         wallJumpWindow: LIFT_ZONE_WALL_JUMP_WINDOW,
         freeWallJumps: true,
         jumpBuffer: LIFT_ZONE_JUMP_BUFFER,
+        ratedWallJumps: false,
+        wallJumpUpSpeed: WALL_JUMP_UP_SPEED,
+        wallJumpPushSpeed: WALL_JUMP_PUSH_SPEED,
     };
 }
 
@@ -1813,14 +1834,15 @@ function LiftZoneUpSpeed(triggerName) {
 // camera zones (camera_enter/camera_leave, CAMERA_ZONE_* in camera-zone/constants.js)
 // jump pads (jump_pad_enter/jump_pad_leave, zones/jump-pad/constants.js)
 // water zones (water_enter/water_leave, zones/water/constants.js)
-// and side-view zones (side_view_enter/side_view_leave, zones/side-view/constants.js):
+// side-view zones (side_view_enter/side_view_leave, zones/side-view/constants.js)
+// and jump recharge zones (jump_recharge_enter/jump_recharge_leave, zones/jump-recharge/logic.js):
 // entering/leaving them (registered in inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.
 // Each kind is a Map on the kart: trigger entity -> its value (heal rate in
 // health/s, lift kick in u/s, camera zoom), so overlapping zones and their leaves are
 // tracked separately.
 
-/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews"} ZoneKind */
+/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews" | "jumpRecharges"} ZoneKind */
 
 /**
  * The melon entered a zone trigger of this kind, worth `value`.
@@ -1851,6 +1873,7 @@ function LeaveZones(kart) {
     kart.jumpPads?.clear();
     kart.waterZones?.clear();
     kart.sideViews?.clear();
+    kart.jumpRecharges?.clear();
 }
 
 /**
@@ -1886,9 +1909,18 @@ function InWater(kart) {
     return StrongestZone(kart, "waterZones") !== undefined;
 }
 
+/**
+ * Whether the melon is inside a jump recharge zone — its wall-jump charges
+ * are kept full there.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function InJumpRechargeZone(kart) {
+    return StrongestZone(kart, "jumpRecharges") !== undefined;
+}
+
 /** The wall bounce / wall jump rules for where the melon is now (see WallRules). @param {import("../core/kart-registry.js").Kart} kart */
 function CurrentWallRules(kart) {
-    return WallRules(StrongestZone(kart, "liftZones"));
+    return WallRules(StrongestZone(kart, "liftZones"), CurrentSideView(kart) !== undefined);
 }
 
 /**
@@ -3186,15 +3218,17 @@ function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGro
  * wall is kept, the part across it points away from the wall at
  * WALL_JUMP_PUSH_SPEED (or faster, if it already was — e.g. just after a
  * wall bounce), plus WALL_JUMP_UP_SPEED up (the caller keeps a faster
- * upward speed the melon already has, see TryWallJump).
+ * upward speed the melon already has, see TryWallJump). A zone can change
+ * both (WallRules: a side-view zone's are higher).
  * @param {{ x: number, y: number }} v current horizontal velocity @param {{ x: number, y: number }} n wall normal (horizontal, unit length, pointing away from the wall)
+ * @param {number} [pushSpeed] @param {number} [upSpeed]
  */
-function WallJumpVelocity(v, n) {
+function WallJumpVelocity(v, n, pushSpeed = WALL_JUMP_PUSH_SPEED, upSpeed = WALL_JUMP_UP_SPEED) {
     const across = v.x * n.x + v.y * n.y;
     const alongX = v.x - across * n.x;
     const alongY = v.y - across * n.y;
-    const away = Math.max(across, WALL_JUMP_PUSH_SPEED);
-    return { x: alongX + away * n.x, y: alongY + away * n.y, z: WALL_JUMP_UP_SPEED };
+    const away = Math.max(across, pushSpeed);
+    return { x: alongX + away * n.x, y: alongY + away * n.y, z: upSpeed };
 }
 
 /**
@@ -4604,7 +4638,7 @@ function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
         kart.lastIdleJumpPressTime = now;
     }
     // In the air and not a wall jump yet: where there's a jump buffer (lift
-    // zones), remember the press — a wall touched soon after still gets it.
+    // and side-view zones), remember the press — a wall touched soon after still gets it.
     kart.bufferedWallJumpTime = blockedBy !== null && !grounded && rules.jumpBuffer > 0 ? now : undefined;
 }
 
@@ -4639,7 +4673,7 @@ function UpgradePendingBounce(kart, now, v) {
 
 /**
  * A jump pressed shortly *before* touching a wall (within rules.jumpBuffer,
- * lift zones only) fires the wall jump once the melon touches one.
+ * lift and side-view zones only) fires the wall jump once the melon touches one.
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
  * @param {{ x: number, y: number, z: number }} v @param {import("../../zones/lift/logic.js").WallRules} rules
  */
@@ -4649,7 +4683,7 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
         return;
     }
     if (now - pressed > rules.jumpBuffer) {
-        kart.bufferedWallJumpTime = undefined; // too long ago, or left the lift zone (no buffer outside)
+        kart.bufferedWallJumpTime = undefined; // too long ago, or left the zone (no buffer outside)
         return;
     }
     const wallContact = kart.lastWallContact;
@@ -4668,7 +4702,7 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
  * WALL_JUMP_CHARGES (none left: no wall jump). WallJumpVelocity keeps whichever
  * push away from the wall is stronger. Rated by the angle it came at the
  * wall like a bounce (WallJumpAngle, WALL_JUMP_RATING_SPEED_MULTIPLIER): only
- * (not in a lift zone) a PERFECT/GOOD one leaves with the speed it came in with times the
+ * (rules.ratedWallJumps — not in a lift or side-view zone) a PERFECT/GOOD one leaves with the speed it came in with times the
  * multiplier, like a bounce (WallJumpBoostedVelocity) — that raises kart.speedCap — a plain wall jump
  * doesn't, chained wall jumps used to ratchet the melon ever faster.
  * Never lowers the melon's upward speed (a jump just after a ground jump,
@@ -4699,13 +4733,14 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
     if (!wallContact || blockedBy !== null) {
         return blockedBy;
     }
-    const jump = WallJumpVelocity({ x: v.x, y: v.y }, wallContact.normal);
+    const jump = WallJumpVelocity({ x: v.x, y: v.y }, wallContact.normal, rules.wallJumpPushSpeed, rules.wallJumpUpSpeed);
     // In a lift zone the angle doesn't matter — the shaft is climbed, not
-    // raced: a plain wall jump, no rating, boost or feedback.
+    // raced — nor in a side-view zone (2D jump & run): a plain wall jump, no
+    // rating, boost or feedback.
     /** @type {ReturnType<typeof WallJumpAngle> | undefined} */
     let rated = undefined;
     let bonus = { speed: 1, up: 1 };
-    if (rules.inLift) {
+    if (!rules.ratedWallJumps) {
         v.x = jump.x;
         v.y = jump.y;
         v.z = Math.max(v.z, jump.z);
@@ -6988,6 +7023,23 @@ function UpdateWallContact(kart, origin, now, currentVelocity, dt, grounded) {
     return nearest.normal;
 }
 
+// Jump recharge zones: a trigger_multiple (filtered to prop_physics like the
+// other triggers) with OnStartTouch -> RunScriptInput "jump_recharge_enter"
+// and OnEndTouch -> "jump_recharge_leave". While the melon is inside, its
+// wall-jump charges (WALL_JUMP_CHARGES) are full at once and kept full — the
+// first wall jump after leaving starts from a full set. Pure rule, no
+// cs_script import; applied by movement/driving/drive.js
+// (test/zones/jump-recharge.test.mjs).
+
+/**
+ * The wall-jump charge after this tick's refill (RechargeWallJump): full
+ * inside a jump recharge zone, unchanged outside one.
+ * @param {number} charge @param {boolean} inZone
+ */
+function ChargeInRechargeZone(charge, inZone) {
+    return inZone ? WALL_JUMP_CHARGES : charge;
+}
+
 // Per-tick melon driving (UpdateKart): the order everything happens in each
 // tick — break/lock handling, contact measurement, impact and wall-bounce
 // detection, steering, friction, jump, speed cap. The individual parts live
@@ -6999,6 +7051,7 @@ function UpdateKart(slot, kart, dt) {
     // Before every early return below: the charge refills standing still,
     // race-locked or broken too.
     RechargeWallJumpCharge(kart, dt);
+    kart.wallJumpCharge = ChargeInRechargeZone(GetWallJumpCharges(kart), InJumpRechargeZone(kart));
 
     // Locked during the pre-race countdown, and again once a kart has
     // finished its heat (parked so it stops re-triggering checkpoints).
@@ -7771,7 +7824,7 @@ function RegisterTeleportInput() {
     });
 }
 
-// Script inputs of the zone triggers — heal, lift, camera, side-view and water zones, jump pads,
+// Script inputs of the zone triggers — heal, lift, camera, side-view, water and jump recharge zones, jump pads,
 // plus the teleporters (teleport/inputs.js). The zones all work
 // the same way: OnStartTouch -> "<kind>_enter", OnEndTouch -> "<kind>_leave",
 // and the touched trigger's own name may carry its value (heal_zone_<rate>,
@@ -7819,11 +7872,14 @@ function RegisterZoneInputs() {
     // Water zones (a trigger around a func_water) — see water/constants.js:
     // landing in one stops the melon, and UpdateKart reads no impacts inside.
     RegisterZone("water_enter", "water_leave", "waterZones", () => 1, "(water)", StopInWater);
+    // Jump recharge zones — see jump-recharge/logic.js. Read by UpdateKart:
+    // the wall-jump charges are kept full inside.
+    RegisterZone("jump_recharge_enter", "jump_recharge_leave", "jumpRecharges", () => 1, "(jump recharge)");
     RegisterTeleportInput();
 }
 
 // Map triggers that change what a melon does while it's inside: lift/,
-// jump-pad/, camera-zone/, side-view/, water/ (heal zones are in health/heal/), plus the
+// jump-pad/, camera-zone/, side-view/, water/, jump-recharge/ (heal zones are in health/heal/), plus the
 // teleporters (teleport/). registry.js tracks which zones a melon is in;
 // inputs.js registers every *_enter/*_leave and melon_teleport input.
 

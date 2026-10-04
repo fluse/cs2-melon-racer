@@ -84,8 +84,11 @@ floor keep pulling it back in, use `camera_zone_noclip_front_…`.
 
 A 2D jump & run section: the camera stops following the mouse and looks at
 the melon from one fixed side, at a set distance. A/D drive left/right on
-screen, W drives the way the melon faces, S the other way, Space jumps. The
-melon stays on the plane it entered on — nothing moves it towards or away
+screen, W drives the way the melon faces, S the other way, Space jumps. Wall
+jumps there aren't rated by angle (no boost, no PERFECT), as in a
+[lift zone](10-lift-zones.md), but always go a bit higher and further, and
+use a lift zone's timing (short cooldown, longer contact window, a press just
+before touching the wall counts) — they still use up charges. The melon stays on the plane it entered on — nothing moves it towards or away
 from the camera.
 
 | Setting | Value |
@@ -129,6 +132,8 @@ bit of room above for jumps.
 | `SIDE_VIEW_HEIGHT` | 40 units | height without a number | `zones/side-view/constants.js` |
 | `SIDE_VIEW_PLANE_PULL` | 6 /s | how fast a drift off the plane is pulled back | `zones/side-view/constants.js` |
 | `SIDE_VIEW_PLANE_MAX_SPEED` | 200 u/s | that pull at most | `zones/side-view/constants.js` |
+| `SIDE_VIEW_WALL_JUMP_UP_SPEED` | 300 u/s | a wall jump's upward speed in the zone (outside: 240) | `zones/side-view/constants.js` |
+| `SIDE_VIEW_WALL_JUMP_PUSH_SPEED` | 220 u/s | a wall jump's push off the wall in the zone (outside: 160) | `zones/side-view/constants.js` |
 | `SIDE_VIEW_EASE_SECONDS` | 0.8 s | swing to the side and back | `camera/side-view/constants.js` |
 
 ---

@@ -335,6 +335,21 @@ test("in a lift zone a wall jump isn't rated: at the optimal angle still a plain
     assert.equal(v.z, C.WALL_JUMP_UP_SPEED, "plain kick, no PERFECT multiplier");
 });
 
+test("in a side-view zone a wall jump isn't rated, but goes higher and further: at the optimal angle no PERFECT, no feedback", () => {
+    const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
+    Geometry({ floorBelow: false, wallX });
+    // Looking north: the plane runs east-west, so the push off the x wall stays.
+    kart.sideViews = new Map([[new Entity({ name: "side_view_90" }), { yaw: 90, distance: C.SIDE_VIEW_DISTANCE, height: C.SIDE_VIEW_HEIGHT }]]);
+    const rad = (C.WALL_BOUNCE_OPTIMAL_ANGLE * Math.PI) / 180;
+    const s = C.WALL_BOUNCE_MIN_IMPACT / 2;
+    const into = { x: Math.cos(rad) * s, y: Math.sin(rad) * s };
+    const v = Tick({ commanded: { ...into, z: -100 }, actual: { x: 0, y: into.y, z: -100 - C.GRAVITY * DT }, jump: true });
+    assert.ok(kart.lastWallJump, "the wall jump happened");
+    assert.equal(kart.lastBounceInfo, undefined, "no rating shown");
+    assert.ok(Math.abs(v.x + C.SIDE_VIEW_WALL_JUMP_PUSH_SPEED) < 1e-6, `the side view's push (vx=${v.x})`);
+    assert.equal(v.z, C.SIDE_VIEW_WALL_JUMP_UP_SPEED, "the side view's kick, no PERFECT multiplier");
+});
+
 // Regression: a press a couple of ticks after the touch only saw the melon
 // sliding along the wall (physics had stopped it there) — read as 90°, MISS.
 test("wall jump pressed a couple of ticks after the touch still gets the approach's rating", () => {

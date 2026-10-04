@@ -29,3 +29,9 @@ export const SIDE_VIEW_HEIGHT = 40; // units
 export const SIDE_VIEW_PLANE_PULL = 6;
 // ... but never faster than this.
 export const SIDE_VIEW_PLANE_MAX_SPEED = 200; // units/sec
+// Wall jumps in a side-view zone aren't rated (no angle bonus, see
+// zones/lift/logic.js WallRules) but go a bit higher and further than
+// outside one (WALL_JUMP_UP_SPEED / WALL_JUMP_PUSH_SPEED), for jump & run
+// sections. Same rules otherwise (charges, cooldown, never slower upward).
+export const SIDE_VIEW_WALL_JUMP_UP_SPEED = 300; // units/sec upward
+export const SIDE_VIEW_WALL_JUMP_PUSH_SPEED = 220; // units/sec at least away from the wall

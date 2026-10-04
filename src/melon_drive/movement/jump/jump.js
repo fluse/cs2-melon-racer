@@ -96,7 +96,7 @@ export function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
         kart.lastIdleJumpPressTime = now;
     }
     // In the air and not a wall jump yet: where there's a jump buffer (lift
-    // zones), remember the press — a wall touched soon after still gets it.
+    // and side-view zones), remember the press — a wall touched soon after still gets it.
     kart.bufferedWallJumpTime = blockedBy !== null && !grounded && rules.jumpBuffer > 0 ? now : undefined;
 }
 
@@ -131,7 +131,7 @@ function UpgradePendingBounce(kart, now, v) {
 
 /**
  * A jump pressed shortly *before* touching a wall (within rules.jumpBuffer,
- * lift zones only) fires the wall jump once the melon touches one.
+ * lift and side-view zones only) fires the wall jump once the melon touches one.
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
  * @param {{ x: number, y: number, z: number }} v @param {import("../../zones/lift/logic.js").WallRules} rules
  */
@@ -141,7 +141,7 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
         return;
     }
     if (now - pressed > rules.jumpBuffer) {
-        kart.bufferedWallJumpTime = undefined; // too long ago, or left the lift zone (no buffer outside)
+        kart.bufferedWallJumpTime = undefined; // too long ago, or left the zone (no buffer outside)
         return;
     }
     const wallContact = kart.lastWallContact;
@@ -160,7 +160,7 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
  * WALL_JUMP_CHARGES (none left: no wall jump). WallJumpVelocity keeps whichever
  * push away from the wall is stronger. Rated by the angle it came at the
  * wall like a bounce (WallJumpAngle, WALL_JUMP_RATING_SPEED_MULTIPLIER): only
- * (not in a lift zone) a PERFECT/GOOD one leaves with the speed it came in with times the
+ * (rules.ratedWallJumps — not in a lift or side-view zone) a PERFECT/GOOD one leaves with the speed it came in with times the
  * multiplier, like a bounce (WallJumpBoostedVelocity) — that raises kart.speedCap — a plain wall jump
  * doesn't, chained wall jumps used to ratchet the melon ever faster.
  * Never lowers the melon's upward speed (a jump just after a ground jump,
@@ -191,13 +191,14 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
     if (!wallContact || blockedBy !== null) {
         return blockedBy;
     }
-    const jump = WallJumpVelocity({ x: v.x, y: v.y }, wallContact.normal);
+    const jump = WallJumpVelocity({ x: v.x, y: v.y }, wallContact.normal, rules.wallJumpPushSpeed, rules.wallJumpUpSpeed);
     // In a lift zone the angle doesn't matter — the shaft is climbed, not
-    // raced: a plain wall jump, no rating, boost or feedback.
+    // raced — nor in a side-view zone (2D jump & run): a plain wall jump, no
+    // rating, boost or feedback.
     /** @type {ReturnType<typeof WallJumpAngle> | undefined} */
     let rated = undefined;
     let bonus = { speed: 1, up: 1 };
-    if (rules.inLift) {
+    if (!rules.ratedWallJumps) {
         v.x = jump.x;
         v.y = jump.y;
         v.z = Math.max(v.z, jump.z);

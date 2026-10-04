@@ -33,6 +33,7 @@ this folder, the script doesn't know about it.
 | 14 | [Prefabs](14-prefabs.md) | Hub, routes, start/finish/heal gates; map variables, rules |
 | 15 | [Checking your map](15-checking.md) | What `npm test` catches, debug log, minimal checklist |
 | 16 | [Movers](16-movers.md) | `func_movelinear`s the script keeps going back and forth |
+| 17 | [Jump recharge zones](17-jump-recharge-zones.md) | Wall jumps recharged at once, kept full inside |
 
 ## All script inputs
 
@@ -67,6 +68,8 @@ script, and `npm test` fails on it.
 | `jump_pad_leave` | **End** | the same jump pad trigger | — | [Jump pads](12-jump-pads.md) |
 | `water_enter` | Start | any trigger around a `func_water` | — | [Water zones](13-water-zones.md) |
 | `water_leave` | **End** | the same water trigger | — | [Water zones](13-water-zones.md) |
+| `jump_recharge_enter` | Start | any jump recharge trigger | — | [Jump recharge zones](17-jump-recharge-zones.md) |
+| `jump_recharge_leave` | **End** | the same jump recharge trigger | — | [Jump recharge zones](17-jump-recharge-zones.md) |
 
 ## All entity names
 

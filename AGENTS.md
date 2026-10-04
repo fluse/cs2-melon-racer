@@ -30,7 +30,7 @@ CHANGELOG.md                             # player-facing changes per release (gi
 docs/TRACK_CREATION.md                   # step-by-step Hammer guide for a new track
 docs/valve/scripting_api.html            # saved copy of Valve's cs_script API wiki page (the site blocks automated fetches)
 docs/mapping-api/*.md                    # Mapping API (map↔script contract): README.md = index of every input/name/pattern,
-                                          #   01-…16-*.md one page per topic, each with setup / name-variant / "Values" tables
+                                          #   01-…17-*.md one page per topic, each with setup / name-variant / "Values" tables
 maps/melon_racer.vmap                    # main map (binary DMX, Hammer-authoritative)
 maps/prefabs/*.vmap                      # prefabs placed in melon_racer.vmap (hub, routes, gates, jump pads); the start/checkpoint/finish gates and jump_pad are set up by a
                                           #   map variable per copy (docs/mapping-api/14-prefabs.md) — test/helpers/vmap.mjs reads prefabs, overrides resolved
@@ -55,7 +55,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              heal/ (heal zones, full health on respawn)
                                           #   zones/     registry.js (which zones a melon is in, the WallRules that follow), inputs.js (every *_enter/*_leave),
                                           #              lift/, jump-pad/ (launch + no-damage flight), camera-zone/, side-view/ (2D: screen-axis driving, plane lock),
-                                          #              water/ (stop on entry, no impacts inside),
+                                          #              water/ (stop on entry, no impacts inside), jump-recharge/ (wall-jump charges kept full inside),
                                           #              teleport/ (melon_teleport)
                                           #   race/      track-config.js (tracks from trigger names), checkpoints/ (progress, start_/checkpoint_/finish_ inputs),
                                           #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs)
@@ -91,6 +91,7 @@ particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3
                                           #   soft swaying glow motes + faint fast rising air streaks);
                                           #   jump_pad_rings + jump_pad_sparks (ambient, same way: two info_particle_systems on a jump pad —
                                           #   flat lime rings shooting up and widening + fast rising lime sparks);
+                                          #   jump_recharge_rings + jump_recharge_sparks (ambient, same way: the jump pad's two in health blue, on a jump recharge zone);
                                           #   heal_crosses (script-driven, the effect in particle_health_template: a burst of
                                           #   rising "+" crosses in holo_heal's green/mint, sprite particle_heal_cross.vtex from tools/make-holo.mjs)
                                           #   Write the editor source format, not resourceinfo's compiled dump — see the comments in boost_trail.vpcf;
