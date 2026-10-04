@@ -12,6 +12,7 @@ Reads `maps/melon_racer.vmap` and every [prefab](14-prefabs.md) placed in it (sa
 | Triggers | a trigger feeding the script without "Physics Objects" ticked | [conventions](01-conventions.md#3-every-melon-trigger-is-set-up-the-same-way) |
 | Names | entity names with leading/trailing whitespace | [conventions](01-conventions.md#2-names-are-exact) |
 | Hub | `hub_enter`/`hub_leave` fired by anything but `hub_start_trigger`, or either missing there | [Hub](05-hub.md) |
+| Zones | a zone trigger (`heal_`, `lift_`, `camera_`, `side_view_`, `jump_pad_`, `water_`, `jump_recharge_`) firing `<zone>_enter` on anything but `OnStartTouch` or `<zone>_leave` on anything but `OnEndTouch`, or missing either one — otherwise the melon never leaves the zone (e.g. stays in 2D after a teleport out) | [conventions](01-conventions.md#4-every-output-goes-to-the-same-place) |
 | Tracks | `start_<t>` from a trigger not named `start_<t>[_laps<M>]`, or a `start_*` trigger without it (or `start_line`) | [Tracks](04-tracks.md#start-line) |
 | Tracks | `start_line`/`finish_line` from a trigger whose name names no track, or two start triggers for one track | [Tracks](04-tracks.md#start-gate-prefab) |
 | Tracks | `start_spawn_<t>` without a `start_<t>` trigger, or any other `start_*` name | [Tracks](04-tracks.md#start-line) |
@@ -47,6 +48,7 @@ broken or race-locked melon, and every `*_leave`.
 | `[melon_drive] hub_enter fired by "…", not "hub_start_trigger"` (even with `DEBUG` off) | `hub_enter` on the wrong trigger — use [`hub_teleport`](05-hub.md#sending-melons-to-the-hub) |
 | `[melon_drive] SpawnFromTemplate: no point_template named "…"` (for the break templates even with `DEBUG` off) | an [effect template](03-effect-templates.md) missing or misnamed |
 | `no info_target "checkpoint_spawn_…" or "checkpoint_spawn" nearby` | checkpoint has no [checkpoint spawn](04-tracks.md#checkpoints) |
+| camera / zone effect stays after leaving (e.g. 2D view after teleporting to the hub) | the zone trigger lacks `OnEndTouch` → `<zone>_leave` |
 | hub modal never closes | `hub_leave` missing on `hub_start_trigger` |
 
 ## Minimal map checklist

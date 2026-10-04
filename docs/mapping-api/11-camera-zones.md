@@ -116,7 +116,10 @@ bit of room above for jumps.
 
 - Entering, the camera swings from behind the melon to the side over
   `SIDE_VIEW_EASE_SECONDS`; leaving, the player's view is turned the way the
-  melon was facing on screen and the camera swings back behind it.
+  melon was facing on screen and the camera swings back behind it —
+  unless it was teleported out (hub, a checkpoint, a teleporter): then the
+  camera cuts straight back behind it and the view keeps the facing the
+  teleport gave it.
 - Walls don't pull the side camera in: keep the space between the track and
   the camera clear (or let it look through a wall on purpose).
 - Overlapping side-view zones: the one entered last counts; entering a new
@@ -135,6 +138,8 @@ bit of room above for jumps.
 | `SIDE_VIEW_WALL_JUMP_UP_SPEED` | 300 u/s | a wall jump's upward speed in the zone (outside: 240) | `zones/side-view/constants.js` |
 | `SIDE_VIEW_WALL_JUMP_PUSH_SPEED` | 220 u/s | a wall jump's push off the wall in the zone (outside: 160) | `zones/side-view/constants.js` |
 | `SIDE_VIEW_EASE_SECONDS` | 0.8 s | swing to the side and back | `camera/side-view/constants.js` |
+| `SIDE_VIEW_TELEPORT_DISTANCE` | 256 units | a move in one tick this far counts as a teleport | `camera/side-view/constants.js` |
+| `SIDE_VIEW_TELEPORT_CUT_SECONDS` | 0.25 s | leaving within this long after a teleport cuts back instead of swinging | `camera/side-view/constants.js` |
 
 ---
 [← Lift zones](10-lift-zones.md) · [Mapping API](README.md) · [Jump pads →](12-jump-pads.md)

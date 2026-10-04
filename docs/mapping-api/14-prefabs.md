@@ -16,11 +16,15 @@ never knows whether an entity came from a prefab.
 | `hub.vmap` | `melon_racer.vmap` | the hub: `hub_start_trigger` (`hub_enter`/`hub_leave`), `hub_spawn`, the teleporters into the tutorial sections | — |
 | `route_canals.vmap` | `melon_racer.vmap` | track 1 with its checkpoints, zones and gates | — |
 | `route_bridge.vmap` | `melon_racer.vmap` | track 2 with its checkpoints, zones and gates | — |
+| `route_side_slice.vmap` | `melon_racer.vmap` | track 3, a 2D section: `start_3`, `start_spawn`, `finish_3` (built in, not gate prefabs) and two [side-view zones](11-camera-zones.md#side-view-zones) | — |
+| `route_tutorial.vmap` | `melon_racer.vmap` | the tutorial area: [`intro_spawn`](02-core-entities.md#spawn-points), [paint triggers](06-paint-triggers.md), [lift zones](10-lift-zones.md), a [camera zone](11-camera-zones.md), water, the [checkpoint teleporters](07-teleporters.md#name-variants) and the [`hub_teleport`](05-hub.md#sending-melons-to-the-hub) back to the hub | — |
 | `start_gate.vmap` | a route | a track's [start line](#start-gate): start trigger, `start_spawn`, full-heal zone | `track` = `start_<trackId>[_laps<M>]` |
 | `checkpoint_gate.vmap` | a route | a [checkpoint](#checkpoint-gate): checkpoint trigger, `checkpoint_spawn` | `checkpoint` = `checkpoint_<trackId>_<index>` |
 | `jump_pad.vmap` | a route | a [jump pad](#jump-pad): pad trigger (`jump_pad_enter`/`jump_pad_leave`) and its two marker particle systems | `jump_pad_high_far` = `jump_pad_<up>[_<forward>]` (optional) |
 | `finish_gate.vmap` | a route | a track's [finish line](#finish-gate): finish trigger | `track` = `finish_<trackId>` |
 | `heal_gate.vmap` | a route | a [full-heal](09-heal-zones.md#full-heal-zone) gate: `heal_zone_full` (`heal_enter`/`heal_leave`) | — |
+| `obstacle_mover.vmap` | a route | an [obstacle mover](#obstacle-mover): a [mover](16-movers.md) and a [kill trigger](08-kill-triggers.md#kill-trigger) riding along on it | `Mover Name` = `mover_<anything>`, plus direction, distance, speed, kill on/off |
+| `refill_jumps.vmap` | — (not placed yet) | a [jump recharge zone](#refill-jumps): trigger (`jump_recharge_enter`/`jump_recharge_leave`) and its marker particles | — |
 
 A route prefab holds one whole track, so it's placed **once**: the track
 ids are in its gates' overrides (and in any checkpoint placed without the
@@ -111,6 +115,34 @@ place a finish gate on the start line, overlapping the start gate. Never add
 `finish_line` to the start gate itself — see
 [Tracks: finish gate prefab](04-tracks.md#finish-gate-prefab).
 
+## Obstacle mover
+
+| Inside `obstacle_mover.vmap` | Set to |
+|---|---|
+| `func_movelinear` | a [mover](16-movers.md): **Name**, **Move Direction**, **Move Distance** and **Speed** bound to the variables below |
+| `trigger_multiple` `melon_killer` | a [kill trigger](08-kill-triggers.md#kill-trigger): `OnStartTouch` → `melon_break`, **Parent** bound to `Mover Name` (so it moves along), **Start Disabled** bound to `Disable Melon Break` |
+
+| Variable | Default | Override with |
+|---|---|---|
+| `Mover Name` | `mover_<uniqe_name>` | the mover's name: `mover_<anything>` or `mover_wait<seconds>[_<anything>]` ([Movers](16-movers.md)) — **one name per copy**, see below |
+| `movdir` | — | the direction it goes from its start |
+| `Moving Distance` | `220` | how far it goes, in units |
+| `Moving Speed` | `100` | units/sec |
+| `Disable Melon Break` | `0` | `1`: touching it doesn't break the melon (it's still a wall and hits as an impact) |
+
+Movers may share a name, but this prefab's kill trigger finds its mover
+**by name** (its Parent): two copies with the same `Mover Name` can leave
+a kill trigger riding on the other copy's mover. Give every copy its own.
+
+## Refill jumps
+
+| Inside `refill_jumps.vmap` | Set to |
+|---|---|
+| `trigger_multiple` | a [jump recharge zone](17-jump-recharge-zones.md): `OnStartTouch` → `jump_recharge_enter`, `OnEndTouch` → `jump_recharge_leave` |
+| `info_particle_system` | `particles/melon_racer/jump_recharge_rings.vpcf`, Start Active — the zone's marker |
+
+Nothing to set per copy; place it as often as needed.
+
 ## Rules
 
 - **"Fix Up Entity Names" stays off** on every placed prefab. With it on,
@@ -118,7 +150,7 @@ place a finish gate on the start line, overlapping the start gate. Never add
   script no longer finds `start_2`, `start_spawn`, `hub_start_trigger`, …
   and the triggers do nothing in-game.
 - **Names that must be unique stay in prefabs placed once**: `hub_spawn`,
-  `hub_start_trigger`, a track's `start_<trackId>`/`checkpoint_<trackId>_<index>`.
+  `hub_start_trigger`, `intro_spawn`, a track's `start_<trackId>`/`checkpoint_<trackId>_<index>`.
   Names that may repeat (`heal_zone_full`, `start_spawn`,
   `checkpoint_spawn`, `jump_pad_*`, zone triggers) can go into prefabs
   placed many times.

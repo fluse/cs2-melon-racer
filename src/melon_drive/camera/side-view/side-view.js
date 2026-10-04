@@ -3,10 +3,10 @@
 // at it from one side, like a 2D jump & run. The camera is switched to
 // CONTROLLED mode and placed by script every tick; it swings over from the
 // chase camera and back (SIDE_VIEW_EASE_SECONDS, the math in logic.js).
-import { CustomCameraMode } from "cs_script/point_script";
+import { Instance, CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { ApplyCameraFollow, ZonedFollowOffset } from "../follow/follow.js";
-import { StepSideViewBlend, SideViewPose, ChaseCameraPose, BlendPose } from "./logic.js";
+import { StepSideViewBlend, SideViewPose, ChaseCameraPose, BlendPose, IsTeleportJump, CutsSideViewExit } from "./logic.js";
 import { SideViewAxes } from "../../zones/side-view/logic.js";
 import { ViewAnglesFacing } from "../../zones/teleport/logic.js";
 // Straight from zones/registry.js, not zones/index.js: that one also loads
@@ -30,7 +30,24 @@ export function UpdateSideViewCamera(kart, dt) {
     if (kart.breaking || kart.freeLook) {
         return;
     }
+    const origin = kart.melon.GetAbsOrigin();
+    const now = Instance.GetGameTime();
+    const jumped = IsTeleportJump(kart.sideViewOrigin, origin);
+    kart.sideViewOrigin = origin;
+    if (jumped) {
+        kart.sideViewTeleportTime = now;
+    }
     const zone = CurrentSideView(kart);
+    if (!zone && (kart.sideViewBlend ?? 0) > 0 && CutsSideViewExit(kart.sideViewTeleportTime, now)) {
+        // Teleported out (hub, a checkpoint, a teleporter): straight back to
+        // the chase camera, the view left facing the way the teleport set it.
+        kart.sideViewBlend = 0;
+        kart.sideViewZone = undefined;
+        kart.sideViewLast = undefined;
+        ApplyCameraFollow(kart);
+        Debug(`side view: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} teleported out, camera cut back`);
+        return;
+    }
     if (!zone && kart.sideViewZone) {
         LookAlongTravel(kart, kart.sideViewZone);
     }
@@ -60,7 +77,6 @@ export function UpdateSideViewCamera(kart, dt) {
         camera.SetMode(CustomCameraMode.CONTROLLED);
         Debug(`side view: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} camera to the side (yaw ${sideView.yaw})`);
     }
-    const origin = kart.melon.GetAbsOrigin();
     const side = SideViewPose(origin, sideView);
     const pose =
         blend >= 1
@@ -74,7 +90,13 @@ export function UpdateSideViewCamera(kart, dt) {
                   side,
                   blend
               );
-    camera.Move({ position: pose.position, angles: pose.angles });
+    // Teleport after a jump (e.g. a respawn inside the zone): Move would
+    // interpolate the camera across the map.
+    if (jumped) {
+        camera.Teleport({ position: pose.position, angles: pose.angles });
+    } else {
+        camera.Move({ position: pose.position, angles: pose.angles });
+    }
 }
 
 /**

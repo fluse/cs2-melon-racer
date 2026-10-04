@@ -30,7 +30,7 @@ this folder, the script doesn't know about it.
 | 11 | [Camera zones](11-camera-zones.md) | Zoom out/in, front view, close-up, side view (2D) |
 | 12 | [Jump pads](12-jump-pads.md) | Timed launch pads, no damage |
 | 13 | [Water zones](13-water-zones.md) | Landing in water stops the melon, no bounces in it |
-| 14 | [Prefabs](14-prefabs.md) | Hub, routes, start/finish/heal gates; map variables, rules |
+| 14 | [Prefabs](14-prefabs.md) | Hub, routes, tutorial, start/finish/heal gates, jump pad, obstacle mover, refill jumps; map variables, rules |
 | 15 | [Checking your map](15-checking.md) | What `npm test` catches, debug log, minimal checklist |
 | 16 | [Movers](16-movers.md) | `func_movelinear`s the script keeps going back and forth |
 | 17 | [Jump recharge zones](17-jump-recharge-zones.md) | Wall jumps recharged at once, kept full inside |

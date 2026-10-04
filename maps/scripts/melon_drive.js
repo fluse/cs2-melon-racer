@@ -112,6 +112,7 @@ function TraceSphere(config) {
  *   sideViewDrive?: { zone: import("../zones/side-view/logic.js").SideView, plane: number, facing: 1 | -1 }, // the side view being driven in: its plane and which way the melon faces on screen — see UpdateKart
  *   sideViewBlend?: number, // 0..1, how far the camera has swung to the side — see UpdateSideViewCamera
  *   sideViewZone?: import("../zones/side-view/logic.js").SideView, sideViewLast?: import("../zones/side-view/logic.js").SideView, // the side view the camera is in / swinging out of — see UpdateSideViewCamera
+ *   sideViewOrigin?: { x: number, y: number, z: number }, sideViewTeleportTime?: number, // the melon's origin last tick / when it last jumped there by teleport — see UpdateSideViewCamera
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
  * }} Kart
  */
@@ -1238,6 +1239,13 @@ const SIDE_VIEW_WALL_JUMP_PUSH_SPEED = 220; // units/sec at least away from the 
 // Seconds the camera takes to swing from behind the melon to the side (and
 // back after leaving). Higher: a slower, smoother swing. 0: cuts.
 const SIDE_VIEW_EASE_SECONDS = 0.8;
+// Units the melon moves in one tick that only a teleport does (hub,
+// checkpoint respawn, a teleporter) — far beyond any boosted speed.
+const SIDE_VIEW_TELEPORT_DISTANCE = 256;
+// Seconds after such a jump in which leaving the side view cuts straight back
+// to the chase camera instead of swinging (the zone's OnEndTouch can arrive a
+// tick or two after the teleport).
+const SIDE_VIEW_TELEPORT_CUT_SECONDS = 0.25;
 
 // Debug output timing.
 
@@ -2106,6 +2114,32 @@ function StepSideViewBlend(blend, inSideView, dt) {
 }
 
 /**
+ * Whether the melon got from `previous` to `origin` in one tick only by a
+ * teleport (SIDE_VIEW_TELEPORT_DISTANCE).
+ * @param {{ x: number, y: number, z: number } | undefined} previous @param {{ x: number, y: number, z: number }} origin
+ */
+function IsTeleportJump(previous, origin) {
+    if (!previous) {
+        return false;
+    }
+    const dx = origin.x - previous.x;
+    const dy = origin.y - previous.y;
+    const dz = origin.z - previous.z;
+    return dx * dx + dy * dy + dz * dz > SIDE_VIEW_TELEPORT_DISTANCE * SIDE_VIEW_TELEPORT_DISTANCE;
+}
+
+/**
+ * Whether leaving the side view now cuts straight to the chase camera: the
+ * melon was teleported out (a jump at most SIDE_VIEW_TELEPORT_CUT_SECONDS
+ * ago) — swinging back from a side view of where it landed, with the view
+ * turned along the old 2D track, would only throw the camera around.
+ * @param {number | undefined} teleportTime @param {number} now
+ */
+function CutsSideViewExit(teleportTime, now) {
+    return teleportTime !== undefined && now - teleportTime <= SIDE_VIEW_TELEPORT_CUT_SECONDS;
+}
+
+/**
  * The side camera: `distance` back from `target` against the view direction
  * and `height` above it, looking at it.
  * @param {{ x: number, y: number, z: number }} target the melon's center
@@ -2243,7 +2277,24 @@ function UpdateSideViewCamera(kart, dt) {
     if (kart.breaking || kart.freeLook) {
         return;
     }
+    const origin = kart.melon.GetAbsOrigin();
+    const now = Instance.GetGameTime();
+    const jumped = IsTeleportJump(kart.sideViewOrigin, origin);
+    kart.sideViewOrigin = origin;
+    if (jumped) {
+        kart.sideViewTeleportTime = now;
+    }
     const zone = CurrentSideView(kart);
+    if (!zone && (kart.sideViewBlend ?? 0) > 0 && CutsSideViewExit(kart.sideViewTeleportTime, now)) {
+        // Teleported out (hub, a checkpoint, a teleporter): straight back to
+        // the chase camera, the view left facing the way the teleport set it.
+        kart.sideViewBlend = 0;
+        kart.sideViewZone = undefined;
+        kart.sideViewLast = undefined;
+        ApplyCameraFollow(kart);
+        Debug(`side view: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} teleported out, camera cut back`);
+        return;
+    }
     if (!zone && kart.sideViewZone) {
         LookAlongTravel(kart, kart.sideViewZone);
     }
@@ -2273,7 +2324,6 @@ function UpdateSideViewCamera(kart, dt) {
         camera.SetMode(CustomCameraMode.CONTROLLED);
         Debug(`side view: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} camera to the side (yaw ${sideView.yaw})`);
     }
-    const origin = kart.melon.GetAbsOrigin();
     const side = SideViewPose(origin, sideView);
     const pose =
         blend >= 1
@@ -2287,7 +2337,13 @@ function UpdateSideViewCamera(kart, dt) {
                   side,
                   blend
               );
-    camera.Move({ position: pose.position, angles: pose.angles });
+    // Teleport after a jump (e.g. a respawn inside the zone): Move would
+    // interpolate the camera across the map.
+    if (jumped) {
+        camera.Teleport({ position: pose.position, angles: pose.angles });
+    } else {
+        camera.Move({ position: pose.position, angles: pose.angles });
+    }
 }
 
 /**

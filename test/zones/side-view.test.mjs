@@ -7,7 +7,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
 import { SideViewFromName, SideViewAxes, InitialFacing, SideViewInput, KeepOnPlane } from "../../src/melon_drive/zones/side-view/logic.js";
-import { StepSideViewBlend, SideViewPose, ChaseCameraPose, BlendPose } from "../../src/melon_drive/camera/side-view/logic.js";
+import { StepSideViewBlend, SideViewPose, ChaseCameraPose, BlendPose, IsTeleportJump, CutsSideViewExit } from "../../src/melon_drive/camera/side-view/logic.js";
 import {
     SIDE_VIEW_DEFAULT_YAW,
     SIDE_VIEW_DISTANCE,
@@ -15,6 +15,8 @@ import {
     SIDE_VIEW_PLANE_PULL,
     SIDE_VIEW_PLANE_MAX_SPEED,
     SIDE_VIEW_EASE_SECONDS,
+    SIDE_VIEW_TELEPORT_DISTANCE,
+    SIDE_VIEW_TELEPORT_CUT_SECONDS,
     MELON_TEMPLATE_NAME,
     HUB_SPAWN_NAME,
 } from "../../src/melon_drive/constants/index.js";
@@ -74,6 +76,16 @@ test("the swing to the side eases over SIDE_VIEW_EASE_SECONDS, the yaw the short
     assert.ok(close(BlendPose(from, to, 0.5).position.x, 5));
     const chase = ChaseCameraPose({ x: 0, y: 0, z: 20 }, { x: -50, y: 0, z: 0 }, { pitch: 0, yaw: 0 });
     assert.ok(close(chase.position.x, -50) && close(chase.position.z, 20));
+});
+
+test("a teleport is a jump beyond SIDE_VIEW_TELEPORT_DISTANCE in one tick; leaving cuts only within SIDE_VIEW_TELEPORT_CUT_SECONDS of it", () => {
+    const o = { x: 0, y: 0, z: 0 };
+    assert.equal(IsTeleportJump(undefined, o), false);
+    assert.equal(IsTeleportJump(o, { x: SIDE_VIEW_TELEPORT_DISTANCE - 1, y: 0, z: 0 }), false);
+    assert.equal(IsTeleportJump(o, { x: 0, y: 0, z: SIDE_VIEW_TELEPORT_DISTANCE + 1 }), true);
+    assert.equal(CutsSideViewExit(undefined, 10), false);
+    assert.equal(CutsSideViewExit(10, 10 + SIDE_VIEW_TELEPORT_CUT_SECONDS), true);
+    assert.equal(CutsSideViewExit(10, 10 + SIDE_VIEW_TELEPORT_CUT_SECONDS + 0.01), false);
 });
 
 /** @type {CSPlayerPawn} */
@@ -142,4 +154,26 @@ test("the camera takes over in CONTROLLED mode at the side and hands back to the
     }
     assert.equal(camera.GetMode(), 3); // FOLLOW_POSITION
     assert.ok(close(Math.abs(pawn.GetEyeAngles().yaw), 180), `view turned west, got ${pawn.GetEyeAngles().yaw}`);
+});
+
+// Regression: teleported out of a side view (here to the hub), the camera
+// swung back from a side view of the hub over SIDE_VIEW_EASE_SECONDS and the
+// view was turned along the old 2D track instead of the hub's facing.
+test("teleported out of a side view, the camera cuts straight back to the chase camera and the view keeps the destination's facing", () => {
+    kart.melon.origin = { x: 5000, y: 50, z: 10 };
+    ScriptInput("side_view_enter")({ caller: trigger, activator: kart.melon });
+    for (let i = 0; i < 64 * SIDE_VIEW_EASE_SECONDS + 2; i++) {
+        Tick(["LEFT"]);
+    }
+    const camera = pawn.GetCustomCamera();
+    assert.equal(camera.GetMode(), 1); // CONTROLLED
+
+    ScriptInput("hub_teleport")({ caller: trigger, activator: kart.melon });
+    const hubYaw = pawn.GetEyeAngles().yaw;
+    Tick([]); // the teleport seen, the zone's OnEndTouch not yet in
+    ScriptInput("side_view_leave")({ caller: trigger, activator: kart.melon });
+    Tick([]);
+    assert.equal(camera.GetMode(), 3); // FOLLOW_POSITION at once, no swing
+    assert.equal(kart.sideViewBlend, 0);
+    assert.ok(close(pawn.GetEyeAngles().yaw, hubYaw), `view kept the hub's facing ${hubYaw}, got ${pawn.GetEyeAngles().yaw}`);
 });

@@ -52,6 +52,31 @@ test(`"${HUB_TRIGGER_NAME}" fires hub_enter on touch and hub_leave on untouch`, 
     assert.ok(own.some((c) => c.output === "OnEndTouch" && c.param === "hub_leave"), `${Named(HUB_TRIGGER_NAME)} is missing OnEndTouch -> hub_leave`);
 });
 
+// Regression: a side-view trigger fired side_view_leave on OnStartTouch, so
+// teleporting out of it (e.g. back to the hub) never left the zone and the
+// camera stayed in 2D. Every zone is entered on touch and left on untouch,
+// by the same trigger.
+test("every <zone>_enter fires on OnStartTouch, with <zone>_leave on OnEndTouch of the same trigger", () => {
+    const wrong = [];
+    for (const c of scriptInputs) {
+        const zone = /^(\w+)_(enter|leave)$/.exec(c.param);
+        if (!zone) {
+            continue;
+        }
+        const [, kind, edge] = zone;
+        const expected = edge === "enter" ? "OnStartTouch" : "OnEndTouch";
+        if (c.output !== expected) {
+            wrong.push(`${Describe(c)} fires ${c.param} on ${c.output} — should be ${expected}`);
+        }
+        const other = `${kind}_${edge === "enter" ? "leave" : "enter"}`;
+        const otherOutput = edge === "enter" ? "OnEndTouch" : "OnStartTouch";
+        if (!scriptInputs.some((o) => o.node === c.node && o.param === other && o.output === otherOutput)) {
+            wrong.push(`${Describe(c)} fires ${c.param} but not ${otherOutput} -> ${other}`);
+        }
+    }
+    assert.deepEqual(wrong, []);
+});
+
 // Generic teleporters: the destination lives in the trigger's name
 // (teleport_to_<destination>), so a typo there or a missing destination
 // entity makes the teleporter silently do nothing in-game.

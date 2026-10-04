@@ -59,6 +59,7 @@ import { predictionDotSet } from "./trace.js";
  *   sideViewDrive?: { zone: import("../zones/side-view/logic.js").SideView, plane: number, facing: 1 | -1 }, // the side view being driven in: its plane and which way the melon faces on screen — see UpdateKart
  *   sideViewBlend?: number, // 0..1, how far the camera has swung to the side — see UpdateSideViewCamera
  *   sideViewZone?: import("../zones/side-view/logic.js").SideView, sideViewLast?: import("../zones/side-view/logic.js").SideView, // the side view the camera is in / swinging out of — see UpdateSideViewCamera
+ *   sideViewOrigin?: { x: number, y: number, z: number }, sideViewTeleportTime?: number, // the melon's origin last tick / when it last jumped there by teleport — see UpdateSideViewCamera
  *   lastKnownPosition: any, lastKnownAngles: any, // set once the melon's first seen valid; unset only for a session's very first tick
  * }} Kart
  */

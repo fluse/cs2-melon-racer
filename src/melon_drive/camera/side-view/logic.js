@@ -1,7 +1,7 @@
 // Pure rules for the side-view camera — no cs_script import, so it's
 // unit-testable in Node (see test/camera/side-view.test.mjs). side-view.js
 // next to it places the camera.
-import { SIDE_VIEW_EASE_SECONDS } from "../../constants/index.js";
+import { SIDE_VIEW_EASE_SECONDS, SIDE_VIEW_TELEPORT_DISTANCE, SIDE_VIEW_TELEPORT_CUT_SECONDS } from "../../constants/index.js";
 import { SideViewAxes } from "../../zones/side-view/logic.js";
 import { RotateCameraOffset } from "../wall-clip/logic.js";
 
@@ -18,6 +18,32 @@ import { RotateCameraOffset } from "../wall-clip/logic.js";
 export function StepSideViewBlend(blend, inSideView, dt) {
     const step = SIDE_VIEW_EASE_SECONDS > 0 ? Math.max(0, dt) / SIDE_VIEW_EASE_SECONDS : 1;
     return inSideView ? Math.min(1, blend + step) : Math.max(0, blend - step);
+}
+
+/**
+ * Whether the melon got from `previous` to `origin` in one tick only by a
+ * teleport (SIDE_VIEW_TELEPORT_DISTANCE).
+ * @param {{ x: number, y: number, z: number } | undefined} previous @param {{ x: number, y: number, z: number }} origin
+ */
+export function IsTeleportJump(previous, origin) {
+    if (!previous) {
+        return false;
+    }
+    const dx = origin.x - previous.x;
+    const dy = origin.y - previous.y;
+    const dz = origin.z - previous.z;
+    return dx * dx + dy * dy + dz * dz > SIDE_VIEW_TELEPORT_DISTANCE * SIDE_VIEW_TELEPORT_DISTANCE;
+}
+
+/**
+ * Whether leaving the side view now cuts straight to the chase camera: the
+ * melon was teleported out (a jump at most SIDE_VIEW_TELEPORT_CUT_SECONDS
+ * ago) — swinging back from a side view of where it landed, with the view
+ * turned along the old 2D track, would only throw the camera around.
+ * @param {number | undefined} teleportTime @param {number} now
+ */
+export function CutsSideViewExit(teleportTime, now) {
+    return teleportTime !== undefined && now - teleportTime <= SIDE_VIEW_TELEPORT_CUT_SECONDS;
 }
 
 /**

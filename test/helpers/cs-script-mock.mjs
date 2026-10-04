@@ -73,7 +73,7 @@ export class CSPlayerPawn extends Entity {
         this.justPressed = new Set();
         /** @type {Entity[]} weapons held, the first is the active one */
         this.weapons = [];
-        this.camera = { mode: 0, config: undefined, SetMode(m) { this.mode = m; }, GetMode() { return this.mode; }, SetFollowConfig(c) { this.config = c; }, Move(v) { this.pose = v; } };
+        this.camera = { mode: 0, config: undefined, SetMode(m) { this.mode = m; }, GetMode() { return this.mode; }, SetFollowConfig(c) { this.config = c; }, Move(v) { this.pose = v; }, Teleport(v) { this.pose = v; } };
     }
     Teleport(values = {}) {
         super.Teleport(values);

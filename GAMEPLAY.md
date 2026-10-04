@@ -966,6 +966,9 @@ camera looks, Hammer yaw; defaults `SIDE_VIEW_*`). Inside:
   (`SIDE_VIEW_PLANE_PULL`).
 - Leaving, the player's view is turned the way the melon faced on screen,
   so driving carries on in that direction behind the chase camera.
+  Teleported out instead (hub, checkpoint, teleporter — a jump of more than
+  `SIDE_VIEW_TELEPORT_DISTANCE` in one tick), the camera cuts straight back
+  to the chase camera, no swing, and the view keeps the teleport's facing.
 
 Constants: `zones/side-view/constants.js`, `camera/side-view/constants.js`;
 rules: `zones/side-view/logic.js` and `camera/side-view/logic.js`, applied
