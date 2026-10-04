@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ApplyCheckpointTouch, ApplyLapCompletion, ApplyStartTouch, StartLineTrackId, FinishLineTrackId } from "../../src/melon_drive/race/checkpoints/logic.js";
+import { ApplyCheckpointTouch, ApplyLapCompletion, ApplyStartTouch, StartLineTrackId, FinishLineTrackId, CheckpointFromTrigger } from "../../src/melon_drive/race/checkpoints/logic.js";
 
 const TRACK = 1;
 const OTHER_TRACK = 2;
@@ -217,6 +217,13 @@ test("start_line reads the track from a start trigger's name", () => {
     assert.equal(StartLineTrackId("start_spawn"), undefined);
     assert.equal(StartLineTrackId("finish_2"), undefined);
     assert.equal(StartLineTrackId(""), undefined);
+});
+
+test("checkpoint reads track and index from a checkpoint trigger's name", () => {
+    assert.deepEqual(CheckpointFromTrigger("checkpoint_2_3"), { trackId: 2, index: 3 });
+    assert.deepEqual(CheckpointFromTrigger(" checkpoint_1_12 "), { trackId: 1, index: 12 });
+    assert.equal(CheckpointFromTrigger("checkpoint_spawn_1_3"), undefined);
+    assert.equal(CheckpointFromTrigger("checkpoint"), undefined);
 });
 
 test("finish_line reads the track from a finish trigger's name, or a loop's start trigger", () => {

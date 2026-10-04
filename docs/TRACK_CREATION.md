@@ -91,6 +91,15 @@ the trigger) its respawn point until checkpoint 1.
 
 ## 2. Checkpoint triggers
 
+**Quickest way: the checkpoint gate prefab.** Place
+`maps/prefabs/checkpoint_gate.vmap` where racers should pass, select the
+placed instance and set the **Override** of its map variable `checkpoint`
+to this checkpoint's trigger name (`checkpoint_2_3`, …). Its trigger
+already fires `checkpoint` and it holds a `checkpoint_spawn` the script
+finds next to it. Details:
+[Mapping API: checkpoint gate prefab](mapping-api/04-tracks.md#checkpoint-gate-prefab).
+The rest of this section is what the prefab contains.
+
 For each checkpoint after the start line (numbered 1 through N, in the order
 racers should reach them), place a `trigger_multiple` where racers should
 pass it, plus an `info_target` where a broken melon should respawn after
@@ -101,26 +110,28 @@ trigger_multiple  checkpoint_<trackId>_<index>         e.g. checkpoint_1_3
 info_target       checkpoint_spawn_<trackId>_<index>   e.g. checkpoint_spawn_1_3
 ```
 
-**The trigger's name must be exactly its parameter** — the script can't see
-which parameter an output fires, so it counts a track's checkpoints from
-these names (the highest index). Number them without gaps; `npm test` fails
-on a misnamed checkpoint trigger or a gap.
+**Every checkpoint trigger fires the same parameter, `checkpoint`** — the
+script reads which checkpoint it is from the trigger's name, and counts a
+track's checkpoints from these names (the highest index). Number them
+without gaps; `npm test` fails on a misnamed checkpoint trigger or a gap.
 
 The melon respawns just above the floor below the `info_target`, facing the
 `info_target`'s yaw (turn it in Hammer; pitch/roll don't matter). It can sit
-anywhere — in front of, behind or beside the trigger. Without one, the
-trigger's own position/angles are the respawn point.
+anywhere — in front of, behind or beside the trigger. Without
+`checkpoint_spawn_<trackId>_<index>` the `info_target` named just
+`checkpoint_spawn` nearest to the trigger is used (within 1024 units — the
+gate prefab's), and without that the trigger's own position/angles.
 
 **Outputs** (on each checkpoint trigger):
 
 | Output | Target entity | Via this input | Parameter |
 |---|---|---|---|
-| `OnStartTouch` | the map's `point_script` entity | `RunScriptInput` | `checkpoint_<trackId>_<index>` |
+| `OnStartTouch` | the map's `point_script` entity | `RunScriptInput` | `checkpoint` |
 
-Example for track 1's 3rd checkpoint:
+Every checkpoint, e.g. track 1's 3rd (the trigger named `checkpoint_1_3`):
 
 ```
-OnStartTouch → melon_drive_script → RunScriptInput → checkpoint_1_3
+OnStartTouch → melon_drive_script → RunScriptInput → checkpoint
 ```
 
 Checkpoints only count once the kart crossed this track's start line, one
@@ -194,9 +205,9 @@ only melons — never player pawns or other props — can fire it.
    - `OnStartTouch → melon_drive_script → RunScriptInput → start_1`
    - `OnStartTouch → melon_drive_script → RunScriptInput → finish_1`
 2. `trigger_multiple` **"checkpoint_1_1"** partway round.
-   Output: `OnStartTouch → melon_drive_script → RunScriptInput → checkpoint_1_1`
+   Output: `OnStartTouch → melon_drive_script → RunScriptInput → checkpoint`
 3. `trigger_multiple` **"checkpoint_1_2"** further round.
-   Output: `OnStartTouch → melon_drive_script → RunScriptInput → checkpoint_1_2`
+   Output: `OnStartTouch → melon_drive_script → RunScriptInput → checkpoint`
 
 Driving flow: spawn on the line → `checkpoint_1_1` → `checkpoint_1_2` →
 back across the start line → lap 1/3 done → repeat two more times → heat
@@ -260,7 +271,7 @@ parameter name, not a script problem. Run `npm test` too: it checks the
       start trigger) behind the start line, facing down the track, with room
       for the racers side by side.
 - [ ] One `checkpoint_<trackId>_<index>` trigger per checkpoint, `1..N`, each
-      named exactly like the parameter it fires.
+      firing `checkpoint`.
 - [ ] A `finish_<trackId>` output — on the start trigger (loop) or on a
       trigger at the end (point-to-point).
 - [ ] Every trigger above filtered to `prop_physics`.

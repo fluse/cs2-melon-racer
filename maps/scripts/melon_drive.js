@@ -876,12 +876,13 @@ const BREAK_PIECE_SPIN = 600;
 
 // Tracks, checkpoints and the hub -> race -> next-track flow.
 
-// The map has multiple separate tracks, so a checkpoint's script input
-// parameter names both which track it belongs to and its position along
-// that track: "checkpoint_<trackId>_<index>", e.g. "checkpoint_2_5" is
-// track 2's 5th checkpoint. Registered up front for every combination (see
-// race/checkpoints/checkpoints.js) — raise these if a track ends up needing more checkpoints,
-// or the map more tracks, than currently allowed for.
+// The map has multiple separate tracks, so a checkpoint trigger's name
+// says both which track it belongs to and its position along that track:
+// "checkpoint_<trackId>_<index>", e.g. "checkpoint_2_5" is track 2's 5th
+// checkpoint. The start_<trackId>/finish_<trackId> inputs are registered up
+// front for every track (see race/checkpoints/checkpoints.js) — raise these
+// if a track ends up needing more checkpoints, or the map more tracks, than
+// currently allowed for.
 const MAX_TRACKS = 8;
 const MAX_CHECKPOINTS_PER_TRACK = 32;
 
@@ -942,17 +943,23 @@ function StartSpawnName(trackId) {
 const START_SPAWN_SHARED_NAME = "start_spawn";
 const START_SPAWN_SHARED_MAX_DISTANCE = 1024;
 
-// Checkpoint triggers are named like their script input,
-// "checkpoint_<trackId>_<index>" — GetTrackConfig() counts a track's
-// checkpoints from these names (the script can't see which parameter a
-// trigger's output fires), so the name is required, not just tidy.
+// Checkpoint triggers are named "checkpoint_<trackId>_<index>" and all fire
+// the one script input "checkpoint", which reads track and index from the
+// firing trigger's name — GetTrackConfig() counts a track's checkpoints from
+// these names too. (Not a parameter per checkpoint, named like its trigger:
+// Hammer warns about a RunScriptInput parameter that matches an entity name.)
 const CHECKPOINT_TRIGGER_NAME_PATTERN = /^checkpoint_(\d+)_(\d+)$/;
 
 // Respawn point of a checkpoint: an info_target named
 // "checkpoint_spawn_<trackId>_<index>" (e.g. "checkpoint_spawn_1_3"). A
 // broken melon respawns there, facing the entity's yaw. Without one, the
-// checkpoint trigger's own transform is used instead.
+// nearest info_target named just "checkpoint_spawn" within
+// CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE of the checkpoint trigger is used
+// (every copy of a checkpoint gate prefab carries one, like start_spawn),
+// and without that the checkpoint trigger's own transform.
 const CHECKPOINT_SPAWN_NAME_PATTERN = /^checkpoint_spawn_(\d+)_(\d+)$/;
+const CHECKPOINT_SPAWN_SHARED_NAME = "checkpoint_spawn";
+const CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE = 1024;
 /** @param {number} trackId @param {number} index */
 function CheckpointSpawnName(trackId, index) {
     return `checkpoint_spawn_${trackId}_${index}`;
@@ -1958,9 +1965,10 @@ function TeleportExitVelocity(velocity, destinationYaw, keepSpeed = TELEPORT_KEE
 
 /**
  * Index of the point in `points` nearest to `origin`, if it's within
- * `maxDistance` — undefined if there's none that close. Picks a start gate
- * prefab's own shared-name "start_spawn" for its start trigger: every copy
- * of the gate carries one, and its own is the one right next to it.
+ * `maxDistance` — undefined if there's none that close. Picks a gate
+ * prefab's own shared-name spawn ("start_spawn", "checkpoint_spawn") for its
+ * trigger: every copy of the gate carries one, and its own is the one right
+ * next to it.
  * @param {Array<{ x: number, y: number, z: number }>} points
  * @param {{ x: number, y: number, z: number }} origin
  * @param {number} maxDistance
@@ -2059,22 +2067,22 @@ function FindSpawnPoint(name, facingName) {
 }
 
 /**
- * Spawn point of the entity named START_SPAWN_SHARED_NAME nearest to
- * `trigger`, within START_SPAWN_SHARED_MAX_DISTANCE — a start gate prefab's
- * own spawn (every copy of the gate has one by that name). Undefined if none
- * is that close.
- * @param {any} trigger
+ * Spawn point of the entity named `name` nearest to `trigger`, within
+ * `maxDistance` — a gate prefab's own spawn (every copy of a start or
+ * checkpoint gate has one by that shared name). Undefined if none is that
+ * close.
+ * @param {string} name @param {any} trigger @param {number} maxDistance
  * @returns {SpawnPoint | undefined}
  */
-function FindSharedStartSpawnPoint(trigger) {
-    const candidates = Instance.FindEntitiesByName(START_SPAWN_SHARED_NAME);
+function FindSharedSpawnPoint(name, trigger, maxDistance) {
+    const candidates = Instance.FindEntitiesByName(name);
     if (candidates.length === 0) {
         return undefined;
     }
     const origin = trigger.GetAbsOrigin();
-    const nearest = NearestWithin(candidates.map((e) => e.GetAbsOrigin()), origin, START_SPAWN_SHARED_MAX_DISTANCE);
+    const nearest = NearestWithin(candidates.map((e) => e.GetAbsOrigin()), origin, maxDistance);
     if (nearest === undefined) {
-        Debug(`FindSharedStartSpawnPoint: no "${START_SPAWN_SHARED_NAME}" within ${START_SPAWN_SHARED_MAX_DISTANCE} units of "${trigger.GetEntityName()}"`);
+        Debug(`FindSharedSpawnPoint: no "${name}" within ${maxDistance} units of "${trigger.GetEntityName()}"`);
         return undefined;
     }
     const entity = candidates[nearest];
@@ -2106,12 +2114,13 @@ function GetIntroSpawnPoint() {
 /**
  * Where a melon respawns after reaching checkpoint `index` of track
  * `trackId`: the checkpoint_spawn_<trackId>_<index> info_target, facing its
- * yaw. Undefined if the map has none — the caller falls back to the
- * checkpoint trigger itself.
- * @param {number} trackId @param {number} index
+ * yaw — else the nearest "checkpoint_spawn" to the checkpoint trigger `trigger`
+ * (a checkpoint gate prefab's). Undefined if the map has neither — the
+ * caller falls back to the checkpoint trigger itself.
+ * @param {number} trackId @param {number} index @param {any} trigger
  */
-function GetCheckpointSpawnPoint(trackId, index) {
-    return FindSpawnPoint(CheckpointSpawnName(trackId, index));
+function GetCheckpointSpawnPoint(trackId, index, trigger) {
+    return FindSpawnPoint(CheckpointSpawnName(trackId, index)) ?? FindSharedSpawnPoint(CHECKPOINT_SPAWN_SHARED_NAME, trigger, CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE);
 }
 
 /**
@@ -2123,7 +2132,7 @@ function GetCheckpointSpawnPoint(trackId, index) {
  * @returns {SpawnPoint}
  */
 function GetStartSpawnPoint(trackId, trigger) {
-    const spawn = FindSpawnPoint(StartSpawnName(trackId)) ?? FindSharedStartSpawnPoint(trigger);
+    const spawn = FindSpawnPoint(StartSpawnName(trackId)) ?? FindSharedSpawnPoint(START_SPAWN_SHARED_NAME, trigger, START_SPAWN_SHARED_MAX_DISTANCE);
     if (spawn) {
         return spawn;
     }
@@ -5636,7 +5645,7 @@ function UpdateRaceFlow(now) {
 // Pure checkpoint/lap progression rules — no cs_script import, so they're
 // unit-testable in Node (see test/race/checkpoint-progress.test.mjs).
 // race/checkpoints/checkpoints.js wires these to the start_<trackId> /
-// checkpoint_<trackId>_<index> / finish_<trackId> script inputs and handles
+// checkpoint / finish_<trackId> script inputs and handles
 // the engine side (respawn position, FinishKart, debug logging). See
 // "Multiple tracks & checkpoints" in GAMEPLAY.md for the design.
 //
@@ -5665,6 +5674,17 @@ function StartLineTrackId(triggerName) {
 function FinishLineTrackId(triggerName) {
     const m = FINISH_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
     return m ? Number(m[1]) : StartLineTrackId(triggerName);
+}
+
+/**
+ * checkpoint: which checkpoint a trigger is, from its name
+ * ("checkpoint_2_3" -> track 2, 3rd checkpoint). Undefined for any other name.
+ * @param {string} triggerName
+ * @returns {{ trackId: number, index: number } | undefined}
+ */
+function CheckpointFromTrigger(triggerName) {
+    const m = CHECKPOINT_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
+    return m ? { trackId: Number(m[1]), index: Number(m[2]) } : undefined;
 }
 
 /**
@@ -5805,12 +5825,14 @@ function ApplyCheckpointTouch(kart, trackId, index) {
 // whose trigger name is a prefab variable but whose output is fixed.
 //
 // Checkpoints: a trigger_multiple per checkpoint along the track, named
-// like its parameter, OnStartTouch -> RunScriptInput
 // "checkpoint_<trackId>_<index>" — e.g. track 2's 3rd checkpoint is
-// "checkpoint_2_3", counted from 1 after the start line. If the melon breaks
+// "checkpoint_2_3", counted from 1 after the start line — with
+// OnStartTouch -> RunScriptInput "checkpoint", which reads the checkpoint
+// from that name. If the melon breaks
 // after reaching it, it respawns at the info_target named
-// "checkpoint_spawn_<trackId>_<index>", facing that entity's yaw — or,
-// without one, at the trigger's own position/angles.
+// "checkpoint_spawn_<trackId>_<index>", facing that entity's yaw — else at
+// the nearest "checkpoint_spawn" (a checkpoint gate prefab's), else at the
+// trigger's own position/angles.
 //
 // The progression rules themselves (which touch counts, one checkpoint at
 // a time, the start picks the track, lap counting on a start re-touch) live
@@ -5830,12 +5852,12 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
             Debug(`checkpoint_${trackId}_${index}: kart is at checkpoint ${kart.checkpointIndex}, skipped one — ignoring`);
             return;
     }
-    const spawn = GetCheckpointSpawnPoint(trackId, index);
+    const spawn = GetCheckpointSpawnPoint(trackId, index, trigger);
     if (spawn) {
         kart.checkpointPosition = spawn.position;
         kart.checkpointAngles = spawn.angles;
     } else {
-        Debug(`checkpoint_${trackId}_${index}: no info_target "checkpoint_spawn_${trackId}_${index}", respawning at the trigger itself`);
+        Debug(`checkpoint_${trackId}_${index}: no info_target "checkpoint_spawn_${trackId}_${index}" or "checkpoint_spawn" nearby, respawning at the trigger itself`);
         // + TELEPORT_UP_OFFSET for the same reason BeginHeat adds
         // it to their teleport targets: mappers commonly sink a checkpoint
         // trigger's brush into the floor so a fast-moving melon reliably
@@ -6021,7 +6043,7 @@ function TrackIdFromCaller(input, caller, parse) {
     return trackId;
 }
 
-/** Registers the start_<trackId>, checkpoint_<trackId>_<index> and finish_<trackId> OnScriptInput handlers for every track/checkpoint slot the map is allowed to use, plus the generic start_line / finish_line. Called once from index.js. */
+/** Registers the start_<trackId> and finish_<trackId> OnScriptInput handlers for every track the map is allowed to use, plus the generic start_line / finish_line and checkpoint. Called once from index.js. */
 function RegisterCheckpointAndFinishInputs() {
     Instance.OnScriptInput("start_line", ({ caller, activator }) => {
         const kart = activator && FindKartByMelon(activator);
@@ -6058,20 +6080,20 @@ function RegisterCheckpointAndFinishInputs() {
         });
     }
 
-    for (let t = 1; t <= MAX_TRACKS; t++) {
-        for (let i = 1; i <= MAX_CHECKPOINTS_PER_TRACK; i++) {
-            const trackId = t;
-            const index = i;
-            Instance.OnScriptInput(`checkpoint_${trackId}_${index}`, ({ caller, activator }) => {
-                const kart = activator && FindKartByMelon(activator);
-                if (!kart || !caller) {
-                    Debug(`checkpoint_${trackId}_${index}: activator wasn't a tracked melon, ignoring`);
-                    return;
-                }
-                OnCheckpointTouched(trackId, index, kart, caller);
-            });
+    Instance.OnScriptInput("checkpoint", ({ caller, activator }) => {
+        const kart = activator && FindKartByMelon(activator);
+        if (!kart || !caller) {
+            Debug("checkpoint: activator wasn't a tracked melon, ignoring");
+            return;
         }
-    }
+        const name = caller.GetEntityName();
+        const checkpoint = CheckpointFromTrigger(name);
+        if (!checkpoint || checkpoint.trackId < 1 || checkpoint.trackId > MAX_TRACKS || checkpoint.index < 1 || checkpoint.index > MAX_CHECKPOINTS_PER_TRACK) {
+            Instance.Msg(`[melon_drive] checkpoint fired by "${name}", which isn't named checkpoint_<trackId 1..${MAX_TRACKS}>_<index 1..${MAX_CHECKPOINTS_PER_TRACK}> — ignoring. See docs/mapping-api/04-tracks.md.`);
+            return;
+        }
+        OnCheckpointTouched(checkpoint.trackId, checkpoint.index, kart, caller);
+    });
 
     for (let t = 1; t <= MAX_TRACKS; t++) {
         const trackId = t;

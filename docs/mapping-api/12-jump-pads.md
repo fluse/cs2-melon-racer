@@ -52,6 +52,15 @@ moving). Height ≈ up² / 1600 units — a normal jump reaches ~85.
   after landing — landings, crashes and wall hits are free. The attack
   boost still costs health, [kill triggers](08-kill-triggers.md) still break.
 
+## Jump pad prefab
+
+`maps/prefabs/jump_pad.vmap` is a whole pad: the trigger with both outputs
+and the two marker particle systems below. Its trigger name is bound to the
+map variable `jump_pad_high_far` (default `jump_pad_1000_1000`): leave it
+for a 1000 u/s up, +1000 u/s forward pad, or **Override** it per copy with
+any name from the table above, e.g. `jump_pad_1200_500`. How map variables
+work: [Prefabs](14-prefabs.md#jump-pad).
+
 ## Marker effect (optional, not script-driven)
 
 Two `info_particle_system`s at the pad's center, just above its surface,

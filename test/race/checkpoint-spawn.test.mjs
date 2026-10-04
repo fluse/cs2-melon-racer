@@ -17,7 +17,7 @@ const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
 const { GetIntroSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
 const { RespawnKartAtCheckpoint } = await import("../../src/melon_drive/kart/index.js");
 const { BeginHeat } = await import("../../src/melon_drive/race/heat/race-flow.js");
-const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, TELEPORT_UP_OFFSET, START_SPAWN_SHARED_NAME, START_SPAWN_SHARED_MAX_DISTANCE, CheckpointSpawnName, StartSpawnName } = await import("../../src/melon_drive/constants/index.js");
+const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, TELEPORT_UP_OFFSET, START_SPAWN_SHARED_NAME, START_SPAWN_SHARED_MAX_DISTANCE, CHECKPOINT_SPAWN_SHARED_NAME, CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE, CheckpointSpawnName, StartSpawnName } = await import("../../src/melon_drive/constants/index.js");
 await import("../../src/melon_drive/index.js"); // registers the script inputs
 
 /** @param {string} name */
@@ -54,7 +54,7 @@ test("a checkpoint respawns the melon at its checkpoint_spawn info_target, facin
         angles: { pitch: 20, yaw: 135, roll: 5 },
     }));
     ScriptInput("start_1")({ caller: start, activator: kart.melon });
-    ScriptInput("checkpoint_1_1")({ caller: trigger, activator: kart.melon });
+    ScriptInput("checkpoint")({ caller: trigger, activator: kart.melon });
     assert.equal(kart.checkpointIndex, 1);
 
     RespawnKartAtCheckpoint(kart);
@@ -68,7 +68,50 @@ test("a checkpoint respawns the melon at its checkpoint_spawn info_target, facin
 
 test("without a checkpoint_spawn info_target the checkpoint trigger itself is the respawn point", () => {
     ScriptInput("start_1")({ caller: start, activator: kart.melon });
-    ScriptInput("checkpoint_1_1")({ caller: trigger, activator: kart.melon });
+    ScriptInput("checkpoint")({ caller: trigger, activator: kart.melon });
+
+    RespawnKartAtCheckpoint(kart);
+    const origin = trigger.GetAbsOrigin();
+    assert.deepEqual(kart.melon.GetAbsOrigin(), { x: origin.x, y: origin.y, z: origin.z + TELEPORT_UP_OFFSET });
+});
+
+/** A checkpoint_spawn (shared name, as in the checkpoint gate prefab) `offset` units along x from the checkpoint trigger. @param {number} offset @param {number} yaw */
+function AddSharedCheckpointSpawn(offset, yaw) {
+    const origin = trigger.GetAbsOrigin();
+    return world.add(new Entity({
+        name: CHECKPOINT_SPAWN_SHARED_NAME,
+        className: "info_target",
+        origin: { x: origin.x + offset, y: origin.y, z: origin.z },
+        angles: { pitch: 0, yaw, roll: 0 },
+    }));
+}
+
+test("without checkpoint_spawn_<trackId>_<index>, a checkpoint uses the nearest shared checkpoint_spawn", () => {
+    AddSharedCheckpointSpawn(600, 0); // another gate's
+    const own = AddSharedCheckpointSpawn(-150, 30);
+    ScriptInput("start_1")({ caller: start, activator: kart.melon });
+    ScriptInput("checkpoint")({ caller: trigger, activator: kart.melon });
+
+    RespawnKartAtCheckpoint(kart);
+    const origin = own.GetAbsOrigin();
+    assert.deepEqual(kart.melon.GetAbsOrigin(), { x: origin.x, y: origin.y, z: origin.z + SPAWN_UP_OFFSET });
+    assert.equal(kart.melon.GetAbsAngles().yaw, 30);
+});
+
+test("checkpoint_spawn_<trackId>_<index> wins over a shared checkpoint_spawn", () => {
+    AddSharedCheckpointSpawn(-10, 30);
+    const target = world.add(new Entity({ name: CheckpointSpawnName(1, 1), className: "info_target", origin: { x: 2500, y: 1300, z: 64 } }));
+    ScriptInput("start_1")({ caller: start, activator: kart.melon });
+    ScriptInput("checkpoint")({ caller: trigger, activator: kart.melon });
+
+    RespawnKartAtCheckpoint(kart);
+    assert.equal(kart.melon.GetAbsOrigin().x, target.GetAbsOrigin().x);
+});
+
+test("a shared checkpoint_spawn too far from the checkpoint trigger isn't used", () => {
+    AddSharedCheckpointSpawn(CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE + 1, 30);
+    ScriptInput("start_1")({ caller: start, activator: kart.melon });
+    ScriptInput("checkpoint")({ caller: trigger, activator: kart.melon });
 
     RespawnKartAtCheckpoint(kart);
     const origin = trigger.GetAbsOrigin();
@@ -78,7 +121,7 @@ test("without a checkpoint_spawn info_target the checkpoint trigger itself is th
 test("a tilted checkpoint trigger respawns the melon level, facing its yaw", () => {
     const tilted = world.add(new Entity({ name: "checkpoint_1_1", className: "trigger_multiple", origin: { x: 0, y: 0, z: 0 }, angles: { pitch: 15, yaw: 60, roll: 10 } }));
     ScriptInput("start_1")({ caller: start, activator: kart.melon });
-    ScriptInput("checkpoint_1_1")({ caller: tilted, activator: kart.melon });
+    ScriptInput("checkpoint")({ caller: tilted, activator: kart.melon });
 
     RespawnKartAtCheckpoint(kart);
     assert.deepEqual(kart.melon.GetAbsAngles(), { pitch: 0, yaw: 60, roll: 0 });
@@ -189,7 +232,7 @@ test("start_line from a trigger named after no track is ignored", () => {
 test("finish_line counts the lap of the track its trigger is named after", () => {
     const finish = world.add(new Entity({ name: "finish_1", className: "trigger_multiple" }));
     ScriptInput("start_1")({ caller: start, activator: kart.melon });
-    ScriptInput("checkpoint_1_1")({ caller: trigger, activator: kart.melon });
+    ScriptInput("checkpoint")({ caller: trigger, activator: kart.melon });
     ScriptInput("finish_line")({ caller: finish, activator: kart.melon });
     assert.equal(kart.lapsCompleted, 1);
 });
@@ -197,14 +240,14 @@ test("finish_line counts the lap of the track its trigger is named after", () =>
 test("finish_line from a trigger named after no track is ignored", () => {
     const finish = world.add(new Entity({ name: "finish_gate", className: "trigger_multiple" }));
     ScriptInput("start_1")({ caller: start, activator: kart.melon });
-    ScriptInput("checkpoint_1_1")({ caller: trigger, activator: kart.melon });
+    ScriptInput("checkpoint")({ caller: trigger, activator: kart.melon });
     ScriptInput("finish_line")({ caller: finish, activator: kart.melon });
     assert.equal(kart.lapsCompleted, 0);
 });
 
 test("a checkpoint before the start line is crossed doesn't count", () => {
     const before = kart.checkpointPosition;
-    ScriptInput("checkpoint_1_1")({ caller: trigger, activator: kart.melon });
+    ScriptInput("checkpoint")({ caller: trigger, activator: kart.melon });
     assert.equal(kart.trackId, undefined);
     assert.equal(kart.checkpointPosition, before);
 });
@@ -212,7 +255,17 @@ test("a checkpoint before the start line is crossed doesn't count", () => {
 test("an ignored checkpoint touch doesn't move the respawn point", () => {
     world.add(new Entity({ name: CheckpointSpawnName(1, 2), className: "info_target", origin: { x: 9000, y: 9000, z: 0 } }));
     const before = kart.checkpointPosition;
-    ScriptInput("checkpoint_1_2")({ caller: trigger, activator: kart.melon }); // not on track 1 yet
+    const second = world.add(new Entity({ name: "checkpoint_1_2", className: "trigger_multiple" }));
+    ScriptInput("checkpoint")({ caller: second, activator: kart.melon }); // not on track 1 yet
+    assert.equal(kart.checkpointPosition, before);
+});
+
+test("checkpoint from a trigger named after no checkpoint is ignored", () => {
+    ScriptInput("start_1")({ caller: start, activator: kart.melon });
+    const before = kart.checkpointPosition;
+    const odd = world.add(new Entity({ name: "checkpoint_gate", className: "trigger_multiple" }));
+    ScriptInput("checkpoint")({ caller: odd, activator: kart.melon });
+    assert.equal(kart.checkpointIndex, 0);
     assert.equal(kart.checkpointPosition, before);
 });
 

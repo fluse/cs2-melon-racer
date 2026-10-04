@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { ReadVmapConnections, ReadVmapEntities } from "../helpers/vmap.mjs";
 import { ParseTeleportTarget } from "../../src/melon_drive/zones/teleport/logic.js";
-import { HUB_TRIGGER_NAME, CHECKPOINT_SPAWN_NAME_PATTERN, START_TRIGGER_NAME_PATTERN, START_SPAWN_NAME_PATTERN, START_SPAWN_SHARED_NAME, CHECKPOINT_TRIGGER_NAME_PATTERN } from "../../src/melon_drive/constants/index.js";
+import { HUB_TRIGGER_NAME, CHECKPOINT_SPAWN_NAME_PATTERN, START_TRIGGER_NAME_PATTERN, START_SPAWN_NAME_PATTERN, START_SPAWN_SHARED_NAME, CHECKPOINT_TRIGGER_NAME_PATTERN, CHECKPOINT_SPAWN_SHARED_NAME } from "../../src/melon_drive/constants/index.js";
 import { StartLineTrackId, FinishLineTrackId } from "../../src/melon_drive/race/checkpoints/logic.js";
 
 const vmapPath = fileURLToPath(new URL("../../maps/melon_racer.vmap", import.meta.url));
@@ -22,7 +22,7 @@ function Describe(c) {
 }
 
 // Everything src/melon_drive/ registers via Instance.OnScriptInput.
-const KNOWN_INPUT = /^(start_\d+|start_line|checkpoint_\d+_\d+|finish_\d+|finish_line|hub_enter|hub_leave|hub_teleport|melon_paint|melon_teleport|melon_break|melon_respawn|heal_enter|heal_leave|lift_enter|lift_leave|camera_enter|camera_leave|jump_pad_enter|jump_pad_leave|water_enter|water_leave)$/;
+const KNOWN_INPUT = /^(start_\d+|start_line|checkpoint|finish_\d+|finish_line|hub_enter|hub_leave|hub_teleport|melon_paint|melon_teleport|melon_break|melon_respawn|heal_enter|heal_leave|lift_enter|lift_leave|camera_enter|camera_leave|jump_pad_enter|jump_pad_leave|water_enter|water_leave)$/;
 
 test("every RunScriptInput names an input the script registers", () => {
     const unknown = scriptInputs.filter((c) => !KNOWN_INPUT.test(c.param)).map((c) => `${Describe(c)} -> "${c.param}"`);
@@ -164,11 +164,28 @@ test("every start_* entity is a start trigger or a start_spawn", () => {
     assert.deepEqual(bad, []);
 });
 
-test("checkpoint triggers are named exactly like the checkpoint they fire", () => {
-    const bad = scriptInputs
-        .filter((c) => CHECKPOINT_TRIGGER_NAME_PATTERN.test(c.param) && c.targetname.trim() !== c.param)
-        .map((c) => `${Describe(c)} fires ${c.param} — the checkpoint count is read from trigger names`);
+test("every checkpoint* entity is a checkpoint trigger or a checkpoint_spawn", () => {
+    const bad = [...entityNames]
+        .filter((name) => name.startsWith("checkpoint") && !CHECKPOINT_TRIGGER_NAME_PATTERN.test(name) && !CHECKPOINT_SPAWN_NAME_PATTERN.test(name) && name !== CHECKPOINT_SPAWN_SHARED_NAME)
+        .map((name) => `"${name}" — checkpoint_<trackId>_<index> (trigger), checkpoint_spawn_<trackId>_<index> or checkpoint_spawn (info_target)?`);
     assert.deepEqual(bad, []);
+});
+
+test("checkpoint is fired only by a checkpoint_<trackId>_<index> trigger", () => {
+    const bad = scriptInputs
+        .filter((c) => c.param === "checkpoint" && !CHECKPOINT_TRIGGER_NAME_PATTERN.test(c.targetname.trim()))
+        .map((c) => `${Describe(c)} fires checkpoint — the checkpoint is read from the trigger's name, checkpoint_<trackId>_<index>`);
+    assert.deepEqual(bad, []);
+});
+
+test("every checkpoint_<trackId>_<index> trigger fires checkpoint", () => {
+    const firing = new Set(scriptInputs.filter((c) => c.param === "checkpoint").map((c) => c.targetname.trim()));
+    const silent = ReadVmapEntities(vmapPath)
+        .filter((e) => e.classname === "trigger_multiple" && CHECKPOINT_TRIGGER_NAME_PATTERN.test(String(e.targetname ?? "").trim()))
+        .map((e) => String(e.targetname).trim())
+        .filter((name) => !firing.has(name))
+        .map((name) => `"${name}" — set its OnStartTouch -> RunScriptInput parameter to checkpoint`);
+    assert.deepEqual([...new Set(silent)], []);
 });
 
 test("each track's checkpoint triggers run 1..N without gaps", () => {
@@ -193,13 +210,13 @@ test("each track's checkpoint triggers run 1..N without gaps", () => {
 });
 
 // Checkpoint respawn points: an info_target checkpoint_spawn_<t>_<i> is only
-// used by the checkpoint_<t>_<i> input — a typo in either name makes the
+// used by the checkpoint_<t>_<i> trigger — a typo in either name makes the
 // melon silently respawn at the trigger instead.
 test("every checkpoint_spawn_<trackId>_<index> belongs to a checkpoint the map fires", () => {
-    const fired = new Set(scriptInputs.map((c) => c.param));
+    const fired = new Set(scriptInputs.filter((c) => c.param === "checkpoint").map((c) => c.targetname.trim()));
     const orphans = [...entityNames]
         .map((name) => name.match(CHECKPOINT_SPAWN_NAME_PATTERN))
         .filter((m) => m && !fired.has(`checkpoint_${m[1]}_${m[2]}`))
-        .map((m) => `"${m[0]}" — no trigger fires RunScriptInput checkpoint_${m[1]}_${m[2]}`);
+        .map((m) => `"${m[0]}" — no trigger checkpoint_${m[1]}_${m[2]} fires RunScriptInput checkpoint`);
     assert.deepEqual(orphans, []);
 });

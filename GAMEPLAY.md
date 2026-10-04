@@ -310,26 +310,30 @@ The map has more than one track, so checkpoint identity is `(trackId,
 index)`, not just an index. Checkpoint tracking lives in
 `race/checkpoints/`, inside the `melon_drive` script (not a separate
 `point_script` — checkpoints share the kart state). `MAX_TRACKS` × `MAX_CHECKPOINTS_PER_TRACK`
-script inputs are pre-registered as `checkpoint_<trackId>_<index>` — e.g.
+checkpoints are allowed, each a trigger named `checkpoint_<trackId>_<index>` — e.g.
 track 2's 3rd checkpoint is `checkpoint_2_3` — plus one `start_<trackId>`
 and one `finish_<trackId>` per track. A track is **start line →
 checkpoints → finish line**, and can be a loop (start and finish on the same
 line, several laps) or point-to-point (finish somewhere else, one lap)
 (decided). Hammer setup per checkpoint:
 
-- A `trigger_multiple` volume placed along the track, **named exactly like
-  its parameter** (`checkpoint_2_3`): the script counts a track's
-  checkpoints from these names (see the next section), since it can't see
-  which parameter an output fires.
+- A `trigger_multiple` volume placed along the track, named
+  `checkpoint_<trackId>_<index>` (`checkpoint_2_3`): the script reads which
+  checkpoint was touched from this name and counts a track's checkpoints
+  from these names (see the next section).
 - An `info_target` named `checkpoint_spawn_<trackId>_<index>` where a
   broken melon should respawn after reaching this checkpoint, facing its
-  yaw (without one: the trigger's own position/angles).
+  yaw — or one named just `checkpoint_spawn` next to the trigger (the
+  nearest within `CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE`, as in the
+  checkpoint gate prefab); without either, the trigger's own
+  position/angles.
 - Filtered (via a `filter_activator_class` set to `prop_physics`) so only
   melons — not the frozen player pawns — can trigger it.
 - Its `OnStartTouch` output fires `RunScriptInput` on this map's
-  `point_script` entity, with the parameter set to `checkpoint_<trackId>_N`
-  matching that track's id and this checkpoint's position along it (starting
-  at 1 for the first checkpoint *after* the start line).
+  `point_script` entity with the parameter `checkpoint` — the same for every
+  checkpoint (decided): a parameter per checkpoint named like its trigger
+  made Hammer warn that the parameter matches an entity name. The index
+  counts from 1 for the first checkpoint *after* the start line.
 
 A kart isn't considered "on" any track until it crosses that track's start
 line (`start_<trackId>`) — that's what picks a track (a racer can drive
@@ -444,7 +448,7 @@ run by `race/heat/`):
    so a longer countdown shows nothing until 3.
 4. **RACING** — normal driving, existing checkpoint/lap logic, plus a
    dedicated `finish_<trackId>` script input (registered for every
-   `1..MAX_TRACKS`, same pattern as `checkpoint_<trackId>_<index>`) that's
+   `1..MAX_TRACKS`, same pattern as `start_<trackId>`) that's
    the sole thing that counts a completed lap. Wire it as an `OnStartTouch`
    output, `RunScriptInput` with parameter `finish_<trackId>` (e.g. track 2
    gets `finish_2`), on whichever trigger sits on that track's finish line —

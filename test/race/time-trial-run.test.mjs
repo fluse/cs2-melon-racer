@@ -57,7 +57,7 @@ beforeEach(() => {
 test("free roam, point-to-point: the clock runs from the start line to the finish", () => {
     Touch(10, "start_2");
     assert.equal(kart.runStartTime, 10);
-    Touch(20, "checkpoint_2_1");
+    Touch(20, "checkpoint_2_1", "checkpoint");
     Touch(34.5, "end_of_track_2", "finish_2");
 
     assert.equal(kart.runStartTime, undefined, "clock stopped");
@@ -68,7 +68,7 @@ test("free roam, point-to-point: the clock runs from the start line to the finis
 test("free roam: the finish sends the melon straight back to the start spawn", () => {
     const spawn = world.add(new Entity({ name: StartSpawnName(2), className: "info_target", origin: { x: 500, y: 600, z: 10 }, angles: { pitch: 0, yaw: 90, roll: 0 } }));
     Touch(0, "start_2");
-    Touch(5, "checkpoint_2_1");
+    Touch(5, "checkpoint_2_1", "checkpoint");
     kart.health = 10;
     kart.melon.Teleport({ position: { x: 9000, y: 9000, z: 0 }, velocity: { x: 300, y: 0, z: 0 } });
     Touch(9, "end_of_track_2", "finish_2");
@@ -90,7 +90,7 @@ test("free roam: the finish sends the melon straight back to the start spawn", (
 test("a slower run keeps the best time, a faster one replaces it", () => {
     for (const [start, end] of [[0, 30], [100, 140], [200, 225]]) {
         Touch(start, "start_2");
-        Touch(start + 5, "checkpoint_2_1");
+        Touch(start + 5, "checkpoint_2_1", "checkpoint");
         Touch(end, "end_of_track_2", "finish_2");
     }
     assert.equal(GetBestTime(kart, 2), 25);
@@ -99,11 +99,11 @@ test("a slower run keeps the best time, a faster one replaces it", () => {
 
 test("free roam, loop: the clock covers every lap, then back to the start for the next attempt", () => {
     Touch(0, "start_1_laps2", "start_1");
-    Touch(10, "checkpoint_1_1");
+    Touch(10, "checkpoint_1_1", "checkpoint");
     Touch(20, "start_1_laps2", "start_1"); // lap 1 (start fires before finish)
     Touch(20, "start_1_laps2", "finish_1");
     assert.equal(kart.runStartTime, 0, "still running after lap 1");
-    Touch(30, "checkpoint_1_1");
+    Touch(30, "checkpoint_1_1", "checkpoint");
     Touch(41, "start_1_laps2", "finish_1"); // lap 2 (this time finish fires first)
     Touch(41, "start_1_laps2", "start_1"); // the same touch: the melon is at the start spawn by now
 
@@ -116,10 +116,10 @@ test("free roam, loop: the clock covers every lap, then back to the start for th
     Touch(50, "start_1_laps2", "start_1");
     Touch(50, "start_1_laps2", "finish_1");
     assert.equal(kart.runStartTime, 50, "the next attempt");
-    Touch(60, "checkpoint_1_1");
+    Touch(60, "checkpoint_1_1", "checkpoint");
     Touch(70, "start_1_laps2", "start_1");
     Touch(70, "start_1_laps2", "finish_1");
-    Touch(80, "checkpoint_1_1");
+    Touch(80, "checkpoint_1_1", "checkpoint");
     Touch(90, "start_1_laps2", "start_1"); // last lap, start fires first this time
     Touch(90, "start_1_laps2", "finish_1");
     assert.equal(kart.lastRun.time, 40);
@@ -138,7 +138,7 @@ test("a heat's clock starts at GO, and the finish time is recorded", () => {
     assert.equal(kart.runStartTime, 50 + COUNTDOWN_SECONDS, "GO");
 
     Touch(60, "start_2"); // crossing the line after GO doesn't restart it
-    Touch(70, "checkpoint_2_1");
+    Touch(70, "checkpoint_2_1", "checkpoint");
     Touch(80, "end_of_track_2", "finish_2");
     assert.equal(kart.finished, true);
     assert.equal(kart.lastRun.time, 80 - (50 + COUNTDOWN_SECONDS));
@@ -156,7 +156,7 @@ test("leaving the track cancels the run without a time", () => {
 test("save data other systems keep survives a new best", () => {
     world.saveData = JSON.stringify({ somethingElse: 7 });
     Touch(0, "start_2");
-    Touch(5, "checkpoint_2_1");
+    Touch(5, "checkpoint_2_1", "checkpoint");
     Touch(9, "end_of_track_2", "finish_2");
     assert.equal(ParseSaveData(world.saveData).somethingElse, 7);
     assert.deepEqual(SavedBest(), { 2: { anna: 9 } });
@@ -170,7 +170,7 @@ test("restart: back to the start spawn, whole and still, clock at zero until the
     const spawn = world.add(new Entity({ name: StartSpawnName(2), className: "info_target", origin: { x: 500, y: 600, z: 10 }, angles: { pitch: 0, yaw: 90, roll: 0 } }));
     assert.equal(CanRestartTimeTrial(kart), false, "not before a time trial");
     Touch(0, "start_2");
-    Touch(5, "checkpoint_2_1");
+    Touch(5, "checkpoint_2_1", "checkpoint");
     kart.health = 10;
     kart.melon.Teleport({ position: { x: 9000, y: 9000, z: 0 }, velocity: { x: 300, y: 0, z: 0 } });
     assert.equal(CanRestartTimeTrial(kart), true);
@@ -191,7 +191,7 @@ test("restart: back to the start spawn, whole and still, clock at zero until the
 
 test("restart only while on the track in a time trial — not in a heat or off the track", () => {
     Touch(0, "start_2");
-    Touch(5, "checkpoint_2_1");
+    Touch(5, "checkpoint_2_1", "checkpoint");
     Touch(9, "end_of_track_2", "finish_2");
     assert.equal(CanRestartTimeTrial(kart), true, "back at the start after the finish");
 
@@ -215,7 +215,7 @@ test("restart shortcut: R restarts a time trial, does nothing outside one", () =
     assert.deepEqual(kart.melon.GetAbsOrigin(), { x: 9000, y: 9000, z: 0 }, "not in a time trial: stays put");
 
     Touch(0, "start_2");
-    Touch(5, "checkpoint_2_1");
+    Touch(5, "checkpoint_2_1", "checkpoint");
     kart.userMenuOpen = true;
     UpdateUserMenu(0, kart);
     assert.deepEqual(kart.melon.GetAbsOrigin(), { x: 500, y: 600, z: 10 + SPAWN_UP_OFFSET });

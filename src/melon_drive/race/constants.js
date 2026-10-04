@@ -1,11 +1,12 @@
 // Tracks, checkpoints and the hub -> race -> next-track flow.
 
-// The map has multiple separate tracks, so a checkpoint's script input
-// parameter names both which track it belongs to and its position along
-// that track: "checkpoint_<trackId>_<index>", e.g. "checkpoint_2_5" is
-// track 2's 5th checkpoint. Registered up front for every combination (see
-// race/checkpoints/checkpoints.js) — raise these if a track ends up needing more checkpoints,
-// or the map more tracks, than currently allowed for.
+// The map has multiple separate tracks, so a checkpoint trigger's name
+// says both which track it belongs to and its position along that track:
+// "checkpoint_<trackId>_<index>", e.g. "checkpoint_2_5" is track 2's 5th
+// checkpoint. The start_<trackId>/finish_<trackId> inputs are registered up
+// front for every track (see race/checkpoints/checkpoints.js) — raise these
+// if a track ends up needing more checkpoints, or the map more tracks, than
+// currently allowed for.
 export const MAX_TRACKS = 8;
 export const MAX_CHECKPOINTS_PER_TRACK = 32;
 
@@ -66,17 +67,23 @@ export function StartSpawnName(trackId) {
 export const START_SPAWN_SHARED_NAME = "start_spawn";
 export const START_SPAWN_SHARED_MAX_DISTANCE = 1024;
 
-// Checkpoint triggers are named like their script input,
-// "checkpoint_<trackId>_<index>" — GetTrackConfig() counts a track's
-// checkpoints from these names (the script can't see which parameter a
-// trigger's output fires), so the name is required, not just tidy.
+// Checkpoint triggers are named "checkpoint_<trackId>_<index>" and all fire
+// the one script input "checkpoint", which reads track and index from the
+// firing trigger's name — GetTrackConfig() counts a track's checkpoints from
+// these names too. (Not a parameter per checkpoint, named like its trigger:
+// Hammer warns about a RunScriptInput parameter that matches an entity name.)
 export const CHECKPOINT_TRIGGER_NAME_PATTERN = /^checkpoint_(\d+)_(\d+)$/;
 
 // Respawn point of a checkpoint: an info_target named
 // "checkpoint_spawn_<trackId>_<index>" (e.g. "checkpoint_spawn_1_3"). A
 // broken melon respawns there, facing the entity's yaw. Without one, the
-// checkpoint trigger's own transform is used instead.
+// nearest info_target named just "checkpoint_spawn" within
+// CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE of the checkpoint trigger is used
+// (every copy of a checkpoint gate prefab carries one, like start_spawn),
+// and without that the checkpoint trigger's own transform.
 export const CHECKPOINT_SPAWN_NAME_PATTERN = /^checkpoint_spawn_(\d+)_(\d+)$/;
+export const CHECKPOINT_SPAWN_SHARED_NAME = "checkpoint_spawn";
+export const CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE = 1024;
 /** @param {number} trackId @param {number} index */
 export function CheckpointSpawnName(trackId, index) {
     return `checkpoint_spawn_${trackId}_${index}`;

@@ -3,9 +3,10 @@
 
 /**
  * Index of the point in `points` nearest to `origin`, if it's within
- * `maxDistance` — undefined if there's none that close. Picks a start gate
- * prefab's own shared-name "start_spawn" for its start trigger: every copy
- * of the gate carries one, and its own is the one right next to it.
+ * `maxDistance` — undefined if there's none that close. Picks a gate
+ * prefab's own shared-name spawn ("start_spawn", "checkpoint_spawn") for its
+ * trigger: every copy of the gate carries one, and its own is the one right
+ * next to it.
  * @param {Array<{ x: number, y: number, z: number }>} points
  * @param {{ x: number, y: number, z: number }} origin
  * @param {number} maxDistance

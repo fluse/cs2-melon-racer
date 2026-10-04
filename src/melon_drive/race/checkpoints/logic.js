@@ -1,14 +1,14 @@
 // Pure checkpoint/lap progression rules — no cs_script import, so they're
 // unit-testable in Node (see test/race/checkpoint-progress.test.mjs).
 // race/checkpoints/checkpoints.js wires these to the start_<trackId> /
-// checkpoint_<trackId>_<index> / finish_<trackId> script inputs and handles
+// checkpoint / finish_<trackId> script inputs and handles
 // the engine side (respawn position, FinishKart, debug logging). See
 // "Multiple tracks & checkpoints" in GAMEPLAY.md for the design.
 //
 // The three Apply* functions mutate the kart's progress fields in place and
 // return what happened, so the caller can log it and react (e.g. call FinishKart).
 
-import { START_TRIGGER_NAME_PATTERN, FINISH_TRIGGER_NAME_PATTERN } from "../../constants/index.js";
+import { START_TRIGGER_NAME_PATTERN, FINISH_TRIGGER_NAME_PATTERN, CHECKPOINT_TRIGGER_NAME_PATTERN } from "../../constants/index.js";
 
 /**
  * start_line: the track a start trigger belongs to, from its name
@@ -31,6 +31,17 @@ export function StartLineTrackId(triggerName) {
 export function FinishLineTrackId(triggerName) {
     const m = FINISH_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
     return m ? Number(m[1]) : StartLineTrackId(triggerName);
+}
+
+/**
+ * checkpoint: which checkpoint a trigger is, from its name
+ * ("checkpoint_2_3" -> track 2, 3rd checkpoint). Undefined for any other name.
+ * @param {string} triggerName
+ * @returns {{ trackId: number, index: number } | undefined}
+ */
+export function CheckpointFromTrigger(triggerName) {
+    const m = CHECKPOINT_TRIGGER_NAME_PATTERN.exec(triggerName.trim());
+    return m ? { trackId: Number(m[1]), index: Number(m[2]) } : undefined;
 }
 
 /**

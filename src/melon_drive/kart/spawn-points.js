@@ -3,7 +3,7 @@ import { Debug } from "../core/debug.js";
 import { TraceLine } from "../core/trace.js";
 import { ViewAnglesFacing } from "../zones/teleport/logic.js";
 import { NearestWithin } from "./spawn-points-logic.js";
-import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, TELEPORT_UP_OFFSET, FLOOR_TRACE_UP, FLOOR_TRACE_DOWN, START_SPAWN_SHARED_NAME, START_SPAWN_SHARED_MAX_DISTANCE, CheckpointSpawnName, StartSpawnName } from "../constants/index.js";
+import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, TELEPORT_UP_OFFSET, FLOOR_TRACE_UP, FLOOR_TRACE_DOWN, START_SPAWN_SHARED_NAME, START_SPAWN_SHARED_MAX_DISTANCE, CHECKPOINT_SPAWN_SHARED_NAME, CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE, CheckpointSpawnName, StartSpawnName } from "../constants/index.js";
 
 // The one place that turns a Hammer spawn entity into a melon position.
 // Every caller that puts a melon at the hub or the intro goes through here,
@@ -81,22 +81,22 @@ function FindSpawnPoint(name, facingName) {
 }
 
 /**
- * Spawn point of the entity named START_SPAWN_SHARED_NAME nearest to
- * `trigger`, within START_SPAWN_SHARED_MAX_DISTANCE — a start gate prefab's
- * own spawn (every copy of the gate has one by that name). Undefined if none
- * is that close.
- * @param {any} trigger
+ * Spawn point of the entity named `name` nearest to `trigger`, within
+ * `maxDistance` — a gate prefab's own spawn (every copy of a start or
+ * checkpoint gate has one by that shared name). Undefined if none is that
+ * close.
+ * @param {string} name @param {any} trigger @param {number} maxDistance
  * @returns {SpawnPoint | undefined}
  */
-function FindSharedStartSpawnPoint(trigger) {
-    const candidates = Instance.FindEntitiesByName(START_SPAWN_SHARED_NAME);
+function FindSharedSpawnPoint(name, trigger, maxDistance) {
+    const candidates = Instance.FindEntitiesByName(name);
     if (candidates.length === 0) {
         return undefined;
     }
     const origin = trigger.GetAbsOrigin();
-    const nearest = NearestWithin(candidates.map((e) => e.GetAbsOrigin()), origin, START_SPAWN_SHARED_MAX_DISTANCE);
+    const nearest = NearestWithin(candidates.map((e) => e.GetAbsOrigin()), origin, maxDistance);
     if (nearest === undefined) {
-        Debug(`FindSharedStartSpawnPoint: no "${START_SPAWN_SHARED_NAME}" within ${START_SPAWN_SHARED_MAX_DISTANCE} units of "${trigger.GetEntityName()}"`);
+        Debug(`FindSharedSpawnPoint: no "${name}" within ${maxDistance} units of "${trigger.GetEntityName()}"`);
         return undefined;
     }
     const entity = candidates[nearest];
@@ -128,12 +128,13 @@ export function GetIntroSpawnPoint() {
 /**
  * Where a melon respawns after reaching checkpoint `index` of track
  * `trackId`: the checkpoint_spawn_<trackId>_<index> info_target, facing its
- * yaw. Undefined if the map has none — the caller falls back to the
- * checkpoint trigger itself.
- * @param {number} trackId @param {number} index
+ * yaw — else the nearest "checkpoint_spawn" to the checkpoint trigger `trigger`
+ * (a checkpoint gate prefab's). Undefined if the map has neither — the
+ * caller falls back to the checkpoint trigger itself.
+ * @param {number} trackId @param {number} index @param {any} trigger
  */
-export function GetCheckpointSpawnPoint(trackId, index) {
-    return FindSpawnPoint(CheckpointSpawnName(trackId, index));
+export function GetCheckpointSpawnPoint(trackId, index, trigger) {
+    return FindSpawnPoint(CheckpointSpawnName(trackId, index)) ?? FindSharedSpawnPoint(CHECKPOINT_SPAWN_SHARED_NAME, trigger, CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE);
 }
 
 /**
@@ -145,7 +146,7 @@ export function GetCheckpointSpawnPoint(trackId, index) {
  * @returns {SpawnPoint}
  */
 export function GetStartSpawnPoint(trackId, trigger) {
-    const spawn = FindSpawnPoint(StartSpawnName(trackId)) ?? FindSharedStartSpawnPoint(trigger);
+    const spawn = FindSpawnPoint(StartSpawnName(trackId)) ?? FindSharedSpawnPoint(START_SPAWN_SHARED_NAME, trigger, START_SPAWN_SHARED_MAX_DISTANCE);
     if (spawn) {
         return spawn;
     }

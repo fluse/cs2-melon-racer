@@ -17,11 +17,14 @@ never knows whether an entity came from a prefab.
 | `route_canals.vmap` | `melon_racer.vmap` | track 1 with its checkpoints, zones and gates | — |
 | `route_bridge.vmap` | `melon_racer.vmap` | track 2 with its checkpoints, zones and gates | — |
 | `start_gate.vmap` | a route | a track's [start line](#start-gate): start trigger, `start_spawn`, full-heal zone | `track` = `start_<trackId>[_laps<M>]` |
+| `checkpoint_gate.vmap` | a route | a [checkpoint](#checkpoint-gate): checkpoint trigger, `checkpoint_spawn` | `checkpoint` = `checkpoint_<trackId>_<index>` |
+| `jump_pad.vmap` | a route | a [jump pad](#jump-pad): pad trigger (`jump_pad_enter`/`jump_pad_leave`) and its two marker particle systems | `jump_pad_high_far` = `jump_pad_<up>[_<forward>]` (optional) |
 | `finish_gate.vmap` | a route | a track's [finish line](#finish-gate): finish trigger | `track` = `finish_<trackId>` |
 | `heal_gate.vmap` | a route | a [full-heal](09-heal-zones.md#full-heal-zone) gate: `heal_zone_full` (`heal_enter`/`heal_leave`) | — |
 
 A route prefab holds one whole track, so it's placed **once**: the track
-ids are in its checkpoint names and its gates' overrides.
+ids are in its gates' overrides (and in any checkpoint placed without the
+gate).
 
 ## Map variables
 
@@ -46,12 +49,14 @@ its route's `.vmap`.
 
 A variable replaces the property's **whole value**, and an output's
 parameter can't take one. That's why the gates fire the generic
-`start_line`/`finish_line`, which read the track from the trigger's own
-name, instead of a numbered `start_<trackId>`.
+`start_line`/`checkpoint`/`finish_line`, which read the track (and
+checkpoint) from the trigger's own name, instead of a numbered
+`start_<trackId>`.
 
-**Every copy needs its override.** The gates' defaults are deliberately no
-track (`start_unset`, `finish_unset`): a copy left on the default fails
-`npm test` (its `start_line`/`finish_line` names no track) and logs in
+**Every gate copy needs its override.** The gates' defaults are
+deliberately no track (`start_unset`, `checkpoint_trackid_checkpoint`,
+`finish_unset`): a copy left on the default fails `npm test` (its
+`start_line`/`checkpoint`/`finish_line` names no track) and logs in
 game, instead of quietly joining some track. Hammer also doesn't keep an
 override that equals the default — another reason the default is never a
 real value. A set override shows the variable's label in color.
@@ -68,6 +73,31 @@ real value. A set override shows the variable's label in color.
 Override `track` with the start trigger's name: `start_2`, `start_1_laps3`,
 … Details on the start line, `start_line` and the shared `start_spawn`:
 [Tracks: start gate prefab](04-tracks.md#start-gate-prefab).
+
+## Checkpoint gate
+
+| Inside `checkpoint_gate.vmap` | Set to |
+|---|---|
+| checkpoint trigger's **Name** | bound to `checkpoint` (`target_source`), default `checkpoint_trackid_checkpoint` |
+| its output | `OnStartTouch` → `checkpoint` |
+| `info_target` | `checkpoint_spawn` — the shared checkpoint spawn the script finds next to the trigger |
+
+Override `checkpoint` with the trigger's name: `checkpoint_2_3`, … Details:
+[Tracks: checkpoint gate prefab](04-tracks.md#checkpoint-gate-prefab).
+
+## Jump pad
+
+| Inside `jump_pad.vmap` | Set to |
+|---|---|
+| pad trigger's **Name** | bound to `jump_pad_high_far` (`target_source`), default `jump_pad_1000_1000` |
+| its outputs | `OnStartTouch` → `jump_pad_enter`, `OnEndTouch` → `jump_pad_leave` |
+| `info_particle_system` × 2 | `particles/melon_racer/jump_pad_rings.vpcf` and `jump_pad_sparks.vpcf`, Start Active — the pad's marker |
+
+Unlike the gates, the override is **optional**: the default is a real pad
+(1000 u/s up, +1000 u/s forward), so a copy left on it works. Override
+`jump_pad_high_far` for another launch, e.g. `jump_pad_1200_500` — the name
+variants are in [Jump pads](12-jump-pads.md#name-variants-and-launch-height).
+Jump pads may repeat, so the prefab can be placed any number of times.
 
 ## Finish gate
 
@@ -89,11 +119,14 @@ place a finish gate on the start line, overlapping the start gate. Never add
   and the triggers do nothing in-game.
 - **Names that must be unique stay in prefabs placed once**: `hub_spawn`,
   `hub_start_trigger`, a track's `start_<trackId>`/`checkpoint_<trackId>_<index>`.
-  Names that may repeat (`heal_zone_full`, `start_spawn`, zone triggers)
-  can go into prefabs placed many times.
-- **Gates of different tracks stay apart**: the shared `start_spawn` is
-  matched to the start trigger it's nearest to, within
-  `START_SPAWN_SHARED_MAX_DISTANCE` (1024 units).
+  Names that may repeat (`heal_zone_full`, `start_spawn`,
+  `checkpoint_spawn`, `jump_pad_*`, zone triggers) can go into prefabs
+  placed many times.
+- **Gates stay apart**: the shared `start_spawn` / `checkpoint_spawn` is
+  matched to the start / checkpoint trigger it's nearest to, within
+  `START_SPAWN_SHARED_MAX_DISTANCE` / `CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE`
+  (1024 units each) — keep each gate's spawn nearer to its own trigger than
+  to the next gate's.
 - **Save the prefab's `.vmap`** after editing it — `npm test` reads the
   prefab files, not what's open in Hammer.
 
@@ -108,7 +141,7 @@ them — the copy's override, else the default — so every check in
 |---|---|
 | a placed prefab with "Fix Up Entity Names" ticked | ✗ |
 | two start triggers for one track (e.g. two gate copies with the same override) | ✗ |
-| `start_line`/`finish_line` from a trigger whose name names no track (e.g. a gate copy without its override) | ✗ |
+| `start_line`/`checkpoint`/`finish_line` from a trigger whose name names no track (e.g. a gate copy without its override) | ✗ |
 
 ---
 [← Water zones](13-water-zones.md) · [Mapping API](README.md) · [Checking your map →](15-checking.md)

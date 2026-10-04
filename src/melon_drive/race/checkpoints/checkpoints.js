@@ -3,7 +3,7 @@ import { Debug } from "../../core/debug.js";
 import { FindKartByMelon } from "../../core/kart-registry.js";
 import { activeTrackId, FinishKart } from "../heat/race-flow.js";
 import { GetTrackConfig } from "../track-config.js";
-import { ApplyCheckpointTouch, ApplyLapCompletion, ApplyStartTouch, StartLineTrackId, FinishLineTrackId } from "./logic.js";
+import { ApplyCheckpointTouch, ApplyLapCompletion, ApplyStartTouch, StartLineTrackId, FinishLineTrackId, CheckpointFromTrigger } from "./logic.js";
 import { MAX_TRACKS, MAX_CHECKPOINTS_PER_TRACK, TELEPORT_UP_OFFSET, FINISH_RESTART_START_GUARD } from "../../constants/index.js";
 import { Lifted, LevelAngles, GetCheckpointSpawnPoint, GetStartSpawnPoint } from "../../kart/spawn-points.js";
 import { StartRun, FinishRun, CancelRun, CanRestartTimeTrial } from "../time-trial/time-trial.js";
@@ -23,12 +23,14 @@ import { RespawnKartAtCheckpoint } from "../../kart/teleport.js";
 // whose trigger name is a prefab variable but whose output is fixed.
 //
 // Checkpoints: a trigger_multiple per checkpoint along the track, named
-// like its parameter, OnStartTouch -> RunScriptInput
 // "checkpoint_<trackId>_<index>" — e.g. track 2's 3rd checkpoint is
-// "checkpoint_2_3", counted from 1 after the start line. If the melon breaks
+// "checkpoint_2_3", counted from 1 after the start line — with
+// OnStartTouch -> RunScriptInput "checkpoint", which reads the checkpoint
+// from that name. If the melon breaks
 // after reaching it, it respawns at the info_target named
-// "checkpoint_spawn_<trackId>_<index>", facing that entity's yaw — or,
-// without one, at the trigger's own position/angles.
+// "checkpoint_spawn_<trackId>_<index>", facing that entity's yaw — else at
+// the nearest "checkpoint_spawn" (a checkpoint gate prefab's), else at the
+// trigger's own position/angles.
 //
 // The progression rules themselves (which touch counts, one checkpoint at
 // a time, the start picks the track, lap counting on a start re-touch) live
@@ -48,12 +50,12 @@ function OnCheckpointTouched(trackId, index, kart, trigger) {
             Debug(`checkpoint_${trackId}_${index}: kart is at checkpoint ${kart.checkpointIndex}, skipped one — ignoring`);
             return;
     }
-    const spawn = GetCheckpointSpawnPoint(trackId, index);
+    const spawn = GetCheckpointSpawnPoint(trackId, index, trigger);
     if (spawn) {
         kart.checkpointPosition = spawn.position;
         kart.checkpointAngles = spawn.angles;
     } else {
-        Debug(`checkpoint_${trackId}_${index}: no info_target "checkpoint_spawn_${trackId}_${index}", respawning at the trigger itself`);
+        Debug(`checkpoint_${trackId}_${index}: no info_target "checkpoint_spawn_${trackId}_${index}" or "checkpoint_spawn" nearby, respawning at the trigger itself`);
         // + TELEPORT_UP_OFFSET for the same reason BeginHeat adds
         // it to their teleport targets: mappers commonly sink a checkpoint
         // trigger's brush into the floor so a fast-moving melon reliably
@@ -239,7 +241,7 @@ function TrackIdFromCaller(input, caller, parse) {
     return trackId;
 }
 
-/** Registers the start_<trackId>, checkpoint_<trackId>_<index> and finish_<trackId> OnScriptInput handlers for every track/checkpoint slot the map is allowed to use, plus the generic start_line / finish_line. Called once from index.js. */
+/** Registers the start_<trackId> and finish_<trackId> OnScriptInput handlers for every track the map is allowed to use, plus the generic start_line / finish_line and checkpoint. Called once from index.js. */
 export function RegisterCheckpointAndFinishInputs() {
     Instance.OnScriptInput("start_line", ({ caller, activator }) => {
         const kart = activator && FindKartByMelon(activator);
@@ -276,20 +278,20 @@ export function RegisterCheckpointAndFinishInputs() {
         });
     }
 
-    for (let t = 1; t <= MAX_TRACKS; t++) {
-        for (let i = 1; i <= MAX_CHECKPOINTS_PER_TRACK; i++) {
-            const trackId = t;
-            const index = i;
-            Instance.OnScriptInput(`checkpoint_${trackId}_${index}`, ({ caller, activator }) => {
-                const kart = activator && FindKartByMelon(activator);
-                if (!kart || !caller) {
-                    Debug(`checkpoint_${trackId}_${index}: activator wasn't a tracked melon, ignoring`);
-                    return;
-                }
-                OnCheckpointTouched(trackId, index, kart, caller);
-            });
+    Instance.OnScriptInput("checkpoint", ({ caller, activator }) => {
+        const kart = activator && FindKartByMelon(activator);
+        if (!kart || !caller) {
+            Debug("checkpoint: activator wasn't a tracked melon, ignoring");
+            return;
         }
-    }
+        const name = caller.GetEntityName();
+        const checkpoint = CheckpointFromTrigger(name);
+        if (!checkpoint || checkpoint.trackId < 1 || checkpoint.trackId > MAX_TRACKS || checkpoint.index < 1 || checkpoint.index > MAX_CHECKPOINTS_PER_TRACK) {
+            Instance.Msg(`[melon_drive] checkpoint fired by "${name}", which isn't named checkpoint_<trackId 1..${MAX_TRACKS}>_<index 1..${MAX_CHECKPOINTS_PER_TRACK}> — ignoring. See docs/mapping-api/04-tracks.md.`);
+            return;
+        }
+        OnCheckpointTouched(checkpoint.trackId, checkpoint.index, kart, caller);
+    });
 
     for (let t = 1; t <= MAX_TRACKS; t++) {
         const trackId = t;

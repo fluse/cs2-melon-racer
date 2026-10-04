@@ -32,8 +32,8 @@ docs/valve/scripting_api.html            # saved copy of Valve's cs_script API w
 docs/mapping-api/*.md                    # Mapping API (map↔script contract): README.md = index of every input/name/pattern,
                                           #   01-…15-*.md one page per topic, each with setup / name-variant / "Values" tables
 maps/melon_racer.vmap                    # main map (binary DMX, Hammer-authoritative)
-maps/prefabs/*.vmap                      # prefabs placed in melon_racer.vmap (hub, routes, gates); start_gate.vmap is set to a track by its
-                                          #   `track` map variable (docs/mapping-api/14-prefabs.md) — test/helpers/vmap.mjs reads prefabs, overrides resolved
+maps/prefabs/*.vmap                      # prefabs placed in melon_racer.vmap (hub, routes, gates, jump pads); the start/checkpoint/finish gates and jump_pad are set up by a
+                                          #   map variable per copy (docs/mapping-api/14-prefabs.md) — test/helpers/vmap.mjs reads prefabs, overrides resolved
 maps/content_examples/lighting_info.vmap
 maps/scripts/*.js                        # AUTO-GENERATED bundle output, see below — don't hand-edit
 maps/scripts/point_script.d.ts           # cs_script API type declarations (copied from cs_script_demo)

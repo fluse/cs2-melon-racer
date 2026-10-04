@@ -44,7 +44,7 @@ script, and `npm test` fails on it.
 |---|---|---|---|---|
 | `start_<trackId>` | Start | the track's `start_<trackId>[_laps<M>]` trigger | — | [Tracks](04-tracks.md#start-line) |
 | `start_line` | Start | a `start_<trackId>[_laps<M>]` trigger | name (track) | [Tracks](04-tracks.md#start-gate-prefab) |
-| `checkpoint_<trackId>_<index>` | Start | the checkpoint's trigger, **named like the parameter** | name (counted) | [Tracks](04-tracks.md#checkpoints) |
+| `checkpoint` | Start | a `checkpoint_<trackId>_<index>` trigger | name (track, index — also counted) | [Tracks](04-tracks.md#checkpoints) |
 | `finish_<trackId>` | Start | any trigger on the finish line | — | [Tracks](04-tracks.md#finish-line) |
 | `finish_line` | Start | a `finish_<trackId>` trigger, or a loop's start trigger | name (track) | [Tracks](04-tracks.md#finish-line) |
 | `hub_enter` | Start | **only** `hub_start_trigger` | name (checked) | [Hub](05-hub.md) |
@@ -83,6 +83,7 @@ names once, when the script first needs the track list.
 | `hub_spawn_facing` | `info_target` | — | [Core entities](02-core-entities.md#spawn-points) |
 | `heal_zone_full` | `trigger_multiple` | — | [Heal zones](09-heal-zones.md#full-heal-zone) |
 | `start_spawn` | `info_target` | — | [Tracks](04-tracks.md#start-gate-prefab) |
+| `checkpoint_spawn` | `info_target` | — | [Tracks](04-tracks.md#checkpoint-gate-prefab) |
 | `melon_break_template` | `point_template` | — | [Effect templates](03-effect-templates.md#break-burst) |
 | `melon_break_chunks_template` | `point_template` | — | [Effect templates](03-effect-templates.md#break-chunks) |
 | `perfect_hit_particle_template` | `point_template` | — | [Effect templates](03-effect-templates.md#perfect-spark) |

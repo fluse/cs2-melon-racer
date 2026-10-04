@@ -17,8 +17,8 @@ Step-by-step build guide: [TRACK_CREATION.md](../TRACK_CREATION.md).
 |---|---|---|---|---|
 | Start trigger | `trigger_multiple` | `start_<trackId>` or `start_<trackId>_laps<M>` | exactly 1 | `OnStartTouch` → `start_line` (or `start_<trackId>`, always without `_laps`) |
 | Start spawn | `info_target` | `start_spawn_<trackId>`, or `start_spawn` next to the start trigger | 1 (recommended) | — |
-| Checkpoint trigger | `trigger_multiple` | `checkpoint_<trackId>_<index>` | 0 … 32 | `OnStartTouch` → `checkpoint_<trackId>_<index>` (same as its name) |
-| Checkpoint spawn | `info_target` | `checkpoint_spawn_<trackId>_<index>` | 1 per checkpoint (recommended) | — |
+| Checkpoint trigger | `trigger_multiple` | `checkpoint_<trackId>_<index>` | 0 … 32 | `OnStartTouch` → `checkpoint` |
+| Checkpoint spawn | `info_target` | `checkpoint_spawn_<trackId>_<index>`, or `checkpoint_spawn` next to the checkpoint trigger | 1 per checkpoint (recommended) | — |
 | Finish | any trigger on the finish line | any; `finish_<trackId>` for `finish_line` | 1 | `OnStartTouch` → `finish_<trackId>` or `finish_line` |
 
 ## Values
@@ -30,6 +30,7 @@ Step-by-step build guide: [TRACK_CREATION.md](../TRACK_CREATION.md).
 | `DEFAULT_LAPS_TO_WIN` | 1 | laps without `_laps<M>` | `race/constants.js` |
 | `RACE_SPAWN_LATERAL_SPACING` | 120 units | gap between racers lined up at the start spawn | `race/constants.js` |
 | `START_SPAWN_SHARED_MAX_DISTANCE` | 1024 units | how far a shared-name `start_spawn` may be from its start trigger | `race/constants.js` |
+| `CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE` | 1024 units | how far a shared-name `checkpoint_spawn` may be from its checkpoint trigger | `race/constants.js` |
 | `COUNTDOWN_SECONDS` | 3 s | countdown before GO | `race/constants.js` |
 | `BREAK_SECONDS` | 10 s | pause after a heat before the next track / hub | `race/constants.js` |
 
@@ -64,7 +65,7 @@ Step-by-step build guide: [TRACK_CREATION.md](../TRACK_CREATION.md).
   `TELEPORT_UP_OFFSET`, no floor trace) and yaw are used. With `DEBUG` on,
   every start crossing, heat start and time-trial restart logs
   `GetStartSpawnPoint: no info_target "start_spawn_<t>" or "start_spawn" nearby`
-  — plus `FindSharedStartSpawnPoint: no "start_spawn" within 1024 units of
+  — plus `FindSharedSpawnPoint: no "start_spawn" within 1024 units of
   "<trigger>"` when there are `start_spawn`s, just all too far.
 - Crossing the trigger puts a free-roaming melon on that track and starts
   its [time trial](../../GAMEPLAY.md#time-trial-decided-implemented).
@@ -73,7 +74,8 @@ Step-by-step build guide: [TRACK_CREATION.md](../TRACK_CREATION.md).
   1 … `MAX_TRACKS` always logs (`DEBUG` or not) `[melon_drive] start_line
   fired by "<name>", which names no track 1..8 — ignoring.`
 - Keep `trackId` ≤ `MAX_TRACKS`: a `start_9` trigger would still join the
-  heat order, but no `start_9`/`checkpoint_9_*` input exists.
+  heat order, but no `start_9` input exists and `checkpoint_9_*` triggers
+  are ignored.
 
 ## Start gate prefab
 
@@ -117,19 +119,50 @@ once (as with both outputs on one trigger).
 |---|---|---|---|
 | trigger | `^checkpoint_(\d+)_(\d+)$` | `checkpoint_1_3` | track 1, 3rd checkpoint after the start line |
 | spawn | `^checkpoint_spawn_(\d+)_(\d+)$` | `checkpoint_spawn_1_3` | respawn spot once `checkpoint_1_3` is reached |
+| shared spawn | `checkpoint_spawn` | `checkpoint_spawn` | the checkpoint spawn of whichever checkpoint trigger it's nearest to |
 
-- **The name must equal the parameter** — the script counts a track's
-  checkpoints from the trigger names (the highest index), since it can't see
-  which parameter an output fires.
+- **Every checkpoint fires the same parameter, `checkpoint`** — the script
+  reads track and index from the firing trigger's name, and counts a
+  track's checkpoints from those names (the highest index). Not a parameter
+  per checkpoint named like its trigger: Hammer warns about a
+  `RunScriptInput` parameter that matches an entity name ("…corresponds to
+  an entity target name… (FGD Error?)").
+- `checkpoint` from a trigger not named `checkpoint_<trackId>_<index>`
+  (track 1 … `MAX_TRACKS`, index 1 … `MAX_CHECKPOINTS_PER_TRACK`) always
+  logs `[melon_drive] checkpoint fired by "<name>", which isn't named
+  checkpoint_<trackId 1..8>_<index 1..32> — ignoring.`
 - **No gaps:** `index` = 1 … N in driving order. With `_1`, `_2`, `_4` the
   track needs 4 and the finish is never reached.
 - Checkpoints only count once the melon crossed the track's start line, and
   strictly in order (skipping one doesn't count). Progress never goes
   backwards.
 - **Checkpoint spawn:** a broken melon respawns `SPAWN_UP_OFFSET` above the
-  floor under it, facing its yaw. Without one, the trigger's own transform
-  (lifted `TELEPORT_UP_OFFSET`) is used and the touch logs
-  `no info_target "checkpoint_spawn_…"`.
+  floor under it, facing its yaw.
+- **Shared-name checkpoint spawn:** without a
+  `checkpoint_spawn_<trackId>_<index>`, the `info_target` named just
+  `checkpoint_spawn` that's nearest to the checkpoint trigger is used — if
+  it's within `CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE`. Every copy of the
+  [checkpoint gate prefab](#checkpoint-gate-prefab) carries its own; it
+  picks the right one as long as each gate's spawn is nearer to its own
+  trigger than to any other checkpoint's.
+- **Without a checkpoint spawn:** the trigger's own transform (lifted
+  `TELEPORT_UP_OFFSET`) is used and the touch logs
+  `no info_target "checkpoint_spawn_…" or "checkpoint_spawn" nearby`.
+
+## Checkpoint gate prefab
+
+`maps/prefabs/checkpoint_gate.vmap`, a whole checkpoint set to its track
+and index by one value — like the [start gate](#start-gate-prefab):
+
+| Inside the prefab | Set to |
+|---|---|
+| checkpoint trigger's **Name** | bound to the prefab variable `checkpoint` (type `target_source`), default `checkpoint_trackid_checkpoint` |
+| its output | `OnStartTouch` → `checkpoint` |
+| `info_target` | `checkpoint_spawn` (shared name) |
+
+Per placed copy: **Override** `checkpoint` = the trigger name, e.g.
+`checkpoint_2_3`. A copy left on the default (no track) fails `npm test` —
+see [Prefabs: map variables](14-prefabs.md#map-variables).
 
 ## Finish line
 
@@ -163,9 +196,10 @@ OnStartTouch → melon_drive_script → RunScriptInput → finish_<trackId>
 | `start_line` from a trigger not named `start_<t>[_laps<M>]`, `finish_line` from one not named `finish_<t>` or `start_<t>[_laps<M>]` | ✗ |
 | two start triggers for the same track (e.g. two gate copies with the same override) | ✗ |
 | `start_spawn_<t>` without a `start_<t>` trigger, or any other `start_*` name (typo) | ✗ |
-| checkpoint trigger named differently from the parameter it fires | ✗ |
+| `checkpoint` from a trigger not named `checkpoint_<t>_<i>` (e.g. a gate copy without its override), or a checkpoint trigger that doesn't fire `checkpoint` | ✗ |
+| any other `checkpoint*` name than `checkpoint_<t>_<i>`, `checkpoint_spawn_<t>_<i>`, `checkpoint_spawn` (typo) | ✗ |
 | gap in a track's checkpoint numbers | ✗ |
-| `checkpoint_spawn_<t>_<i>` whose checkpoint no trigger fires | ✗ |
+| `checkpoint_spawn_<t>_<i>` without a `checkpoint_<t>_<i>` trigger firing `checkpoint` | ✗ |
 | a placed prefab with "Fix Up Entity Names" ticked ([Prefabs](14-prefabs.md#rules)) | ✗ |
 
 Not checked: whether a shared `start_spawn` is within

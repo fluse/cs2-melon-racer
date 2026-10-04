@@ -21,7 +21,7 @@ const doc = Object.values(pages).join("\n");
 const SCRIPT_INPUTS = [
     "start_<trackId>",
     "start_line",
-    "checkpoint_<trackId>_<index>",
+    "checkpoint",
     "finish_<trackId>",
     "finish_line",
     "hub_enter",
