@@ -4,7 +4,7 @@ import { HEARTBEAT_INTERVAL } from "../constants/index.js";
 import { karts, EnsureModerator, DropKart } from "./kart-registry.js";
 import { SetUpPlayerKart, EnsurePlayerKarts, HoldPawn } from "../kart/spawn.js";
 import { GetHubSpawnPoint } from "../kart/spawn-points.js";
-import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud, UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, ApplyHubModalState } from "../hud/index.js";
+import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud, UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, UpdateScoreboardHud, ApplyHubModalState } from "../hud/index.js";
 import { UpdateKart } from "../movement/index.js";
 import { HandleMelonLost } from "../health/index.js";
 import { phase, UpdateRaceFlow } from "../race/heat/race-flow.js";
@@ -82,6 +82,7 @@ export function Think() {
             UpdateJumpHud(slot, kart);
             UpdateHealthHud(slot, kart);
             UpdateCheckpointHud(slot, kart);
+            UpdateScoreboardHud(slot, kart);
             if (kart.inHub) {
                 ApplyHubModalState(slot, phase);
             }

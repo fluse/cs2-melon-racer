@@ -1,20 +1,20 @@
 import { Instance } from "cs_script/point_script";
-import { GetTrackConfig } from "../race/track-config.js";
-import { RunElapsed, GetBestTime } from "../race/time-trial/time-trial.js";
-import { FormatRaceTime } from "../race/time-trial/logic.js";
-import { CheckpointStrip } from "./checkpoint-strip-logic.js";
-import { GetSpeedHud } from "./layout.js";
-import { RUN_RESULT_SECONDS, CHECKPOINT_HUD_SLOTS } from "../constants/index.js";
+import { GetTrackConfig } from "../../race/track-config.js";
+import { RunElapsed, GetBestTime } from "../../race/time-trial/time-trial.js";
+import { FormatRaceTime } from "../../race/time-trial/logic.js";
+import { CheckpointStrip } from "./logic.js";
+import { GetSpeedHud } from "../layout.js";
+import { RUN_RESULT_SECONDS, CHECKPOINT_HUD_SLOTS } from "../../constants/index.js";
 
 /**
  * The track HUD: the time trial panel top left (see race/time-trial/time-trial.js) — run
  * clock, the player's best on the track, and for RUN_RESULT_SECONDS after a
  * finish (in a heat: until it's over) the finish time — and the checkpoint
  * strip top center (start -> checkpoints -> finish, see
- * hud/checkpoint-strip-logic.js) with the lap below it on multi-lap tracks. Shown
+ * hud/track/logic.js) with the lap below it on multi-lap tracks. Shown
  * while the kart is on a track — or, right after a free-roaming finish took
  * it off the track, while that result is up.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
  */
 export function UpdateCheckpointHud(slot, kart) {
     const hud = GetSpeedHud();
@@ -43,8 +43,8 @@ export function UpdateCheckpointHud(slot, kart) {
 }
 
 /**
- * @param {any} hud @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {number} trackId @param {number} now
- * @param {import("../core/kart-registry.js").Kart["lastRun"]} result the finish time to show, if any
+ * @param {any} hud @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} trackId @param {number} now
+ * @param {import("../../core/kart-registry.js").Kart["lastRun"]} result the finish time to show, if any
  */
 function UpdateRunPanel(hud, slot, kart, trackId, now, result) {
     const clock = kart.runStartTime !== undefined ? RunElapsed(kart, now) : result ? result.time : 0;

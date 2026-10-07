@@ -58,11 +58,14 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              water/ (stop on entry, no impacts inside), jump-recharge/ (wall-jump charges kept full inside),
                                           #              teleport/ (melon_teleport)
                                           #   race/      track-config.js (tracks from trigger names), checkpoints/ (progress, start_/checkpoint_/finish_ inputs),
-                                          #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs)
+                                          #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs),
+                                          #              grand-prix/ (places + points per heat, standings over the heats)
                                           #   camera/    follow/ (chase camera, the only SetFollowConfig), wall-clip/ (eased pull-in at walls), break-zoom/, lift-zoom/, zone-zoom/,
                                           #              side-view/ (fixed side camera, CONTROLLED mode)
-                                          #   hud/       layout.js (the custom_hud_layout), one file per panel: speedometer.js (speed panel: km/h, health bar, jump dots), bounce-panel.js,
-                                          #              track.js (time trial + checkpoint strip), hub-modal.js, user-menu.js; inputs.js (every button click)
+                                          #   hud/       layout.js (the custom_hud_layout), one folder per panel with its own rules: speedometer/ (km/h, health bar, jump dots),
+                                          #              track/ (time trial + checkpoint strip), scoreboard/ (Tab: Grand Prix standings / best times,
+                                          #              in place of CS2's own); one file per panel without: bounce-panel.js, hub-modal.js, user-menu.js;
+                                          #              inputs.js (every button click)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
                                           #              boost-trail/, prediction/ (the guide line)
                                           #   dev/       collision-debug.js (the user-menu collision debug view), free-look.js (the user-menu free look), attack-debug.js
@@ -122,7 +125,7 @@ package, so leave it as a bare import. A JSDoc-only type from another file
   `Register…Inputs()` for its `OnScriptInput`s, and an `index.js` for its
   public API where it has more than one consumer. A folder with several pure
   rule files names them `<topic>-logic.js` next to the engine file they
-  serve (`hud/track.js` ↔ `hud/checkpoint-strip-logic.js`) — but when a
+  serve (`kart/spawn-points.js` ↔ `kart/spawn-points-logic.js`) — but when a
   domain's mechanics each get their own rules, they get their own folders
   instead (`camera/lift-zoom/`, `camera/wall-clip/`, …).
 - **A new feature is a new folder** in the fitting domain, registered
@@ -131,7 +134,7 @@ package, so leave it as a bare import. A JSDoc-only type from another file
   to `constants/index.js`.
 - **Each domain's `index.js` is its public API** — other domains and tests
   import from it, except where that would close an import cycle (e.g.
-  `hud/speedometer.js` takes `GetWallJumpCharges` straight from
+  `hud/speedometer/speedometer.js` takes `GetWallJumpCharges` straight from
   `movement/jump/jump.js`); Rollup prints `Circular dependency` warnings on
   `npm run build` — keep it free of them.
 
@@ -314,7 +317,9 @@ CS2 supports a scripted custom UI via Panorama, wired through the same
 - The engine sets these classes on an ancestor panel, for CSS to react to:
   `HUD_TEAMINTRO_VISIBLE`, `HUD_BUYMENU_VISIBLE`, `HUD_SCOREBOARD_VISIBLE`,
   `HUD_WINPANEL_VISIBLE`, `HUD_ENDOFMATCH_VISIBLE` (e.g.
-  `.HUD_SCOREBOARD_VISIBLE #some_panel { opacity: 0; }`).
+  `.HUD_SCOREBOARD_VISIBLE #some_panel { opacity: 0; }`). There's no API to
+  replace CS2's scoreboard; `#scoreboard` (`hud/scoreboard/scoreboard.js`) is shown by
+  `HUD_SCOREBOARD_VISIBLE` and covers it with a near-opaque backdrop.
 - Place a `custom_hud_layout` point entity in the map, set its `layout`
   property to the `.vxml` asset.
 - Drive it from script: `SetHasClass`/`SetHasClassForPlayer`,

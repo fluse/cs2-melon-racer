@@ -23,7 +23,9 @@ respawns at its last checkpoint.
 3. **Hub** — players gather in `hub_start_trigger` and start a race
    together ("Hub → race → next-track flow").
 4. **Heats** — one per track in `trackId` order: countdown, race, break,
-   next track; after the last one everyone returns to the hub.
+   next track; after the last one everyone returns to the hub. Together
+   they're a **Grand Prix**: each heat's finishers score points by place,
+   the most points over all tracks wins ("Grand Prix — places & points").
 
 Nobody dies: `gamemode` aborts all player damage. Instead the melon breaks
 (health at 0, or a kill trigger) and respawns at its respawn point — see
@@ -375,7 +377,7 @@ ends. Below it "LAP 1/3", only on tracks with more than one lap. The
 checkpoint count (and the laps-to-win count used by the flow below) comes
 from that track's trigger names — see "Hub → race → next-track flow".
 Flag icons: `tools/make-icons.mjs` (`track-start`, `track-finish`); rule:
-`hud/checkpoint-strip-logic.js` (`test/hud/checkpoint-strip.test.mjs`), applied
+`hud/track/logic.js` (`test/hud/checkpoint-strip.test.mjs`), applied
 in `hud/`.
 
 **Switching tracks while free roaming:** crossing another track's start
@@ -476,6 +478,57 @@ run by `race/heat/`):
    fresh COUNTDOWN on the next track in sequence, or, if that was the last
    track, teleports the whole group to `hub_spawn` and returns to phase
    `HUB`.
+
+## Grand Prix — places & points (decided, implemented)
+
+**Win condition.** The heats from the hub's "Start race" to the group's
+return to the hub are one **Grand Prix**:
+
+- **Per heat:** finishers get places in the order they cross the finish of
+  the last lap, and points for them: `HEAT_POINTS` (10, 8, 6, 5, 4, 3, 2, 1
+  for 1st…8th), every place after that `HEAT_POINTS_FINISHER` (1). The place
+  shows under the FINISH image, "1ST · +10 PTS" (`finish_place`), until
+  the next heat or the hub.
+- **Overall winner:** the most points after the last track. Ties: more heat
+  wins, then the lower total time over the heats, then by name.
+- **Solo:** outside a Grand Prix the best time per track counts ("Time
+  trial").
+
+A moderator abort (or everyone leaving) ends it as *cancelled*; the
+standings so far stay. Players are told apart by slot + name for the
+Grand Prix's duration (`PlayerKey`), so someone who leaves keeps their
+row. The standings stay until the next Grand Prix starts. Constants:
+`race/grand-prix/constants.js`; rules: `race/grand-prix/logic.js`
+(`test/race/grand-prix.test.mjs`), applied by `race/grand-prix/grand-prix.js`
+from `race/heat/race-flow.js` (`test/race/grand-prix-flow.test.mjs`).
+
+**Podium in the hub — to build (Hammer, not done yet).** After the last
+track the top 3 should be shown on a podium in the hub. Nothing for it
+exists in the map or the script so far; the standings it needs are in
+`grandPrix` (`SortedStandings`).
+
+## Scoreboard (implemented)
+
+CS2's own scoreboard knows nothing of points or times, and a custom HUD
+can't replace it — so the custom one covers it: `#scoreboard` in
+`speedometer.xml` shows while the engine sets `HUD_SCOREBOARD_VISIBLE`
+(Tab held), full screen on a near-opaque backdrop (pure CSS, the script
+can't tell whether Tab is held). What it shows, per viewer
+(`hud/scoreboard/logic.js`, `test/hud/scoreboard.test.mjs`):
+
+- **Grand Prix** — while one runs, and its final standings afterwards
+  ("FINAL" / "CANCELLED") while the viewer isn't on a track: rank, name,
+  points, place in the current/last heat, best time on that track. Players
+  who didn't start in it are listed after the racers, without a rank.
+- **Time trial** — otherwise (or when the viewer is on a track): the best
+  times on the viewer's track (else the last Grand Prix's last track, else
+  the first one), fastest first, saved times of players who aren't on the
+  map included.
+
+`SCOREBOARD_ROWS` (12) rows; with more players the viewer's own row takes
+the last one. The viewer's row is tinted. Rebuilt every
+`SCOREBOARD_UPDATE_SECONDS` whether open or not, sent on change plus every
+`HUD_RESEND_SECONDS` (`hud/scoreboard/scoreboard.js`).
 
 ## Moderator (decided, implemented)
 
@@ -623,7 +676,7 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   health). HUD: three round outlines stacked right of the speed
   panel (bottom center; bottom up, `jump_dot_<i>`), each filled white only
   while that charge is ready — used up or refilling shows just the outline. Rule:
-  `hud/jump-dots-logic.js` (`test/hud/jump-dots.test.mjs`). The ground jump has no cooldown to show. **Rated by
+  `hud/speedometer/logic.js` (`test/hud/jump-dots.test.mjs`). The ground jump has no cooldown to show. **Rated by
   angle, like a bounce** (decided): the angle the melon came at the wall
   (its approach, remembered when the wall contact starts and kept while it
   goes on — `WallApproach` — so a press a tick or two after the touch,
@@ -1003,6 +1056,5 @@ script). Constants:
   than disconnecting — the group is blocked until every racer finishes.
   Worth a "force-finish"/skip vote or a hard timeout once this is actually
   played with real groups.
-- **Winner recognition**: `lapsToWin` decides when a kart is *done* with a
-  heat, but nothing records or displays *who got there first* —
-  worth a "1st/2nd/3rd" HUD callout once this is played with real groups.
+- **Podium**: decided (see "Grand Prix — places & points"), still to
+  build in the hub.

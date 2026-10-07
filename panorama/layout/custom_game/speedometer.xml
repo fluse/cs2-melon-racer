@@ -120,6 +120,8 @@
 		<!-- Shown to a racer the moment they finish (see FinishKart), until
 		     the next heat or the hub. -->
 		<Image id="finish_image" class="FinishImage Hidden" src="file://{images}/custom_game/word-finish.png" />
+		<!-- The place under it, "1ST  ·  +10 PTS" (Grand Prix points, see FinishKart). -->
+		<Label id="finish_place" class="FinishPlace Hidden" text="{s:place}" />
 
 		<!-- Countdown under the finish image between heats (BREAK_SECONDS … 0,
 		     see race-flow.js): a tens and a ones digit, all ten number images
@@ -428,6 +430,111 @@
 				<Button id="usermenu_close_button" class="UserMenuCloseButton">
 					<Label class="UserMenuCloseIcon" text="✕" />
 				</Button>
+			</Panel>
+		</Panel>
+
+		<!-- Scoreboard in place of CS2's own (see hud/scoreboard.js): shown by
+		     the CSS while the engine sets HUD_SCOREBOARD_VISIBLE (Tab held),
+		     on a near-opaque backdrop that covers the default scoreboard.
+		     Grand Prix standings (points, place in the current/last heat,
+		     best time) or, in a time trial (TimeTrial class: no PTS/HEAT
+		     columns), the track's best times. SCOREBOARD_ROWS rows, unused
+		     ones collapsed (Unused), the viewer's own one marked Self. -->
+		<Panel id="scoreboard" class="Scoreboard" hittest="false">
+			<Panel class="ScoreboardCard">
+				<Label class="ScoreboardTitle" text="{s:title}" />
+				<Label class="ScoreboardSubtitle" text="{s:subtitle}" />
+				<Panel class="ScoreRow ScoreHeader">
+					<Label class="ScoreRank" text="#" />
+					<Label class="ScoreName" text="PLAYER" />
+					<Label class="ScorePoints" text="PTS" />
+					<Label class="ScoreHeat" text="HEAT" />
+					<Label class="ScoreBest" text="{s:best_header}" />
+				</Panel>
+				<Panel id="score_row_0" class="ScoreRow Unused">
+					<Label class="ScoreRank" text="{s:rank}" />
+					<Label class="ScoreName" text="{s:name}" />
+					<Label class="ScorePoints" text="{s:points}" />
+					<Label class="ScoreHeat" text="{s:heat}" />
+					<Label class="ScoreBest" text="{s:best}" />
+				</Panel>
+				<Panel id="score_row_1" class="ScoreRow Unused">
+					<Label class="ScoreRank" text="{s:rank}" />
+					<Label class="ScoreName" text="{s:name}" />
+					<Label class="ScorePoints" text="{s:points}" />
+					<Label class="ScoreHeat" text="{s:heat}" />
+					<Label class="ScoreBest" text="{s:best}" />
+				</Panel>
+				<Panel id="score_row_2" class="ScoreRow Unused">
+					<Label class="ScoreRank" text="{s:rank}" />
+					<Label class="ScoreName" text="{s:name}" />
+					<Label class="ScorePoints" text="{s:points}" />
+					<Label class="ScoreHeat" text="{s:heat}" />
+					<Label class="ScoreBest" text="{s:best}" />
+				</Panel>
+				<Panel id="score_row_3" class="ScoreRow Unused">
+					<Label class="ScoreRank" text="{s:rank}" />
+					<Label class="ScoreName" text="{s:name}" />
+					<Label class="ScorePoints" text="{s:points}" />
+					<Label class="ScoreHeat" text="{s:heat}" />
+					<Label class="ScoreBest" text="{s:best}" />
+				</Panel>
+				<Panel id="score_row_4" class="ScoreRow Unused">
+					<Label class="ScoreRank" text="{s:rank}" />
+					<Label class="ScoreName" text="{s:name}" />
+					<Label class="ScorePoints" text="{s:points}" />
+					<Label class="ScoreHeat" text="{s:heat}" />
+					<Label class="ScoreBest" text="{s:best}" />
+				</Panel>
+				<Panel id="score_row_5" class="ScoreRow Unused">
+					<Label class="ScoreRank" text="{s:rank}" />
+					<Label class="ScoreName" text="{s:name}" />
+					<Label class="ScorePoints" text="{s:points}" />
+					<Label class="ScoreHeat" text="{s:heat}" />
+					<Label class="ScoreBest" text="{s:best}" />
+				</Panel>
+				<Panel id="score_row_6" class="ScoreRow Unused">
+					<Label class="ScoreRank" text="{s:rank}" />
+					<Label class="ScoreName" text="{s:name}" />
+					<Label class="ScorePoints" text="{s:points}" />
+					<Label class="ScoreHeat" text="{s:heat}" />
+					<Label class="ScoreBest" text="{s:best}" />
+				</Panel>
+				<Panel id="score_row_7" class="ScoreRow Unused">
+					<Label class="ScoreRank" text="{s:rank}" />
+					<Label class="ScoreName" text="{s:name}" />
+					<Label class="ScorePoints" text="{s:points}" />
+					<Label class="ScoreHeat" text="{s:heat}" />
+					<Label class="ScoreBest" text="{s:best}" />
+				</Panel>
+				<Panel id="score_row_8" class="ScoreRow Unused">
+					<Label class="ScoreRank" text="{s:rank}" />
+					<Label class="ScoreName" text="{s:name}" />
+					<Label class="ScorePoints" text="{s:points}" />
+					<Label class="ScoreHeat" text="{s:heat}" />
+					<Label class="ScoreBest" text="{s:best}" />
+				</Panel>
+				<Panel id="score_row_9" class="ScoreRow Unused">
+					<Label class="ScoreRank" text="{s:rank}" />
+					<Label class="ScoreName" text="{s:name}" />
+					<Label class="ScorePoints" text="{s:points}" />
+					<Label class="ScoreHeat" text="{s:heat}" />
+					<Label class="ScoreBest" text="{s:best}" />
+				</Panel>
+				<Panel id="score_row_10" class="ScoreRow Unused">
+					<Label class="ScoreRank" text="{s:rank}" />
+					<Label class="ScoreName" text="{s:name}" />
+					<Label class="ScorePoints" text="{s:points}" />
+					<Label class="ScoreHeat" text="{s:heat}" />
+					<Label class="ScoreBest" text="{s:best}" />
+				</Panel>
+				<Panel id="score_row_11" class="ScoreRow Unused">
+					<Label class="ScoreRank" text="{s:rank}" />
+					<Label class="ScoreName" text="{s:name}" />
+					<Label class="ScorePoints" text="{s:points}" />
+					<Label class="ScoreHeat" text="{s:heat}" />
+					<Label class="ScoreBest" text="{s:best}" />
+				</Panel>
 			</Panel>
 		</Panel>
 

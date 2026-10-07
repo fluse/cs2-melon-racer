@@ -16,6 +16,8 @@ import { RestoreFullHealth } from "../../health/heal/index.js";
 import { StartRun, CancelRun } from "../time-trial/time-trial.js";
 import { BreakCountdownValue, CountdownDigits } from "./logic.js";
 import { SetFreeLook } from "../../dev/free-look.js";
+import { StartGrandPrix, StartGrandPrixHeat, RecordGrandPrixFinish, EndGrandPrix } from "../grand-prix/grand-prix.js";
+import { OrdinalPlace } from "../grand-prix/logic.js";
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
 // See GAMEPLAY.md's "Hub -> race -> next-track flow" for the full design.
@@ -118,6 +120,7 @@ export function TryStartRace() {
         }
     }
     Debug(`TryStartRace: starting heat on track ${order[0]} with ${racers.length} racer(s)`);
+    StartGrandPrix(racers, order.length);
     BeginHeat(order[0]);
 }
 
@@ -130,6 +133,7 @@ export function TryAbortRace() {
         return;
     }
     Debug(`TryAbortRace: moderator aborted the heat on track ${activeTrackId}`);
+    EndGrandPrix(true);
     ReturnAllToHub(CurrentRacers());
     phase = RacePhase.HUB;
     activeTrackId = undefined;
@@ -162,12 +166,14 @@ export function BeginHeat(trackId) {
         // have marked these karts racing/hidden their hub modal before
         // calling in here, and they'd otherwise be stranded with racing:true
         // and no hub UI, silently swept into whatever heat starts next.
+        EndGrandPrix(true);
         ReturnAllToHub(CurrentRacers());
         phase = RacePhase.HUB;
         activeTrackId = undefined;
         return;
     }
     activeTrackId = trackId;
+    StartGrandPrixHeat(trackId);
     // start_spawn_<trackId> if placed, else the nearest start_spawn, else the start trigger itself.
     const { position: center, angles } = GetStartSpawnPoint(trackId, start);
 
@@ -220,11 +226,13 @@ export function BeginHeat(trackId) {
 
 /**
  * Shows or hides the big "FINISH" image (finish_image in speedometer.xml)
+ * and the place under it ("1ST · +10 PTS", finish_place — set by FinishKart)
  * for one player. @param {number | undefined} slot @param {boolean} visible
  */
 function SetFinishImageVisible(slot, visible) {
     if (slot !== undefined) {
         GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_image", "Hidden", !visible);
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_place", "Hidden", !visible);
     }
 }
 
@@ -233,9 +241,15 @@ function SetFinishImageVisible(slot, visible) {
 export function FinishKart(kart) {
     kart.finished = true;
     kart.locked = true;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    // The place this racer crossed the line in, and the Grand Prix points for it.
+    const result = activeTrackId !== undefined ? RecordGrandPrixFinish(kart, activeTrackId) : undefined;
+    if (slot !== undefined) {
+        GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "finish_place", "place", result ? `${OrdinalPlace(result.place)}  ·  +${result.points} PTS` : "");
+    }
     // Shown the moment this racer crosses the line, not only once the whole
     // heat is over — stays up through BREAK until the next heat/the hub.
-    SetFinishImageVisible(kart.pawn.GetPlayerController()?.GetPlayerSlot(), true);
+    SetFinishImageVisible(slot, true);
     Debug(`FinishKart: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} finished track ${activeTrackId}`);
 }
 
@@ -332,6 +346,7 @@ export function UpdateRaceFlow(now) {
             // get permanently stuck there (see the RACING branch's own
             // "nobody left" check), bricking the race flow for everyone.
             Debug("UpdateRaceFlow: all racers left during countdown, aborting heat back to HUB");
+            EndGrandPrix(true);
             phase = RacePhase.HUB;
             activeTrackId = undefined;
             return;
@@ -381,6 +396,7 @@ export function UpdateRaceFlow(now) {
             // when length is also checked, and TryStartRace refuses to start
             // a new heat while phase isn't HUB.
             Debug("UpdateRaceFlow: all racers left mid-heat, aborting back to HUB");
+            EndGrandPrix(true);
             phase = RacePhase.HUB;
             activeTrackId = undefined;
             return;
@@ -421,6 +437,7 @@ export function UpdateRaceFlow(now) {
             }
             BeginHeat(nextTrackId);
         } else {
+            EndGrandPrix(false);
             ReturnAllToHub(racers);
             phase = RacePhase.HUB;
             activeTrackId = undefined;

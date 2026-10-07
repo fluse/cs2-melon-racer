@@ -24,6 +24,7 @@ import { predictionDotSet } from "./trace.js";
  *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
  *   hudHealthSegments?: number, hudJumpReady?: boolean[], // what the health bar / jump dots last sent to the HUD — see UpdateHealthHud/UpdateJumpHud
  *   hudResendAt?: { health?: number, jump?: number }, // when they send their whole state again — see HUD_RESEND_SECONDS
+ *   scoreboardNextUpdate?: number, scoreboardResendAt?: number, scoreboardShown?: Record<string, string>, // the scoreboard's next rebuild, next full resend, and what it last sent — see UpdateScoreboardHud
  *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
