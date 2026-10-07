@@ -30,6 +30,7 @@ import { predictionDotSet } from "./trace.js";
  *   lastWallContact?: { time: number, normal: { x: number, y: number }, approach?: { x: number, y: number }, approachTime?: number }, // last wall touched in the air (probe or bounce), with how the melon came at it — see UpdateWallContact
  *   lastWallJump?: { time: number, normal: { x: number, y: number } }, // see CanWallJump
  *   bufferedWallJumpTime?: number, // a lift-zone jump press not yet used, fired on the next wall touch — see LIFT_ZONE_JUMP_BUFFER
+ *   bufferedGroundJumpTime?: number, // an air jump press that did nothing, fired on touching down — see GROUND_JUMP_BUFFER
  *   perfectBounceBoost?: boolean, // its speed above MAX_SPEED is from a PERFECT bounce — no boost trail for that, see fx/boost-trail/boost-trail.js
  *   attackBoosting?: boolean, // the attack boost is on this tick — shows the boost trail, see fx/boost-trail/boost-trail.js
  *   attackGuardUntil?: number, // until when engine pushes from attack are cancelled — see ATTACK_PUSH_GUARD_SECONDS

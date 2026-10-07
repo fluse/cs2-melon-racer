@@ -33,6 +33,11 @@ export const GROUND_COYOTE_TIME = 0.08; // seconds a ground contact stays valid 
 // doesn't count for this long after any jump. Otherwise a second press just
 // after taking off jumped again in mid-air.
 export const GROUND_LIFTOFF_TIME = 0.15; // seconds
+// A jump pressed in the air up to this long before touching down jumps on
+// the touchdown (see BufferedGroundJump) — otherwise a press a tick or two
+// early was simply lost. Shorter than any real jump's airtime, so a second
+// press right after taking off can't turn into a jump on the next landing.
+export const GROUND_JUMP_BUFFER = 0.1; // seconds
 
 // Wall jump: in the air, at a wall (a line trace in any of
 // WALL_PROBE_DIRECTIONS horizontal directions finds a steep surface within

@@ -83,6 +83,7 @@ function TraceSphere(config) {
  *   lastWallContact?: { time: number, normal: { x: number, y: number }, approach?: { x: number, y: number }, approachTime?: number }, // last wall touched in the air (probe or bounce), with how the melon came at it — see UpdateWallContact
  *   lastWallJump?: { time: number, normal: { x: number, y: number } }, // see CanWallJump
  *   bufferedWallJumpTime?: number, // a lift-zone jump press not yet used, fired on the next wall touch — see LIFT_ZONE_JUMP_BUFFER
+ *   bufferedGroundJumpTime?: number, // an air jump press that did nothing, fired on touching down — see GROUND_JUMP_BUFFER
  *   perfectBounceBoost?: boolean, // its speed above MAX_SPEED is from a PERFECT bounce — no boost trail for that, see fx/boost-trail/boost-trail.js
  *   attackBoosting?: boolean, // the attack boost is on this tick — shows the boost trail, see fx/boost-trail/boost-trail.js
  *   attackGuardUntil?: number, // until when engine pushes from attack are cancelled — see ATTACK_PUSH_GUARD_SECONDS
@@ -274,6 +275,11 @@ const GROUND_COYOTE_TIME = 0.08; // seconds a ground contact stays valid after l
 // doesn't count for this long after any jump. Otherwise a second press just
 // after taking off jumped again in mid-air.
 const GROUND_LIFTOFF_TIME = 0.15; // seconds
+// A jump pressed in the air up to this long before touching down jumps on
+// the touchdown (see BufferedGroundJump) — otherwise a press a tick or two
+// early was simply lost. Shorter than any real jump's airtime, so a second
+// press right after taking off can't turn into a jump on the next landing.
+const GROUND_JUMP_BUFFER = 0.1; // seconds
 
 // Wall jump: in the air, at a wall (a line trace in any of
 // WALL_PROBE_DIRECTIONS horizontal directions finds a steep surface within
@@ -3198,6 +3204,23 @@ function CanGroundJump({ grounded, lastGroundedTime, lastJumpTime }) {
 }
 
 /**
+ * Whether a jump press that did nothing (in the air) jumps now after all:
+ * pressed at most GROUND_JUMP_BUFFER ago, and the melon has touched down
+ * since — a ground contact newer than the press — so a ground jump is
+ * allowed now (CanGroundJump).
+ * @param {{ now: number, pressTime?: number, grounded: boolean, lastGroundedTime?: number, lastJumpTime?: number }} s
+ */
+function BufferedGroundJump({ now, pressTime, grounded, lastGroundedTime, lastJumpTime }) {
+    if (pressTime === undefined || now - pressTime > GROUND_JUMP_BUFFER) {
+        return false;
+    }
+    if (lastGroundedTime === undefined || lastGroundedTime <= pressTime) {
+        return false;
+    }
+    return CanGroundJump({ grounded, lastGroundedTime, lastJumpTime });
+}
+
+/**
  * The wall-jump charges (0..WALL_JUMP_CHARGES, fractional while one is
  * refilling) after `dt` seconds of refilling — one after the other,
  * WALL_JUMP_RECHARGE_SECONDS each.
@@ -4665,6 +4688,7 @@ function GetWallJumpCharges(kart) {
  */
 function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
     if (!jumpPressed) {
+        FireBufferedGroundJump(slot, kart, now, grounded, v);
         FireBufferedWallJump(slot, kart, now, grounded, v, rules);
         return;
     }
@@ -4693,6 +4717,9 @@ function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
     if (!groundJump && blockedBy !== null) {
         kart.lastIdleJumpPressTime = now;
     }
+    // Did nothing: if the melon touches down within GROUND_JUMP_BUFFER, it
+    // jumps then (FireBufferedGroundJump).
+    kart.bufferedGroundJumpTime = !groundJump && blockedBy !== null ? now : undefined;
     // In the air and not a wall jump yet: where there's a jump buffer (lift
     // and side-view zones), remember the press — a wall touched soon after still gets it.
     kart.bufferedWallJumpTime = blockedBy !== null && !grounded && rules.jumpBuffer > 0 ? now : undefined;
@@ -4725,6 +4752,34 @@ function UpgradePendingBounce(kart, now, v) {
         kart.lastBounceInfo.jumpFactor = lateFactor;
     }
     kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), after);
+}
+
+/**
+ * A jump pressed in the air shortly *before* touching down (within
+ * GROUND_JUMP_BUFFER) is a ground jump on the touchdown — see
+ * BufferedGroundJump.
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
+ * @param {{ x: number, y: number, z: number }} v
+ */
+function FireBufferedGroundJump(slot, kart, now, grounded, v) {
+    const pressed = kart.bufferedGroundJumpTime;
+    if (pressed === undefined) {
+        return;
+    }
+    if (now - pressed > GROUND_JUMP_BUFFER) {
+        kart.bufferedGroundJumpTime = undefined;
+        return;
+    }
+    if (!BufferedGroundJump({ now, pressTime: pressed, grounded, lastGroundedTime: kart.lastGroundedTime, lastJumpTime: kart.lastJumpTime })) {
+        return;
+    }
+    kart.bufferedGroundJumpTime = undefined;
+    v.z = JUMP_SPEED;
+    kart.lastJumpTime = now;
+    if (kart.lastIdleJumpPressTime === pressed) {
+        kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
+    }
+    Debug(`ground jump: slot ${slot} from a press ${(now - pressed).toFixed(3)}s before touching down`);
 }
 
 /**

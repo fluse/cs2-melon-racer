@@ -269,6 +269,26 @@ test("no double jump while the floor still pushes during takeoff", () => {
     assert.equal(second.z, first.z + 20, "no second jump: vertical speed left as physics had it");
 });
 
+/** The tick a falling melon lands: commanded falling at `vz`, the floor stopped it. */
+const landing = (vz, vx = 200) => ({ commanded: { x: vx, y: 0, z: vz }, actual: { x: vx, y: 0, z: 0 } });
+
+test("a jump pressed just before touching down jumps on the touchdown (GROUND_JUMP_BUFFER)", () => {
+    Geometry();
+    const inAir = Tick({ ...falling(-200, 200), jump: true });
+    assert.ok(inAir.z < 0, `no jump in the air (vz=${inAir.z})`);
+    const landed = Tick(landing(-200));
+    assert.equal(landed.z, C.JUMP_SPEED);
+    assert.equal(kart.lastIdleJumpPressTime, undefined, "the press did something after all — no mashing lockout");
+});
+
+test("a press longer than GROUND_JUMP_BUFFER before touching down is dropped", () => {
+    Geometry();
+    Tick({ ...falling(-200, 200), jump: true });
+    world.time += C.GROUND_JUMP_BUFFER;
+    const landed = Tick(landing(-200));
+    assert.equal(landed.z, 0, "lands without jumping");
+});
+
 test("jumping again right after landing works — no cooldown", () => {
     Geometry();
     Tick({ ...rolling(), jump: true });

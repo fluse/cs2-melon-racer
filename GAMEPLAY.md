@@ -607,7 +607,10 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   still find it ~40 units up in a jump — one tick of measured support there
   is enough for a mid-air jump. Nor does ground contact count for
   `GROUND_LIFTOFF_TIME` after any jump (the floor still pushes the melon up
-  for a tick while it takes off).
+  for a tick while it takes off). **Jump buffer:** a press in the air that
+  does nothing jumps on the touchdown if the melon lands within
+  `GROUND_JUMP_BUFFER` (0.1 s) — a press a tick or two early isn't lost
+  (`BufferedGroundJump`).
 - **Wall jump**: in the air, touching a wall and pressing jump pushes the
   melon off the wall (`WALL_JUMP_PUSH_SPEED`, more if it's already moving
   away faster — e.g. right after a wall bounce) and up

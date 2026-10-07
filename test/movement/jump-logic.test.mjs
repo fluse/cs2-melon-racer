@@ -2,7 +2,7 @@
 // asserted in terms of the constants. The engine side is test/movement/jump.test.mjs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CanGroundJump, CanWallJump, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter } from "../../src/melon_drive/movement/jump/logic.js";
+import { CanGroundJump, BufferedGroundJump, CanWallJump, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter } from "../../src/melon_drive/movement/jump/logic.js";
 import {
     WALL_JUMP_WINDOW,
     WALL_JUMP_COOLDOWN,
@@ -10,6 +10,7 @@ import {
     WALL_JUMP_PUSH_SPEED,
     WALL_JUMP_CHARGES,
     WALL_JUMP_RECHARGE_SECONDS,
+    GROUND_JUMP_BUFFER,
 } from "../../src/melon_drive/constants/index.js";
 
 const wallA = { x: 1, y: 0 };
@@ -158,4 +159,29 @@ test("wall approach: remembered from the contact's start, while the contact goes
     // contact lost for longer than WALL_JUMP_WINDOW: a new contact, a new approach
     const fresh = WallApproach({ time: 10, normal: n, ...start }, 10 + WALL_JUMP_WINDOW * 3, n, [slide]);
     assert.deepEqual(fresh, { approach: undefined, approachTime: 10 + WALL_JUMP_WINDOW * 3 });
+});
+
+test("buffered ground jump: a press just before touching down jumps on the touchdown", () => {
+    const pressTime = 10;
+    const now = pressTime + GROUND_JUMP_BUFFER / 2;
+    const s = { now, pressTime, grounded: true, lastGroundedTime: now, lastJumpTime: 9 };
+    assert.equal(BufferedGroundJump(s), true);
+    assert.equal(BufferedGroundJump({ ...s, grounded: false }), false, "still in the air");
+    assert.equal(BufferedGroundJump({ ...s, pressTime: undefined }), false, "no press");
+});
+
+test("buffered ground jump: not once GROUND_JUMP_BUFFER has passed", () => {
+    const now = 10 + GROUND_JUMP_BUFFER + 0.01;
+    assert.equal(BufferedGroundJump({ now, pressTime: 10, grounded: true, lastGroundedTime: now, lastJumpTime: 9 }), false);
+});
+
+test("buffered ground jump: needs a ground contact newer than the press", () => {
+    const now = 10 + GROUND_JUMP_BUFFER / 2;
+    // Still counting as grounded (hop tolerance) from a contact before the press.
+    assert.equal(BufferedGroundJump({ now, pressTime: 10, grounded: true, lastGroundedTime: 9.99, lastJumpTime: 9 }), false);
+});
+
+test("buffered ground jump: not right after a jump (the press was a double tap on takeoff)", () => {
+    const now = 10 + GROUND_JUMP_BUFFER / 2;
+    assert.equal(BufferedGroundJump({ now, pressTime: 10, grounded: true, lastGroundedTime: now, lastJumpTime: now }), false);
 });

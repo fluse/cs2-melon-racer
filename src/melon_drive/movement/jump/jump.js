@@ -5,11 +5,11 @@
 // or at a wall comes from ../contact/; what a lift zone changes arrives as
 // WallRules (../../zones/lift/logic.js).
 import { Debug } from "../../core/debug.js";
-import { CanGroundJump, WallJumpBlockReason, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter, WallJumpAngle, WallJumpRatingMultipliers, WallJumpBoostedVelocity, FreshApproach } from "./logic.js";
+import { CanGroundJump, BufferedGroundJump, WallJumpBlockReason, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter, WallJumpAngle, WallJumpRatingMultipliers, WallJumpBoostedVelocity, FreshApproach } from "./logic.js";
 import { JumpTimingFactor, JumpMultiplier, WallTimingPress } from "../wall-bounce/logic.js";
 import { MomentumMaxSpeed } from "../momentum/logic.js";
 import { PlayPerfectSpark } from "../wall-bounce/wall-bounce.js";
-import { JUMP_SPEED, BOUNCE_RATINGS, WALL_JUMP_CHARGES } from "../../constants/index.js";
+import { JUMP_SPEED, GROUND_JUMP_BUFFER, BOUNCE_RATINGS, WALL_JUMP_CHARGES } from "../../constants/index.js";
 import { LogJumpPress, LogWallJumpVerdict } from "../../dev/collision-debug.js";
 
 /**
@@ -67,6 +67,7 @@ export function GetWallJumpCharges(kart) {
  */
 export function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
     if (!jumpPressed) {
+        FireBufferedGroundJump(slot, kart, now, grounded, v);
         FireBufferedWallJump(slot, kart, now, grounded, v, rules);
         return;
     }
@@ -95,6 +96,9 @@ export function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
     if (!groundJump && blockedBy !== null) {
         kart.lastIdleJumpPressTime = now;
     }
+    // Did nothing: if the melon touches down within GROUND_JUMP_BUFFER, it
+    // jumps then (FireBufferedGroundJump).
+    kart.bufferedGroundJumpTime = !groundJump && blockedBy !== null ? now : undefined;
     // In the air and not a wall jump yet: where there's a jump buffer (lift
     // and side-view zones), remember the press — a wall touched soon after still gets it.
     kart.bufferedWallJumpTime = blockedBy !== null && !grounded && rules.jumpBuffer > 0 ? now : undefined;
@@ -127,6 +131,34 @@ function UpgradePendingBounce(kart, now, v) {
         kart.lastBounceInfo.jumpFactor = lateFactor;
     }
     kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), after);
+}
+
+/**
+ * A jump pressed in the air shortly *before* touching down (within
+ * GROUND_JUMP_BUFFER) is a ground jump on the touchdown — see
+ * BufferedGroundJump.
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
+ * @param {{ x: number, y: number, z: number }} v
+ */
+function FireBufferedGroundJump(slot, kart, now, grounded, v) {
+    const pressed = kart.bufferedGroundJumpTime;
+    if (pressed === undefined) {
+        return;
+    }
+    if (now - pressed > GROUND_JUMP_BUFFER) {
+        kart.bufferedGroundJumpTime = undefined;
+        return;
+    }
+    if (!BufferedGroundJump({ now, pressTime: pressed, grounded, lastGroundedTime: kart.lastGroundedTime, lastJumpTime: kart.lastJumpTime })) {
+        return;
+    }
+    kart.bufferedGroundJumpTime = undefined;
+    v.z = JUMP_SPEED;
+    kart.lastJumpTime = now;
+    if (kart.lastIdleJumpPressTime === pressed) {
+        kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
+    }
+    Debug(`ground jump: slot ${slot} from a press ${(now - pressed).toFixed(3)}s before touching down`);
 }
 
 /**

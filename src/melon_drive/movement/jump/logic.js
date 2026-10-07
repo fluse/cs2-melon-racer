@@ -16,6 +16,7 @@ import {
     WALL_JUMP_PERFECT_UP_MULTIPLIER,
     BOUNCE_RATINGS,
     WALL_JUMP_APPROACH_MEMORY,
+    GROUND_JUMP_BUFFER,
 } from "../../constants/index.js";
 import { WallAngleFactor, GetBounceRating } from "../wall-bounce/logic.js";
 
@@ -30,6 +31,23 @@ export function CanGroundJump({ grounded, lastGroundedTime, lastJumpTime }) {
         return false;
     }
     return lastJumpTime === undefined || (lastGroundedTime !== undefined && lastGroundedTime > lastJumpTime);
+}
+
+/**
+ * Whether a jump press that did nothing (in the air) jumps now after all:
+ * pressed at most GROUND_JUMP_BUFFER ago, and the melon has touched down
+ * since — a ground contact newer than the press — so a ground jump is
+ * allowed now (CanGroundJump).
+ * @param {{ now: number, pressTime?: number, grounded: boolean, lastGroundedTime?: number, lastJumpTime?: number }} s
+ */
+export function BufferedGroundJump({ now, pressTime, grounded, lastGroundedTime, lastJumpTime }) {
+    if (pressTime === undefined || now - pressTime > GROUND_JUMP_BUFFER) {
+        return false;
+    }
+    if (lastGroundedTime === undefined || lastGroundedTime <= pressTime) {
+        return false;
+    }
+    return CanGroundJump({ grounded, lastGroundedTime, lastJumpTime });
 }
 
 /**
