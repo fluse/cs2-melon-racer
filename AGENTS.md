@@ -83,6 +83,9 @@ site/*.html, style.css, build.mjs        # GitHub Page: `npm run site` -> site/d
                                           #   via site/markdown.mjs — test/site/ checks every link/#anchor); .github/workflows/pages.yml deploys on push to main
 tools/make-icons.mjs                     # generates panorama/images/custom_game/icons/*.png (user menu icons, checkpoint strip flags) — edit shapes there, re-run with node
 tools/png.mjs                            # the PNG encoder make-icons.mjs uses
+tools/make-logo.mjs                      # renders the logo (melon slice + slanted MELON RACER banner, an SVG in the file) into
+                                          #   panorama/images/custom_game/logo_melon_racer.png (846x295: intro screen, user menu, GitHub page) —
+                                          #   then re-run make-decal.mjs for the map decal; font tools/fonts/Bungee-Regular.ttf (OFL), renderer @resvg/resvg-js (devDependency)
 tools/make-route-icons.mjs               # generates the hub window's route cards from the .vmap: an icon per track, picked by its name (ROUTE_ICONS)
                                           #   (panorama/images/custom_game/routes/route_<trackId>.png) + route names (src/melon_drive/hud/hub-modal/routes.js,
                                           #   from route_<name>.vmap) — re-run after adding/renaming a route (test/map/route-icons.test.mjs)

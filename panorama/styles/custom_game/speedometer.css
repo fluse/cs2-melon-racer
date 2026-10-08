@@ -1195,8 +1195,8 @@
 
 /* Melon Racer logo after picking a team, before the melon spawns — full
    screen, so the frozen first-person view behind it doesn't show. Fades out
-   as the melon appears. Solid dark rind green (no alpha), matching the logo's
-   green letters and orange outline. */
+   as the melon appears. Solid dark rind green (no alpha), behind the logo's
+   melon slice and red banner (tools/make-logo.mjs). */
 .IntroLogo {
     width: 100%;
     height: 100%;
