@@ -91,7 +91,7 @@
 
     padding: 10px 18px;
     background-color: #00000088;
-    border-radius: 24px;
+    border-radius: 0px;
 
     transition-property: opacity;
     transition-duration: .15s;
