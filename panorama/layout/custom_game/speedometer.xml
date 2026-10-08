@@ -430,10 +430,12 @@
 									<Label class="UserMenuButtonLabel" text="Respawn at Checkpoint" />
 								</Panel>
 							</Button>
-							<Button id="usermenu_hub_button" class="UserMenuActionButton UserMenuButtonRed">
+							<!-- "Exit Race" while signed up for a heat, else "Return to Hub"
+						     (UpdateHubButtonHud) — either way just this player leaves. -->
+						<Button id="usermenu_hub_button" class="UserMenuActionButton UserMenuButtonRed">
 								<Panel class="UserMenuButtonContent">
 									<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/home.png" />
-									<Label class="UserMenuButtonLabel" text="Return to Hub" />
+									<Label class="UserMenuButtonLabel" text="{s:hub_label}" />
 								</Panel>
 							</Button>
 							<!-- Only during a free-roaming time trial (script toggles

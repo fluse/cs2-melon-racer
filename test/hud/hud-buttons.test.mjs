@@ -122,9 +122,13 @@ test("respawn button: back at the respawn point, whole — but not while breakin
 });
 
 test("hub button: just this racer leaves the heat, the others keep racing", () => {
+    SetUserMenuOpen(0, a, true);
+    assert.equal(hud.Variable(0, "usermenu_hub_button", "hub_label"), "Return to Hub", "not in a race");
+    SetUserMenuOpen(0, a, false);
     a.inHub = b.inHub = true;
     flow.TryStartRace();
     SetUserMenuOpen(0, a, true);
+    assert.equal(hud.Variable(0, "usermenu_hub_button", "hub_label"), "Exit Race", "signed up for the heat");
 
     Click(0, "usermenu_hub_button");
     assert.equal(a.racing, false);
@@ -132,6 +136,8 @@ test("hub button: just this racer leaves the heat, the others keep racing", () =
     assert.deepEqual(HorizontalSpot(a), [HUB.x, HUB.y]);
     assert.equal(b.racing, true);
     assert.equal(flow.phase, RacePhase.COUNTDOWN);
+    SetUserMenuOpen(0, a, true);
+    assert.equal(hud.Variable(0, "usermenu_hub_button", "hub_label"), "Return to Hub", "out of it again");
 });
 
 test("tutorial button: leaves the heat and goes to intro_spawn, which becomes the respawn point", () => {

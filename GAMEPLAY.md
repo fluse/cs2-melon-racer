@@ -871,10 +871,13 @@ long fall lands hard enough for the engine to destroy the melon on impact.
   first join again (the kart is dropped on disconnect).
 - Returning to the hub uses `hub_spawn` (required — there's no fallback),
   facing `hub_spawn_facing` if placed, else `hub_spawn`'s own angles.
-- The user menu's "Play Tutorial" button ("LEARNING & TUTORIAL") sends that player back to
+- The user menu's "Play Tutorial" button sends that player back to
   `intro_spawn` (or `hub_spawn` without one) the same way its "Return to
-  hub" button works: it leaves a running heat, clears track progress, and
-  makes that spot the kart's respawn point.
+  Hub" button works: it leaves a running heat, clears track progress, and
+  makes that spot the kart's respawn point. While the player is signed up
+  for a heat, the hub button reads **"Exit Race"** (decided): it takes just
+  them out of the Grand Prix, the others race on, their standings so far
+  stay (`UpdateHubButtonHud` in `hud/user-menu.js`).
 - **Full health on every spawn** (decided): wherever a melon is sent on
   purpose — the user menu's hub, tutorial and respawn buttons,
   `hub_teleport`, a heat's start and its end, a checkpoint respawn after a

@@ -7335,8 +7335,19 @@ function SetUserMenuOpen(slot, kart, open) {
         UpdatePredictionHud(slot, kart);
         UpdateCollisionDebugHud(slot, kart);
         UpdateFreeLookHud(slot, kart);
+        UpdateHubButtonHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
+}
+
+/**
+ * The hub button's label: "Exit Race" while the player is signed up for a
+ * heat (kart.racing — the button takes just them out of it, see
+ * usermenu_hub_button in hud/inputs.js), else "Return to Hub".
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+function UpdateHubButtonHud(slot, kart) {
+    GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "usermenu_hub_button", "hub_label", kart.racing ? "Exit Race" : "Return to Hub");
 }
 
 /**
@@ -7411,8 +7422,9 @@ function UpdateUserMenu(slot, kart) {
     }
     if (kart.userMenuOpen) {
         // Every tick while open: the time trial can start or end (finish,
-        // a heat, the hub) with the menu up.
+        // a heat, the hub) with the menu up, and so can the player's heat.
         GetSpeedHud()?.SetHasClassForPlayer(slot, "usermenu_restart_row", "Hidden", !CanRestartTimeTrial(kart));
+        UpdateHubButtonHud(slot, kart);
     }
 }
 
