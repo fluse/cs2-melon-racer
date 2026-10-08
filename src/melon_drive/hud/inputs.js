@@ -11,7 +11,7 @@ import { IsFreeLookOn, SetFreeLook } from "../dev/free-look.js";
 import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial } from "../race/heat/race-flow.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { GetSpeedHud } from "./layout.js";
-import { HideHubModal } from "./hub-modal.js";
+import { HideHubModal } from "./hub-modal/hub-modal.js";
 import { SetUserMenuOpen, UpdateCollisionDebugHud, UpdateFreeLookHud, UpdateMelonGlowHud, UpdatePredictionHud } from "./user-menu.js";
 import { COLOR_PRESETS } from "../constants/index.js";
 

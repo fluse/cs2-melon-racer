@@ -3,7 +3,7 @@ import { NewGrandPrix, BeginGrandPrixHeat, RecordHeatFinish, OrdinalPlace } from
 
 // The running Grand Prix (or the last one, until the next starts — the
 // scoreboard shows its final standings in the hub). race/heat/race-flow.js
-// starts it with the hub's "Start race", opens a heat per track and records
+// starts it with the hub's "Start Grand Prix", opens a heat per track and records
 // every finish; the rules are in logic.js.
 
 /** @type {import("./logic.js").GrandPrix | undefined} */

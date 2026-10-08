@@ -3,7 +3,7 @@
 import { Instance } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { FindKartByMelon } from "../../core/kart-registry.js";
-import { ShowHubModal, HideHubModal } from "../../hud/hub-modal.js";
+import { ShowHubModal, HideHubModal } from "../../hud/hub-modal/hub-modal.js";
 import { phase, ReturnAllToHub } from "./race-flow.js";
 import { HUB_TRIGGER_NAME } from "../../constants/index.js";
 

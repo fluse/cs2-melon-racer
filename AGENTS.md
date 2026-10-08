@@ -59,12 +59,12 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              teleport/ (melon_teleport)
                                           #   race/      track-config.js (tracks from trigger names), checkpoints/ (progress, start_/checkpoint_/finish_ inputs),
                                           #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs),
-                                          #              grand-prix/ (places + points per heat, standings over the heats)
+                                          #              grand-prix/ (places + points per heat, standings over the heats), podium/ (top 3 held on the hub podium)
                                           #   camera/    follow/ (chase camera, the only SetFollowConfig), wall-clip/ (eased pull-in at walls), break-zoom/, lift-zoom/, zone-zoom/,
                                           #              side-view/ (fixed side camera, CONTROLLED mode)
                                           #   hud/       layout.js (the custom_hud_layout), one folder per panel with its own rules: speedometer/ (km/h, health bar, jump dots),
                                           #              track/ (time trial + checkpoint strip), scoreboard/ (Tab: Grand Prix standings / best times,
-                                          #              in place of CS2's own); one file per panel without: bounce-panel.js, hub-modal.js, user-menu.js;
+                                          #              in place of CS2's own), hub-modal/ ("Start Grand Prix": heat cards + who rides along; routes.js is generated); one file per panel without: bounce-panel.js, user-menu.js;
                                           #              inputs.js (every button click)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
                                           #              boost-trail/, prediction/ (the guide line)
@@ -74,7 +74,7 @@ src/melon_drive/constants/index.js       # re-exports every folder's constants.j
 test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one folder per src/melon_drive/ domain (movement/, race/, …): unit tests
                                           #   for the pure files, engine-side tests against the fake engine (filed under the domain they're mainly about)
 test/map/*.test.mjs                      # checks of the .vmap/.xml/docs/mapping-api/ the script relies on, and module-layout.test.mjs (the folder rules below)
-test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities
+test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests can check .vmap entities (+ world positions/prefab chains for make-route-icons.mjs)
 test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files
 test/helpers/fake-hud.mjs                # fake custom_hud_layout: per-slot classes, dialog variables, input capture
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
@@ -83,6 +83,9 @@ site/*.html, style.css, build.mjs        # GitHub Page: `npm run site` -> site/d
                                           #   via site/markdown.mjs — test/site/ checks every link/#anchor); .github/workflows/pages.yml deploys on push to main
 tools/make-icons.mjs                     # generates panorama/images/custom_game/icons/*.png (user menu icons, checkpoint strip flags) — edit shapes there, re-run with node
 tools/png.mjs                            # the PNG encoder make-icons.mjs uses
+tools/make-route-icons.mjs               # generates the hub window's route cards from the .vmap: an icon per track, picked by its name (ROUTE_ICONS)
+                                          #   (panorama/images/custom_game/routes/route_<trackId>.png) + route names (src/melon_drive/hud/hub-modal/routes.js,
+                                          #   from route_<name>.vmap) — re-run after adding/renaming a route (test/map/route-icons.test.mjs)
 tools/make-decal.mjs                     # generates materials/melon_racer/<decal>_{color,trans}.png for every decal in its DECALS list
                                           #   (HUD logo, rawDecals/*.png|jpg — JPG via Windows System.Drawing; can key out a baked-in checkerboard, writes <name>_transparent.png)
 rawDecals/*.png                          # new source images for decals (make-decal.mjs input); once done, the tool moves
@@ -311,7 +314,8 @@ CS2 supports a scripted custom UI via Panorama, wired through the same
   (`-game csgo -addon melon_racer -i "<path to the .css/.xml under content/>"`,
   add `-f` if it reports "skipped"), then reload the map.
 - Supported tags only: `<Panel>` (`id`, `class`, `hittest`), `<Label>`
-  (+ `text`), `<Image>` (+ `src`, `texturewidth`, `textureheight`),
+  (+ `text`), `<Image>` (+ `src`; size it in CSS — `texturewidth`/
+  `textureheight` made the whole HUD vanish in-game, no error anywhere),
   `<Button>` (`id`, `class` only). No client-side scripting or events
   inside the layout itself — all interactivity goes through `Instance`.
 - The engine sets these classes on an ancestor panel, for CSS to react to:

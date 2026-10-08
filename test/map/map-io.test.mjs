@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { ReadVmapConnections, ReadVmapEntities } from "../helpers/vmap.mjs";
 import { ParseTeleportTarget } from "../../src/melon_drive/zones/teleport/logic.js";
-import { HUB_TRIGGER_NAME, CHECKPOINT_SPAWN_NAME_PATTERN, START_TRIGGER_NAME_PATTERN, START_SPAWN_NAME_PATTERN, START_SPAWN_SHARED_NAME, CHECKPOINT_TRIGGER_NAME_PATTERN, CHECKPOINT_SPAWN_SHARED_NAME } from "../../src/melon_drive/constants/index.js";
+import { HUB_TRIGGER_NAME, CHECKPOINT_SPAWN_NAME_PATTERN, START_TRIGGER_NAME_PATTERN, START_SPAWN_NAME_PATTERN, START_SPAWN_SHARED_NAME, CHECKPOINT_TRIGGER_NAME_PATTERN, CHECKPOINT_SPAWN_SHARED_NAME, PODIUM_SPAWN_NAME_PATTERN, PODIUM_CONFETTI_NAME } from "../../src/melon_drive/constants/index.js";
 import { StartLineTrackId, FinishLineTrackId } from "../../src/melon_drive/race/checkpoints/logic.js";
 
 const vmapPath = fileURLToPath(new URL("../../maps/melon_racer.vmap", import.meta.url));
@@ -200,6 +200,25 @@ test("every checkpoint* entity is a checkpoint trigger or a checkpoint_spawn", (
     const bad = [...entityNames]
         .filter((name) => name.startsWith("checkpoint") && !CHECKPOINT_TRIGGER_NAME_PATTERN.test(name) && !CHECKPOINT_SPAWN_NAME_PATTERN.test(name) && name !== CHECKPOINT_SPAWN_SHARED_NAME)
         .map((name) => `${Named(name)} — checkpoint_<trackId>_<index> (trigger), checkpoint_spawn_<trackId>_<index> or checkpoint_spawn (info_target)?`);
+    assert.deepEqual(bad, []);
+});
+
+// podium_ is a reserved prefix: a typo ("podium_spawn1", "podium_spawn_4")
+// would silently leave that place at the hub spawn.
+test("every podium_* entity is a podium_spawn_<place>", () => {
+    const bad = [...entityNames]
+        .filter((name) => name.startsWith("podium") && !PODIUM_SPAWN_NAME_PATTERN.test(name))
+        .map((name) => `${Named(name)} — podium_spawn_1, podium_spawn_2 or podium_spawn_3 (info_target)?`);
+    assert.deepEqual(bad, []);
+});
+
+// The script starts and stops the podium confetti — one that starts active
+// would rain on the empty podium from map load on.
+test("the podium confetti is an info_particle_system that doesn't start active", () => {
+    const bad = entities
+        .filter((e) => String(e.targetname ?? "").trim() === PODIUM_CONFETTI_NAME)
+        .filter((e) => e.classname !== "info_particle_system" || String(e.start_active) !== "0")
+        .map((e) => `${e.classname} ${Named(PODIUM_CONFETTI_NAME)} — needs to be an info_particle_system with Start Active off`);
     assert.deepEqual(bad, []);
 });
 

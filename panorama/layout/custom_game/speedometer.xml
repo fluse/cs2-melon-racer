@@ -88,22 +88,124 @@
 			</Panel>
 		</Panel>
 
-		<!-- Hub "start the race" prompt: shown while a kart is standing in
-		     hub_start_trigger. Toggled between the button (phase HUB) and a
-		     waiting message (any other phase) via the WaitingForOthers class.
-		     While a heat is running, the moderator (IsModerator class) sees
-		     an abort button instead of the plain waiting message. -->
+		<!-- Hub "start the Grand Prix" window: shown while a kart is standing in
+		     hub_start_trigger (hud/hub-modal/). The heats it runs — a card per
+		     track, "hub_heat_<trackId>" up to MAX_TRACKS, with the route's
+		     icon from tools/make-route-icons.mjs — and who rides
+		     along (HUB_RACER_ROWS chips, the viewer's own marked Self, "+N MORE"
+		     for the rest). While a heat runs (WaitingForOthers) only a waiting
+		     message, or for the moderator (IsModerator) the abort button. -->
 		<Panel id="hub_modal" class="HubModal Hidden">
 			<Button id="hub_close_button" class="HubCloseButton">
 				<Label class="HubCloseIcon" text="✕" />
 			</Button>
-			<Label class="HubTitle" text="Ready for racing?" />
+			<Label class="HubKicker" text="GRAND PRIX" />
+			<Label class="HubTitle" text="Ready to race?" />
+			<Panel id="hub_heats" class="HubSection">
+				<Label class="HubSectionTitle" text="{s:title}" />
+				<Panel class="HeatCards">
+					<Panel id="hub_heat_1" class="HeatCard Unused">
+						<Panel class="HeatMapBox">
+							<Image class="HeatMap" src="file://{images}/custom_game/routes/route_1.png" />
+							<Label class="HeatBadge" text="{s:heat}" />
+						</Panel>
+						<Label class="HeatName" text="{s:name}" />
+						<Label class="HeatInfo" text="{s:info}" />
+					</Panel>
+					<Panel id="hub_heat_2" class="HeatCard Unused">
+						<Panel class="HeatMapBox">
+							<Image class="HeatMap" src="file://{images}/custom_game/routes/route_2.png" />
+							<Label class="HeatBadge" text="{s:heat}" />
+						</Panel>
+						<Label class="HeatName" text="{s:name}" />
+						<Label class="HeatInfo" text="{s:info}" />
+					</Panel>
+					<Panel id="hub_heat_3" class="HeatCard Unused">
+						<Panel class="HeatMapBox">
+							<Image class="HeatMap" src="file://{images}/custom_game/routes/route_3.png" />
+							<Label class="HeatBadge" text="{s:heat}" />
+						</Panel>
+						<Label class="HeatName" text="{s:name}" />
+						<Label class="HeatInfo" text="{s:info}" />
+					</Panel>
+					<Panel id="hub_heat_4" class="HeatCard Unused">
+						<Panel class="HeatMapBox">
+							<Image class="HeatMap" src="file://{images}/custom_game/routes/route_4.png" />
+							<Label class="HeatBadge" text="{s:heat}" />
+						</Panel>
+						<Label class="HeatName" text="{s:name}" />
+						<Label class="HeatInfo" text="{s:info}" />
+					</Panel>
+					<Panel id="hub_heat_5" class="HeatCard Unused">
+						<Panel class="HeatMapBox">
+							<Image class="HeatMap" src="file://{images}/custom_game/routes/route_5.png" />
+							<Label class="HeatBadge" text="{s:heat}" />
+						</Panel>
+						<Label class="HeatName" text="{s:name}" />
+						<Label class="HeatInfo" text="{s:info}" />
+					</Panel>
+					<Panel id="hub_heat_6" class="HeatCard Unused">
+						<Panel class="HeatMapBox">
+							<Image class="HeatMap" src="file://{images}/custom_game/routes/route_6.png" />
+							<Label class="HeatBadge" text="{s:heat}" />
+						</Panel>
+						<Label class="HeatName" text="{s:name}" />
+						<Label class="HeatInfo" text="{s:info}" />
+					</Panel>
+					<Panel id="hub_heat_7" class="HeatCard Unused">
+						<Panel class="HeatMapBox">
+							<Image class="HeatMap" src="file://{images}/custom_game/routes/route_7.png" />
+							<Label class="HeatBadge" text="{s:heat}" />
+						</Panel>
+						<Label class="HeatName" text="{s:name}" />
+						<Label class="HeatInfo" text="{s:info}" />
+					</Panel>
+					<Panel id="hub_heat_8" class="HeatCard Unused">
+						<Panel class="HeatMapBox">
+							<Image class="HeatMap" src="file://{images}/custom_game/routes/route_8.png" />
+							<Label class="HeatBadge" text="{s:heat}" />
+						</Panel>
+						<Label class="HeatName" text="{s:name}" />
+						<Label class="HeatInfo" text="{s:info}" />
+					</Panel>
+				</Panel>
+			</Panel>
+			<Panel id="hub_racers" class="HubSection">
+				<Label class="HubSectionTitle" text="{s:title}" />
+				<Panel class="HubRacerChips">
+					<Panel id="hub_racer_0" class="HubRacerChip Unused">
+						<Label class="HubRacerName" text="{s:name}" />
+					</Panel>
+					<Panel id="hub_racer_1" class="HubRacerChip Unused">
+						<Label class="HubRacerName" text="{s:name}" />
+					</Panel>
+					<Panel id="hub_racer_2" class="HubRacerChip Unused">
+						<Label class="HubRacerName" text="{s:name}" />
+					</Panel>
+					<Panel id="hub_racer_3" class="HubRacerChip Unused">
+						<Label class="HubRacerName" text="{s:name}" />
+					</Panel>
+					<Panel id="hub_racer_4" class="HubRacerChip Unused">
+						<Label class="HubRacerName" text="{s:name}" />
+					</Panel>
+					<Panel id="hub_racer_5" class="HubRacerChip Unused">
+						<Label class="HubRacerName" text="{s:name}" />
+					</Panel>
+					<Panel id="hub_racer_6" class="HubRacerChip Unused">
+						<Label class="HubRacerName" text="{s:name}" />
+					</Panel>
+					<Panel id="hub_racer_7" class="HubRacerChip Unused">
+						<Label class="HubRacerName" text="{s:name}" />
+					</Panel>
+					<Label id="hub_racers_more" class="HubRacersMore Unused" text="{s:more}" />
+				</Panel>
+			</Panel>
 			<Button id="hub_start_button" class="HubStartButton">
-				<Label text="Start race" />
+				<Label text="START GRAND PRIX" />
 			</Button>
-			<Label class="HubWaitingLabel" text="Race already in progress…" />
+			<Label class="HubWaitingLabel" text="Grand Prix in progress…" />
 			<Button id="hub_abort_button" class="HubAbortButton">
-				<Label text="Cancel race" />
+				<Label text="Cancel Grand Prix" />
 			</Button>
 		</Panel>
 

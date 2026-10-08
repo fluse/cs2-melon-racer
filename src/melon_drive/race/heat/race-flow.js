@@ -3,7 +3,7 @@ import { Debug } from "../../core/debug.js";
 import { GetTrackConfig, GetTrackOrder } from "../track-config.js";
 import { karts } from "../../core/kart-registry.js";
 import { GetSpeedHud } from "../../hud/layout.js";
-import { HideHubModal } from "../../hud/hub-modal.js";
+import { HideHubModal } from "../../hud/hub-modal/hub-modal.js";
 import {
     RacePhase,
     COUNTDOWN_SECONDS,
@@ -16,7 +16,8 @@ import { RestoreFullHealth } from "../../health/heal/index.js";
 import { StartRun, CancelRun } from "../time-trial/time-trial.js";
 import { BreakCountdownValue, CountdownDigits } from "./logic.js";
 import { SetFreeLook } from "../../dev/free-look.js";
-import { StartGrandPrix, StartGrandPrixHeat, RecordGrandPrixFinish, EndGrandPrix } from "../grand-prix/grand-prix.js";
+import { grandPrix, StartGrandPrix, StartGrandPrixHeat, RecordGrandPrixFinish, EndGrandPrix } from "../grand-prix/grand-prix.js";
+import { PlaceOnPodium } from "../podium/podium.js";
 import { OrdinalPlace } from "../grand-prix/logic.js";
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
@@ -209,6 +210,7 @@ export function BeginHeat(trackId) {
         CancelRun(kart); // a free-roaming run doesn't carry into the heat — its clock starts at GO
         kart.finished = false;
         kart.locked = true;
+        kart.podium = undefined; // off the podium into the next Grand Prix
         // Its own lined-up spot, not the start line's center — a respawn
         // before reaching checkpoint 1 (break, or the user menu's respawn
         // button during the countdown) would otherwise stack it on whoever
@@ -281,6 +283,7 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.racing = false;
         kart.finished = false;
         kart.locked = false;
+        kart.podium = undefined; // the hub/tutorial button takes a melon down from the podium too
         // kart.inHub (and the hub modal) is deliberately left to the
         // hub_start_trigger's own hub_enter/hub_leave inputs: the teleport
         // below lands inside it and fires hub_enter from there. Forcing it
@@ -439,6 +442,8 @@ export function UpdateRaceFlow(now) {
         } else {
             EndGrandPrix(false);
             ReturnAllToHub(racers);
+            // The top three go on from the hub spawn onto the podium.
+            PlaceOnPodium(grandPrix, racers);
             phase = RacePhase.HUB;
             activeTrackId = undefined;
             Debug("UpdateRaceFlow: last track done, group returned to hub");

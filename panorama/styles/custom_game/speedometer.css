@@ -241,21 +241,23 @@
     color: #ffe066cc;
 }
 
-/* Hub "ready to start" prompt — shown while a kart stands in
-   hub_start_trigger. .WaitingForOthers swaps the button out for a "race in
-   progress" message once a heat is already running (see melon_drive.js). */
+/* Hub "start the Grand Prix" window (hud/hub-modal/) — shown while a kart
+   stands in hub_start_trigger: kicker + title, the heats as route cards
+   (icons from tools/make-route-icons.mjs), who rides along as
+   name chips, one big start button. .WaitingForOthers (a heat is running)
+   swaps it all for a waiting message, or the moderator's abort button. */
 .HubModal {
-    width: 360px;
+    width: 800px;
     horizontal-align: center;
     vertical-align: center;
-    margin-top: -80px;
 
     flow-children: down;
 
-    padding: 24px;
-    background-color: #000000ee;
-    border: 1px solid #ffe066;
-    border-radius: 8px;
+    padding: 28px 32px 32px 32px;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #141a12f4 ), to( #07090af4 ) );
+    border: 1px solid #ffffff1f;
+    border-radius: 10px;
+    box-shadow: #000000aa 0px 12px 40px 0px;
 
     transition-property: opacity;
     transition-duration: .15s;
@@ -267,80 +269,219 @@
 }
 
 /* Dismisses the modal for just this player without leaving the hub trigger
-   (see hub_close_button in melon_drive.js) — they still get pulled into the
-   next heat that starts while they're standing in it, they just don't have
-   to stare at the prompt until then. Pulled up and right via negative
-   margin so it sits in the modal's corner instead of the padding box. */
+   (see hub_close_button in hud/inputs.js) — they still get pulled into the
+   next Grand Prix that starts while they're standing in it, they just
+   don't have to stare at the prompt until then. Pulled up and right via
+   negative margin so it sits in the modal's corner. */
 .HubCloseButton {
     horizontal-align: right;
     vertical-align: top;
-    margin-top: -12px;
-    margin-right: -12px;
+    margin-top: -14px;
+    margin-right: -18px;
     padding-left: 3px;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
 
-    border-radius: 12px;
-    background-color: #ffffff22;
+    border-radius: 14px;
+    background-color: #ffffff14;
 
     transition-property: background-color;
     transition-duration: .1s;
     &:hover {
-        background-color: #ffffff44;
+        background-color: #ffffff38;
     }
 }
 
 .HubCloseIcon {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: bold;
     color: #ffffffcc;
     horizontal-align: center;
     vertical-align: center;
 }
 
+.HubKicker {
+    margin-top: -18px;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: #7fd13b;
+}
+
 .HubTitle {
-    font-size: 24px;
+    font-size: 34px;
     font-weight: bold;
     color: white;
-    horizontal-align: center;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
+}
+
+/* A titled block: "HEATS · 3", "RACERS · 2". */
+.HubSection {
+    width: 100%;
+    flow-children: down;
+    margin-bottom: 20px;
+}
+
+.HubSectionTitle {
+    width: 100%;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #ffffff88;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #ffffff22;
+}
+
+/* The heats: one card per track, three to a row — 3 × (226 + 2 border
+   + 14 gap) fits the window's 736px inside its padding. */
+.HeatCards {
+    width: 100%;
+    flow-children: right-wrap;
+}
+
+.HeatCard {
+    width: 226px;
+    flow-children: down;
+    margin-right: 14px;
+    margin-bottom: 12px;
+    padding: 8px 8px 10px 8px;
+
+    border-radius: 8px;
+    background-color: #ffffff0d;
+    border: 1px solid #ffffff14;
+
+    &.Unused {
+        visibility: collapse;
+    }
+}
+
+/* The route icon with the heat number over its top-left corner. */
+.HeatMapBox {
+    width: 210px;
+    height: 116px;
+    border-radius: 6px;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #0b0f0a ), to( #121a10 ) );
+}
+
+.HeatMap {
+    width: 210px;
+    height: 116px;
+}
+
+.HeatBadge {
+    margin: 6px 0px 0px 6px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background-color: #7fd13b;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #0b0f0a;
+}
+
+.HeatName {
+    margin-top: 8px;
+    margin-left: 2px;
+    font-size: 19px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: white;
+}
+
+.HeatInfo {
+    margin-left: 2px;
+    margin-top: 2px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: #ffffff88;
+}
+
+/* Who rides along: a name chip each, the viewer's own tinted (Self:
+   transparent tint by default, the class sets the color). */
+.HubRacerChips {
+    width: 100%;
+    flow-children: right-wrap;
+}
+
+.HubRacerChip {
+    height: 34px;
+    margin-right: 8px;
+    margin-bottom: 8px;
+    padding: 0px 16px;
+    border-radius: 17px;
+    border: 1px solid #ffffff22;
+    background-color: #ffffff10;
+
+    &.Unused {
+        visibility: collapse;
+    }
+
+    &.Self {
+        background-color: #ffe06633;
+        border: 1px solid #ffe066;
+    }
+}
+
+.HubRacerName {
+    vertical-align: center;
+    font-size: 17px;
+    font-weight: bold;
+    color: white;
+}
+
+.HubRacersMore {
+    height: 34px;
+    padding-top: 7px;
+    font-size: 15px;
+    color: #ffffffaa;
+
+    &.Unused {
+        visibility: collapse;
+    }
 }
 
 .HubStartButton {
-    horizontal-align: center;
-    border-radius: 4px;
-    padding: 10px 20px;
-    font-size: 18px;
+    width: 100%;
+    height: 56px;
+    border-radius: 8px;
+    margin-top: 4px;
 
-    background-color: #ffe066;
-    color: black;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #ffe680 ), to( #ffcf33 ) );
 
     transition-property: background-color;
     transition-duration: .1s;
     &:hover {
-        background-color: #ffd633;
+        background-color: gradient( linear, 0% 0%, 0% 100%, from( #fff0a6 ), to( #ffd94d ) );
     }
+}
+
+.HubStartButton Label {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: 22px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #141a12;
 }
 
 .HubWaitingLabel {
     horizontal-align: center;
-    font-size: 16px;
+    font-size: 18px;
     color: #ffffffaa;
     visibility: collapse;
 }
 
-/* Moderator-only "abort the running heat" button — shown instead of
+/* Moderator-only "abort the running Grand Prix" button — shown instead of
    HubWaitingLabel while a heat is running, see .IsModerator below. */
 .HubAbortButton {
     visibility: collapse;
     horizontal-align: center;
-    border-radius: 4px;
-    padding: 10px 20px;
-    font-size: 18px;
-    margin-top: 8px;
+    border-radius: 6px;
+    padding: 12px 28px;
+    margin-top: 10px;
 
     background-color: #e05c5c;
-    color: white;
 
     transition-property: background-color;
     transition-duration: .1s;
@@ -349,7 +490,19 @@
     }
 }
 
+.HubAbortButton Label {
+    font-size: 18px;
+    font-weight: bold;
+    color: white;
+}
+
+/* A heat is running: no heats, racers or start — just the message. */
 .HubModal.WaitingForOthers {
+    width: 460px;
+
+    .HubSection {
+        visibility: collapse;
+    }
     .HubStartButton {
         visibility: collapse;
     }

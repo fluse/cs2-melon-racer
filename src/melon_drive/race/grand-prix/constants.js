@@ -1,4 +1,4 @@
-// Grand Prix: the run of heats from the hub's "Start race" to the group's
+// Grand Prix: the run of heats from the hub's "Start Grand Prix" to the group's
 // return to the hub. Every heat's finishers score points by the place they
 // crossed the line in; the totals over all tracks decide the overall
 // winner. See "Grand Prix — places & points" in GAMEPLAY.md.

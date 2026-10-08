@@ -21,7 +21,7 @@ this folder, the script doesn't know about it.
 | 2 | [Core entities](02-core-entities.md) | Required entities (`point_script`s, HUD, melon template, hub) and spawn points |
 | 3 | [Effect templates](03-effect-templates.md) | Break burst, chunks, perfect spark, heal effect, boost trail, prediction dots |
 | 4 | [Tracks](04-tracks.md) | Start line, checkpoints, respawn spots, finish line, laps |
-| 5 | [Hub](05-hub.md) | Hub start area, `hub_teleport` |
+| 5 | [Hub](05-hub.md) | Hub start area, `hub_teleport`, podium |
 | 6 | [Paint triggers](06-paint-triggers.md) | Recolor the melon |
 | 7 | [Teleporters](07-teleporters.md) | Generic teleports, respawn teleporters |
 | 8 | [Kill & respawn triggers](08-kill-triggers.md) | Break the melon on the spot, or send it back to its checkpoint |
@@ -96,6 +96,7 @@ names once, when the script first needs the track list.
 | `particle_health_template` | `point_template` | — | [Effect templates](03-effect-templates.md#heal-effect) |
 | `particle_boost_trail_template` | `point_template` | — | [Effect templates](03-effect-templates.md#boost-trail) |
 | `prediction_dot_template` | `point_template` | — | [Effect templates](03-effect-templates.md#prediction-dots) |
+| `particle_podium_confetti` | `info_particle_system` | — | [Hub](05-hub.md#confetti) |
 
 ## All name patterns
 
@@ -108,6 +109,7 @@ Names the script parses — the name carries the config.
 | `finish_<trackId>` | `finish_2` | `trigger_multiple` | [Tracks](04-tracks.md#finish-line) |
 | `checkpoint_<trackId>_<index>` | `checkpoint_1_3` | `trigger_multiple` | [Tracks](04-tracks.md#checkpoints) |
 | `checkpoint_spawn_<trackId>_<index>` | `checkpoint_spawn_1_3` | `info_target` | [Tracks](04-tracks.md#checkpoints) |
+| `podium_spawn_<place>` (1–3) | `podium_spawn_1` | `info_target` | [Hub](05-hub.md#podium) |
 | `paint_trigger_<r>_<g>_<b>` | `paint_trigger_255_0_0` | `trigger_multiple` | [Paint triggers](06-paint-triggers.md) |
 | `teleport_[stop_\|keep_][checkpoint_]to_<dest>` | `teleport_stop_to_tp_dest_hub_back` | `trigger_multiple` | [Teleporters](07-teleporters.md) |
 | `heal_zone_<rate>` | `heal_zone_25` | `trigger_multiple` | [Heal zones](09-heal-zones.md) |
