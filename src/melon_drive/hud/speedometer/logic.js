@@ -1,7 +1,7 @@
 // Pure rule for the HUD's wall-jump dots — no cs_script import, so it's
 // unit-testable in Node (see test/hud/jump-dots.test.mjs). Applied by
 // UpdateJumpHud in ./speedometer.js.
-import { JUMP_DOT_FILL_STEPS } from "../constants/index.js";
+import { JUMP_DOT_FILL_STEPS } from "../../constants/index.js";
 
 /**
  * How full each jump dot is, in fill steps (0 = empty ..

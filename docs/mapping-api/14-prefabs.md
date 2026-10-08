@@ -14,6 +14,7 @@ never knows whether an entity came from a prefab.
 | Prefab | Placed in | What's in it | Set per copy |
 |---|---|---|---|
 | `hub.vmap` | `melon_racer.vmap` | the hub: `hub_start_trigger` (`hub_enter`/`hub_leave`), `hub_spawn`, the teleporters into the tutorial sections | — |
+| `podium.vmap` | `melon_racer.vmap` | the hub's [podium](05-hub.md#podium): `podium_spawn_1` … `_3` and the [confetti](05-hub.md#confetti) `particle_podium_confetti` | — |
 | `route_canals.vmap` | `melon_racer.vmap` | track 1 with its checkpoints, zones and gates | — |
 | `route_bridge.vmap` | `melon_racer.vmap` | track 2 with its checkpoints, zones and gates | — |
 | `route_side_slice.vmap` | `melon_racer.vmap` | track 3, a 2D section: `start_3`, `start_spawn`, `finish_3` (built in, not gate prefabs) and two [side-view zones](11-camera-zones.md#side-view-zones) | — |
@@ -25,6 +26,13 @@ never knows whether an entity came from a prefab.
 | `heal_gate.vmap` | a route | a [full-heal](09-heal-zones.md#full-heal-zone) gate: `heal_zone_full` (`heal_enter`/`heal_leave`) | — |
 | `obstacle_mover.vmap` | a route | an [obstacle mover](#obstacle-mover): a [mover](16-movers.md) and a [kill trigger](08-kill-triggers.md#kill-trigger) riding along on it | `Mover Name` = `mover_<anything>`, plus direction, distance, speed, kill on/off |
 | `refill_jumps.vmap` | — (not placed yet) | a [jump recharge zone](#refill-jumps): trigger (`jump_recharge_enter`/`jump_recharge_leave`) and its marker particles | — |
+
+A route prefab's **file name is the route's name** in the hub window's heat
+cards (`route_side_slice.vmap` → "SIDE SLICE"), and a keyword in it picks
+the card's icon (aqueduct, truss bridge, melon wedge; a checkered flag for any
+other — `ROUTE_ICONS` in the tool). Both are generated: after adding or
+renaming a route, run `node tools/make-route-icons.mjs` (`npm test` fails
+on a track without them).
 
 A route prefab holds one whole track, so it's placed **once**: the track
 ids are in its gates' overrides (and in any checkpoint placed without the

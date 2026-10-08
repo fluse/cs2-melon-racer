@@ -262,3 +262,111 @@ export function ReadVmapConnections(path) {
     }
     return result;
 }
+
+// --- world positions ---------------------------------------------------
+// Hammer stores each node's origin/angles/scales relative to its parent
+// (group, entity, prefab instance), so a world position is the chain of
+// those transforms down from the map's CMapWorld. Angles are Source's
+// [pitch, yaw, roll]. Instances (CMapInstance) are followed into their
+// target group with the instance's transform on top.
+
+/** @param {number[]} angles [pitch, yaw, roll] in degrees @returns {number[][]} rotation matrix */
+function RotationMatrix([pitch, yaw, roll]) {
+    const [p, y, r] = [pitch, yaw, roll].map((d) => (d * Math.PI) / 180);
+    const [cp, sp, cy, sy, cr, sr] = [Math.cos(p), Math.sin(p), Math.cos(y), Math.sin(y), Math.cos(r), Math.sin(r)];
+    return [
+        [cp * cy, sr * sp * cy - cr * sy, cr * sp * cy + sr * sy],
+        [cp * sy, sr * sp * sy + cr * cy, cr * sp * sy - sr * cy],
+        [-sp, sr * cp, cr * cp],
+    ];
+}
+
+/** @typedef {{ origin: number[], rotation: number[][], scale: number[] }} Transform */
+const IDENTITY = { origin: [0, 0, 0], rotation: RotationMatrix([0, 0, 0]), scale: [1, 1, 1] };
+
+/** `point` (local to `t`) in the space `t` lives in. @param {Transform} t @param {number[]} point */
+function Apply(t, point) {
+    const s = point.map((v, i) => v * t.scale[i]);
+    return t.origin.map((o, i) => o + t.rotation[i][0] * s[0] + t.rotation[i][1] * s[1] + t.rotation[i][2] * s[2]);
+}
+
+/** A child node's transform, given its parent's. @param {Transform} parent @param {Record<string, any>} attrs */
+function Child(parent, attrs) {
+    const local = RotationMatrix(attrs.angles ?? [0, 0, 0]);
+    return {
+        origin: Apply(parent, attrs.origin ?? [0, 0, 0]),
+        rotation: parent.rotation.map((row) => [0, 1, 2].map((j) => row[0] * local[0][j] + row[1] * local[1][j] + row[2] * local[2][j])),
+        scale: parent.scale.map((v, i) => v * (attrs.scales ?? [1, 1, 1])[i]),
+    };
+}
+
+/**
+ * Walks a .vmap's node tree (prefabs included, their map variables resolved)
+ * with each node's world transform: `onEntity` for every entity (its
+ * keyvalues). `files` is the chain of .vmap files the node sits in,
+ * outermost first.
+ * @param {string} path
+ * @param {(kv: Record<string, any>, t: Transform, files: string[]) => void} onEntity
+ */
+function WalkVmap(path, onEntity) {
+    /** @param {string} file absolute @param {Record<string, string>} overrides @param {Transform} transform @param {string[]} files */
+    const ReadFile = (file, overrides, transform, files) => {
+        const normalized = resolve(file).replace(/\\/g, "/");
+        const root = normalized.slice(0, normalized.lastIndexOf("/maps/"));
+        const relative = normalized.slice(root.length + 1);
+        if (files.includes(relative)) {
+            return;
+        }
+        const chain = [...files, relative];
+        const elements = ResolveVariables(ReadDmxElementsCached(normalized), overrides);
+        /** @param {number} index @param {Transform} parent */
+        const Visit = (index, parent) => {
+            const e = elements[index];
+            if (!e) {
+                return;
+            }
+            if (e.type === "CMapPrefab") {
+                const names = e.attrs.variableOverrideNames ?? [];
+                const values = e.attrs.variableOverrideValues ?? [];
+                if (typeof e.attrs.targetMapPath === "string" && e.attrs.targetMapPath) {
+                    ReadFile(join(root, e.attrs.targetMapPath), Object.fromEntries(names.map((n, i) => [n, values[i]])), Child(parent, e.attrs), chain);
+                }
+                return;
+            }
+            if (e.type === "CMapInstance") {
+                Visit(e.attrs.target?.elem, Child(parent, e.attrs));
+                return;
+            }
+            const own = e.type === "CMapGroup" || e.type === "CMapEntity" ? Child(parent, e.attrs) : parent;
+            if (e.type === "CMapEntity") {
+                const kv = elements[e.attrs.entity_properties?.elem]?.attrs;
+                if (kv && typeof kv.classname === "string") {
+                    onEntity(kv, own, chain);
+                }
+            }
+            for (const child of e.attrs.children ?? []) {
+                Visit(child.elem ?? child, own);
+            }
+        };
+        const world = elements.find((e) => e.type === "CMapWorld");
+        for (const child of world?.attrs.children ?? []) {
+            Visit(child.elem ?? child, transform);
+        }
+    };
+    ReadFile(path, {}, IDENTITY, []);
+}
+
+/**
+ * Every entity in a .vmap (prefabs included, their map variables resolved,
+ * like ReadVmapEntities) with its world position: its keyvalues plus
+ * `origin` ([x, y, z]) and `files`, the chain of .vmap files it sits in,
+ * outermost first ("maps/melon_racer.vmap", "maps/prefabs/route_canals.vmap", …).
+ * @param {string} path
+ * @returns {Array<Record<string, any> & { origin: number[], files: string[] }>}
+ */
+export function ReadVmapEntityOrigins(path) {
+    /** @type {Array<Record<string, any> & { origin: number[], files: string[] }>} */
+    const result = [];
+    WalkVmap(path, (kv, t, files) => result.push({ ...kv, origin: t.origin, files }));
+    return result;
+}

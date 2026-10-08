@@ -10,10 +10,11 @@ import { IsCollisionDebugOn, SetCollisionDebug } from "../dev/collision-debug.js
 import { IsFreeLookOn, SetFreeLook } from "../dev/free-look.js";
 import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial } from "../race/heat/race-flow.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
+import { PlaceOnPodium, TestGrandPrix } from "../race/podium/podium.js";
 import { GetSpeedHud } from "./layout.js";
-import { HideHubModal } from "./hub-modal.js";
+import { HideHubModal } from "./hub-modal/hub-modal.js";
 import { SetUserMenuOpen, UpdateCollisionDebugHud, UpdateFreeLookHud, UpdateMelonGlowHud, UpdatePredictionHud } from "./user-menu.js";
-import { COLOR_PRESETS } from "../constants/index.js";
+import { COLOR_PRESETS, RacePhase } from "../constants/index.js";
 
 export function RegisterHudInputs() {
     Instance.OnCustomHudClicked((event) => {
@@ -134,6 +135,25 @@ export function RegisterHudInputs() {
                     SetUserMenuOpen(slot, kart, false);
                 }
             }
+        } else if (event.buttonId === "usermenu_podium_button") {
+            // Developer: the end of a Grand Prix without racing one — everyone
+            // to the hub, then the clicking player onto place 1 and the others
+            // in join order onto 2 and 3, held there, confetti on. Not while
+            // a heat runs (it would pull its racers out).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (!kart) {
+                return;
+            }
+            if (phase !== RacePhase.HUB) {
+                Debug(`usermenu_podium_button: slot ${slot}, ignored — a heat is running (phase=${phase})`);
+                return;
+            }
+            const racers = [kart, ...[...karts.values()].filter((other) => other !== kart && other.melon.IsValid())];
+            Debug(`usermenu_podium_button: slot ${slot} plays the podium with ${racers.length} player(s)`);
+            SetUserMenuOpen(slot, kart, false);
+            ReturnAllToHub(racers);
+            PlaceOnPodium(TestGrandPrix(racers), racers);
         } else if (event.buttonId.startsWith("usermenu_color_")) {
             const key = event.buttonId.slice("usermenu_color_".length);
             const preset = COLOR_PRESETS[key];
