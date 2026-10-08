@@ -1224,6 +1224,13 @@
     color: #ffffffaa;
 }
 
+/* An action row (Test Podium): a gold outlined pill instead of ON/OFF. */
+.UserMenuTogglePill.UserMenuRunPill {
+    background-color: #00000000;
+    border: 1px solid #ffd84d;
+    color: #ffd84d;
+}
+
 .UserMenuToggle.ToggleOn .UserMenuTogglePill {
     background-color: #3fae3f;
     color: #ffffff;

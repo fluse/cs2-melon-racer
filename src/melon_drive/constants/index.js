@@ -26,6 +26,7 @@ export * from "../kart/constants.js";
 export * from "../camera/follow/constants.js";
 export * from "../camera/wall-clip/constants.js";
 export * from "../camera/lift-zoom/constants.js";
+export * from "../camera/podium-zoom/constants.js";
 export * from "../camera/break-zoom/constants.js";
 export * from "../zones/camera-zone/constants.js";
 export * from "../zones/side-view/constants.js";

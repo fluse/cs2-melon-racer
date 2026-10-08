@@ -1,11 +1,12 @@
 // The third-person chase camera: attaching it to the melon, its normal
 // offset (CAMERA_DISTANCE/CAMERA_HEIGHT), and the one place that writes
-// the follow config (SetFollowOffset) — the break, lift and camera-zone
-// zooms (the other folders in camera/) all go through it. Walls pull the
+// the follow config (SetFollowOffset) — the break, lift, podium and
+// camera-zone zooms (the other folders in camera/) all go through it. Walls pull the
 // camera in through ../wall-clip/ (eased), not the engine.
 import { CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { LiftCameraOffset } from "../lift-zoom/logic.js";
+import { PodiumCameraOffset } from "../podium-zoom/logic.js";
 import { WallClippedOffset } from "../wall-clip/wall-clip.js";
 import { ZoneCameraClips, ZoneCameraOffset } from "../../zones/camera-zone/logic.js";
 import { CAMERA_LATERAL, CAMERA_DISTANCE, CAMERA_HEIGHT, CAMERA_OFFSET_RETURN_STRENGTH, FOLLOW_OFFSET } from "../../constants/index.js";
@@ -62,7 +63,7 @@ export function UpdateFollowCamera(kart, dt) {
 export function ApplyZonedFollowOffset(kart, dt) {
     const liftBlend = kart.liftCameraBlend ?? 0;
     const offset = ZonedFollowOffset(kart);
-    const clips = liftBlend === 0 && ZoneCameraClips(kart.zoneCamera);
+    const clips = liftBlend === 0 && (kart.podiumCameraBlend ?? 0) === 0 && ZoneCameraClips(kart.zoneCamera);
     if (!clips) {
         kart.cameraWallScale = undefined; // no wall pull-in out here; starts over once it's back on
     }
@@ -80,7 +81,8 @@ export function ApplyZonedFollowOffset(kart, dt) {
  * @param {import("../../core/kart-registry.js").Kart} kart
  */
 export function ZonedFollowOffset(kart) {
-    return ZoneCameraOffset(LiftCameraOffset(GetCameraOffsetFor(kart), kart.liftCameraBlend ?? 0), kart.zoneCamera);
+    const lifted = LiftCameraOffset(GetCameraOffsetFor(kart), kart.liftCameraBlend ?? 0);
+    return ZoneCameraOffset(PodiumCameraOffset(lifted, kart.podiumCameraBlend ?? 0), kart.zoneCamera);
 }
 
 /**

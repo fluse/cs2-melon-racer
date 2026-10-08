@@ -92,6 +92,7 @@ function TraceSphere(config) {
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
  *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
  *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
+ *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
@@ -997,8 +998,11 @@ const HEAT_POINTS_FINISHER = 1;
 // How many places the podium has — one info_target per place.
 const PODIUM_PLACES = 3;
 // Where place <n> stands: an info_target named "podium_spawn_<n>"
-// ("podium_spawn_1" = the winner's step), on the floor under it, facing its
-// yaw. A place without one sends that racer to hub_spawn like everyone else.
+// ("podium_spawn_1" = the winner's step), on the floor under it. Its yaw is
+// the way the podium faces (towards the room): the melon is set down facing
+// it, the player's view the other way, so the chase camera looks at the
+// podium from the room. A place without one sends that racer to hub_spawn
+// like everyone else.
 const PODIUM_SPAWN_NAME_PATTERN = /^podium_spawn_([1-3])$/;
 /** @param {number} place */
 function PodiumSpawnName(place) {
@@ -1014,9 +1018,12 @@ const PODIUM_HOLD_SECONDS = 10;
 const PODIUM_PULL = 6;
 const PODIUM_PULL_MAX_SPEED = 200;
 // Confetti over the podium: every info_particle_system by this name (Start
-// Active off) gets Start once the top three are up there, and Stop when
-// their hold ends. Optional.
+// Active off) gets Start once the top three are up there, again every
+// PODIUM_CONFETTI_INTERVAL seconds (a short Stop first, so a one-off burst
+// fires anew), and Stop when their hold ends. Optional.
 const PODIUM_CONFETTI_NAME = "particle_podium_confetti";
+const PODIUM_CONFETTI_INTERVAL = 2; // seconds between bursts
+const PODIUM_CONFETTI_RESTART_GAP = 0.1; // seconds between a burst's Stop and its Start
 
 // Teleporters and the lift applied to every trigger/destination teleport target.
 
@@ -1167,6 +1174,14 @@ const CAMERA_WALL_MARGIN = 8;
 const LIFT_CAMERA_EXTRA_DISTANCE = 220; // units further back
 const LIFT_CAMERA_EXTRA_HEIGHT = 30; // units higher up
 const LIFT_CAMERA_EASE_SECONDS = 0.6; // seconds to zoom fully out (or back in)
+
+// Podium (race/podium/): while a melon is held on its step, the chase camera
+// eases back and up by this much on top of the normal
+// CAMERA_DISTANCE/CAMERA_HEIGHT, so the whole podium is in view; it eases
+// back in once the hold ends. Walls don't pull it in meanwhile.
+const PODIUM_CAMERA_EXTRA_DISTANCE = 160; // units further back
+const PODIUM_CAMERA_EXTRA_HEIGHT = 40; // units higher up
+const PODIUM_CAMERA_EASE_SECONDS = 0.8; // seconds to zoom fully out (or back in)
 
 // The break camera (camera/break-zoom/break-zoom.js) uses the engine's own
 // wall clipping, unlike the normal chase camera (camera/wall-clip/) — this is
@@ -1380,6 +1395,36 @@ function LiftCameraOffset(base, blend) {
         x: base.x - LIFT_CAMERA_EXTRA_DISTANCE * eased,
         y: base.y,
         z: base.z + LIFT_CAMERA_EXTRA_HEIGHT * eased,
+    };
+}
+
+// Pure rules for the podium camera zoom — no cs_script import, so it's
+// unit-testable in Node (see test/camera/podium-zoom.test.mjs).
+// podium-zoom.js next to it and ../follow/follow.js apply it.
+
+/**
+ * How far the podium camera is zoomed out after `dt` more seconds, 0
+ * (normal) to 1 (fully out): towards 1 while held on the podium, towards 0
+ * after, taking PODIUM_CAMERA_EASE_SECONDS for the whole way.
+ * @param {number} blend current value @param {boolean} onPodium @param {number} dt
+ */
+function PodiumCameraBlend(blend, onPodium, dt) {
+    const step = PODIUM_CAMERA_EASE_SECONDS > 0 ? Math.max(0, dt) / PODIUM_CAMERA_EASE_SECONDS : 1;
+    return onPodium ? Math.min(1, blend + step) : Math.max(0, blend - step);
+}
+
+/**
+ * The chase camera offset with the podium zoom on top: further back (x is
+ * forward, negative = behind) and higher, eased (smoothstep).
+ * @param {{ x: number, y: number, z: number }} base @param {number} blend see PodiumCameraBlend
+ */
+function PodiumCameraOffset(base, blend) {
+    const t = Math.max(0, Math.min(1, blend));
+    const eased = t * t * (3 - 2 * t);
+    return {
+        x: base.x - PODIUM_CAMERA_EXTRA_DISTANCE * eased,
+        y: base.y,
+        z: base.z + PODIUM_CAMERA_EXTRA_HEIGHT * eased,
     };
 }
 
@@ -1631,8 +1676,8 @@ function ZoneCameraOffset(base, state) {
 
 // The third-person chase camera: attaching it to the melon, its normal
 // offset (CAMERA_DISTANCE/CAMERA_HEIGHT), and the one place that writes
-// the follow config (SetFollowOffset) — the break, lift and camera-zone
-// zooms (the other folders in camera/) all go through it. Walls pull the
+// the follow config (SetFollowOffset) — the break, lift, podium and
+// camera-zone zooms (the other folders in camera/) all go through it. Walls pull the
 // camera in through ../wall-clip/ (eased), not the engine.
 
 /** The normal chase offset, before any zoom. @param {import("../../core/kart-registry.js").Kart} kart */
@@ -1687,7 +1732,7 @@ function UpdateFollowCamera(kart, dt) {
 function ApplyZonedFollowOffset(kart, dt) {
     const liftBlend = kart.liftCameraBlend ?? 0;
     const offset = ZonedFollowOffset(kart);
-    const clips = liftBlend === 0 && ZoneCameraClips(kart.zoneCamera);
+    const clips = liftBlend === 0 && (kart.podiumCameraBlend ?? 0) === 0 && ZoneCameraClips(kart.zoneCamera);
     if (!clips) {
         kart.cameraWallScale = undefined; // no wall pull-in out here; starts over once it's back on
     }
@@ -1705,7 +1750,8 @@ function ApplyZonedFollowOffset(kart, dt) {
  * @param {import("../../core/kart-registry.js").Kart} kart
  */
 function ZonedFollowOffset(kart) {
-    return ZoneCameraOffset(LiftCameraOffset(GetCameraOffsetFor(kart), kart.liftCameraBlend ?? 0), kart.zoneCamera);
+    const lifted = LiftCameraOffset(GetCameraOffsetFor(kart), kart.liftCameraBlend ?? 0);
+    return ZoneCameraOffset(PodiumCameraOffset(lifted, kart.podiumCameraBlend ?? 0), kart.zoneCamera);
 }
 
 /**
@@ -2066,6 +2112,72 @@ function UpdateLiftCamera(kart, dt) {
         return;
     }
     kart.liftCameraBlend = LiftCameraBlend(kart.liftCameraBlend ?? 0, InLiftZone(kart), dt);
+}
+
+// Pure podium rules — no cs_script import, so they're unit-testable in Node
+// (see test/race/podium.test.mjs). race/podium/podium.js puts the melons
+// there; movement/driving/drive.js holds them.
+
+/**
+ * A melon held on the podium: the spot it's pulled back over, and until when.
+ * @typedef {{ place: number, spot: { x: number, y: number, z: number }, until: number }} PodiumHold
+ */
+
+/**
+ * Who stands where: the first PODIUM_PLACES of the final standings (leader
+ * first, see SortedStandings), as long as they're still among `presentKeys`
+ * — a place whose racer has left stays empty, nobody moves up.
+ * @param {string[]} rankedKeys player keys, leader first
+ * @param {Set<string>} presentKeys player keys of the racers still on the map
+ * @returns {Map<string, number>} player key -> place (1 = winner)
+ */
+function PodiumPlaces(rankedKeys, presentKeys) {
+    /** @type {Map<string, number>} */
+    const places = new Map();
+    rankedKeys.slice(0, PODIUM_PLACES).forEach((key, i) => {
+        if (presentKeys.has(key)) {
+            places.set(key, i + 1);
+        }
+    });
+    return places;
+}
+
+/** Whether `hold` still holds the melon at `now`. @param {PodiumHold | undefined} hold @param {number} now */
+function PodiumHoldActive(hold, now) {
+    return hold !== undefined && now < hold.until;
+}
+
+/**
+ * The horizontal velocity that keeps a held melon over its spot: straight
+ * back towards it, PODIUM_PULL per unit it's off, at most
+ * PODIUM_PULL_MAX_SPEED. Zero right on it.
+ * @param {{ x: number, y: number }} origin @param {{ x: number, y: number }} spot
+ */
+function PodiumHoldVelocity(origin, spot) {
+    const dx = spot.x - origin.x;
+    const dy = spot.y - origin.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance === 0) {
+        return { x: 0, y: 0 };
+    }
+    const speed = Math.min(distance * PODIUM_PULL, PODIUM_PULL_MAX_SPEED);
+    return { x: (dx / distance) * speed, y: (dy / distance) * speed };
+}
+
+// Podium camera: zooms out while the melon is held on the hub's podium
+// (PODIUM_CAMERA_* in constants.js, the math in logic.js).
+
+/**
+ * Per tick: eases the chase camera out while the melon stands on the podium
+ * and back in after (UpdateFollowCamera in follow.js applies the zoom right
+ * after). Left alone while the melon is breaking — the break camera owns it.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
+ */
+function UpdatePodiumCamera(kart, dt) {
+    if (kart.breaking) {
+        return;
+    }
+    kart.podiumCameraBlend = PodiumCameraBlend(kart.podiumCameraBlend ?? 0, PodiumHoldActive(kart.podium, Instance.GetGameTime()), dt);
 }
 
 // Camera zones: zoom in or out while the melon is in a camera_enter/_leave
@@ -2435,7 +2547,7 @@ function LookAlongTravel(kart, sideView) {
 // Chase camera — one folder per feature: follow/ (the normal chase camera and
 // the one place that writes the follow config), wall-clip/ (eased pull-in at
 // walls), break-zoom/ (pull-back on a break), lift-zoom/ (zoom-out in lift
-// zones), zone-zoom/ (zoom in/out in camera zones), side-view/ (the fixed
+// zones), podium-zoom/ (zoom-out on the hub's podium), zone-zoom/ (zoom in/out in camera zones), side-view/ (the fixed
 // side camera in side-view zones). Other parts of
 // melon_drive import from here.
 
@@ -5982,56 +6094,6 @@ function CountdownDigits(value) {
     return { tens: clamped >= 10 ? Math.floor(clamped / 10) : undefined, ones: clamped % 10 };
 }
 
-// Pure podium rules — no cs_script import, so they're unit-testable in Node
-// (see test/race/podium.test.mjs). race/podium/podium.js puts the melons
-// there; movement/driving/drive.js holds them.
-
-/**
- * A melon held on the podium: the spot it's pulled back over, and until when.
- * @typedef {{ place: number, spot: { x: number, y: number, z: number }, until: number }} PodiumHold
- */
-
-/**
- * Who stands where: the first PODIUM_PLACES of the final standings (leader
- * first, see SortedStandings), as long as they're still among `presentKeys`
- * — a place whose racer has left stays empty, nobody moves up.
- * @param {string[]} rankedKeys player keys, leader first
- * @param {Set<string>} presentKeys player keys of the racers still on the map
- * @returns {Map<string, number>} player key -> place (1 = winner)
- */
-function PodiumPlaces(rankedKeys, presentKeys) {
-    /** @type {Map<string, number>} */
-    const places = new Map();
-    rankedKeys.slice(0, PODIUM_PLACES).forEach((key, i) => {
-        if (presentKeys.has(key)) {
-            places.set(key, i + 1);
-        }
-    });
-    return places;
-}
-
-/** Whether `hold` still holds the melon at `now`. @param {PodiumHold | undefined} hold @param {number} now */
-function PodiumHoldActive(hold, now) {
-    return hold !== undefined && now < hold.until;
-}
-
-/**
- * The horizontal velocity that keeps a held melon over its spot: straight
- * back towards it, PODIUM_PULL per unit it's off, at most
- * PODIUM_PULL_MAX_SPEED. Zero right on it.
- * @param {{ x: number, y: number }} origin @param {{ x: number, y: number }} spot
- */
-function PodiumHoldVelocity(origin, spot) {
-    const dx = spot.x - origin.x;
-    const dy = spot.y - origin.y;
-    const distance = Math.hypot(dx, dy);
-    if (distance === 0) {
-        return { x: 0, y: 0 };
-    }
-    const speed = Math.min(distance * PODIUM_PULL, PODIUM_PULL_MAX_SPEED);
-    return { x: (dx / distance) * speed, y: (dy / distance) * speed };
-}
-
 // The podium in the hub: once a Grand Prix has run to its last track and the
 // group is back in the hub (race/heat/race-flow.js), the top three are moved
 // on from hub_spawn onto their podium_spawn_<place> and held there for
@@ -6066,7 +6128,9 @@ function PlaceOnPodium(gp, racers) {
             continue;
         }
         kart.melon.Teleport({ position: spawn.position, angles: spawn.angles, velocity: { x: 0, y: 0, z: 0 }, angularVelocity: { x: 0, y: 0, z: 0 } });
-        FacePlayerView(kart.pawn, spawn.angles.yaw);
+        // The view (and so the chase camera behind the melon) looks back at
+        // the podium from the side its steps face, not out from it.
+        FacePlayerView(kart.pawn, spawn.angles.yaw + 180);
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.podium = { place, spot: spawn.position, until: now + PODIUM_HOLD_SECONDS };
@@ -6079,13 +6143,44 @@ function PlaceOnPodium(gp, racers) {
 }
 
 /**
- * The confetti over the podium (PODIUM_CONFETTI_NAME, if placed): on now,
- * off when the hold ends. Stop first, so a system still running restarts.
+ * The confetti over the podium (PODIUM_CONFETTI_NAME, if placed): a burst
+ * now and every PODIUM_CONFETTI_INTERVAL seconds of the hold (each a Stop,
+ * then a Start PODIUM_CONFETTI_RESTART_GAP later, so a one-off effect fires
+ * again), off when the hold ends. All scheduled now, as delayed inputs.
  */
 function PlayConfetti() {
-    Instance.EntFireAtName({ name: PODIUM_CONFETTI_NAME, input: "Stop" });
-    Instance.EntFireAtName({ name: PODIUM_CONFETTI_NAME, input: "Start" });
-    Instance.EntFireAtName({ name: PODIUM_CONFETTI_NAME, input: "Stop", delay: PODIUM_HOLD_SECONDS });
+    const Fire = (/** @type {string} */ input, /** @type {number} */ delay) => Instance.EntFireAtName({ name: PODIUM_CONFETTI_NAME, input, delay });
+    for (const at of ConfettiBursts()) {
+        Fire("Stop", at);
+        Fire("Start", at + PODIUM_CONFETTI_RESTART_GAP);
+    }
+    Fire("Stop", PODIUM_HOLD_SECONDS);
+}
+
+/** When the bursts go off, in seconds from the podium's start: 0, every interval, all within the hold. */
+function ConfettiBursts() {
+    const bursts = [];
+    for (let at = 0; at + PODIUM_CONFETTI_RESTART_GAP < PODIUM_HOLD_SECONDS; at += PODIUM_CONFETTI_INTERVAL) {
+        bursts.push(at);
+    }
+    return bursts;
+}
+
+/**
+ * A finished one-heat Grand Prix in which `racers` crossed the line in the
+ * order given — for the user menu's developer "Test Podium" button, which
+ * plays the podium without racing a whole Grand Prix.
+ * @param {import("../../core/kart-registry.js").Kart[]} racers
+ */
+function TestGrandPrix(racers) {
+    const entries = racers.map((kart) => ({ key: PlayerKey(kart), name: kart.pawn.GetPlayerController()?.GetPlayerName() ?? "" }));
+    const gp = NewGrandPrix(entries, 1);
+    BeginGrandPrixHeat(gp, 0);
+    for (const entry of entries) {
+        RecordHeatFinish(gp, 0, entry, undefined);
+    }
+    gp.over = true;
+    return gp;
 }
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
@@ -7550,6 +7645,25 @@ function RegisterHudInputs() {
                     SetUserMenuOpen(slot, kart, false);
                 }
             }
+        } else if (event.buttonId === "usermenu_podium_button") {
+            // Developer: the end of a Grand Prix without racing one — everyone
+            // to the hub, then the clicking player onto place 1 and the others
+            // in join order onto 2 and 3, held there, confetti on. Not while
+            // a heat runs (it would pull its racers out).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (!kart) {
+                return;
+            }
+            if (phase !== RacePhase.HUB) {
+                Debug(`usermenu_podium_button: slot ${slot}, ignored — a heat is running (phase=${phase})`);
+                return;
+            }
+            const racers = [kart, ...[...karts.values()].filter((other) => other !== kart && other.melon.IsValid())];
+            Debug(`usermenu_podium_button: slot ${slot} plays the podium with ${racers.length} player(s)`);
+            SetUserMenuOpen(slot, kart, false);
+            ReturnAllToHub(racers);
+            PlaceOnPodium(TestGrandPrix(racers), racers);
         } else if (event.buttonId.startsWith("usermenu_color_")) {
             const key = event.buttonId.slice("usermenu_color_".length);
             const preset = COLOR_PRESETS[key];
@@ -8478,6 +8592,7 @@ function Think() {
             UpdateUserMenu(slot, kart); // checked before UpdateKart's locked/breaking early-returns — USE works as an unstuck button
             UpdateKart(slot, kart, dt);
             UpdateLiftCamera(kart, dt);
+            UpdatePodiumCamera(kart, dt);
             UpdateZoneCamera(kart, dt);
             UpdateSideViewCamera(kart, dt);
             UpdateFollowCamera(kart, dt);

@@ -14,6 +14,7 @@ const { GetHubSpawnPoint } = await import("../../src/melon_drive/kart/spawn-poin
 const flow = await import("../../src/melon_drive/race/heat/race-flow.js");
 const { SetUserMenuOpen } = await import("../../src/melon_drive/hud/user-menu.js");
 const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, SPEED_HUD_ENTITY_NAME, RacePhase, COLOR_PRESETS, MELON_MAX_HEALTH } = await import("../../src/melon_drive/constants/index.js");
+const C = await import("../../src/melon_drive/constants/index.js");
 await import("../../src/melon_drive/index.js"); // registers OnCustomHudClicked
 
 const HUB = { x: 250, y: -520, z: 16 };
@@ -195,4 +196,26 @@ test("clicks from a player without a kart are ignored", () => {
     for (const button of ["hub_close_button", "usermenu_close_button", "usermenu_respawn_button", "usermenu_restart_button", "usermenu_hub_button", "usermenu_tutorial_button", "usermenu_glow_button", "usermenu_freelook_button", "usermenu_color_red"]) {
         assert.doesNotThrow(() => Click(7, button), button);
     }
+});
+
+test("test podium button: the clicker on place 1, the others after — never during a heat", () => {
+    const { PodiumSpawnName, PODIUM_CONFETTI_NAME } = C;
+    const steps = { 1: { x: 900, y: 0, z: 64 }, 2: { x: 900, y: 120, z: 48 }, 3: { x: 900, y: -120, z: 32 } };
+    for (const place of [1, 2, 3]) {
+        world.add(new Entity({ name: PodiumSpawnName(place), className: "info_target", origin: steps[place] }));
+    }
+    a.inHub = b.inHub = true;
+    flow.TryStartRace();
+    Click(1, "usermenu_podium_button");
+    assert.equal(b.podium, undefined, "ignored while a heat runs");
+    assert.equal(a.racing, true, "and nobody was pulled out of it");
+    flow.TryAbortRace();
+
+    SetUserMenuOpen(1, b, true);
+    Click(1, "usermenu_podium_button");
+    assert.equal(b.userMenuOpen, false);
+    assert.equal(b.podium?.place, 1, "the clicker wins");
+    assert.equal(a.podium?.place, 2);
+    assert.deepEqual(HorizontalSpot(b), [steps[1].x, steps[1].y]);
+    assert.ok(world.fired.some((f) => f.name === PODIUM_CONFETTI_NAME && f.input === "Start"), "confetti");
 });

@@ -15,6 +15,7 @@ const { RespawnKartAtCheckpoint } = await import("../../src/melon_drive/kart/tel
 const flow = await import("../../src/melon_drive/race/heat/race-flow.js");
 const { TryStartRace, TryAbortRace, FinishKart, UpdateRaceFlow, RestoreRaceFlowSnapshot } = flow;
 const { UpdateKart } = await import("../../src/melon_drive/movement/index.js");
+const { UpdatePodiumCamera } = await import("../../src/melon_drive/camera/index.js");
 const C = await import("../../src/melon_drive/constants/index.js");
 
 const TRACK = 1;
@@ -98,14 +99,20 @@ test("after the last track the top three stand on their steps, the rest at the h
     assert.equal(b.melon.GetAbsOrigin().x !== STEP[1].x, true, "fourth place stays at the hub");
     // Respawn point stays the hub: the respawn button takes them down.
     assert.notEqual(c.checkpointPosition.x, STEP[1].x);
-    assert.equal(c.pawn.eyeAngles.yaw, 180, "facing the step's yaw");
+    assert.equal(((c.pawn.eyeAngles.yaw % 360) + 360) % 360, 0, "the view looks back at the podium: the steps' yaw (180) turned around");
 });
 
-test("the confetti starts with the podium and stops when the hold ends", () => {
+test("the confetti bursts every PODIUM_CONFETTI_INTERVAL through the hold and stops when it ends", () => {
     const [a] = kartList;
     RunGrandPrix([a], [a]);
     const confetti = world.fired.filter((f) => f.name === C.PODIUM_CONFETTI_NAME);
-    assert.deepEqual(confetti.map((f) => [f.input, f.delay]), [["Stop", undefined], ["Start", undefined], ["Stop", C.PODIUM_HOLD_SECONDS]]);
+    const starts = confetti.filter((f) => f.input === "Start").map((f) => f.delay);
+    assert.equal(starts[0], C.PODIUM_CONFETTI_RESTART_GAP, "the first burst right away");
+    assert.ok(starts.length >= 2, "more than one burst");
+    starts.slice(1).forEach((at, i) => assert.ok(Math.abs(at - starts[i] - C.PODIUM_CONFETTI_INTERVAL) < 1e-9, "evenly spaced"));
+    assert.ok(starts.every((at) => at < C.PODIUM_HOLD_SECONDS), "all within the hold");
+    assert.equal(confetti[confetti.length - 1].input, "Stop");
+    assert.equal(confetti[confetti.length - 1].delay, C.PODIUM_HOLD_SECONDS);
 });
 
 test("a cancelled Grand Prix puts nobody on the podium", () => {
@@ -186,4 +193,16 @@ test("the respawn button, the hub button and the next Grand Prix take it down", 
     world.time = 200;
     TryStartRace();
     assert.equal(a.podium, undefined);
+});
+
+test("on the podium the camera eases out, and back in once the hold ends", () => {
+    const [a] = kartList;
+    RunGrandPrix([a], [a]);
+    UpdatePodiumCamera(a, C.PODIUM_CAMERA_EASE_SECONDS / 2);
+    assert.ok(a.podiumCameraBlend > 0 && a.podiumCameraBlend < 1, "on its way out");
+    UpdatePodiumCamera(a, C.PODIUM_CAMERA_EASE_SECONDS);
+    assert.equal(a.podiumCameraBlend, 1);
+    world.time += C.PODIUM_HOLD_SECONDS;
+    UpdatePodiumCamera(a, C.PODIUM_CAMERA_EASE_SECONDS);
+    assert.equal(a.podiumCameraBlend, 0, "back to normal after the hold");
 });

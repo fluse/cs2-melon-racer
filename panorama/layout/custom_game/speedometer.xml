@@ -507,6 +507,13 @@
 								<Label class="UserMenuToggleName" text="Free Look" />
 								<Label class="UserMenuTogglePill" text="{s:freelook_state}" />
 							</Button>
+							<!-- Plays the end of a Grand Prix: everyone to the hub, you on place 1,
+							     the others on 2 and 3 (usermenu_podium_button in hud/inputs.js).
+							     Ignored while a heat runs. -->
+							<Button id="usermenu_podium_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Test Podium" />
+								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
+							</Button>
 						</Panel>
 					</Panel>
 				</Panel>

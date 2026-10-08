@@ -520,12 +520,18 @@ the standings (`SortedStandings`) are put on the hub's podium instead of
 `hub_spawn`: one `info_target` per step, `podium_spawn_1` … `_3`, no
 triggers. They're **held there** (decided) for `PODIUM_HOLD_SECONDS`:
 jumping and looking around work, driving and the attack boost don't, and a
-melon off its spot is pulled back over it. Their respawn point stays the
+melon off its spot is pulled back over it. The view is turned to look
+**at** the podium (the spots' yaw is the way the podium faces), and the
+chase camera eases further back meanwhile (`camera/podium-zoom/`). Their respawn point stays the
 hub, so the respawn, hub and tutorial buttons (and any teleport, or the next
 Grand Prix) take them down early. A racer who left leaves their step empty;
-a cancelled Grand Prix puts nobody up. Confetti: every
+a cancelled Grand Prix puts nobody up. For testing, the user menu's
+DEVELOPER group has "Test Podium": everyone to the hub, the clicking player
+onto place 1, the others in join order onto 2 and 3 — not while a heat
+runs (`TestGrandPrix` in `race/podium/podium.js`). Confetti: every
 `info_particle_system` named `particle_podium_confetti` (Start Active off)
-is started as they're put up and stopped when the hold ends. Constants:
+bursts as they're put up and again every `PODIUM_CONFETTI_INTERVAL`, and
+is stopped when the hold ends. Constants:
 `race/podium/constants.js`; rules: `race/podium/logic.js`
 (`test/race/podium.test.mjs`), applied by `race/podium/podium.js` and the
 hold in `movement/driving/drive.js` (`test/race/podium-flow.test.mjs`).

@@ -1,8 +1,8 @@
 import { Instance } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { GetPodiumSpawnPoint, FacePlayerView } from "../../kart/spawn-points.js";
-import { PODIUM_HOLD_SECONDS, PODIUM_CONFETTI_NAME } from "../../constants/index.js";
-import { SortedStandings } from "../grand-prix/logic.js";
+import { PODIUM_HOLD_SECONDS, PODIUM_CONFETTI_NAME, PODIUM_CONFETTI_INTERVAL, PODIUM_CONFETTI_RESTART_GAP } from "../../constants/index.js";
+import { SortedStandings, NewGrandPrix, BeginGrandPrixHeat, RecordHeatFinish } from "../grand-prix/logic.js";
 import { PlayerKey } from "../grand-prix/grand-prix.js";
 import { PodiumPlaces } from "./logic.js";
 
@@ -40,7 +40,9 @@ export function PlaceOnPodium(gp, racers) {
             continue;
         }
         kart.melon.Teleport({ position: spawn.position, angles: spawn.angles, velocity: { x: 0, y: 0, z: 0 }, angularVelocity: { x: 0, y: 0, z: 0 } });
-        FacePlayerView(kart.pawn, spawn.angles.yaw);
+        // The view (and so the chase camera behind the melon) looks back at
+        // the podium from the side its steps face, not out from it.
+        FacePlayerView(kart.pawn, spawn.angles.yaw + 180);
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.podium = { place, spot: spawn.position, until: now + PODIUM_HOLD_SECONDS };
@@ -53,11 +55,42 @@ export function PlaceOnPodium(gp, racers) {
 }
 
 /**
- * The confetti over the podium (PODIUM_CONFETTI_NAME, if placed): on now,
- * off when the hold ends. Stop first, so a system still running restarts.
+ * The confetti over the podium (PODIUM_CONFETTI_NAME, if placed): a burst
+ * now and every PODIUM_CONFETTI_INTERVAL seconds of the hold (each a Stop,
+ * then a Start PODIUM_CONFETTI_RESTART_GAP later, so a one-off effect fires
+ * again), off when the hold ends. All scheduled now, as delayed inputs.
  */
 function PlayConfetti() {
-    Instance.EntFireAtName({ name: PODIUM_CONFETTI_NAME, input: "Stop" });
-    Instance.EntFireAtName({ name: PODIUM_CONFETTI_NAME, input: "Start" });
-    Instance.EntFireAtName({ name: PODIUM_CONFETTI_NAME, input: "Stop", delay: PODIUM_HOLD_SECONDS });
+    const Fire = (/** @type {string} */ input, /** @type {number} */ delay) => Instance.EntFireAtName({ name: PODIUM_CONFETTI_NAME, input, delay });
+    for (const at of ConfettiBursts()) {
+        Fire("Stop", at);
+        Fire("Start", at + PODIUM_CONFETTI_RESTART_GAP);
+    }
+    Fire("Stop", PODIUM_HOLD_SECONDS);
+}
+
+/** When the bursts go off, in seconds from the podium's start: 0, every interval, all within the hold. */
+export function ConfettiBursts() {
+    const bursts = [];
+    for (let at = 0; at + PODIUM_CONFETTI_RESTART_GAP < PODIUM_HOLD_SECONDS; at += PODIUM_CONFETTI_INTERVAL) {
+        bursts.push(at);
+    }
+    return bursts;
+}
+
+/**
+ * A finished one-heat Grand Prix in which `racers` crossed the line in the
+ * order given — for the user menu's developer "Test Podium" button, which
+ * plays the podium without racing a whole Grand Prix.
+ * @param {import("../../core/kart-registry.js").Kart[]} racers
+ */
+export function TestGrandPrix(racers) {
+    const entries = racers.map((kart) => ({ key: PlayerKey(kart), name: kart.pawn.GetPlayerController()?.GetPlayerName() ?? "" }));
+    const gp = NewGrandPrix(entries, 1);
+    BeginGrandPrixHeat(gp, 0);
+    for (const entry of entries) {
+        RecordHeatFinish(gp, 0, entry, undefined);
+    }
+    gp.over = true;
+    return gp;
 }

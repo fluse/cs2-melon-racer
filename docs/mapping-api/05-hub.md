@@ -44,11 +44,12 @@ podium instead of `hub_spawn`. **No triggers** — one point entity per step:
 | Class | `info_target` |
 | Name | `podium_spawn_1`, `podium_spawn_2`, `podium_spawn_3` — one each, all optional |
 | Position | right above its step: the melon lands on the floor traced straight down from it (`SPAWN_UP_OFFSET` above) |
-| Angles | yaw = the way the melon and the player's view face |
+| Angles | yaw = the way the podium faces (towards the room): the camera looks back at the podium from there |
 
 - Held there for `PODIUM_HOLD_SECONDS`: jumping and looking around work,
   driving and the attack boost don't; a melon off its spot is pulled back
-  over it.
+  over it. Meanwhile the chase camera eases back
+  (`PODIUM_CAMERA_EXTRA_DISTANCE`/`_HEIGHT`) and walls don't pull it in.
 - The respawn point stays `hub_spawn`, so the user menu's respawn, hub and
   tutorial buttons, `hub_teleport`, any teleporter and the next Grand Prix
   take a melon down early.
@@ -67,8 +68,10 @@ podium instead of `hub_spawn`. **No triggers** — one point entity per step:
 | Name | `particle_podium_confetti` — optional, several allowed |
 | Start Active | **off** (`npm test` checks it) |
 
-Gets `Start` the moment the top three are put on the podium and `Stop` when
-their hold ends (`PODIUM_HOLD_SECONDS`). Not after a cancelled Grand Prix.
+Gets `Start` the moment the top three are put on the podium, again every
+`PODIUM_CONFETTI_INTERVAL` (each time a short `Stop` first, so a one-off
+burst fires anew), and `Stop` when their hold ends (`PODIUM_HOLD_SECONDS`).
+Not after a cancelled Grand Prix.
 
 ### Values
 
@@ -77,6 +80,9 @@ their hold ends (`PODIUM_HOLD_SECONDS`). Not after a cancelled Grand Prix.
 | `PODIUM_HOLD_SECONDS` | 10 s | how long the top three are held on their steps | `race/podium/constants.js` |
 | `PODIUM_PULL` | 6 /s | how hard a held melon is pulled back over its spot | `race/podium/constants.js` |
 | `PODIUM_PULL_MAX_SPEED` | 200 units/s | fastest it's pulled back | `race/podium/constants.js` |
+| `PODIUM_CONFETTI_INTERVAL` | 2 s | time between confetti bursts | `race/podium/constants.js` |
+| `PODIUM_CAMERA_EXTRA_DISTANCE` | 160 units | how much further back the camera is on the podium | `camera/podium-zoom/constants.js` |
+| `PODIUM_CAMERA_EXTRA_HEIGHT` | 40 units | how much higher | `camera/podium-zoom/constants.js` |
 
 ---
 [← Tracks](04-tracks.md) · [Mapping API](README.md) · [Paint triggers →](06-paint-triggers.md)
