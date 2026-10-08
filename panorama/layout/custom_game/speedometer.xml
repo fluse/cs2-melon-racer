@@ -424,22 +424,8 @@
 					<Panel class="UserMenuColumns">
 						<Panel class="UserMenuActions">
 							<Label class="UserMenuColumnTitle" text="ACTIONS" />
-							<Button id="usermenu_respawn_button" class="UserMenuActionButton UserMenuButtonGreen">
-								<Panel class="UserMenuButtonContent">
-									<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/respawn.png" />
-									<Label class="UserMenuButtonLabel" text="Respawn at Checkpoint" />
-								</Panel>
-							</Button>
-							<!-- "Exit Race" while signed up for a heat, else "Return to Hub"
-						     (UpdateHubButtonHud) — either way just this player leaves. -->
-						<Button id="usermenu_hub_button" class="UserMenuActionButton UserMenuButtonRed">
-								<Panel class="UserMenuButtonContent">
-									<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/home.png" />
-									<Label class="UserMenuButtonLabel" text="{s:hub_label}" />
-								</Panel>
-							</Button>
-							<!-- Only during a free-roaming time trial (script toggles
-							     Hidden, see CanRestartTimeTrial). -->
+							<!-- First, when there: only during a free-roaming time trial (script
+							     toggles Hidden, see CanRestartTimeTrial). -->
 							<Panel id="usermenu_restart_row" class="UserMenuRestartRow Hidden">
 								<Button id="usermenu_restart_button" class="UserMenuActionButton UserMenuButtonGold">
 									<Panel class="UserMenuButtonContent">
@@ -448,6 +434,20 @@
 									</Panel>
 								</Button>
 							</Panel>
+							<Button id="usermenu_respawn_button" class="UserMenuActionButton UserMenuButtonGreen">
+								<Panel class="UserMenuButtonContent">
+									<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/respawn.png" />
+									<Label class="UserMenuButtonLabel" text="Respawn at Checkpoint" />
+								</Panel>
+							</Button>
+							<!-- "Exit Race" while signed up for a heat, else "Return to Hub"
+							     (UpdateHubButtonHud) — either way just this player leaves. -->
+							<Button id="usermenu_hub_button" class="UserMenuActionButton UserMenuButtonRed">
+								<Panel class="UserMenuButtonContent">
+									<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/home.png" />
+									<Label class="UserMenuButtonLabel" text="{s:hub_label}" />
+								</Panel>
+							</Button>
 							<!-- Same as the hub button (also leaves a running heat), but to
 							     intro_spawn — see SendKartToTutorial. -->
 							<Button id="usermenu_tutorial_button" class="UserMenuActionButton UserMenuButtonPlain">
