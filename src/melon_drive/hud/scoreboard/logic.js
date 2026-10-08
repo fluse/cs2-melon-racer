@@ -6,7 +6,7 @@ import { FormatRaceTime } from "../../race/time-trial/logic.js";
 
 /**
  * @typedef {{ rank: string, name: string, points: string, heat: string, best: string, self: boolean }} ScoreRow
- * @typedef {{ grandPrixMode: boolean, title: string, subtitle: string, bestHeader: string, rows: ScoreRow[] }} Scoreboard
+ * @typedef {{ grandPrixMode: boolean, title: string, subtitle: string, bestHeader: string, switcher: string, rows: ScoreRow[] }} Scoreboard
  */
 
 const NONE = "–";
@@ -17,15 +17,33 @@ const NO_TIME = "-:--.--";
  * and its final standings afterwards — unless the viewer is on a track in a
  * time trial, then that track's best times. The best-time column is for
  * the heat's track in a Grand Prix, else the viewer's own track, else the
- * last Grand Prix's last track, else the first track.
- * @param {{ grandPrix: import("../../race/grand-prix/logic.js").GrandPrix | undefined, activeTrackId: number | undefined, kartTrackId: number | undefined, trackOrder: number[] }} input
+ * last Grand Prix's last track, else the first track. In a time trial the
+ * viewer can page to another track (`pickedTrackId`, see StepTrack).
+ * @param {{ grandPrix: import("../../race/grand-prix/logic.js").GrandPrix | undefined, activeTrackId: number | undefined, kartTrackId: number | undefined, trackOrder: number[], pickedTrackId?: number }} input
  */
-export function ScoreboardView({ grandPrix, activeTrackId, kartTrackId, trackOrder }) {
+export function ScoreboardView({ grandPrix, activeTrackId, kartTrackId, trackOrder, pickedTrackId }) {
     const running = grandPrix !== undefined && !grandPrix.over;
     const grandPrixMode = running || (grandPrix !== undefined && kartTrackId === undefined);
     const lastGrandPrixTrack = grandPrix?.trackIds[grandPrix.trackIds.length - 1];
-    const boardTrackId = (running ? activeTrackId : undefined) ?? kartTrackId ?? lastGrandPrixTrack ?? trackOrder[0];
+    const picked = !grandPrixMode && pickedTrackId !== undefined && trackOrder.includes(pickedTrackId) ? pickedTrackId : undefined;
+    const boardTrackId = picked ?? (running ? activeTrackId : undefined) ?? kartTrackId ?? lastGrandPrixTrack ?? trackOrder[0];
     return { grandPrixMode, boardTrackId };
+}
+
+/**
+ * The track `direction` (-1 / +1) steps from `current` in race order,
+ * wrapping around; the first track if `current` isn't one.
+ * @param {number[]} trackOrder @param {number | undefined} current @param {number} direction
+ */
+export function StepTrack(trackOrder, current, direction) {
+    if (trackOrder.length === 0) {
+        return undefined;
+    }
+    const index = current !== undefined ? trackOrder.indexOf(current) : -1;
+    if (index === -1) {
+        return trackOrder[0];
+    }
+    return trackOrder[(index + direction + trackOrder.length) % trackOrder.length];
 }
 
 /**
@@ -78,10 +96,12 @@ function KeepSelf(rows, maxRows) {
  *   self: { key: string, name: string },
  *   bestTimes: Record<string, number>, // best time on boardTrackId by player name, saved ones included
  *   maxRows: number,
+ *   trackOrder?: number[], // every track — a time trial with more than one shows how to page through them
+ *   routeNames?: Record<number, string>, // route names by track id (hud/hub-modal/routes.js)
  * }} input
  * @returns {Scoreboard}
  */
-export function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self, bestTimes, maxRows }) {
+export function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self, bestTimes, maxRows, trackOrder = [], routeNames = {} }) {
     const bestHeader = boardTrackId !== undefined ? `BEST T${boardTrackId}` : "BEST";
     if (grandPrixMode && grandPrix) {
         const heatTrack = grandPrix.trackIds[grandPrix.trackIds.length - 1];
@@ -113,6 +133,7 @@ export function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, player
             title: grandPrix.over ? (grandPrix.cancelled ? "GRAND PRIX — CANCELLED" : "GRAND PRIX — FINAL") : "GRAND PRIX",
             subtitle: grandPrix.over ? `${heats} TRACKS RACED` : `TRACK ${heatTrack ?? NONE}  ·  HEAT ${heats}`,
             bestHeader,
+            switcher: "",
             rows: KeepSelf(rows, maxRows),
         };
     }
@@ -122,11 +143,15 @@ export function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, player
     const names = new Set([...Object.keys(bestTimes), ...players.map((player) => player.name)]);
     const entries = [...names].map((name) => ({ name, best: bestTimes[name] })).sort(ByBestTime);
     const ranks = SharedRanks(entries, (a, b) => a.best === b.best);
+    const route = boardTrackId !== undefined ? (routeNames[boardTrackId] ?? `Track ${boardTrackId}`).toUpperCase() : undefined;
+    const position = boardTrackId !== undefined ? trackOrder.indexOf(boardTrackId) + 1 : 0;
     return {
         grandPrixMode: false,
         title: "TIME TRIAL",
-        subtitle: boardTrackId !== undefined ? `TRACK ${boardTrackId}  ·  BEST TIMES` : "NO TRACKS",
+        subtitle: route !== undefined ? `${route}  ·  BEST TIMES` : "NO TRACKS",
         bestHeader,
+        // Paging hint (hold Tab, A/D — see UpdateScoreboardInput).
+        switcher: trackOrder.length > 1 && position > 0 ? `◀  A      ROUTE ${position} / ${trackOrder.length}      D  ▶` : "",
         rows: KeepSelf(
             entries.map((entry, i) => ({
                 rank: entry.best !== undefined ? String(ranks[i]) : NONE,

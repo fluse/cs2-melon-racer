@@ -547,7 +547,13 @@ can't tell whether Tab is held). What it shows, per viewer
 - **Time trial** — otherwise (or when the viewer is on a track): the best
   times on the viewer's track (else the last Grand Prix's last track, else
   the first one), fastest first, saved times of players who aren't on the
-  map included.
+  map included. The subtitle names the route. **Paging** (decided): with
+  Tab held, A and D page to the previous/next track's best times
+  (wrapping around, "◀ A  ROUTE 2 / 3  D ▶" under the subtitle); letting go
+  of Tab forgets it, so every opening starts on the viewer's own track.
+  While Tab is held A/D don't strafe the melon. Not on the Grand Prix
+  board. `StepTrack` in `hud/scoreboard/logic.js`, `UpdateScoreboardInput`
+  in `hud/scoreboard/scoreboard.js`.
 
 `SCOREBOARD_ROWS` (12) rows; with more players the viewer's own row takes
 the last one. The viewer's row is tinted. Rebuilt every

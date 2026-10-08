@@ -1,7 +1,8 @@
-import { Instance } from "cs_script/point_script";
+import { Instance, CSInputs } from "cs_script/point_script";
 import { karts } from "../../core/kart-registry.js";
 import { GetSpeedHud } from "../layout.js";
-import { ScoreboardView, BuildScoreboard } from "./logic.js";
+import { ScoreboardView, BuildScoreboard, StepTrack } from "./logic.js";
+import { ROUTE_NAMES } from "../hub-modal/routes.js";
 import { grandPrix, PlayerKey } from "../../race/grand-prix/grand-prix.js";
 import { activeTrackId } from "../../race/heat/race-flow.js";
 import { GetTrackOrder } from "../../race/track-config.js";
@@ -53,7 +54,8 @@ export function UpdateScoreboardHud(slot, kart) {
         }
     };
 
-    const { grandPrixMode, boardTrackId } = ScoreboardView({ grandPrix, activeTrackId, kartTrackId: kart.trackId, trackOrder: GetTrackOrder() });
+    const trackOrder = GetTrackOrder();
+    const { grandPrixMode, boardTrackId } = ScoreboardView({ grandPrix, activeTrackId, kartTrackId: kart.trackId, trackOrder, pickedTrackId: kart.scoreboardPick });
     const players = [...karts.values()].map((other) => ({ key: PlayerKey(other), name: other.pawn.GetPlayerController()?.GetPlayerName() ?? "" }));
     const board = BuildScoreboard({
         grandPrix,
@@ -63,12 +65,16 @@ export function UpdateScoreboardHud(slot, kart) {
         self: { key: PlayerKey(kart), name: kart.pawn.GetPlayerController()?.GetPlayerName() ?? "" },
         bestTimes: boardTrackId !== undefined ? GetTrackBestTimes(boardTrackId) : {},
         maxRows: SCOREBOARD_ROWS,
+        trackOrder,
+        routeNames: ROUTE_NAMES,
     });
 
     SetClass("scoreboard", "TimeTrial", !board.grandPrixMode);
     SetText("scoreboard", "title", board.title);
     SetText("scoreboard", "subtitle", board.subtitle);
     SetText("scoreboard", "best_header", board.bestHeader);
+    SetText("score_switch", "switcher", board.switcher);
+    SetClass("score_switch", "Unused", board.switcher === "");
     for (let i = 0; i < SCOREBOARD_ROWS; i++) {
         const row = board.rows[i];
         const id = `score_row_${i}`;
@@ -82,4 +88,31 @@ export function UpdateScoreboardHud(slot, kart) {
             SetText(id, "best", row.best);
         }
     }
+}
+
+/**
+ * Paging the time trial board through the tracks: while the scoreboard is
+ * open (Tab held, SHOW_SCORES), A shows the previous track's best times and
+ * D the next one's, wrapping around. Every opening starts on the viewer's
+ * own track again (the pick is dropped when Tab is let go). Per tick, from
+ * core/think.js — a tap is only seen on the tick it happens.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+export function UpdateScoreboardInput(kart) {
+    const pawn = kart.pawn;
+    if (!pawn.IsInputPressed(CSInputs.SHOW_SCORES)) {
+        kart.scoreboardPick = undefined;
+        return;
+    }
+    const direction = (pawn.WasInputJustPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.WasInputJustPressed(CSInputs.LEFT) ? 1 : 0);
+    if (direction === 0) {
+        return;
+    }
+    const trackOrder = GetTrackOrder();
+    const { grandPrixMode, boardTrackId } = ScoreboardView({ grandPrix, activeTrackId, kartTrackId: kart.trackId, trackOrder, pickedTrackId: kart.scoreboardPick });
+    if (grandPrixMode) {
+        return;
+    }
+    kart.scoreboardPick = StepTrack(trackOrder, boardTrackId, direction);
+    kart.scoreboardNextUpdate = undefined; // show it now, not on the next rebuild
 }

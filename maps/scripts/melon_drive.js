@@ -78,6 +78,7 @@ function TraceSphere(config) {
  *   hudHealthSegments?: number, hudJumpReady?: boolean[], // what the health bar / jump dots last sent to the HUD — see UpdateHealthHud/UpdateJumpHud
  *   hudResendAt?: { health?: number, jump?: number }, // when they send their whole state again — see HUD_RESEND_SECONDS
  *   hubRacersResendAt?: number, hubRacersShown?: Record<string, string>, // the hub window's heats and racers: next full resend, and what it last sent — see UpdateHubLists
+ *   scoreboardPick?: number, // track the time trial board was paged to while Tab is held (unset: the viewer's own) — see UpdateScoreboardInput
  *   scoreboardNextUpdate?: number, scoreboardResendAt?: number, scoreboardShown?: Record<string, string>, // the scoreboard's next rebuild, next full resend, and what it last sent — see UpdateScoreboardHud
  *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
@@ -5545,7 +5546,7 @@ function OrdinalPlace(place) {
 
 /**
  * @typedef {{ rank: string, name: string, points: string, heat: string, best: string, self: boolean }} ScoreRow
- * @typedef {{ grandPrixMode: boolean, title: string, subtitle: string, bestHeader: string, rows: ScoreRow[] }} Scoreboard
+ * @typedef {{ grandPrixMode: boolean, title: string, subtitle: string, bestHeader: string, switcher: string, rows: ScoreRow[] }} Scoreboard
  */
 
 const NONE = "–";
@@ -5556,15 +5557,33 @@ const NO_TIME = "-:--.--";
  * and its final standings afterwards — unless the viewer is on a track in a
  * time trial, then that track's best times. The best-time column is for
  * the heat's track in a Grand Prix, else the viewer's own track, else the
- * last Grand Prix's last track, else the first track.
- * @param {{ grandPrix: import("../../race/grand-prix/logic.js").GrandPrix | undefined, activeTrackId: number | undefined, kartTrackId: number | undefined, trackOrder: number[] }} input
+ * last Grand Prix's last track, else the first track. In a time trial the
+ * viewer can page to another track (`pickedTrackId`, see StepTrack).
+ * @param {{ grandPrix: import("../../race/grand-prix/logic.js").GrandPrix | undefined, activeTrackId: number | undefined, kartTrackId: number | undefined, trackOrder: number[], pickedTrackId?: number }} input
  */
-function ScoreboardView({ grandPrix, activeTrackId, kartTrackId, trackOrder }) {
+function ScoreboardView({ grandPrix, activeTrackId, kartTrackId, trackOrder, pickedTrackId }) {
     const running = grandPrix !== undefined && !grandPrix.over;
     const grandPrixMode = running || (grandPrix !== undefined && kartTrackId === undefined);
     const lastGrandPrixTrack = grandPrix?.trackIds[grandPrix.trackIds.length - 1];
-    const boardTrackId = (running ? activeTrackId : undefined) ?? kartTrackId ?? lastGrandPrixTrack ?? trackOrder[0];
+    const picked = !grandPrixMode && pickedTrackId !== undefined && trackOrder.includes(pickedTrackId) ? pickedTrackId : undefined;
+    const boardTrackId = picked ?? (running ? activeTrackId : undefined) ?? kartTrackId ?? lastGrandPrixTrack ?? trackOrder[0];
     return { grandPrixMode, boardTrackId };
+}
+
+/**
+ * The track `direction` (-1 / +1) steps from `current` in race order,
+ * wrapping around; the first track if `current` isn't one.
+ * @param {number[]} trackOrder @param {number | undefined} current @param {number} direction
+ */
+function StepTrack(trackOrder, current, direction) {
+    if (trackOrder.length === 0) {
+        return undefined;
+    }
+    const index = current !== undefined ? trackOrder.indexOf(current) : -1;
+    if (index === -1) {
+        return trackOrder[0];
+    }
+    return trackOrder[(index + direction + trackOrder.length) % trackOrder.length];
 }
 
 /**
@@ -5617,10 +5636,12 @@ function KeepSelf(rows, maxRows) {
  *   self: { key: string, name: string },
  *   bestTimes: Record<string, number>, // best time on boardTrackId by player name, saved ones included
  *   maxRows: number,
+ *   trackOrder?: number[], // every track — a time trial with more than one shows how to page through them
+ *   routeNames?: Record<number, string>, // route names by track id (hud/hub-modal/routes.js)
  * }} input
  * @returns {Scoreboard}
  */
-function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self, bestTimes, maxRows }) {
+function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self, bestTimes, maxRows, trackOrder = [], routeNames = {} }) {
     const bestHeader = boardTrackId !== undefined ? `BEST T${boardTrackId}` : "BEST";
     if (grandPrixMode && grandPrix) {
         const heatTrack = grandPrix.trackIds[grandPrix.trackIds.length - 1];
@@ -5652,6 +5673,7 @@ function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self
             title: grandPrix.over ? (grandPrix.cancelled ? "GRAND PRIX — CANCELLED" : "GRAND PRIX — FINAL") : "GRAND PRIX",
             subtitle: grandPrix.over ? `${heats} TRACKS RACED` : `TRACK ${heatTrack ?? NONE}  ·  HEAT ${heats}`,
             bestHeader,
+            switcher: "",
             rows: KeepSelf(rows, maxRows),
         };
     }
@@ -5661,11 +5683,15 @@ function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self
     const names = new Set([...Object.keys(bestTimes), ...players.map((player) => player.name)]);
     const entries = [...names].map((name) => ({ name, best: bestTimes[name] })).sort(ByBestTime);
     const ranks = SharedRanks(entries, (a, b) => a.best === b.best);
+    const route = boardTrackId !== undefined ? (routeNames[boardTrackId] ?? `Track ${boardTrackId}`).toUpperCase() : undefined;
+    const position = boardTrackId !== undefined ? trackOrder.indexOf(boardTrackId) + 1 : 0;
     return {
         grandPrixMode: false,
         title: "TIME TRIAL",
-        subtitle: boardTrackId !== undefined ? `TRACK ${boardTrackId}  ·  BEST TIMES` : "NO TRACKS",
+        subtitle: route !== undefined ? `${route}  ·  BEST TIMES` : "NO TRACKS",
         bestHeader,
+        // Paging hint (hold Tab, A/D — see UpdateScoreboardInput).
+        switcher: trackOrder.length > 1 && position > 0 ? `◀  A      ROUTE ${position} / ${trackOrder.length}      D  ▶` : "",
         rows: KeepSelf(
             entries.map((entry, i) => ({
                 rank: entry.best !== undefined ? String(ranks[i]) : NONE,
@@ -5679,6 +5705,16 @@ function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self
         ),
     };
 }
+
+// AUTO-GENERATED by tools/make-route-icons.mjs from the route prefabs' file
+// names — re-run it after adding or renaming a route, don't hand-edit.
+// Track id -> the name the hub window shows for it.
+/** @type {Record<number, string>} */
+const ROUTE_NAMES = {
+    1: "Canals",
+    2: "Bridge",
+    3: "Side Slice"
+};
 
 // The running Grand Prix (or the last one, until the next starts — the
 // scoreboard shows its final standings in the hub). race/heat/race-flow.js
@@ -5807,16 +5843,6 @@ function BuildHeatCards(trackOrder, config, names) {
 function HeatsTitle(count) {
     return `HEATS · ${count}`;
 }
-
-// AUTO-GENERATED by tools/make-route-icons.mjs from the route prefabs' file
-// names — re-run it after adding or renaming a route, don't hand-edit.
-// Track id -> the name the hub window shows for it.
-/** @type {Record<number, string>} */
-const ROUTE_NAMES = {
-    1: "Canals",
-    2: "Bridge",
-    3: "Side Slice"
-};
 
 // Kept in sync every tick (see Think in core/think.js) as well as on hub_enter,
 // since a standing-in-hub player's WaitingForOthers/IsModerator state can
@@ -6538,7 +6564,8 @@ function UpdateScoreboardHud(slot, kart) {
         }
     };
 
-    const { grandPrixMode, boardTrackId } = ScoreboardView({ grandPrix, activeTrackId, kartTrackId: kart.trackId, trackOrder: GetTrackOrder() });
+    const trackOrder = GetTrackOrder();
+    const { grandPrixMode, boardTrackId } = ScoreboardView({ grandPrix, activeTrackId, kartTrackId: kart.trackId, trackOrder, pickedTrackId: kart.scoreboardPick });
     const players = [...karts.values()].map((other) => ({ key: PlayerKey(other), name: other.pawn.GetPlayerController()?.GetPlayerName() ?? "" }));
     const board = BuildScoreboard({
         grandPrix,
@@ -6548,12 +6575,16 @@ function UpdateScoreboardHud(slot, kart) {
         self: { key: PlayerKey(kart), name: kart.pawn.GetPlayerController()?.GetPlayerName() ?? "" },
         bestTimes: boardTrackId !== undefined ? GetTrackBestTimes(boardTrackId) : {},
         maxRows: SCOREBOARD_ROWS,
+        trackOrder,
+        routeNames: ROUTE_NAMES,
     });
 
     SetClass("scoreboard", "TimeTrial", !board.grandPrixMode);
     SetText("scoreboard", "title", board.title);
     SetText("scoreboard", "subtitle", board.subtitle);
     SetText("scoreboard", "best_header", board.bestHeader);
+    SetText("score_switch", "switcher", board.switcher);
+    SetClass("score_switch", "Unused", board.switcher === "");
     for (let i = 0; i < SCOREBOARD_ROWS; i++) {
         const row = board.rows[i];
         const id = `score_row_${i}`;
@@ -6567,6 +6598,33 @@ function UpdateScoreboardHud(slot, kart) {
             SetText(id, "best", row.best);
         }
     }
+}
+
+/**
+ * Paging the time trial board through the tracks: while the scoreboard is
+ * open (Tab held, SHOW_SCORES), A shows the previous track's best times and
+ * D the next one's, wrapping around. Every opening starts on the viewer's
+ * own track again (the pick is dropped when Tab is let go). Per tick, from
+ * core/think.js — a tap is only seen on the tick it happens.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function UpdateScoreboardInput(kart) {
+    const pawn = kart.pawn;
+    if (!pawn.IsInputPressed(CSInputs.SHOW_SCORES)) {
+        kart.scoreboardPick = undefined;
+        return;
+    }
+    const direction = (pawn.WasInputJustPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.WasInputJustPressed(CSInputs.LEFT) ? 1 : 0);
+    if (direction === 0) {
+        return;
+    }
+    const trackOrder = GetTrackOrder();
+    const { grandPrixMode, boardTrackId } = ScoreboardView({ grandPrix, activeTrackId, kartTrackId: kart.trackId, trackOrder, pickedTrackId: kart.scoreboardPick });
+    if (grandPrixMode) {
+        return;
+    }
+    kart.scoreboardPick = StepTrack(trackOrder, boardTrackId, direction);
+    kart.scoreboardNextUpdate = undefined; // show it now, not on the next rebuild
 }
 
 // Wall-bounce prediction line — see PREDICTION_* in fx/prediction/constants.js for the
@@ -8003,7 +8061,9 @@ function UpdateKart(slot, kart, dt) {
     const forwardInput = podium
         ? 0
         : (pawn.IsInputPressed(CSInputs.FORWARD) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.BACK) ? 1 : 0);
-    const strafeInput = podium
+    // A/D page the scoreboard while Tab is held (UpdateScoreboardInput) —
+    // no strafing then.
+    const strafeInput = podium || pawn.IsInputPressed(CSInputs.SHOW_SCORES)
         ? 0
         : (pawn.IsInputPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.LEFT) ? 1 : 0);
     const jumpPressed = pawn.WasInputJustPressed(CSInputs.JUMP);
@@ -8416,6 +8476,7 @@ function Think() {
             UpdateJumpHud(slot, kart);
             UpdateHealthHud(slot, kart);
             UpdateCheckpointHud(slot, kart);
+            UpdateScoreboardInput(kart);
             UpdateScoreboardHud(slot, kart);
             if (kart.inHub) {
                 ApplyHubModalState(slot, phase);

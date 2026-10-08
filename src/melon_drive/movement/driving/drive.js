@@ -209,7 +209,9 @@ export function UpdateKart(slot, kart, dt) {
     const forwardInput = podium
         ? 0
         : (pawn.IsInputPressed(CSInputs.FORWARD) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.BACK) ? 1 : 0);
-    const strafeInput = podium
+    // A/D page the scoreboard while Tab is held (UpdateScoreboardInput) —
+    // no strafing then.
+    const strafeInput = podium || pawn.IsInputPressed(CSInputs.SHOW_SCORES)
         ? 0
         : (pawn.IsInputPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.LEFT) ? 1 : 0);
     const jumpPressed = pawn.WasInputJustPressed(CSInputs.JUMP);

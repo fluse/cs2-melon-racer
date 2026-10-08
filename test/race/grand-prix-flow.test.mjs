@@ -16,7 +16,7 @@ const { TryStartRace, TryAbortRace, FinishKart, UpdateRaceFlow, RestoreRaceFlowS
 const gpModule = await import("../../src/melon_drive/race/grand-prix/grand-prix.js");
 const { PlayerKey } = gpModule;
 const { HeatPoints } = await import("../../src/melon_drive/race/grand-prix/logic.js");
-const { UpdateScoreboardHud } = await import("../../src/melon_drive/hud/scoreboard/scoreboard.js");
+const { UpdateScoreboardHud, UpdateScoreboardInput } = await import("../../src/melon_drive/hud/scoreboard/scoreboard.js");
 const {
     MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, SPEED_HUD_ENTITY_NAME,
     RacePhase, COUNTDOWN_SECONDS, BREAK_SECONDS, SCOREBOARD_ROWS,
@@ -157,4 +157,50 @@ test("scoreboard: on a track outside a Grand Prix it's that track's time trial b
     assert.equal(hud.Variable(0, "scoreboard", "title"), "TIME TRIAL");
     assert.equal(hud.Has(0, "scoreboard", "TimeTrial"), true);
     assert.equal(hud.Variable(0, "scoreboard", "best_header"), `BEST T${FIRST_TRACK}`);
+});
+
+test("scoreboard: holding Tab, A/D page the time trial board through the tracks", () => {
+    const [a] = kartList;
+    gpModule.EndGrandPrix(true);
+    a.trackId = FIRST_TRACK;
+    /** One tick with Tab held (or not) and `key` tapped. */
+    const Tick = (key, tab = true) => {
+        a.pawn.pressed = new Set(tab ? ["SHOW_SCORES"] : []);
+        a.pawn.justPressed = new Set(key ? [key] : []);
+        UpdateScoreboardInput(a);
+        UpdateScoreboardHud(0, a);
+    };
+    Tick(undefined);
+    assert.equal(hud.Variable(0, "scoreboard", "best_header"), `BEST T${FIRST_TRACK}`);
+    assert.equal(hud.Has(0, "score_switch", "Unused"), false, "two tracks: the paging hint shows");
+    assert.match(hud.Variable(0, "score_switch", "switcher"), /ROUTE 1 \/ 2/);
+
+    Tick("RIGHT");
+    assert.equal(hud.Variable(0, "scoreboard", "best_header"), `BEST T${LAST_TRACK}`, "D: the next track, at once");
+    assert.match(hud.Variable(0, "score_switch", "switcher"), /ROUTE 2 \/ 2/);
+    Tick("RIGHT");
+    assert.equal(hud.Variable(0, "scoreboard", "best_header"), `BEST T${FIRST_TRACK}`, "wraps around");
+    Tick("LEFT");
+    assert.equal(hud.Variable(0, "scoreboard", "best_header"), `BEST T${LAST_TRACK}`, "A: the previous one");
+
+    Tick(undefined, false);
+    assert.equal(a.scoreboardPick, undefined, "letting go of Tab forgets the pick");
+    a.scoreboardNextUpdate = undefined;
+    Tick(undefined);
+    assert.equal(hud.Variable(0, "scoreboard", "best_header"), `BEST T${FIRST_TRACK}`, "the next opening starts on the own track");
+
+    Tick("RIGHT", false);
+    assert.equal(a.scoreboardPick, undefined, "A/D without Tab do nothing to the board");
+});
+
+test("scoreboard: no paging on the Grand Prix board", () => {
+    const [a, b] = kartList;
+    StartGrandPrixWith([a, b], 500);
+    a.pawn.pressed = new Set(["SHOW_SCORES"]);
+    a.pawn.justPressed = new Set(["RIGHT"]);
+    UpdateScoreboardInput(a);
+    assert.equal(a.scoreboardPick, undefined);
+    UpdateScoreboardHud(0, a);
+    assert.equal(hud.Has(0, "score_switch", "Unused"), true);
+    TryAbortRace();
 });

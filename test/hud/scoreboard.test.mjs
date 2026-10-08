@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ScoreboardView, BuildScoreboard } from "../../src/melon_drive/hud/scoreboard/logic.js";
+import { ScoreboardView, BuildScoreboard, StepTrack } from "../../src/melon_drive/hud/scoreboard/logic.js";
 import { NewGrandPrix, BeginGrandPrixHeat, RecordHeatFinish, HeatPoints } from "../../src/melon_drive/race/grand-prix/logic.js";
 import { FormatRaceTime } from "../../src/melon_drive/race/time-trial/logic.js";
 import { SCOREBOARD_ROWS } from "../../src/melon_drive/constants/index.js";
@@ -127,4 +127,29 @@ test("speedometer.xml has the scoreboard and SCOREBOARD_ROWS rows, each with eve
 test("the scoreboard shows only while the engine's HUD_SCOREBOARD_VISIBLE class is set", () => {
     assert.match(css, /\.HUD_SCOREBOARD_VISIBLE \.Scoreboard\s*\{\s*visibility: visible;/);
     assert.match(css, /\.Scoreboard \{[^}]*visibility: collapse;/);
+});
+
+test("time trial paging: a picked track wins over the own one, never in a Grand Prix", () => {
+    const base = { grandPrix: undefined, activeTrackId: undefined, kartTrackId: 1, trackOrder: [1, 2, 3] };
+    assert.equal(ScoreboardView({ ...base, pickedTrackId: 3 }).boardTrackId, 3);
+    assert.equal(ScoreboardView({ ...base, pickedTrackId: 9 }).boardTrackId, 1, "a track that doesn't exist is ignored");
+    const gp = RunningGrandPrix();
+    assert.equal(ScoreboardView({ ...base, grandPrix: gp, activeTrackId: 2, pickedTrackId: 3 }).boardTrackId, 2);
+});
+
+test("StepTrack: next/previous in race order, wrapping around", () => {
+    assert.equal(StepTrack([1, 2, 3], 1, 1), 2);
+    assert.equal(StepTrack([1, 2, 3], 3, 1), 1);
+    assert.equal(StepTrack([1, 2, 3], 1, -1), 3);
+    assert.equal(StepTrack([1, 3], 9, 1), 1, "unknown: the first track");
+    assert.equal(StepTrack([], 1, 1), undefined);
+});
+
+test("time trial board: route name in the subtitle, a paging hint with several tracks", () => {
+    const args = { grandPrix: undefined, grandPrixMode: false, players: [A], self: A, bestTimes: {}, maxRows: SCOREBOARD_ROWS, routeNames: { 2: "Bridge" } };
+    const board = BuildScoreboard({ ...args, boardTrackId: 2, trackOrder: [1, 2, 3] });
+    assert.match(board.subtitle, /^BRIDGE/);
+    assert.match(board.switcher, /ROUTE 2 \/ 3/);
+    assert.match(BuildScoreboard({ ...args, boardTrackId: 1, trackOrder: [1, 2, 3] }).subtitle, /^TRACK 1/, "no name: the track number");
+    assert.equal(BuildScoreboard({ ...args, boardTrackId: 1, trackOrder: [1] }).switcher, "", "one track: nothing to page");
 });
