@@ -89,6 +89,9 @@ tools/make-logo.mjs                      # renders the logo (melon slice + slant
 tools/make-route-icons.mjs               # generates the hub window's route cards from the .vmap: an icon per track, picked by its name (ROUTE_ICONS)
                                           #   (panorama/images/custom_game/routes/route_<trackId>.png) + route names (src/melon_drive/hud/hub-modal/routes.js,
                                           #   from route_<name>.vmap) — re-run after adding/renaming a route (test/map/route-icons.test.mjs)
+tools/make-logo-model.mjs                # extrudes MELON RACER (Bungee, slanted like the logo, lime green outline ring around them) into models/melon_racer/logo_text.obj + .vmdl
+                                          #   + materials/melon_racer/logo_text_outline.vmat, letters in holo_dashes.vmat (opentype.js + earcut + clipper-lib, devDependencies);
+                                          #   OBJ is written Y-up (ModelDoc rotates OBJ axes) — re-run, then compile the .vmdl with resourcecompiler.exe
 tools/make-decal.mjs                     # generates materials/melon_racer/<decal>_{color,trans}.png for every decal in its DECALS list
                                           #   (HUD logo, rawDecals/*.png|jpg — JPG via Windows System.Drawing; can key out a baked-in checkerboard, writes <name>_transparent.png)
 rawDecals/*.png                          # new source images for decals (make-decal.mjs input); once done, the tool moves
