@@ -154,6 +154,9 @@ export function ComputeWallBounce(kart, n, now) {
     if (!bounce) {
         return null;
     }
+    if (jumpFactor > 0 && kart.lastIdleJumpPressTime === kart.wallTimingPressTime) {
+        kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
+    }
     DebugLogBounce(kart, n, bounce.angle);
     // A PERFECT hit shows its own spark instead of the boost trail — see
     // ShouldShowBoostTrail. Any other rating's speed shows the trail again.

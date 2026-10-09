@@ -4534,6 +4534,9 @@ function ComputeWallBounce(kart, n, now) {
     if (!bounce) {
         return null;
     }
+    if (jumpFactor > 0 && kart.lastIdleJumpPressTime === kart.wallTimingPressTime) {
+        kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
+    }
     DebugLogBounce(kart, n, bounce.angle);
     // A PERFECT hit shows its own spark instead of the boost trail — see
     // ShouldShowBoostTrail. Any other rating's speed shows the trail again.
@@ -4898,21 +4901,20 @@ function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
     }
     // Wall timing — independent of the normal jump above (works in the air
     // too), purely about *when* it's pressed.
-    if (timingPress) {
-        UpgradePendingBounce(kart, now, v);
-    }
+    const timedBounce = timingPress && UpgradePendingBounce(kart, now, v);
     // Wall jump — after the bounce-timing upgrade, so that one's extra speed
     // isn't lost.
     const blockedBy = groundJump ? "ground jump instead" : TryWallJump(slot, kart, now, grounded, v, rules);
     LogWallJumpVerdict(slot, kart, blockedBy, rules.inLift);
-    // Neither a ground nor a wall jump: the press did nothing, so the next
-    // one soon after is mashing (see WallTimingPress).
-    if (!groundJump && blockedBy !== null) {
+    // Neither a ground nor a wall jump nor a bounce's timing: the press did
+    // nothing, so the next one soon after is mashing (see WallTimingPress).
+    const didNothing = !groundJump && blockedBy !== null && !timedBounce;
+    if (didNothing) {
         kart.lastIdleJumpPressTime = now;
     }
     // Did nothing: if the melon touches down within GROUND_JUMP_BUFFER, it
     // jumps then (FireBufferedGroundJump).
-    kart.bufferedGroundJumpTime = !groundJump && blockedBy !== null ? now : undefined;
+    kart.bufferedGroundJumpTime = didNothing ? now : undefined;
     // In the air and not a wall jump yet: where there's a jump buffer (lift
     // and side-view zones), remember the press — a wall touched soon after still gets it.
     kart.bufferedWallJumpTime = blockedBy !== null && !grounded && rules.jumpBuffer > 0 ? now : undefined;
@@ -4924,15 +4926,16 @@ function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
  * upgrade it — more speed (the speed gain it'll settle damage for grows with
  * it; a perfect angle still makes that free).
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {{ x: number, y: number, z: number }} v
+ * @returns {boolean} whether it did — the press counted as the bounce's timing
  */
 function UpgradePendingBounce(kart, now, v) {
     const pending = kart.pendingBounce;
     if (!pending) {
-        return;
+        return false;
     }
     const lateFactor = JumpTimingFactor(now - pending.time);
     if (lateFactor <= pending.jumpFactor) {
-        return;
+        return false;
     }
     const ratio = JumpMultiplier(lateFactor) / JumpMultiplier(pending.jumpFactor);
     const before = Math.hypot(v.x, v.y);
@@ -4945,6 +4948,7 @@ function UpgradePendingBounce(kart, now, v) {
         kart.lastBounceInfo.jumpFactor = lateFactor;
     }
     kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), after);
+    return true;
 }
 
 /**

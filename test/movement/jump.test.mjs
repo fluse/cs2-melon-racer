@@ -497,6 +497,39 @@ test("a ground jump just before doesn't block timing credit on the following wal
     assert.equal(kart.pendingBounce?.jumpFactor, 1, "the press on the hit counted as perfect timing");
 });
 
+// Regression: a press that counted as a bounce's timing was taken for one
+// that did nothing (no ground or wall jump) — the timed press on the next
+// bounce within WALL_TIMING_SPAM_LOCKOUT (a corridor, a shaft) was mashing
+// and got no credit.
+/** Two wall bounces WALL_BOUNCE_COOLDOWN + a bit apart, jump pressed on each hit. */
+function TwoTimedBounces({ earlyPress = false } = {}) {
+    const wallX = kart.melon.GetAbsOrigin().x + NEAR_WALL;
+    if (earlyPress) {
+        Geometry({ floorBelow: false });
+        Tick({ ...falling(-100, 300), jump: true }); // just before the first hit, no wall yet
+        Geometry({ floorBelow: false, wallX });
+        Tick(fallingIntoWall(-100));
+    } else {
+        Geometry({ floorBelow: false, wallX });
+        Tick({ ...fallingIntoWall(-100), jump: true });
+    }
+    assert.ok(kart.pendingBounce?.jumpFactor > 0, "test setup: the first bounce got timing credit");
+    world.time += C.WALL_BOUNCE_COOLDOWN + (C.WALL_TIMING_SPAM_LOCKOUT - C.WALL_BOUNCE_COOLDOWN) / 2;
+    assert.ok(C.WALL_BOUNCE_COOLDOWN + DT < C.WALL_TIMING_SPAM_LOCKOUT, "test setup: two bounces fit into the spam lockout");
+    Tick({ ...fallingIntoWall(-100), jump: true });
+    assert.equal(kart.lastBounceTime, world.time, "test setup: a second wall bounce");
+}
+
+test("chained bounces: a timed press on one doesn't count as mashing for the next", NEEDS_BOUNCE, () => {
+    TwoTimedBounces();
+    assert.equal(kart.pendingBounce.jumpFactor, 1, "the press on the second hit counted as perfect timing");
+});
+
+test("chained bounces: a press just before a hit that timed it doesn't count as mashing either", NEEDS_BOUNCE, () => {
+    TwoTimedBounces({ earlyPress: true });
+    assert.equal(kart.pendingBounce.jumpFactor, 1, "the press on the second hit counted as perfect timing");
+});
+
 test("mashing jump in the air still locks timing credit", NEEDS_BOUNCE, () => {
     Geometry({ floorBelow: false });
     Tick({ ...falling(-100, 300), jump: true }); // does nothing: in the air, no wall
