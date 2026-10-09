@@ -93,6 +93,7 @@ function TraceSphere(config) {
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
  *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
  *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
+ *   testPreview?: { kind: "countdown" | "finish", endTime: number }, // the user menu's developer Test Countdown/Test Finish playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
@@ -6429,6 +6430,7 @@ function BeginHeat(trackId) {
         kart.finished = false;
         kart.locked = true;
         kart.podium = undefined; // off the podium into the next Grand Prix
+        kart.testPreview = undefined; // the real countdown takes over its HUD
         // Its own lined-up spot, not the start line's center — a respawn
         // before reaching checkpoint 1 (break, or the user menu's respawn
         // button during the countdown) would otherwise stack it on whoever
@@ -6502,6 +6504,7 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.finished = false;
         kart.locked = false;
         kart.podium = undefined; // the hub/tutorial button takes a melon down from the podium too
+        kart.testPreview = undefined; // its HUD is hidden below, the melon let go
         // kart.inHub (and the hub modal) is deliberately left to the
         // hub_start_trigger's own hub_enter/hub_leave inputs: the teleport
         // below lands inside it and fires hub_enter from there. Forcing it
@@ -6553,10 +6556,109 @@ function SendKartsOutOfRace(returning, spawn, label) {
     });
 }
 
+/**
+ * Shows one player's countdown_panel at `showClass` (one of
+ * COUNTDOWN_SHOW_CLASSES). @param {number} slot @param {string} showClass
+ */
+function ShowCountdown(slot, showClass) {
+    const hud = GetSpeedHud();
+    hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", false);
+    for (const cls of COUNTDOWN_SHOW_CLASSES) {
+        hud?.SetHasClassForPlayer(slot, "countdown_panel", cls, cls === showClass);
+    }
+}
+
+/**
+ * Developer (user menu "Test Countdown"): the heat's 3…2…1…GO for this one
+ * player, without a heat — the melon is held where it is until GO, like on
+ * the start grid. Doesn't touch the race phase or anyone else. Not for a
+ * racer (their HUD belongs to the heat), a breaking melon or one already
+ * playing a preview.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @returns {boolean} whether it started
+ */
+function TestCountdown(kart) {
+    if (kart.racing || kart.breaking || kart.testPreview) {
+        return false;
+    }
+    kart.testPreview = { kind: "countdown", endTime: Instance.GetGameTime() + COUNTDOWN_SECONDS };
+    kart.locked = true;
+    return true;
+}
+
+/**
+ * Developer (user menu "Test Finish"): what a racer sees on crossing the
+ * finish of the last lap — the FINISH image, "1ST · +10 PTS" under it and the
+ * BREAK countdown — for this one player, without a heat. Held in place
+ * meanwhile, like a finished racer. Same limits as TestCountdown.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @returns {boolean} whether it started
+ */
+function TestFinish(kart) {
+    if (kart.racing || kart.breaking || kart.testPreview) {
+        return false;
+    }
+    kart.testPreview = { kind: "finish", endTime: Instance.GetGameTime() + BREAK_SECONDS };
+    kart.locked = true;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot !== undefined) {
+        GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "finish_place", "place", `${OrdinalPlace(1)}  ·  +${HEAT_POINTS[0]} PTS`);
+        SetFinishImageVisible(slot, true);
+        breakCountdownShown.delete(slot);
+    }
+    return true;
+}
+
+/**
+ * Runs the TestCountdown/TestFinish previews: the same HUD as the real
+ * COUNTDOWN (GO shown for GO_DISPLAY_SECONDS) and BREAK, then everything
+ * hidden again and the melon let go.
+ * @param {number} now
+ */
+function UpdateTestPreviews(now) {
+    for (const kart of karts.values()) {
+        const preview = kart.testPreview;
+        if (!preview) {
+            continue;
+        }
+        const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+        const remaining = preview.endTime - now;
+        if (preview.kind === "countdown") {
+            if (remaining <= 0 && kart.locked) {
+                kart.locked = false; // GO
+            }
+            if (remaining > -GO_DISPLAY_SECONDS) {
+                if (slot !== undefined) {
+                    ShowCountdown(slot, remaining > 0 ? `Show${Math.ceil(remaining)}` : "ShowGo");
+                }
+                continue;
+            }
+            if (slot !== undefined) {
+                GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
+            }
+        } else {
+            if (remaining > 0) {
+                const value = BreakCountdownValue(remaining);
+                if (slot !== undefined && breakCountdownShown.get(slot) !== value) {
+                    SetBreakCountdown(slot, value);
+                }
+                continue;
+            }
+            if (slot !== undefined) {
+                SetBreakCountdown(slot, undefined);
+                SetFinishImageVisible(slot, false);
+            }
+            kart.locked = false;
+        }
+        kart.testPreview = undefined;
+    }
+}
+
 /** Drives the COUNTDOWN/RACING/BREAK timers and transitions — called once per Think tick (see core/think.js). */
 /** @param {number} now */
 function UpdateRaceFlow(now) {
     const hud = GetSpeedHud();
+    UpdateTestPreviews(now);
 
     if (phase === RacePhase.COUNTDOWN) {
         const racers = CurrentRacers();
@@ -6576,12 +6678,8 @@ function UpdateRaceFlow(now) {
         const showClass = remaining > 0 ? `Show${Math.ceil(remaining)}` : "ShowGo";
         for (const kart of racers) {
             const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-            if (slot === undefined) {
-                continue;
-            }
-            hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", false);
-            for (const cls of COUNTDOWN_SHOW_CLASSES) {
-                hud?.SetHasClassForPlayer(slot, "countdown_panel", cls, cls === showClass);
+            if (slot !== undefined) {
+                ShowCountdown(slot, showClass);
             }
         }
         if (remaining <= 0) {
@@ -7719,6 +7817,21 @@ function RegisterHudInputs() {
             SetUserMenuOpen(slot, kart, false);
             ReturnAllToHub(racers);
             PlaceOnPodium(TestGrandPrix(racers), racers);
+        } else if (event.buttonId === "usermenu_testcountdown_button" || event.buttonId === "usermenu_testfinish_button") {
+            // Developer: the heat's countdown, or what a racer sees at the
+            // finish, for the clicking player only — no heat, nobody else.
+            // Not while they race (the heat's HUD is theirs then).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (!kart) {
+                return;
+            }
+            const countdown = event.buttonId === "usermenu_testcountdown_button";
+            if ((countdown ? TestCountdown : TestFinish)(kart)) {
+                SetUserMenuOpen(slot, kart, false);
+            } else {
+                Debug(`${event.buttonId}: slot ${slot}, ignored (racing=${kart.racing}, breaking=${kart.breaking}, preview=${kart.testPreview?.kind})`);
+            }
         } else if (event.buttonId.startsWith("usermenu_color_")) {
             const key = event.buttonId.slice("usermenu_color_".length);
             const preset = COLOR_PRESETS[key];

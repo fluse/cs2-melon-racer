@@ -490,6 +490,14 @@ run by `race/heat/`):
    track, teleports the whole group to `hub_spawn` and returns to phase
    `HUB`.
 
+For testing the countdown and the finish screen without a heat, the user
+menu's DEVELOPER group has **"Test Countdown"** (3…2…1…GO, the melon held
+until GO) and **"Test Finish"** (FINISH, "1ST · +10 PTS" and the
+`BREAK_SECONDS` countdown, the melon held meanwhile) — for the clicking
+player only, the race phase and everyone else untouched. Ignored while that
+player races; the hub/tutorial buttons end a preview early. `TestCountdown`/
+`TestFinish` in `race/heat/race-flow.js` (`test/hud/hud-buttons.test.mjs`).
+
 ## Grand Prix — places & points (decided, implemented)
 
 **Win condition.** The heats from the hub's "Start Grand Prix" to the group's

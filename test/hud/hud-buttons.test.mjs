@@ -219,3 +219,62 @@ test("test podium button: the clicker on place 1, the others after — never dur
     assert.deepEqual(HorizontalSpot(b), [steps[1].x, steps[1].y]);
     assert.ok(world.fired.some((f) => f.name === PODIUM_CONFETTI_NAME && f.input === "Start"), "confetti");
 });
+
+/** Runs the race flow (and with it the test previews) at `time`. @param {number} time */
+function FlowAt(time) {
+    world.time = time;
+    flow.UpdateRaceFlow(time);
+}
+
+test("test countdown button: 3…2…1…GO for the clicker alone, held until GO — no heat", () => {
+    world.time = 50;
+    SetUserMenuOpen(1, b, true);
+    Click(1, "usermenu_testcountdown_button");
+    assert.equal(b.userMenuOpen, false, "the menu closes");
+    assert.equal(flow.phase, RacePhase.HUB, "no heat started");
+    assert.equal(b.locked, true, "held like on the start grid");
+    FlowAt(50 + 0.5);
+    assert.equal(hud.Has(1, "countdown_panel", "Hidden"), false);
+    assert.equal(hud.Has(1, "countdown_panel", `Show${Math.ceil(C.COUNTDOWN_SECONDS - 0.5)}`), true);
+    assert.equal(hud.Has(0, "countdown_panel", "Hidden"), undefined, "the other player sees nothing");
+    assert.equal(a.locked, false);
+    FlowAt(50 + C.COUNTDOWN_SECONDS);
+    assert.equal(hud.Has(1, "countdown_panel", "ShowGo"), true, "GO");
+    assert.equal(b.locked, false, "let go at GO");
+    FlowAt(50 + C.COUNTDOWN_SECONDS + C.GO_DISPLAY_SECONDS + 0.01);
+    assert.equal(hud.Has(1, "countdown_panel", "Hidden"), true, "hidden again after GO");
+    assert.equal(b.testPreview, undefined);
+});
+
+test("test finish button: FINISH, the place and the break countdown for the clicker alone, held meanwhile", () => {
+    world.time = 50;
+    Click(1, "usermenu_testfinish_button");
+    assert.equal(flow.phase, RacePhase.HUB, "no heat started");
+    assert.equal(b.locked, true, "parked like a finished racer");
+    assert.equal(hud.Has(1, "finish_image", "Hidden"), false);
+    assert.ok(hud.Variable(1, "finish_place", "place").includes(`+${C.HEAT_POINTS[0]} PTS`), "1st place's points under it");
+    FlowAt(50 + 0.5);
+    assert.equal(hud.Has(1, "break_countdown", "Hidden"), false, "the break countdown runs");
+    assert.equal(hud.Has(0, "finish_image", "Hidden"), undefined, "the other player sees nothing");
+    FlowAt(50 + C.BREAK_SECONDS);
+    assert.equal(hud.Has(1, "finish_image", "Hidden"), true, "hidden again");
+    assert.equal(hud.Has(1, "break_countdown", "Hidden"), true);
+    assert.equal(b.locked, false, "let go");
+    assert.equal(b.testPreview, undefined);
+});
+
+test("test countdown/finish buttons: ignored while racing; the hub button ends a preview", () => {
+    a.inHub = b.inHub = true;
+    flow.TryStartRace();
+    Click(1, "usermenu_testcountdown_button");
+    Click(1, "usermenu_testfinish_button");
+    assert.equal(b.testPreview, undefined, "ignored in a heat");
+    flow.TryAbortRace();
+
+    Click(1, "usermenu_testfinish_button");
+    assert.equal(b.testPreview?.kind, "finish");
+    Click(1, "usermenu_hub_button");
+    assert.equal(b.testPreview, undefined, "the hub button ends it");
+    assert.equal(b.locked, false);
+    assert.equal(hud.Has(1, "finish_image", "Hidden"), true);
+});

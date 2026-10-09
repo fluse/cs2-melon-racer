@@ -514,6 +514,18 @@
 								<Label class="UserMenuToggleName" text="Test Podium" />
 								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
 							</Button>
+							<!-- Plays the heat's 3…2…1…GO for you alone, the melon held until GO
+							     (TestCountdown in race/heat/race-flow.js). Not while you race. -->
+							<Button id="usermenu_testcountdown_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Test Countdown" />
+								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
+							</Button>
+							<!-- Plays what a racer sees at the finish: FINISH, "1ST · +10 PTS" and
+							     the break countdown, the melon held meanwhile (TestFinish). Not while you race. -->
+							<Button id="usermenu_testfinish_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Test Finish" />
+								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
+							</Button>
 						</Panel>
 					</Panel>
 				</Panel>
