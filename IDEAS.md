@@ -17,7 +17,7 @@
 
 
 # MelonRacer Coop Edition
-- Schalte Rätsel
+- Schalter Rätsel
 - Physik Rätsel
 
 # Allgemeine Mechanic
