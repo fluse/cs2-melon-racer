@@ -255,8 +255,8 @@ function ShowIntroLogoThenSpawn(slot, pawn) {
     }
 }
 
-/** @param {number} slot @param {boolean} visible */
-function SetIntroLogoVisible(slot, visible) {
+/** Shows or hides the Melon Racer logo (intro_logo) for one player — also the user menu's "Test Intro". @param {number} slot @param {boolean} visible */
+export function SetIntroLogoVisible(slot, visible) {
     GetSpeedHud()?.SetHasClassForPlayer(slot, "intro_logo", "Hidden", !visible);
 }
 

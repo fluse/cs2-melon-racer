@@ -1245,8 +1245,10 @@
     height: 100%;
     background-color: #12301a;
 
+    /* Quick both ways: a longer fade-out duration on .Hidden made the
+       fade-in slow too (Panorama seems to use it when Hidden is dropped). */
     transition-property: opacity;
-    transition-duration: .5s;
+    transition-duration: .1s;
     opacity: 1;
 
     &.Hidden {
@@ -1254,12 +1256,77 @@
     }
 }
 
-/* Native size 846x295. */
+/* Native size 846x295. Its whole show is one animation, started as the
+   intro shows (Hidden dropped: the animation applies, so it starts) — one
+   timeline instead of animation-delay, so nothing relies on a fill mode.
+   5s, longer than INTRO_LOGO_SECONDS (kart/constants.js, 3.2s): the logo is
+   still out of the picture when Hidden comes, and Hidden collapses it at
+   once, so it never snaps back to the middle while the backdrop fades out.
+   No transform outside the animation — a resting translateX(2000px) here
+   kept the logo off screen in-game, animation or not. Every step a whole
+   percent (1% = 0.05s):
+   0    – 0.3s   off screen left: the backdrop fades in (.1s) and a beat more
+   0.3  – 0.6s   shoots in, past the middle
+   0.6  – 1.35s  swings back and forth like on a rubber band, settling
+   1.35 – 2.35s  stands still
+   2.35 – 2.85s  a short pull back, then races out to the right
+   3.2s          Hidden: the backdrop fades out.
+   2D translate only (no 3D transforms in the custom HUD). */
 .IntroLogoImage {
     horizontal-align: center;
     vertical-align: center;
     width: 846px;
     height: 295px;
+
+    animation-name: IntroLogoShow;
+    animation-duration: 5s;
+    animation-timing-function: ease-out;
+    animation-iteration-count: 1;
+}
+
+.IntroLogo.Hidden .IntroLogoImage {
+    animation-name: none;
+    visibility: collapse;
+}
+
+/* Whole percentages of the 5s, see the timeline above. */
+@keyframes 'IntroLogoShow' {
+    0% {
+        transform: translateX(-1600px);
+    }
+    6% {
+        transform: translateX(-1600px);
+    }
+    12% {
+        transform: translateX(110px);
+    }
+    17% {
+        transform: translateX(-55px);
+    }
+    21% {
+        transform: translateX(26px);
+    }
+    24% {
+        transform: translateX(-11px);
+    }
+    26% {
+        transform: translateX(4px);
+    }
+    27% {
+        transform: translateX(0px);
+    }
+    47% {
+        transform: translateX(0px);
+    }
+    49% {
+        transform: translateX(-40px);
+    }
+    57% {
+        transform: translateX(2000px);
+    }
+    100% {
+        transform: translateX(2000px);
+    }
 }
 
 /* Scoreboard in place of CS2's own (#scoreboard, hud/scoreboard.js): only

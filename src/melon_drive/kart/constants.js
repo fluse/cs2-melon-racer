@@ -3,8 +3,11 @@
 export const MELON_TEMPLATE_NAME = "melon_template";
 
 // How long the Melon Racer logo (intro_logo in speedometer.xml) shows after
-// a player picks a team, before their melon spawns at the intro.
-export const INTRO_LOGO_SECONDS = 5;
+// a player picks a team, before their melon spawns at the intro. Its
+// animation (.IntroLogoImage in speedometer.css) has the logo out of the
+// picture after 2.85s — keep this a little longer than that, and shorter
+// than the animation itself (5s).
+export const INTRO_LOGO_SECONDS = 3.2;
 
 // How far above the floor under a spawn entity (hub_spawn, intro_spawn) the
 // melon's origin appears — straight above it, no sideways offset (see

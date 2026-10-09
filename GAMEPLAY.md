@@ -494,7 +494,9 @@ For testing the countdown and the finish screen without a heat, the user
 menu's DEVELOPER group has **"Test Countdown"** (3…2…1…GO, the melon held
 until GO) and **"Test Finish"** (FINISH, "1ST · +10 PTS" and the
 `BREAK_SECONDS` countdown, the melon held meanwhile) — for the clicking
-player only, the race phase and everyone else untouched. Ignored while that
+player only, the race phase and everyone else untouched — and **"Test
+Intro"** for the logo a player sees on joining (`INTRO_LOGO_SECONDS`, the
+melon held behind it). Ignored while that
 player races; the hub/tutorial buttons end a preview early. `TestCountdown`/
 `TestFinish` in `race/heat/race-flow.js` (`test/hud/hud-buttons.test.mjs`).
 

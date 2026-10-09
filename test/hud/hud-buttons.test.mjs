@@ -278,3 +278,32 @@ test("test countdown/finish buttons: ignored while racing; the hub button ends a
     assert.equal(b.locked, false);
     assert.equal(hud.Has(1, "finish_image", "Hidden"), true);
 });
+
+test("test intro button: the join logo for the clicker alone, held behind it", () => {
+    world.time = 50;
+    Click(1, "usermenu_testintro_button");
+    assert.equal(hud.Has(1, "intro_logo", "Hidden"), false, "the logo shows");
+    assert.equal(hud.Has(0, "intro_logo", "Hidden"), undefined, "the other player sees nothing");
+    assert.equal(b.locked, true);
+    FlowAt(50 + C.INTRO_LOGO_SECONDS / 2);
+    assert.equal(hud.Has(1, "intro_logo", "Hidden"), false, "still up");
+    FlowAt(50 + C.INTRO_LOGO_SECONDS);
+    assert.equal(hud.Has(1, "intro_logo", "Hidden"), true, "hidden again");
+    assert.equal(b.locked, false, "let go");
+    assert.equal(b.testPreview, undefined);
+});
+
+// Regression: a heat starting while Test Finish ran left its break
+// countdown on screen through the heat.
+test("a heat starting ends a running preview and hides all of it", () => {
+    world.time = 50;
+    Click(1, "usermenu_testfinish_button");
+    FlowAt(50 + 0.5);
+    assert.equal(hud.Has(1, "break_countdown", "Hidden"), false, "setup: the break countdown runs");
+    b.inHub = true;
+    flow.TryStartRace();
+    assert.equal(b.testPreview, undefined);
+    assert.equal(hud.Has(1, "break_countdown", "Hidden"), true, "no leftover break countdown");
+    assert.equal(hud.Has(1, "finish_image", "Hidden"), true);
+    assert.equal(b.locked, true, "held for the real countdown");
+});

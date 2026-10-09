@@ -11,7 +11,9 @@ import {
     GO_DISPLAY_SECONDS,
     RACE_SPAWN_LATERAL_SPACING,
     HEAT_POINTS,
+    INTRO_LOGO_SECONDS,
 } from "../../constants/index.js";
+import { SetIntroLogoVisible } from "../../kart/spawn.js";
 import { GetHubSpawnPoint, GetIntroSpawnPoint, GetStartSpawnPoint, FacePlayerView } from "../../kart/spawn-points.js";
 import { RestoreFullHealth } from "../../health/heal/index.js";
 import { StartRun, CancelRun } from "../time-trial/time-trial.js";
@@ -212,7 +214,7 @@ export function BeginHeat(trackId) {
         kart.finished = false;
         kart.locked = true;
         kart.podium = undefined; // off the podium into the next Grand Prix
-        kart.testPreview = undefined; // the real countdown takes over its HUD
+        EndTestPreview(kart); // the real countdown takes over its HUD
         // Its own lined-up spot, not the start line's center — a respawn
         // before reaching checkpoint 1 (break, or the user menu's respawn
         // button during the countdown) would otherwise stack it on whoever
@@ -286,7 +288,7 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.finished = false;
         kart.locked = false;
         kart.podium = undefined; // the hub/tutorial button takes a melon down from the podium too
-        kart.testPreview = undefined; // its HUD is hidden below, the melon let go
+        EndTestPreview(kart); // the melon is let go just above
         // kart.inHub (and the hub modal) is deliberately left to the
         // hub_start_trigger's own hub_enter/hub_leave inputs: the teleport
         // below lands inside it and fires hub_enter from there. Forcing it
@@ -392,9 +394,49 @@ export function TestFinish(kart) {
 }
 
 /**
- * Runs the TestCountdown/TestFinish previews: the same HUD as the real
- * COUNTDOWN (GO shown for GO_DISPLAY_SECONDS) and BREAK, then everything
- * hidden again and the melon let go.
+ * Developer (user menu "Test Intro"): the Melon Racer logo a player sees on
+ * joining, for INTRO_LOGO_SECONDS, without rejoining — the melon held where
+ * it is behind it. Same limits as TestCountdown.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @returns {boolean} whether it started
+ */
+export function TestIntro(kart) {
+    if (kart.racing || kart.breaking || kart.testPreview) {
+        return false;
+    }
+    kart.testPreview = { kind: "intro", endTime: Instance.GetGameTime() + INTRO_LOGO_SECONDS };
+    kart.locked = true;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot !== undefined) {
+        SetIntroLogoVisible(slot, true);
+    }
+    return true;
+}
+
+/**
+ * Stops a TestCountdown/TestFinish/TestIntro preview and hides whatever it
+ * showed. Leaves kart.locked to the caller.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function EndTestPreview(kart) {
+    if (!kart.testPreview) {
+        return;
+    }
+    kart.testPreview = undefined;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot === undefined) {
+        return;
+    }
+    GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
+    SetBreakCountdown(slot, undefined);
+    SetFinishImageVisible(slot, false);
+    SetIntroLogoVisible(slot, false);
+}
+
+/**
+ * Runs the TestCountdown/TestFinish/TestIntro previews: the same HUD as the
+ * real COUNTDOWN (GO shown for GO_DISPLAY_SECONDS), BREAK and join, then
+ * everything hidden again and the melon let go.
  * @param {number} now
  */
 function UpdateTestPreviews(now) {
@@ -415,10 +457,7 @@ function UpdateTestPreviews(now) {
                 }
                 continue;
             }
-            if (slot !== undefined) {
-                GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
-            }
-        } else {
+        } else if (preview.kind === "finish") {
             if (remaining > 0) {
                 const value = BreakCountdownValue(remaining);
                 if (slot !== undefined && breakCountdownShown.get(slot) !== value) {
@@ -426,13 +465,11 @@ function UpdateTestPreviews(now) {
                 }
                 continue;
             }
-            if (slot !== undefined) {
-                SetBreakCountdown(slot, undefined);
-                SetFinishImageVisible(slot, false);
-            }
-            kart.locked = false;
+        } else if (remaining > 0) {
+            continue; // intro: the logo stays up
         }
-        kart.testPreview = undefined;
+        EndTestPreview(kart);
+        kart.locked = false;
     }
 }
 

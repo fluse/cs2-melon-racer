@@ -8,7 +8,7 @@ import { IsMelonGlowOn, SetMelonGlow, SetKartPaintColor } from "../kart/look.js"
 import { IsPredictionOn, SetPrediction } from "../fx/prediction/prediction.js";
 import { IsCollisionDebugOn, SetCollisionDebug } from "../dev/collision-debug.js";
 import { IsFreeLookOn, SetFreeLook } from "../dev/free-look.js";
-import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, TestCountdown, TestFinish } from "../race/heat/race-flow.js";
+import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, TestCountdown, TestFinish, TestIntro } from "../race/heat/race-flow.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { PlaceOnPodium, TestGrandPrix } from "../race/podium/podium.js";
 import { GetSpeedHud } from "./layout.js";
@@ -154,17 +154,23 @@ export function RegisterHudInputs() {
             SetUserMenuOpen(slot, kart, false);
             ReturnAllToHub(racers);
             PlaceOnPodium(TestGrandPrix(racers), racers);
-        } else if (event.buttonId === "usermenu_testcountdown_button" || event.buttonId === "usermenu_testfinish_button") {
-            // Developer: the heat's countdown, or what a racer sees at the
-            // finish, for the clicking player only — no heat, nobody else.
-            // Not while they race (the heat's HUD is theirs then).
+        } else if (
+            event.buttonId === "usermenu_testcountdown_button" ||
+            event.buttonId === "usermenu_testfinish_button" ||
+            event.buttonId === "usermenu_testintro_button"
+        ) {
+            // Developer: the heat's countdown, what a racer sees at the
+            // finish, or the join logo, for the clicking player only — no
+            // heat, nobody else. Not while they race (the heat's HUD is
+            // theirs then).
             const slot = event.player.GetPlayerSlot();
             const kart = karts.get(slot);
             if (!kart) {
                 return;
             }
-            const countdown = event.buttonId === "usermenu_testcountdown_button";
-            if ((countdown ? TestCountdown : TestFinish)(kart)) {
+            const preview =
+                event.buttonId === "usermenu_testcountdown_button" ? TestCountdown : event.buttonId === "usermenu_testfinish_button" ? TestFinish : TestIntro;
+            if (preview(kart)) {
                 SetUserMenuOpen(slot, kart, false);
             } else {
                 Debug(`${event.buttonId}: slot ${slot}, ignored (racing=${kart.racing}, breaking=${kart.breaking}, preview=${kart.testPreview?.kind})`);

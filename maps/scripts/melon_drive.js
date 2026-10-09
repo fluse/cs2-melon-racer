@@ -93,7 +93,7 @@ function TraceSphere(config) {
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
  *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
  *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
- *   testPreview?: { kind: "countdown" | "finish", endTime: number }, // the user menu's developer Test Countdown/Test Finish playing — see TestCountdown in race/heat/race-flow.js
+ *   testPreview?: { kind: "countdown" | "finish" | "intro", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
@@ -1069,8 +1069,11 @@ const TELEPORT_UP_OFFSET = 40;
 const MELON_TEMPLATE_NAME = "melon_template";
 
 // How long the Melon Racer logo (intro_logo in speedometer.xml) shows after
-// a player picks a team, before their melon spawns at the intro.
-const INTRO_LOGO_SECONDS = 5;
+// a player picks a team, before their melon spawns at the intro. Its
+// animation (.IntroLogoImage in speedometer.css) has the logo out of the
+// picture after 2.85s — keep this a little longer than that, and shorter
+// than the animation itself (5s).
+const INTRO_LOGO_SECONDS = 3.2;
 
 // How far above the floor under a spawn entity (hub_spawn, intro_spawn) the
 // melon's origin appears — straight above it, no sideways offset (see
@@ -3150,7 +3153,7 @@ function ShowIntroLogoThenSpawn(slot, pawn) {
     }
 }
 
-/** @param {number} slot @param {boolean} visible */
+/** Shows or hides the Melon Racer logo (intro_logo) for one player — also the user menu's "Test Intro". @param {number} slot @param {boolean} visible */
 function SetIntroLogoVisible(slot, visible) {
     GetSpeedHud()?.SetHasClassForPlayer(slot, "intro_logo", "Hidden", !visible);
 }
@@ -6430,7 +6433,7 @@ function BeginHeat(trackId) {
         kart.finished = false;
         kart.locked = true;
         kart.podium = undefined; // off the podium into the next Grand Prix
-        kart.testPreview = undefined; // the real countdown takes over its HUD
+        EndTestPreview(kart); // the real countdown takes over its HUD
         // Its own lined-up spot, not the start line's center — a respawn
         // before reaching checkpoint 1 (break, or the user menu's respawn
         // button during the countdown) would otherwise stack it on whoever
@@ -6504,7 +6507,7 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.finished = false;
         kart.locked = false;
         kart.podium = undefined; // the hub/tutorial button takes a melon down from the podium too
-        kart.testPreview = undefined; // its HUD is hidden below, the melon let go
+        EndTestPreview(kart); // the melon is let go just above
         // kart.inHub (and the hub modal) is deliberately left to the
         // hub_start_trigger's own hub_enter/hub_leave inputs: the teleport
         // below lands inside it and fires hub_enter from there. Forcing it
@@ -6610,9 +6613,49 @@ function TestFinish(kart) {
 }
 
 /**
- * Runs the TestCountdown/TestFinish previews: the same HUD as the real
- * COUNTDOWN (GO shown for GO_DISPLAY_SECONDS) and BREAK, then everything
- * hidden again and the melon let go.
+ * Developer (user menu "Test Intro"): the Melon Racer logo a player sees on
+ * joining, for INTRO_LOGO_SECONDS, without rejoining — the melon held where
+ * it is behind it. Same limits as TestCountdown.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @returns {boolean} whether it started
+ */
+function TestIntro(kart) {
+    if (kart.racing || kart.breaking || kart.testPreview) {
+        return false;
+    }
+    kart.testPreview = { kind: "intro", endTime: Instance.GetGameTime() + INTRO_LOGO_SECONDS };
+    kart.locked = true;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot !== undefined) {
+        SetIntroLogoVisible(slot, true);
+    }
+    return true;
+}
+
+/**
+ * Stops a TestCountdown/TestFinish/TestIntro preview and hides whatever it
+ * showed. Leaves kart.locked to the caller.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function EndTestPreview(kart) {
+    if (!kart.testPreview) {
+        return;
+    }
+    kart.testPreview = undefined;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot === undefined) {
+        return;
+    }
+    GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
+    SetBreakCountdown(slot, undefined);
+    SetFinishImageVisible(slot, false);
+    SetIntroLogoVisible(slot, false);
+}
+
+/**
+ * Runs the TestCountdown/TestFinish/TestIntro previews: the same HUD as the
+ * real COUNTDOWN (GO shown for GO_DISPLAY_SECONDS), BREAK and join, then
+ * everything hidden again and the melon let go.
  * @param {number} now
  */
 function UpdateTestPreviews(now) {
@@ -6633,10 +6676,7 @@ function UpdateTestPreviews(now) {
                 }
                 continue;
             }
-            if (slot !== undefined) {
-                GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
-            }
-        } else {
+        } else if (preview.kind === "finish") {
             if (remaining > 0) {
                 const value = BreakCountdownValue(remaining);
                 if (slot !== undefined && breakCountdownShown.get(slot) !== value) {
@@ -6644,13 +6684,11 @@ function UpdateTestPreviews(now) {
                 }
                 continue;
             }
-            if (slot !== undefined) {
-                SetBreakCountdown(slot, undefined);
-                SetFinishImageVisible(slot, false);
-            }
-            kart.locked = false;
+        } else if (remaining > 0) {
+            continue; // intro: the logo stays up
         }
-        kart.testPreview = undefined;
+        EndTestPreview(kart);
+        kart.locked = false;
     }
 }
 
@@ -7817,17 +7855,23 @@ function RegisterHudInputs() {
             SetUserMenuOpen(slot, kart, false);
             ReturnAllToHub(racers);
             PlaceOnPodium(TestGrandPrix(racers), racers);
-        } else if (event.buttonId === "usermenu_testcountdown_button" || event.buttonId === "usermenu_testfinish_button") {
-            // Developer: the heat's countdown, or what a racer sees at the
-            // finish, for the clicking player only — no heat, nobody else.
-            // Not while they race (the heat's HUD is theirs then).
+        } else if (
+            event.buttonId === "usermenu_testcountdown_button" ||
+            event.buttonId === "usermenu_testfinish_button" ||
+            event.buttonId === "usermenu_testintro_button"
+        ) {
+            // Developer: the heat's countdown, what a racer sees at the
+            // finish, or the join logo, for the clicking player only — no
+            // heat, nobody else. Not while they race (the heat's HUD is
+            // theirs then).
             const slot = event.player.GetPlayerSlot();
             const kart = karts.get(slot);
             if (!kart) {
                 return;
             }
-            const countdown = event.buttonId === "usermenu_testcountdown_button";
-            if ((countdown ? TestCountdown : TestFinish)(kart)) {
+            const preview =
+                event.buttonId === "usermenu_testcountdown_button" ? TestCountdown : event.buttonId === "usermenu_testfinish_button" ? TestFinish : TestIntro;
+            if (preview(kart)) {
                 SetUserMenuOpen(slot, kart, false);
             } else {
                 Debug(`${event.buttonId}: slot ${slot}, ignored (racing=${kart.racing}, breaking=${kart.breaking}, preview=${kart.testPreview?.kind})`);

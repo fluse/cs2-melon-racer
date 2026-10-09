@@ -40,7 +40,7 @@ import { predictionDotSet } from "./trace.js";
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
  *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
  *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
- *   testPreview?: { kind: "countdown" | "finish", endTime: number }, // the user menu's developer Test Countdown/Test Finish playing — see TestCountdown in race/heat/race-flow.js
+ *   testPreview?: { kind: "countdown" | "finish" | "intro", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view

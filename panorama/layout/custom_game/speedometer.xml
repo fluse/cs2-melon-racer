@@ -526,6 +526,12 @@
 								<Label class="UserMenuToggleName" text="Test Finish" />
 								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
 							</Button>
+							<!-- Plays the Melon Racer logo a player sees on joining, the melon held
+							     behind it (TestIntro in race/heat/race-flow.js). Not while you race. -->
+							<Button id="usermenu_testintro_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Test Intro" />
+								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
+							</Button>
 						</Panel>
 					</Panel>
 				</Panel>
