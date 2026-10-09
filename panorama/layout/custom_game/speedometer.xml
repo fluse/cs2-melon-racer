@@ -216,13 +216,16 @@
 		</Panel>
 
 		<!-- Big centered countdown, only visible to racers during COUNTDOWN.
-		     All four images sit stacked in the panel; the Show3/Show2/Show1/
-		     ShowGo class on the panel picks which one is visible. -->
+		     The numbers sit stacked in the panel, collapsed until the script
+		     gives one "In" (falls in from the top, stands in the middle) or
+		     "Out" (knocked down out of the picture by the next one landing) —
+		     ShowCountdown in race/heat/race-flow.js. GO doesn't fall: it grows from
+		     small to huge, fading out, in the 1's place (.CountdownGo). -->
 		<Panel id="countdown_panel" class="CountdownPanel Hidden">
-			<Image class="CountdownImage Countdown3" src="file://{images}/custom_game/number-3.png" />
-			<Image class="CountdownImage Countdown2" src="file://{images}/custom_game/number-2.png" />
-			<Image class="CountdownImage Countdown1" src="file://{images}/custom_game/number-1.png" />
-			<Image class="CountdownImage CountdownGo" src="file://{images}/custom_game/word-go.png" />
+			<Label id="count_3" class="CountdownNumber" text="3" />
+			<Label id="count_2" class="CountdownNumber" text="2" />
+			<Label id="count_1" class="CountdownNumber" text="1" />
+			<Label id="count_go" class="CountdownNumber CountdownGo" text="GO" />
 		</Panel>
 
 		<!-- Shown to a racer the moment they finish (see FinishKart), until
@@ -231,36 +234,19 @@
 		<!-- The place under it, "1ST  ·  +10 PTS" (Grand Prix points, see FinishKart). -->
 		<Label id="finish_place" class="FinishPlace Hidden" text="{s:place}" />
 
-		<!-- Countdown under the finish image between heats (BREAK_SECONDS … 0,
-		     see race-flow.js): a tens and a ones digit, all ten number images
-		     stacked in each; the On class on one image shows it. The tens
-		     slot (break_tens) only shows from 10 up, collapsed otherwise so
-		     a single digit stays centered. -->
-		<Panel id="break_countdown" class="BreakCountdown Hidden" hittest="false">
-			<Panel id="break_tens" class="BreakDigit BreakTens">
-				<Image id="break_tens_0" class="BreakDigitImage" src="file://{images}/custom_game/number-0.png" />
-				<Image id="break_tens_1" class="BreakDigitImage" src="file://{images}/custom_game/number-1.png" />
-				<Image id="break_tens_2" class="BreakDigitImage" src="file://{images}/custom_game/number-2.png" />
-				<Image id="break_tens_3" class="BreakDigitImage" src="file://{images}/custom_game/number-3.png" />
-				<Image id="break_tens_4" class="BreakDigitImage" src="file://{images}/custom_game/number-4.png" />
-				<Image id="break_tens_5" class="BreakDigitImage" src="file://{images}/custom_game/number-5.png" />
-				<Image id="break_tens_6" class="BreakDigitImage" src="file://{images}/custom_game/number-6.png" />
-				<Image id="break_tens_7" class="BreakDigitImage" src="file://{images}/custom_game/number-7.png" />
-				<Image id="break_tens_8" class="BreakDigitImage" src="file://{images}/custom_game/number-8.png" />
-				<Image id="break_tens_9" class="BreakDigitImage" src="file://{images}/custom_game/number-9.png" />
-			</Panel>
-			<Panel class="BreakDigit">
-				<Image id="break_ones_0" class="BreakDigitImage" src="file://{images}/custom_game/number-0.png" />
-				<Image id="break_ones_1" class="BreakDigitImage" src="file://{images}/custom_game/number-1.png" />
-				<Image id="break_ones_2" class="BreakDigitImage" src="file://{images}/custom_game/number-2.png" />
-				<Image id="break_ones_3" class="BreakDigitImage" src="file://{images}/custom_game/number-3.png" />
-				<Image id="break_ones_4" class="BreakDigitImage" src="file://{images}/custom_game/number-4.png" />
-				<Image id="break_ones_5" class="BreakDigitImage" src="file://{images}/custom_game/number-5.png" />
-				<Image id="break_ones_6" class="BreakDigitImage" src="file://{images}/custom_game/number-6.png" />
-				<Image id="break_ones_7" class="BreakDigitImage" src="file://{images}/custom_game/number-7.png" />
-				<Image id="break_ones_8" class="BreakDigitImage" src="file://{images}/custom_game/number-8.png" />
-				<Image id="break_ones_9" class="BreakDigitImage" src="file://{images}/custom_game/number-9.png" />
-			</Panel>
+		<!-- A racer who's gone DNF_WARNING_SECONDS without a new checkpoint:
+		     the seconds until they're out of the Grand Prix (DNF_NO_PROGRESS_SECONDS,
+		     see UpdateDnf in race-flow.js). -->
+		<Label id="dnf_warning" class="DnfWarning Hidden" text="NO CHECKPOINT · OUT IN {s:dnf}" />
+
+		<!-- Countdown between heats (BREAK_SECONDS … 0, see SetBreakCountdown in
+		     race-flow.js), under the finish image and just like the start
+		     countdown (same spot, look and animations): each number falls in
+		     and knocks the one before it out. Two Labels taking turns, the
+		     number in their dialog variable — see BreakCountdownLabels. -->
+		<Panel id="break_countdown" class="CountdownPanel Hidden" hittest="false">
+			<Label id="break_num_0" class="CountdownNumber" text="{s:n}" />
+			<Label id="break_num_1" class="CountdownNumber" text="{s:n}" />
 		</Panel>
 
 		<!-- Wall-bounce feedback, shown briefly after each bounce (see
@@ -424,8 +410,14 @@
 					<Panel class="UserMenuColumns">
 						<Panel class="UserMenuActions">
 							<Label class="UserMenuColumnTitle" text="ACTIONS" />
-							<!-- First, when there: only during a free-roaming time trial (script
-							     toggles Hidden, see CanRestartTimeTrial). -->
+							<Button id="usermenu_respawn_button" class="UserMenuActionButton UserMenuButtonGreen">
+								<Panel class="UserMenuButtonContent">
+									<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/respawn.png" />
+									<Label class="UserMenuButtonLabel" text="Respawn at Checkpoint" />
+								</Panel>
+							</Button>
+							<!-- Only during a free-roaming time trial (script toggles Hidden,
+							     see CanRestartTimeTrial). -->
 							<Panel id="usermenu_restart_row" class="UserMenuRestartRow Hidden">
 								<Button id="usermenu_restart_button" class="UserMenuActionButton UserMenuButtonGold">
 									<Panel class="UserMenuButtonContent">
@@ -434,12 +426,6 @@
 									</Panel>
 								</Button>
 							</Panel>
-							<Button id="usermenu_respawn_button" class="UserMenuActionButton UserMenuButtonGreen">
-								<Panel class="UserMenuButtonContent">
-									<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/respawn.png" />
-									<Label class="UserMenuButtonLabel" text="Respawn at Checkpoint" />
-								</Panel>
-							</Button>
 							<!-- "Exit Race" while signed up for a heat, else "Return to Hub"
 							     (UpdateHubButtonHud) — either way just this player leaves. -->
 							<Button id="usermenu_hub_button" class="UserMenuActionButton UserMenuButtonRed">

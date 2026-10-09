@@ -181,6 +181,44 @@ test("free look button: switching it on closes the menu, switching it off doesn'
     assert.equal(a.userMenuOpen, false);
 });
 
+test("free look: a ghost avatar from template_spectator_hat hangs on the flying pawn, gone again when it's off or the player leaves", async () => {
+    const { DropKart } = await import("../../src/melon_drive/core/kart-registry.js");
+    world.add(new PointTemplate({ name: C.SPECTATOR_HAT_TEMPLATE_NAME, spawn: () => [new Entity({ className: "prop_dynamic", origin: { x: 500, y: 0, z: 0 } })] }));
+    Click(0, "usermenu_freelook_button");
+    const [hat] = a.spectatorHat ?? [];
+    assert.ok(hat?.IsValid(), "spawned");
+    assert.equal(hat.GetParent(), undefined, "moved by script, not parented (parented it sat in the camera)");
+    const feet = a.pawn.GetAbsOrigin();
+    const yaw = a.pawn.GetEyeAngles().yaw * Math.PI / 180;
+    const at = hat.GetAbsOrigin();
+    assert.ok(Math.abs(at.x - (feet.x - Math.cos(yaw) * C.SPECTATOR_HAT_BACK)) < 1e-6
+        && Math.abs(at.y - (feet.y - Math.sin(yaw) * C.SPECTATOR_HAT_BACK)) < 1e-6
+        && at.z === feet.z + C.SPECTATOR_HAT_HEIGHT, "at eye height, a little behind the eyes, not at its Hammer offset");
+    assert.equal(b.spectatorHat, undefined, "only the free-looking player");
+
+    const { UpdateSpectatorHat } = await import("../../src/melon_drive/dev/free-look.js");
+    a.pawn.Teleport({ position: { x: 100, y: 200, z: 300 }, angles: { pitch: 0, yaw: 90, roll: 0 } });
+    UpdateSpectatorHat(a);
+    const moved = hat.GetAbsOrigin();
+    assert.ok(Math.abs(moved.x - 100) < 1e-6 && Math.abs(moved.y - (200 - C.SPECTATOR_HAT_BACK)) < 1e-6
+        && moved.z === 300 + C.SPECTATOR_HAT_HEIGHT, "follows the flying pawn, behind its current view");
+
+    Click(0, "usermenu_freelook_button");
+    assert.equal(hat.IsValid(), false, "removed when free look goes off");
+    assert.equal(a.spectatorHat, undefined);
+
+    Click(0, "usermenu_freelook_button");
+    const [again] = a.spectatorHat;
+    DropKart(0, a);
+    assert.equal(again.IsValid(), false, "removed when the player leaves");
+});
+
+test("free look without template_spectator_hat in the map: no avatar, free look still works", () => {
+    Click(0, "usermenu_freelook_button");
+    assert.equal(a.freeLook, true);
+    assert.deepEqual(a.spectatorHat, []);
+});
+
 test("color buttons paint that player's melon in the preset; an unknown color does nothing", () => {
     const [key, preset] = Object.entries(COLOR_PRESETS)[0];
     Click(0, `usermenu_color_${key}`);
@@ -235,11 +273,11 @@ test("test countdown button: 3…2…1…GO for the clicker alone, held until GO
     assert.equal(b.locked, true, "held like on the start grid");
     FlowAt(50 + 0.5);
     assert.equal(hud.Has(1, "countdown_panel", "Hidden"), false);
-    assert.equal(hud.Has(1, "countdown_panel", `Show${Math.ceil(C.COUNTDOWN_SECONDS - 0.5)}`), true);
+    assert.equal(hud.Has(1, `count_${Math.ceil(C.COUNTDOWN_SECONDS - 0.5)}`, "In"), true);
     assert.equal(hud.Has(0, "countdown_panel", "Hidden"), undefined, "the other player sees nothing");
     assert.equal(a.locked, false);
     FlowAt(50 + C.COUNTDOWN_SECONDS);
-    assert.equal(hud.Has(1, "countdown_panel", "ShowGo"), true, "GO");
+    assert.equal(hud.Has(1, "count_go", "In"), true, "GO");
     assert.equal(b.locked, false, "let go at GO");
     FlowAt(50 + C.COUNTDOWN_SECONDS + C.GO_DISPLAY_SECONDS + 0.01);
     assert.equal(hud.Has(1, "countdown_panel", "Hidden"), true, "hidden again after GO");

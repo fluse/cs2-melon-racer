@@ -9,6 +9,8 @@ import { predictionDotSet } from "./trace.js";
  *   health: number, lastVelocity: { x: number, y: number, z: number } | undefined,
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
+ *   progressWatch?: { checkpoint: number, laps: number, since: number }, // racing: when this racer last made progress, for the DNF rule — see WatchProgress in race/heat/logic.js
+ *   dnfShown?: number, dnfResendAt?: number, // what the dnf_warning shows (undefined: hidden) and when it's sent again — see UpdateDnf in race/heat/race-flow.js
  *   runStartTime?: number, // game time this kart's timed run started (unset: no run) — see race/time-trial/time-trial.js
  *   lastRun?: { trackId: number, time: number, newBest: boolean, at: number }, // last finished run, for the HUD
  *   finishRestartAt?: number, // game time a free-roaming finish sent the melon back to the start — see FINISH_RESTART_START_GUARD
@@ -43,6 +45,7 @@ import { predictionDotSet } from "./trace.js";
  *   testPreview?: { kind: "countdown" | "finish" | "intro", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
+ *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
@@ -121,6 +124,11 @@ export function DropKart(slot, kart) {
         kart.melon.Remove();
     }
     for (const entity of kart.boostTrail?.entities ?? []) {
+        if (entity.IsValid()) {
+            entity.Remove();
+        }
+    }
+    for (const entity of kart.spectatorHat ?? []) {
         if (entity.IsValid()) {
             entity.Remove();
         }

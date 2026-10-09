@@ -5,11 +5,14 @@
 // flies it along the view, and the camera shows its eyes (DISABLED mode)
 // instead of chasing the melon. The melon waits where it was, frozen
 // (UpdateKart skips it; physics motion off), and switching back puts the
-// pawn back on its anchor and the chase camera back on the melon.
+// pawn back on its anchor and the chase camera back on the melon. While
+// it's on, a ghost avatar (SPECTATOR_HAT_TEMPLATE_NAME) hangs on the flying
+// pawn so the others see who it is.
 import { Instance, CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "../core/debug.js";
 import { ApplyCameraFollow } from "../camera/index.js";
-import { CAMERA_DISTANCE, CAMERA_HEIGHT, FOLLOW_OFFSET, FREE_LOOK_EYE_HEIGHT } from "../constants/index.js";
+import { SpawnFromTemplate } from "../fx/particles.js";
+import { CAMERA_DISTANCE, CAMERA_HEIGHT, FOLLOW_OFFSET, FREE_LOOK_EYE_HEIGHT, SPECTATOR_HAT_TEMPLATE_NAME, SPECTATOR_HAT_HEIGHT, SPECTATOR_HAT_BACK } from "../constants/index.js";
 
 /** @param {import("../core/kart-registry.js").Kart} kart */
 export function IsFreeLookOn(kart) {
@@ -39,18 +42,90 @@ export function SetFreeLook(kart, on) {
     kart.lastVelocity = undefined;
     kart.prevLastVelocity = undefined;
     kart.settled = false;
+    RemoveSpectatorHat(kart);
     if (!kart.pawn.IsValid()) {
         return on;
     }
     if (on) {
         kart.pawn.Teleport({ position: ChaseCameraFeet(kart), velocity: { x: 0, y: 0, z: 0 } });
         kart.pawn.GetCustomCamera().SetMode(CustomCameraMode.DISABLED);
+        AttachSpectatorHat(kart);
     } else {
         kart.pawn.Teleport({ position: kart.pawnAnchor, velocity: { x: 0, y: 0, z: 0 } });
         ApplyCameraFollow(kart);
     }
     Debug(`SetFreeLook: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} free look ${on ? "on" : "off"}`);
     return on;
+}
+
+/**
+ * Hangs a fresh copy of the SPECTATOR_HAT_TEMPLATE_NAME template on the
+ * free-looking pawn (see SpectatorHatPose). Nothing if the map has no such
+ * template.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function AttachSpectatorHat(kart) {
+    const { position, angles } = SpectatorHatPose(kart);
+    const hat = SpawnFromTemplate(SPECTATOR_HAT_TEMPLATE_NAME, position, angles);
+    for (const entity of hat) {
+        entity.Teleport({ position, angles }); // ForceSpawn keeps its Hammer offset from the template
+        // In case it's left solid in Hammer: the melons' traces and other
+        // melons mustn't bump into a flying hat.
+        Instance.EntFireAtTarget({ target: entity, input: "DisableCollision" });
+    }
+    kart.spectatorHat = hat;
+}
+
+/**
+ * Keeps the ghost avatar on the flying pawn, every tick while free look is
+ * on. Moved by script, not parented: parented to the pawn it ended up right
+ * in the player's own camera, whatever offset it was given.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+export function UpdateSpectatorHat(kart) {
+    if (!kart.spectatorHat || !kart.pawn.IsValid()) {
+        return;
+    }
+    const pose = SpectatorHatPose(kart);
+    for (const entity of kart.spectatorHat) {
+        if (entity.IsValid()) {
+            entity.Move(pose);
+        }
+    }
+}
+
+/**
+ * Where the ghost avatar hangs: SPECTATOR_HAT_HEIGHT above the pawn's feet
+ * and SPECTATOR_HAT_BACK behind its eyes along the view's yaw (so the
+ * player's own camera doesn't look out through it), facing the view.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function SpectatorHatPose(kart) {
+    const feet = kart.pawn.GetAbsOrigin();
+    const yaw = kart.pawn.GetEyeAngles().yaw;
+    const rad = yaw * Math.PI / 180;
+    return {
+        position: {
+            x: feet.x - Math.cos(rad) * SPECTATOR_HAT_BACK,
+            y: feet.y - Math.sin(rad) * SPECTATOR_HAT_BACK,
+            z: feet.z + SPECTATOR_HAT_HEIGHT,
+        },
+        angles: { pitch: 0, yaw, roll: 0 },
+    };
+}
+
+/**
+ * Removes the free-look ghost avatar, if any — free look off, a new pawn
+ * (SetFreeLook), or the player leaving (DropKart does the same).
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+export function RemoveSpectatorHat(kart) {
+    for (const entity of kart.spectatorHat ?? []) {
+        if (entity.IsValid()) {
+            entity.Remove();
+        }
+    }
+    kart.spectatorHat = undefined;
 }
 
 /**

@@ -12,12 +12,15 @@ import {
     RACE_SPAWN_LATERAL_SPACING,
     HEAT_POINTS,
     INTRO_LOGO_SECONDS,
+    DNF_NO_PROGRESS_SECONDS,
+    DNF_WARNING_SECONDS,
+    HUD_RESEND_SECONDS,
 } from "../../constants/index.js";
 import { SetIntroLogoVisible } from "../../kart/spawn.js";
 import { GetHubSpawnPoint, GetIntroSpawnPoint, GetStartSpawnPoint, FacePlayerView } from "../../kart/spawn-points.js";
 import { RestoreFullHealth } from "../../health/heal/index.js";
 import { StartRun, CancelRun } from "../time-trial/time-trial.js";
-import { BreakCountdownValue, CountdownDigits } from "./logic.js";
+import { BreakCountdownValue, BreakCountdownLabels, CountdownStep, CountdownNumberState, WatchProgress, DnfSecondsLeft, DnfWarningValue } from "./logic.js";
 import { SetFreeLook } from "../../dev/free-look.js";
 import { grandPrix, StartGrandPrix, StartGrandPrixHeat, RecordGrandPrixFinish, EndGrandPrix } from "../grand-prix/grand-prix.js";
 import { PlaceOnPodium } from "../podium/podium.js";
@@ -37,36 +40,43 @@ export let activeTrackId = undefined;
 /** GetGameTime() at which the current COUNTDOWN/BREAK phase should end. */
 export let phaseEndTime = 0;
 
-/** One class per countdown image on the HUD's countdown_panel (see
- * speedometer.xml/.css) — exactly one is set at a time. There's no image for
- * values above 3, so a COUNTDOWN_SECONDS > 3 shows nothing until 3.
+/** The countdown's numbers in countdown_panel (speedometer.xml), in order —
+ * index = CountdownStep. Each gets "In" or "Out" (CountdownNumberState),
+ * which plays its fall in / knock out animation (speedometer.css).
  */
-const COUNTDOWN_SHOW_CLASSES = ["Show3", "Show2", "Show1", "ShowGo"];
+const COUNTDOWN_NUMBER_IDS = ["count_3", "count_2", "count_1", "count_go"];
 
-/** Number the BREAK countdown last sent to each slot — the digit images are
- * only re-sent when it changes (one class per image, see speedometer.xml).
+/** Number the BREAK countdown last sent to each slot — only re-sent when
+ * it changes, each change being one number falling in.
  * @type {Map<number, number>} */
 const breakCountdownShown = new Map();
 
+/** The break countdown's two number Labels, taking turns — see BreakCountdownLabels. */
+const BREAK_NUMBER_IDS = ["break_num_0", "break_num_1"];
+
 /**
- * Shows `value` on one player's break_countdown (number-0..9 images, a tens
- * digit only from 10 up), or hides it with `value` undefined.
+ * Shows `value` on one player's break_countdown like the start countdown:
+ * it falls in, knocking out the number before it (see BreakCountdownLabels).
+ * Hidden with `value` undefined.
  * @param {number} slot @param {number | undefined} value
  */
 function SetBreakCountdown(slot, value) {
     const hud = GetSpeedHud();
+    const previous = breakCountdownShown.get(slot);
     if (value === undefined) {
         breakCountdownShown.delete(slot);
     } else {
         breakCountdownShown.set(slot, value);
     }
-    const digits = value === undefined ? undefined : CountdownDigits(value);
     hud?.SetHasClassForPlayer(slot, "break_countdown", "Hidden", value === undefined);
-    hud?.SetHasClassForPlayer(slot, "break_tens", "On", digits?.tens !== undefined);
-    for (let d = 0; d <= 9; d++) {
-        hud?.SetHasClassForPlayer(slot, `break_tens_${d}`, "On", digits?.tens === d);
-        hud?.SetHasClassForPlayer(slot, `break_ones_${d}`, "On", digits?.ones === d);
-    }
+    const labels = value === undefined ? undefined : BreakCountdownLabels(value, previous);
+    BREAK_NUMBER_IDS.forEach((id, index) => {
+        if (labels?.in === index) {
+            hud?.SetDialogVariableStringForPlayer(slot, id, "n", String(value));
+        }
+        hud?.SetHasClassForPlayer(slot, id, "In", labels?.in === index);
+        hud?.SetHasClassForPlayer(slot, id, "Out", labels?.out === index);
+    });
 }
 
 /**
@@ -213,6 +223,8 @@ export function BeginHeat(trackId) {
         CancelRun(kart); // a free-roaming run doesn't carry into the heat — its clock starts at GO
         kart.finished = false;
         kart.locked = true;
+        kart.progressWatch = undefined; // the DNF clock starts at GO
+        HideDnfWarning(kart);
         kart.podium = undefined; // off the podium into the next Grand Prix
         EndTestPreview(kart); // the real countdown takes over its HUD
         // Its own lined-up spot, not the start line's center — a respawn
@@ -287,6 +299,8 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.racing = false;
         kart.finished = false;
         kart.locked = false;
+        kart.progressWatch = undefined;
+        HideDnfWarning(kart);
         kart.podium = undefined; // the hub/tutorial button takes a melon down from the podium too
         EndTestPreview(kart); // the melon is let go just above
         // kart.inHub (and the hub modal) is deliberately left to the
@@ -341,15 +355,19 @@ function SendKartsOutOfRace(returning, spawn, label) {
 }
 
 /**
- * Shows one player's countdown_panel at `showClass` (one of
- * COUNTDOWN_SHOW_CLASSES). @param {number} slot @param {string} showClass
+ * Shows one player's countdown `remaining` seconds before GO: the current
+ * number falling in / standing, the one before it knocked out (see
+ * CountdownNumberState). @param {number} slot @param {number} remaining
  */
-function ShowCountdown(slot, showClass) {
+function ShowCountdown(slot, remaining) {
     const hud = GetSpeedHud();
+    const step = CountdownStep(remaining);
     hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", false);
-    for (const cls of COUNTDOWN_SHOW_CLASSES) {
-        hud?.SetHasClassForPlayer(slot, "countdown_panel", cls, cls === showClass);
-    }
+    COUNTDOWN_NUMBER_IDS.forEach((id, index) => {
+        const state = CountdownNumberState(index, step);
+        hud?.SetHasClassForPlayer(slot, id, "In", state === "In");
+        hud?.SetHasClassForPlayer(slot, id, "Out", state === "Out");
+    });
 }
 
 /**
@@ -453,7 +471,7 @@ function UpdateTestPreviews(now) {
             }
             if (remaining > -GO_DISPLAY_SECONDS) {
                 if (slot !== undefined) {
-                    ShowCountdown(slot, remaining > 0 ? `Show${Math.ceil(remaining)}` : "ShowGo");
+                    ShowCountdown(slot, remaining);
                 }
                 continue;
             }
@@ -471,6 +489,60 @@ function UpdateTestPreviews(now) {
         EndTestPreview(kart);
         kart.locked = false;
     }
+}
+
+/**
+ * The DNF rule (DNF_NO_PROGRESS_SECONDS): a racer who hasn't reached a new
+ * checkpoint or counted a lap for that long since GO or their last one is
+ * out — back to the hub like the user menu's "Exit Race", their Grand Prix
+ * standings so far kept. So nobody can hold up a heat for the others by
+ * stopping (or getting stuck); if every racer is out, the heat ends like
+ * one everyone left. The last DNF_WARNING_SECONDS are counted down on
+ * their HUD (dnf_warning). Finished racers are left alone.
+ * @param {import("../../core/kart-registry.js").Kart[]} racers @param {number} now
+ */
+function UpdateDnf(racers, now) {
+    for (const kart of racers) {
+        if (kart.finished) {
+            SetDnfWarning(kart, undefined, now);
+            continue;
+        }
+        kart.progressWatch = WatchProgress(kart.progressWatch, kart.checkpointIndex, kart.lapsCompleted, now);
+        const left = DnfSecondsLeft(kart.progressWatch, now, DNF_NO_PROGRESS_SECONDS);
+        if (left <= 0) {
+            Debug(`UpdateDnf: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} made no progress for ${DNF_NO_PROGRESS_SECONDS}s on track ${activeTrackId} — DNF, back to the hub`);
+            ReturnAllToHub([kart]);
+            continue;
+        }
+        SetDnfWarning(kart, DnfWarningValue(left, DNF_WARNING_SECONDS), now);
+    }
+}
+
+/**
+ * Shows `value` seconds on one racer's dnf_warning (hidden with undefined) —
+ * sent on change, and again every HUD_RESEND_SECONDS.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number | undefined} value @param {number} now
+ */
+function SetDnfWarning(kart, value, now) {
+    if (value === kart.dnfShown && now < (kart.dnfResendAt ?? 0)) {
+        return;
+    }
+    kart.dnfShown = value;
+    kart.dnfResendAt = now + HUD_RESEND_SECONDS;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot === undefined) {
+        return;
+    }
+    if (value !== undefined) {
+        GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "dnf_warning", "dnf", String(value));
+    }
+    GetSpeedHud()?.SetHasClassForPlayer(slot, "dnf_warning", "Hidden", value === undefined);
+}
+
+/** Hides a racer's dnf_warning right away — a new heat, or out of the race. @param {import("../../core/kart-registry.js").Kart} kart */
+function HideDnfWarning(kart) {
+    kart.dnfResendAt = undefined;
+    SetDnfWarning(kart, undefined, Instance.GetGameTime());
 }
 
 /** Drives the COUNTDOWN/RACING/BREAK timers and transitions — called once per Think tick (see core/think.js). */
@@ -494,17 +566,17 @@ export function UpdateRaceFlow(now) {
             return;
         }
         const remaining = phaseEndTime - now;
-        const showClass = remaining > 0 ? `Show${Math.ceil(remaining)}` : "ShowGo";
         for (const kart of racers) {
             const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
             if (slot !== undefined) {
-                ShowCountdown(slot, showClass);
+                ShowCountdown(slot, remaining);
             }
         }
         if (remaining <= 0) {
             for (const kart of racers) {
                 kart.locked = false;
                 StartRun(kart, now); // the heat's time trial clock
+                kart.progressWatch = WatchProgress(undefined, kart.checkpointIndex, kart.lapsCompleted, now); // and the DNF one
             }
             // The "GO" image just shown above stays up for GO_DISPLAY_SECONDS —
             // hiding it in this same tick meant it was never actually seen.
@@ -517,6 +589,7 @@ export function UpdateRaceFlow(now) {
     }
 
     if (phase === RacePhase.RACING) {
+        UpdateDnf(CurrentRacers(), now); // may send racers out — counted again below
         const racers = CurrentRacers();
         if (now >= phaseEndTime) {
             for (const kart of racers) {

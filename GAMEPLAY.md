@@ -66,8 +66,8 @@ racing against the clock:
   (`FINISH_RESTART_START_GUARD`), so the next attempt's clock doesn't start
   at the spawn.
 - **Restart:** only while the melon is on a track in a free-roaming time
-  trial (decided), the user menu shows "Restart Time Trial" under the
-  NAVIGATION buttons — or, menu open or not, the reload key (**R**,
+  trial (decided), the user menu shows "Restart Time Trial" in its
+  ACTIONS column, right after "Respawn at Checkpoint" — or, menu open or not, the reload key (**R**,
   `UpdateUserMenu` in `hud/user-menu.js`): the melon goes back to the track's start spawn, whole
   and standing still, the clock at zero until it crosses the start line
   again. Not in a heat (a free reset mid-race), in the hub or tutorial;
@@ -453,12 +453,17 @@ run by `race/heat/`):
    input/friction handling for a locked kart and just holds its horizontal
    velocity at zero every tick (vertical velocity is left alone so gravity
    still applies normally) — melons genuinely cannot be driven until this
-   ends. A large, centered "3…2…1…GO" HUD countdown (see `speedometer.xml`'s
-   `countdown_panel`: one image per step, `number-3/2/1.png` and `word-go.png`
-   in `panorama/images/custom_game/`, switched via `Show3`/`Show2`/`Show1`/
-   `ShowGo` classes) counts down for the racers only. `COUNTDOWN_SECONDS`
-   in `race/constants.js` controls the length — there are only images for 3..1,
-   so a longer countdown shows nothing until 3.
+   ends. A large "3…2…1…GO" HUD countdown counts down for the
+   racers only — in HUD text, not images (decided): each number falls in
+   from the top and stays at the golden section below the screen's middle
+   (61.8% from the top); the next one falling in knocks it
+   down out of the picture at the bottom; GO doesn't fall — it appears in
+   the 1's place, small, and grows huge while fading out
+   (`countdown_panel` in `speedometer.xml`, one Label per number with an
+   `In`/`Out` class; rule `CountdownStep`/`CountdownNumberState` in
+   `race/heat/logic.js`, animations in `speedometer.css`). `COUNTDOWN_SECONDS`
+   in `race/constants.js` controls the length — there are only numbers for
+   3..1, so a longer countdown shows nothing until 3.
 4. **RACING** — normal driving, existing checkpoint/lap logic, plus a
    dedicated `finish_<trackId>` script input (registered for every
    `1..MAX_TRACKS`, same pattern as `start_<trackId>`) that's
@@ -478,13 +483,25 @@ run by `race/heat/`):
    place, out of the way, so it doesn't keep re-triggering checkpoints) and
    that player immediately sees the big `word-finish.png` image
    (`finish_image`) until the next heat or the hub, with a countdown
-   under it once BREAK starts (`BREAK_SECONDS` … 0 in the
-   `number-0..9.png` images, `break_countdown`) — it
+   under it once BREAK starts (`BREAK_SECONDS` … 0, `break_countdown` —
+   like the start countdown: same spot and look, each number falling in
+   and knocking the one before it out; `BreakCountdownLabels`) — it
    does **not** end the heat by itself; see next. See "Multiple tracks &
    checkpoints" above for how it and `start_<trackId>` share a trigger.
+   **DNF** (decided): a racer who reaches no new checkpoint and counts no
+   lap for `DNF_NO_PROGRESS_SECONDS` (60) after GO or their last one is out
+   of the Grand Prix — back to the hub like the user menu's "Exit Race",
+   their standings so far kept, no points for this heat. So nobody can
+   block a heat for the others by stopping or getting stuck, however many
+   of them there are. The last `DNF_WARNING_SECONDS` (15) are counted down
+   on their HUD ("NO CHECKPOINT · OUT IN 12", `dnf_warning`, top center).
+   Finished racers are never out. Rules: `WatchProgress`/`DnfSecondsLeft`/
+   `DnfWarningValue` in `race/heat/logic.js`, applied by `UpdateDnf` in
+   `race/heat/race-flow.js`.
 5. **BREAK** — once every kart that started this heat is either `finished`
-   or has disconnected (the latter already drops its kart entry via
-   `OnPlayerDisconnect`, so it can't block the group), the heat is over.
+   or out (disconnected — `OnPlayerDisconnect` drops its kart entry —, left
+   via "Exit Race", or DNF), the heat is over; if nobody finished, it ends
+   like a heat everyone left.
    After a fixed `BREAK_SECONDS` (10, decided) the flow either starts a
    fresh COUNTDOWN on the next track in sequence, or, if that was the last
    track, teleports the whole group to `hub_spawn` and returns to phase
@@ -823,7 +840,10 @@ it was, frozen (`UpdateKart` skips it, physics motion off) — no damage, but
 a running time trial's clock keeps going. Switching off (USE → the same
 button) puts the pawn back on its anchor and the chase camera on the melon.
 A heat starting or a new pawn switches it off. Not while the melon is
-breaking. All of it in `dev/free-look.js`.
+breaking. While it's on, a **ghost avatar** hangs on the flying pawn — a
+copy of the `template_spectator_hat` point_template, at eye height, flying
+along — so the others see who's flying around (the pawn itself is
+invisible). All of it in `dev/free-look.js`.
 
 ## Jump pads (implemented)
 
@@ -1108,8 +1128,3 @@ script). Constants:
 - **Per-track progress**: should a free-roaming melon that switches tracks
   keep its progress on the old one (see "Switching tracks while free
   roaming")? Currently it starts over.
-- **Stragglers**: there's no timeout for a kart that's fallen way behind or
-  gotten stuck mid-heat (see "Hub → race → next-track flow" above) other
-  than disconnecting — the group is blocked until every racer finishes.
-  Worth a "force-finish"/skip vote or a hard timeout once this is actually
-  played with real groups.

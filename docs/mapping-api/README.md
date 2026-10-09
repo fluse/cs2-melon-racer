@@ -96,6 +96,7 @@ names once, when the script first needs the track list.
 | `particle_health_template` | `point_template` | — | [Effect templates](03-effect-templates.md#heal-effect) |
 | `particle_boost_trail_template` | `point_template` | — | [Effect templates](03-effect-templates.md#boost-trail) |
 | `prediction_dot_template` | `point_template` | — | [Effect templates](03-effect-templates.md#prediction-dots) |
+| `template_spectator_hat` | `point_template` | — | [Effect templates](03-effect-templates.md#free-look-avatar) |
 | `particle_podium_confetti` | `info_particle_system` | — | [Hub](05-hub.md#confetti) |
 
 ## All name patterns

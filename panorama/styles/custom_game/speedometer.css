@@ -528,16 +528,25 @@
     }
 }
 
-/* Big centered pre-race countdown ("3", "2", "1", "GO!") — locked karts
-   can't move while this is showing, see UpdateKart's `locked` handling. */
+/* Big pre-race countdown ("3", "2", "1", "GO") — locked karts can't move
+   while this is showing, see UpdateKart's `locked` handling. The break
+   countdown between heats (#break_countdown) uses the same classes.
+   Each number is a Label, collapsed until the script sets "In" or "Out"
+   (ShowCountdown in race/heat/race-flow.js): the current one falls in from
+   the top and stays in the middle; the one before it waits until the new
+   one hits it, then drops out of the picture at the bottom. No transform
+   outside the animations (a resting transform blocks them in Panorama);
+   whole-percent keyframes only. */
 .CountdownPanel {
+    /* Golden section below the middle: the numbers' middle at 61.8% of the
+       HUD's height (1080) from the top — 667px, minus half the panel's
+       300px. */
     horizontal-align: center;
-    vertical-align: center;
-    margin-top: -140px;
-
-    /* Sized for the 256x256 GO image; the 192x192 numbers are centered in it. */
-    width: 256px;
-    height: 256px;
+    vertical-align: top;
+    margin-top: 517px;
+    width: 640px;
+    height: 300px;
+    overflow: noclip; /* the numbers fall in from far above and out far below */
 
     transition-property: opacity;
     transition-duration: .1s;
@@ -548,27 +557,138 @@
     }
 }
 
-.CountdownImage {
+.CountdownNumber {
     horizontal-align: center;
     vertical-align: center;
-    width: 192px;
-    height: 192px;
+    text-align: center;
+    /* The heaviest cut of the game's own font — the only fonts the HUD can
+       load are the game's (Stratum2, Noto); an addon can't ship its own. */
+    font-family: "Stratum2 Black";
+    font-size: 240px;
+    color: white;
+    text-shadow: 6px 6px 8px #000000cc;
     visibility: collapse;
 }
 
-.CountdownGo {
-    width: 256px;
-    height: 256px;
-}
 
-.CountdownPanel.Show3 .Countdown3,
-.CountdownPanel.Show2 .Countdown2,
-.CountdownPanel.Show1 .Countdown1,
-.CountdownPanel.ShowGo .CountdownGo {
+/* The two animations below are timed together (classes set on the same
+   tick): the new number's bottom touches the standing one at .30s, about
+   one number height (220px) above the middle — that's when the standing one
+   starts falling, and from then on it stays at least that far below the new
+   one, which lands at .35s. Retune them together. */
+
+/* Falls in like under gravity: touches the standing number at .30s
+   (-220px), lands at .35s, small bounce. 1% = .004s. */
+.CountdownNumber.In {
     visibility: visible;
+    animation-name: CountdownFallIn;
+    animation-duration: .4s;
+    animation-timing-function: linear;
+    animation-iteration-count: 1;
 }
 
-/* Big centered "FINISH" image, same spot and size as the countdown's GO. */
+/* Stands until the new number touches it (.30s), then is knocked down out
+   of the picture, always a number height below the new one. 3s, much
+   longer than it's shown (the next step collapses it after 1s) — so it
+   never snaps back to the middle. 1% = .03s. */
+.CountdownNumber.Out {
+    visibility: visible;
+    animation-name: CountdownKnockOut;
+    animation-duration: 3s;
+    animation-timing-function: linear;
+    animation-iteration-count: 1;
+}
+
+/* From -900px: high enough to start out of the picture from the panel's
+   spot below the middle. */
+@keyframes 'CountdownFallIn' {
+    0% {
+        transform: translateY(-900px);
+    }
+    25% {
+        transform: translateY(-830px);
+    }
+    50% {
+        transform: translateY(-620px);
+    }
+    70% {
+        transform: translateY(-310px);
+    }
+    75% {
+        transform: translateY(-220px);
+    }
+    88% {
+        transform: translateY(0px);
+    }
+    94% {
+        transform: translateY(-20px);
+    }
+    100% {
+        transform: translateY(0px);
+    }
+}
+
+@keyframes 'CountdownKnockOut' {
+    0% {
+        transform: translateY(0px);
+    }
+    10% {
+        transform: translateY(0px);
+    }
+    11% {
+        transform: translateY(140px);
+    }
+    12% {
+        transform: translateY(250px);
+    }
+    14% {
+        transform: translateY(430px);
+    }
+    16% {
+        transform: translateY(630px);
+    }
+    18% {
+        transform: translateY(860px);
+    }
+    20% {
+        transform: translateY(1100px);
+    }
+    100% {
+        transform: translateY(1100px);
+    }
+}
+
+/* GO doesn't fall in: it appears in the middle in the 1's place (the 1 is
+   gone, see CountdownNumberState), small, pops to full size by .12s, then
+   fades out over .5s, growing all the way to huge (×5) — gone by .62s,
+   before the HUD hides it GO_DISPLAY_SECONDS (.7s) after GO. 2s long so it stays invisible, not
+   back to normal, until then. 1% = .02s. */
+.CountdownNumber.CountdownGo.In {
+    animation-name: CountdownGoShow;
+    animation-duration: 2s;
+    transform-origin: 50% 50%;
+}
+
+@keyframes 'CountdownGoShow' {
+    0% {
+        transform: scale3d(0.2, 0.2, 1);
+        opacity: 1;
+    }
+    6% {
+        transform: scale3d(1.2, 1.2, 1);
+        opacity: 1;
+    }
+    31% {
+        transform: scale3d(5, 5, 1);
+        opacity: 0;
+    }
+    100% {
+        transform: scale3d(5, 5, 1);
+        opacity: 0;
+    }
+}
+
+/* Big centered "FINISH" image, in the countdown's spot. */
 .FinishImage {
     horizontal-align: center;
     vertical-align: center;
@@ -602,45 +722,28 @@
     }
 }
 
-/* Between-heat countdown right under .FinishImage (see #break_countdown):
-   two digit slots side by side, the number images stacked in each and
-   collapsed unless On; the whole tens slot is collapsed below 10, so a
-   single digit stays centered. */
-.BreakCountdown {
+/* #dnf_warning: a racer about to be out for making no progress (UpdateDnf),
+   top center under the checkpoint strip and lap counter. */
+.DnfWarning {
     horizontal-align: center;
-    vertical-align: center;
-    margin-top: 130px;
-    flow-children: right;
-
-    transition-property: opacity;
-    transition-duration: .15s;
-    opacity: 1;
+    vertical-align: top;
+    margin-top: 190px;
+    padding: 8px 22px;
+    font-size: 28px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #ffffff;
+    background-color: #c0262dcc;
+    border-radius: 6px;
+    text-shadow: 2px 2px 3px #000000cc;
 
     &.Hidden {
-        opacity: 0;
+        visibility: collapse;
     }
 }
 
-/* Collapsed (no width, no margin) unless On — from 10 up. */
-.BreakTens {
-    visibility: collapse;
-    /* The number images have empty space at their sides — pull the two digits together. */
-    margin-right: -36px;
-
-    &.On {
-        visibility: visible;
-    }
-}
-
-.BreakDigitImage {
-    width: 128px;
-    height: 128px;
-    visibility: collapse;
-
-    &.On {
-        visibility: visible;
-    }
-}
+/* The between-heat countdown (#break_countdown) is styled like the start
+   countdown: .CountdownPanel / .CountdownNumber above. */
 
 /* Speed panel, bottom center (see UpdateSpeedHud / UpdateHealthHud): the
    km/h readout over the melon's health bar. Sits right on the bottom edge

@@ -14,10 +14,10 @@ const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
 const { GetHubSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
 const flow = await import("../../src/melon_drive/race/heat/race-flow.js");
 const { TryStartRace, TryAbortRace, BeginHeat, FinishKart, UpdateRaceFlow, NextTrackId, CurrentRacers, RestoreRaceFlowSnapshot } = flow;
-const { CountdownDigits } = await import("../../src/melon_drive/race/heat/logic.js");
 const {
     MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, SPEED_HUD_ENTITY_NAME, StartSpawnName,
     RacePhase, COUNTDOWN_SECONDS, GO_DISPLAY_SECONDS, BREAK_SECONDS, RACE_SPAWN_LATERAL_SPACING, MELON_MAX_HEALTH,
+    DNF_NO_PROGRESS_SECONDS, DNF_WARNING_SECONDS,
 } = await import("../../src/melon_drive/constants/index.js");
 
 // Two tracks with a gap in their ids — the order is by id, not 1, 2, 3, …
@@ -148,16 +148,19 @@ test("racers line up side by side, RACE_SPAWN_LATERAL_SPACING apart across the s
 test("the countdown shows 3, 2, 1, then GO unlocks the racers; GO stays up GO_DISPLAY_SECONDS", () => {
     const [a] = kartList;
     StartHeatWith([a], 100);
-    const shown = () => ["Show3", "Show2", "Show1", "ShowGo"].filter((cls) => hud.Has(0, "countdown_panel", cls));
+    const ids = ["count_3", "count_2", "count_1", "count_go"];
+    /** The numbers standing in the middle, and those being knocked out. */
+    const shown = () => ({ in: ids.filter((id) => hud.Has(0, id, "In")), out: ids.filter((id) => hud.Has(0, id, "Out")) });
 
     for (let n = COUNTDOWN_SECONDS; n >= 1; n--) {
         Tick(100 + COUNTDOWN_SECONDS - n + 0.5);
         assert.equal(hud.Has(0, "countdown_panel", "Hidden"), false);
-        assert.deepEqual(shown(), n <= 3 ? [`Show${n}`] : [], `${n} seconds left`);
+        const expected = n <= 3 ? { in: [`count_${n}`], out: n < 3 ? [`count_${n + 1}`] : [] } : { in: [], out: [] };
+        assert.deepEqual(shown(), expected, `${n} seconds left: ${n} in, the one before knocked out`);
         assert.equal(a.locked, true);
     }
     Tick(100 + COUNTDOWN_SECONDS);
-    assert.deepEqual(shown(), ["ShowGo"]);
+    assert.deepEqual(shown(), { in: ["count_go"], out: [] }, "GO in the 1's place");
     assert.equal(flow.phase, RacePhase.RACING);
     assert.equal(a.locked, false, "GO");
 
@@ -184,25 +187,28 @@ test("the heat waits for every racer to finish, then breaks for BREAK_SECONDS", 
     assert.equal(flow.phaseEndTime, 60 + BREAK_SECONDS);
 });
 
-test("the break counts BREAK_SECONDS down in digit images under the finish image", () => {
+test("the break counts BREAK_SECONDS down like the start countdown: each number falls in, knocking out the one before", () => {
     const [a] = kartList;
     StartHeatWith([a]);
     RunCountdown(COUNTDOWN_SECONDS);
     FinishKart(a);
     Tick(20); // -> BREAK
-    const onDigits = (place) => [...Array(10).keys()].filter((d) => hud.Has(0, `break_${place}_${d}`, "On"));
+    const ids = ["break_num_0", "break_num_1"];
+    /** The number falling in / standing, and the Label being knocked out. */
+    const shown = () => {
+        const inId = ids.find((id) => hud.Has(0, id, "In"));
+        return { in: inId && hud.Variable(0, inId, "n"), out: ids.filter((id) => hud.Has(0, id, "Out")).length };
+    };
 
     Tick(20.01);
-    const first = CountdownDigits(BREAK_SECONDS);
     assert.equal(hud.Has(0, "break_countdown", "Hidden"), false);
-    assert.deepEqual(onDigits("ones"), [first.ones]);
-    assert.deepEqual(onDigits("tens"), first.tens === undefined ? [] : [first.tens]);
-    assert.equal(hud.Has(0, "break_tens", "On"), first.tens !== undefined);
+    assert.deepEqual(shown(), { in: String(BREAK_SECONDS), out: 0 }, "the first number: nothing to knock out");
+
+    Tick(20 + 1.01);
+    assert.deepEqual(shown(), { in: String(BREAK_SECONDS - 1), out: 1 }, "the next knocks it out");
 
     Tick(20 + BREAK_SECONDS - 1.2);
-    assert.deepEqual(onDigits("ones"), [1]);
-    assert.deepEqual(onDigits("tens"), [], "no leading zero");
-    assert.equal(hud.Has(0, "break_tens", "On"), false);
+    assert.equal(shown().in, "1");
 });
 
 test("after the break the next track (by trackId) starts with a fresh countdown", () => {
@@ -308,4 +314,47 @@ test("a racer whose melon is gone mid-break still gets its spot on the grid for 
     assert.equal(flow.phase, RacePhase.COUNTDOWN, "doesn't throw on the dead melon");
     assert.notDeepEqual(a.checkpointPosition, b.checkpointPosition, "its own lined-up spot to respawn at");
     TryAbortRace();
+});
+
+test("DNF: a racer without a new checkpoint for DNF_NO_PROGRESS_SECONDS is out, back in the hub; the others race on", () => {
+    const [a, b] = kartList;
+    StartHeatWith([a, b]);
+    const go = COUNTDOWN_SECONDS;
+    RunCountdown(go);
+
+    Tick(go + DNF_NO_PROGRESS_SECONDS - DNF_WARNING_SECONDS - 1);
+    assert.equal(hud.Has(0, "dnf_warning", "Hidden"), true, "no warning yet");
+    b.checkpointIndex = 1; // b makes progress, a doesn't
+    Tick(go + DNF_NO_PROGRESS_SECONDS - 5);
+    assert.equal(hud.Has(0, "dnf_warning", "Hidden"), false, "a is warned");
+    assert.equal(hud.Variable(0, "dnf_warning", "dnf"), "5");
+    assert.equal(hud.Has(1, "dnf_warning", "Hidden"), true, "b's clock started over at its checkpoint");
+
+    Tick(go + DNF_NO_PROGRESS_SECONDS);
+    assert.equal(a.racing, false, "a is out");
+    assert.ok(DistanceToHub(a) < 1000, "back in the hub");
+    assert.equal(hud.Has(0, "dnf_warning", "Hidden"), true, "warning gone");
+    assert.equal(b.racing, true, "b races on");
+    assert.equal(flow.phase, RacePhase.RACING);
+
+    FinishKart(b);
+    Tick(go + DNF_NO_PROGRESS_SECONDS + 1);
+    assert.equal(flow.phase, RacePhase.BREAK, "the heat ends with b's finish — a doesn't hold it up");
+});
+
+test("DNF: a finished racer is never out; everyone out ends the heat like everyone leaving", () => {
+    const [a, b] = kartList;
+    StartHeatWith([a, b]);
+    RunCountdown(COUNTDOWN_SECONDS);
+    FinishKart(a);
+    Tick(COUNTDOWN_SECONDS + DNF_NO_PROGRESS_SECONDS);
+    assert.equal(a.racing, true, "a finished: still in the Grand Prix");
+    assert.equal(b.racing, false, "b is out");
+    assert.equal(flow.phase, RacePhase.BREAK);
+    TryAbortRace();
+
+    StartHeatWith([a, b], 100);
+    RunCountdown(100 + COUNTDOWN_SECONDS);
+    Tick(100 + COUNTDOWN_SECONDS + DNF_NO_PROGRESS_SECONDS);
+    assert.equal(flow.phase, RacePhase.HUB, "nobody left racing");
 });

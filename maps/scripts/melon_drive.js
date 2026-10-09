@@ -62,6 +62,8 @@ function TraceSphere(config) {
  *   health: number, lastVelocity: { x: number, y: number, z: number } | undefined,
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
+ *   progressWatch?: { checkpoint: number, laps: number, since: number }, // racing: when this racer last made progress, for the DNF rule — see WatchProgress in race/heat/logic.js
+ *   dnfShown?: number, dnfResendAt?: number, // what the dnf_warning shows (undefined: hidden) and when it's sent again — see UpdateDnf in race/heat/race-flow.js
  *   runStartTime?: number, // game time this kart's timed run started (unset: no run) — see race/time-trial/time-trial.js
  *   lastRun?: { trackId: number, time: number, newBest: boolean, at: number }, // last finished run, for the HUD
  *   finishRestartAt?: number, // game time a free-roaming finish sent the melon back to the start — see FINISH_RESTART_START_GUARD
@@ -96,6 +98,7 @@ function TraceSphere(config) {
  *   testPreview?: { kind: "countdown" | "finish" | "intro", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
+ *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
@@ -174,6 +177,11 @@ function DropKart(slot, kart) {
         kart.melon.Remove();
     }
     for (const entity of kart.boostTrail?.entities ?? []) {
+        if (entity.IsValid()) {
+            entity.Remove();
+        }
+    }
+    for (const entity of kart.spectatorHat ?? []) {
         if (entity.IsValid()) {
             entity.Remove();
         }
@@ -901,8 +909,15 @@ const RacePhase = /** @type {const} */ ({
 const HUB_TRIGGER_NAME = "hub_start_trigger";
 
 const COUNTDOWN_SECONDS = 3;
-const GO_DISPLAY_SECONDS = 1; // how long "GO!" stays on screen once the countdown ends
+const GO_DISPLAY_SECONDS = 0.7; // how long "GO" stays on screen once the countdown ends — its grow-and-fade (speedometer.css) is done by .62s
 const BREAK_SECONDS = 10; // fixed by the original request
+// A racer who reaches no new checkpoint (and counts no lap) for this long
+// after GO or their last one is out of the Grand Prix (DNF) and back in the
+// hub — so one player who stops driving can't block a heat for everyone.
+const DNF_NO_PROGRESS_SECONDS = 60;
+// The last this-many seconds of that are counted down on the racer's HUD
+// (dnf_warning), so it doesn't come as a surprise.
+const DNF_WARNING_SECONDS = 15;
 // Spacing between racers teleported onto the same start line side-by-side,
 // so they don't spawn stacked on top of each other.
 const RACE_SPAWN_LATERAL_SPACING = 120;
@@ -1352,6 +1367,17 @@ const HEARTBEAT_INTERVAL = 1; // seconds
 // Switching it on puts those eyes where the chase camera was: the pawn's
 // origin goes FREE_LOOK_EYE_HEIGHT below that spot (CS2's standing eye height).
 const FREE_LOOK_EYE_HEIGHT = 64;
+
+// The ghost avatar of a free-looking player: a fresh copy of this
+// point_template's entities (e.g. a hat prop_dynamic, "Not solid") hangs on
+// their flying pawn while free look is on — the pawn itself is invisible, so
+// it shows the others who's flying around. Optional: without it, no avatar.
+const SPECTATOR_HAT_TEMPLATE_NAME = "template_spectator_hat";
+// Where it hangs: this far above the pawn's origin (its feet) — at its eyes.
+const SPECTATOR_HAT_HEIGHT = FREE_LOOK_EYE_HEIGHT;
+// …and this far behind the eyes, against the view's yaw — so the player's
+// own camera (at the eyes) doesn't look out through it.
+const SPECTATOR_HAT_BACK = 48;
 
 // Movers: a func_movelinear whose name starts with "mover" goes back and
 // forth on its own — the script starts it (Open) when the map loads and
@@ -2847,6 +2873,120 @@ function HideMelonGlow(kart) {
     }
 }
 
+// Particle effects from point_templates, the one way every effect in
+// melon_drive is spawned: the break burst (health/breaking/effects.js), the
+// PERFECT spark (movement/wall-bounce/wall-bounce.js), the heal sparkle (health/heal/effect.js)
+// and the boost trail (fx/boost-trail/boost-trail.js).
+// Tested against the fake engine in test/fx/particles.test.mjs.
+//
+// Two engine quirks every caller would otherwise have to know about:
+// - ForceSpawn keeps each templated entity's Hammer offset from its
+//   point_template, so without moving them the effect plays wherever the
+//   template happens to sit relative to it (see PlaceAll).
+// - "Start Active" alone doesn't reliably play an info_particle_system
+//   spawned later from a point_template — it's started explicitly
+//   (StartParticles).
+
+/**
+ * A fresh copy of the named point_template's entities, spawned at
+ * `position` — still at their Hammer offsets, not started yet.
+ * @param {string} templateName @param {any} position @param {any} [angles]
+ * @param {{ warn?: boolean }} [options] warn: report a missing/broken
+ *   template with Instance.Msg (always in the console) instead of Debug —
+ *   for effects that are part of the map's contract, where silently
+ *   spawning nothing is the bug.
+ * @returns {any[]} empty if nothing spawned
+ */
+function SpawnFromTemplate(templateName, position, angles, { warn = false } = {}) {
+    const report = warn ? (/** @type {string} */ text) => Instance.Msg(`[melon_drive] ${text}`) : Debug;
+    const template = Instance.FindEntityByName(templateName);
+    if (!template) {
+        report(`SpawnFromTemplate: no point_template named "${templateName}" in the map`);
+        return [];
+    }
+    if (!(template instanceof PointTemplate)) {
+        report(`SpawnFromTemplate: "${templateName}" is a ${template.GetClassName()}, not a point_template`);
+        return [];
+    }
+    const spawned = template.ForceSpawn(position, angles) ?? [];
+    if (spawned.length === 0) {
+        report(`SpawnFromTemplate: ForceSpawn of "${templateName}" returned nothing — check its Template01.. entries in Hammer`);
+    }
+    return spawned;
+}
+
+/** @param {any} entity */
+function IsParticleSystem(entity) {
+    return entity.GetClassName() === "info_particle_system";
+}
+
+/** Moves every entity exactly onto `position` (undoing ForceSpawn's Hammer offsets). @param {any[]} entities @param {any} position */
+function PlaceAll(entities, position) {
+    for (const entity of entities) {
+        entity.Teleport({ position });
+    }
+}
+
+/** Starts every info_particle_system among `entities`. @param {any[]} entities */
+function StartParticles(entities) {
+    for (const entity of entities) {
+        if (IsParticleSystem(entity)) {
+            Instance.EntFireAtTarget({ target: entity, input: "Start" });
+        }
+    }
+}
+
+/**
+ * Stops every info_particle_system among `entities` that's still around:
+ * no new particles, the ones already out play to the end of their lifetime.
+ * @param {any[]} entities
+ */
+function StopParticles(entities) {
+    for (const entity of entities) {
+        if (entity.IsValid() && IsParticleSystem(entity)) {
+            Instance.EntFireAtTarget({ target: entity, input: "Stop" });
+        }
+    }
+}
+
+/**
+ * Removes `entities` after `seconds` (those still around — a parented one
+ * goes with its parent if that's removed first). Removing an
+ * info_particle_system ends its particles, so `seconds` must cover the
+ * effect's own duration.
+ * @param {any[]} entities @param {number} seconds
+ */
+function RemoveAfter(entities, seconds) {
+    Instance.Delay(seconds).then(() => {
+        for (const entity of entities) {
+            if (entity.IsValid()) {
+                entity.Remove();
+            }
+        }
+    });
+}
+
+/**
+ * The whole short-lived effect in one call: a fresh copy of the template,
+ * placed exactly at `position`, optionally riding along on `parent`,
+ * started, and removed after `lifetime` seconds.
+ * @param {string} templateName @param {any} position
+ * @param {{ lifetime: number, parent?: any, angles?: any, warn?: boolean }} options
+ * @returns {any[]} the spawned entities (empty if nothing spawned)
+ */
+function PlayParticleTemplate(templateName, position, { lifetime, parent, angles, warn }) {
+    const spawned = SpawnFromTemplate(templateName, position, angles, { warn });
+    PlaceAll(spawned, position);
+    if (parent) {
+        for (const entity of spawned) {
+            entity.SetParent(parent);
+        }
+    }
+    StartParticles(spawned);
+    RemoveAfter(spawned, lifetime);
+    return spawned;
+}
+
 // Free look: fly through the map with the player's own pawn instead of
 // driving. Toggled per player from the user menu (kart.freeLook, see
 // SetFreeLook); off by default. The pawn is NOCLIP anyway (FreezePawn), so
@@ -2854,7 +2994,9 @@ function HideMelonGlow(kart) {
 // flies it along the view, and the camera shows its eyes (DISABLED mode)
 // instead of chasing the melon. The melon waits where it was, frozen
 // (UpdateKart skips it; physics motion off), and switching back puts the
-// pawn back on its anchor and the chase camera back on the melon.
+// pawn back on its anchor and the chase camera back on the melon. While
+// it's on, a ghost avatar (SPECTATOR_HAT_TEMPLATE_NAME) hangs on the flying
+// pawn so the others see who it is.
 
 /** @param {import("../core/kart-registry.js").Kart} kart */
 function IsFreeLookOn(kart) {
@@ -2884,18 +3026,90 @@ function SetFreeLook(kart, on) {
     kart.lastVelocity = undefined;
     kart.prevLastVelocity = undefined;
     kart.settled = false;
+    RemoveSpectatorHat(kart);
     if (!kart.pawn.IsValid()) {
         return on;
     }
     if (on) {
         kart.pawn.Teleport({ position: ChaseCameraFeet(kart), velocity: { x: 0, y: 0, z: 0 } });
         kart.pawn.GetCustomCamera().SetMode(CustomCameraMode.DISABLED);
+        AttachSpectatorHat(kart);
     } else {
         kart.pawn.Teleport({ position: kart.pawnAnchor, velocity: { x: 0, y: 0, z: 0 } });
         ApplyCameraFollow(kart);
     }
     Debug(`SetFreeLook: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} free look ${on ? "on" : "off"}`);
     return on;
+}
+
+/**
+ * Hangs a fresh copy of the SPECTATOR_HAT_TEMPLATE_NAME template on the
+ * free-looking pawn (see SpectatorHatPose). Nothing if the map has no such
+ * template.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function AttachSpectatorHat(kart) {
+    const { position, angles } = SpectatorHatPose(kart);
+    const hat = SpawnFromTemplate(SPECTATOR_HAT_TEMPLATE_NAME, position, angles);
+    for (const entity of hat) {
+        entity.Teleport({ position, angles }); // ForceSpawn keeps its Hammer offset from the template
+        // In case it's left solid in Hammer: the melons' traces and other
+        // melons mustn't bump into a flying hat.
+        Instance.EntFireAtTarget({ target: entity, input: "DisableCollision" });
+    }
+    kart.spectatorHat = hat;
+}
+
+/**
+ * Keeps the ghost avatar on the flying pawn, every tick while free look is
+ * on. Moved by script, not parented: parented to the pawn it ended up right
+ * in the player's own camera, whatever offset it was given.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function UpdateSpectatorHat(kart) {
+    if (!kart.spectatorHat || !kart.pawn.IsValid()) {
+        return;
+    }
+    const pose = SpectatorHatPose(kart);
+    for (const entity of kart.spectatorHat) {
+        if (entity.IsValid()) {
+            entity.Move(pose);
+        }
+    }
+}
+
+/**
+ * Where the ghost avatar hangs: SPECTATOR_HAT_HEIGHT above the pawn's feet
+ * and SPECTATOR_HAT_BACK behind its eyes along the view's yaw (so the
+ * player's own camera doesn't look out through it), facing the view.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function SpectatorHatPose(kart) {
+    const feet = kart.pawn.GetAbsOrigin();
+    const yaw = kart.pawn.GetEyeAngles().yaw;
+    const rad = yaw * Math.PI / 180;
+    return {
+        position: {
+            x: feet.x - Math.cos(rad) * SPECTATOR_HAT_BACK,
+            y: feet.y - Math.sin(rad) * SPECTATOR_HAT_BACK,
+            z: feet.z + SPECTATOR_HAT_HEIGHT,
+        },
+        angles: { pitch: 0, yaw, roll: 0 },
+    };
+}
+
+/**
+ * Removes the free-look ghost avatar, if any — free look off, a new pawn
+ * (SetFreeLook), or the player leaving (DropKart does the same).
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function RemoveSpectatorHat(kart) {
+    for (const entity of kart.spectatorHat ?? []) {
+        if (entity.IsValid()) {
+            entity.Remove();
+        }
+    }
+    kart.spectatorHat = undefined;
 }
 
 /**
@@ -3665,120 +3879,6 @@ function UpdateMomentum(momentum, horizSpeed, now, boosted) {
     const chained = momentum.lastHitTime !== undefined && now - momentum.lastHitTime <= MOMENTUM_HIT_WINDOW;
     const steps = chained ? Math.min(momentum.steps + 1, MOMENTUM_MAX_STEPS) : momentum.steps;
     return { steps, armed: false, lastHitTime: now };
-}
-
-// Particle effects from point_templates, the one way every effect in
-// melon_drive is spawned: the break burst (health/breaking/effects.js), the
-// PERFECT spark (movement/wall-bounce/wall-bounce.js), the heal sparkle (health/heal/effect.js)
-// and the boost trail (fx/boost-trail/boost-trail.js).
-// Tested against the fake engine in test/fx/particles.test.mjs.
-//
-// Two engine quirks every caller would otherwise have to know about:
-// - ForceSpawn keeps each templated entity's Hammer offset from its
-//   point_template, so without moving them the effect plays wherever the
-//   template happens to sit relative to it (see PlaceAll).
-// - "Start Active" alone doesn't reliably play an info_particle_system
-//   spawned later from a point_template — it's started explicitly
-//   (StartParticles).
-
-/**
- * A fresh copy of the named point_template's entities, spawned at
- * `position` — still at their Hammer offsets, not started yet.
- * @param {string} templateName @param {any} position @param {any} [angles]
- * @param {{ warn?: boolean }} [options] warn: report a missing/broken
- *   template with Instance.Msg (always in the console) instead of Debug —
- *   for effects that are part of the map's contract, where silently
- *   spawning nothing is the bug.
- * @returns {any[]} empty if nothing spawned
- */
-function SpawnFromTemplate(templateName, position, angles, { warn = false } = {}) {
-    const report = warn ? (/** @type {string} */ text) => Instance.Msg(`[melon_drive] ${text}`) : Debug;
-    const template = Instance.FindEntityByName(templateName);
-    if (!template) {
-        report(`SpawnFromTemplate: no point_template named "${templateName}" in the map`);
-        return [];
-    }
-    if (!(template instanceof PointTemplate)) {
-        report(`SpawnFromTemplate: "${templateName}" is a ${template.GetClassName()}, not a point_template`);
-        return [];
-    }
-    const spawned = template.ForceSpawn(position, angles) ?? [];
-    if (spawned.length === 0) {
-        report(`SpawnFromTemplate: ForceSpawn of "${templateName}" returned nothing — check its Template01.. entries in Hammer`);
-    }
-    return spawned;
-}
-
-/** @param {any} entity */
-function IsParticleSystem(entity) {
-    return entity.GetClassName() === "info_particle_system";
-}
-
-/** Moves every entity exactly onto `position` (undoing ForceSpawn's Hammer offsets). @param {any[]} entities @param {any} position */
-function PlaceAll(entities, position) {
-    for (const entity of entities) {
-        entity.Teleport({ position });
-    }
-}
-
-/** Starts every info_particle_system among `entities`. @param {any[]} entities */
-function StartParticles(entities) {
-    for (const entity of entities) {
-        if (IsParticleSystem(entity)) {
-            Instance.EntFireAtTarget({ target: entity, input: "Start" });
-        }
-    }
-}
-
-/**
- * Stops every info_particle_system among `entities` that's still around:
- * no new particles, the ones already out play to the end of their lifetime.
- * @param {any[]} entities
- */
-function StopParticles(entities) {
-    for (const entity of entities) {
-        if (entity.IsValid() && IsParticleSystem(entity)) {
-            Instance.EntFireAtTarget({ target: entity, input: "Stop" });
-        }
-    }
-}
-
-/**
- * Removes `entities` after `seconds` (those still around — a parented one
- * goes with its parent if that's removed first). Removing an
- * info_particle_system ends its particles, so `seconds` must cover the
- * effect's own duration.
- * @param {any[]} entities @param {number} seconds
- */
-function RemoveAfter(entities, seconds) {
-    Instance.Delay(seconds).then(() => {
-        for (const entity of entities) {
-            if (entity.IsValid()) {
-                entity.Remove();
-            }
-        }
-    });
-}
-
-/**
- * The whole short-lived effect in one call: a fresh copy of the template,
- * placed exactly at `position`, optionally riding along on `parent`,
- * started, and removed after `lifetime` seconds.
- * @param {string} templateName @param {any} position
- * @param {{ lifetime: number, parent?: any, angles?: any, warn?: boolean }} options
- * @returns {any[]} the spawned entities (empty if nothing spawned)
- */
-function PlayParticleTemplate(templateName, position, { lifetime, parent, angles, warn }) {
-    const spawned = SpawnFromTemplate(templateName, position, angles, { warn });
-    PlaceAll(spawned, position);
-    if (parent) {
-        for (const entity of spawned) {
-            entity.SetParent(parent);
-        }
-    }
-    StartParticles(spawned);
-    RemoveAfter(spawned, lifetime);
-    return spawned;
 }
 
 // Pure health-bar math — no cs_script import, so it's unit-testable in
@@ -6143,14 +6243,87 @@ function BreakCountdownValue(remaining) {
 }
 
 /**
- * The digit images that show `value`: tens undefined below 10 (no leading
- * zero), at most two digits (above 99 shows 99).
- * @param {number} value
- * @returns {{ tens: number | undefined, ones: number }}
+ * Which step of the pre-race countdown shows `remaining` seconds before GO:
+ * 0 = "3", 1 = "2", 2 = "1", 3 = "GO" (at and after GO). Undefined above 3
+ * seconds — there's no number for those (COUNTDOWN_SECONDS > 3 shows nothing
+ * until 3).
+ * @param {number} remaining
+ * @returns {number | undefined}
  */
-function CountdownDigits(value) {
-    const clamped = Math.min(99, Math.max(0, Math.floor(value)));
-    return { tens: clamped >= 10 ? Math.floor(clamped / 10) : undefined, ones: clamped % 10 };
+function CountdownStep(remaining) {
+    if (remaining <= 0) {
+        return 3;
+    }
+    const seconds = Math.ceil(remaining);
+    return seconds <= 3 ? 3 - seconds : undefined;
+}
+
+/**
+ * What the countdown's number `index` (0 = "3" … 3 = "GO") does while step
+ * `step` is showing: "In" — it's the current one, falling in from the top
+ * and standing in the middle (GO instead grows from small to huge, fading
+ * out); "Out" — the one before it, knocked down out of the picture by the
+ * current one landing; undefined — not shown. GO doesn't fall in, so it
+ * knocks nothing out: the 1 is simply gone when GO appears in its place.
+ * @param {number} index @param {number | undefined} step see CountdownStep
+ * @returns {"In" | "Out" | undefined}
+ */
+function CountdownNumberState(index, step) {
+    if (step === undefined) {
+        return undefined;
+    }
+    if (index === step) {
+        return "In";
+    }
+    return index === step - 1 && step < 3 ? "Out" : undefined;
+}
+
+/**
+ * The break countdown's two number Labels take turns (the numbers change
+ * every second, so there's no Label per number like the start countdown's):
+ * `value` falls in on Label `value % 2` ("In"), and the other one — still
+ * showing value + 1 — is knocked out ("Out"), but only if that was the
+ * number shown just before (not on the first one).
+ * @param {number} value the number now, see BreakCountdownValue
+ * @param {number | undefined} previous the number shown before it, if any
+ * @returns {{ in: number, out: number | undefined }} Label indexes, 0 or 1
+ */
+function BreakCountdownLabels(value, previous) {
+    return { in: value % 2, out: previous === value + 1 ? (value + 1) % 2 : undefined };
+}
+
+/**
+ * Keeps track of when a racer last made progress (a new checkpoint or a
+ * lap): returns `watch` unchanged while `checkpoint`/`laps` are the same as
+ * it saw, else a fresh watch starting at `now`. Start one at GO with
+ * `watch` undefined.
+ * @param {{ checkpoint: number, laps: number, since: number } | undefined} watch
+ * @param {number} checkpoint @param {number} laps @param {number} now
+ */
+function WatchProgress(watch, checkpoint, laps, now) {
+    if (watch && watch.checkpoint === checkpoint && watch.laps === laps) {
+        return watch;
+    }
+    return { checkpoint, laps, since: now };
+}
+
+/**
+ * Seconds a racer has left to make progress before they're out (DNF) — at
+ * or below 0 they are. @param {{ since: number }} watch @param {number} now
+ * @param {number} limit DNF_NO_PROGRESS_SECONDS
+ */
+function DnfSecondsLeft(watch, now, limit) {
+    return limit - (now - watch.since);
+}
+
+/**
+ * What the racer's dnf_warning shows `left` seconds before they're out: the
+ * whole seconds, rounded up (so it never shows 0 while still racing), only
+ * within the last `warning` seconds — undefined before that.
+ * @param {number} left see DnfSecondsLeft @param {number} warning DNF_WARNING_SECONDS
+ */
+function DnfWarningValue(left, warning) {
+    return left > 0 && left <= warning ? Math.ceil(left) : undefined;
 }
 
 // The podium in the hub: once a Grand Prix has run to its last track and the
@@ -6256,36 +6429,43 @@ let activeTrackId = undefined;
 /** GetGameTime() at which the current COUNTDOWN/BREAK phase should end. */
 let phaseEndTime = 0;
 
-/** One class per countdown image on the HUD's countdown_panel (see
- * speedometer.xml/.css) — exactly one is set at a time. There's no image for
- * values above 3, so a COUNTDOWN_SECONDS > 3 shows nothing until 3.
+/** The countdown's numbers in countdown_panel (speedometer.xml), in order —
+ * index = CountdownStep. Each gets "In" or "Out" (CountdownNumberState),
+ * which plays its fall in / knock out animation (speedometer.css).
  */
-const COUNTDOWN_SHOW_CLASSES = ["Show3", "Show2", "Show1", "ShowGo"];
+const COUNTDOWN_NUMBER_IDS = ["count_3", "count_2", "count_1", "count_go"];
 
-/** Number the BREAK countdown last sent to each slot — the digit images are
- * only re-sent when it changes (one class per image, see speedometer.xml).
+/** Number the BREAK countdown last sent to each slot — only re-sent when
+ * it changes, each change being one number falling in.
  * @type {Map<number, number>} */
 const breakCountdownShown = new Map();
 
+/** The break countdown's two number Labels, taking turns — see BreakCountdownLabels. */
+const BREAK_NUMBER_IDS = ["break_num_0", "break_num_1"];
+
 /**
- * Shows `value` on one player's break_countdown (number-0..9 images, a tens
- * digit only from 10 up), or hides it with `value` undefined.
+ * Shows `value` on one player's break_countdown like the start countdown:
+ * it falls in, knocking out the number before it (see BreakCountdownLabels).
+ * Hidden with `value` undefined.
  * @param {number} slot @param {number | undefined} value
  */
 function SetBreakCountdown(slot, value) {
     const hud = GetSpeedHud();
+    const previous = breakCountdownShown.get(slot);
     if (value === undefined) {
         breakCountdownShown.delete(slot);
     } else {
         breakCountdownShown.set(slot, value);
     }
-    const digits = value === undefined ? undefined : CountdownDigits(value);
     hud?.SetHasClassForPlayer(slot, "break_countdown", "Hidden", value === undefined);
-    hud?.SetHasClassForPlayer(slot, "break_tens", "On", digits?.tens !== undefined);
-    for (let d = 0; d <= 9; d++) {
-        hud?.SetHasClassForPlayer(slot, `break_tens_${d}`, "On", digits?.tens === d);
-        hud?.SetHasClassForPlayer(slot, `break_ones_${d}`, "On", digits?.ones === d);
-    }
+    const labels = value === undefined ? undefined : BreakCountdownLabels(value, previous);
+    BREAK_NUMBER_IDS.forEach((id, index) => {
+        if (labels?.in === index) {
+            hud?.SetDialogVariableStringForPlayer(slot, id, "n", String(value));
+        }
+        hud?.SetHasClassForPlayer(slot, id, "In", labels?.in === index);
+        hud?.SetHasClassForPlayer(slot, id, "Out", labels?.out === index);
+    });
 }
 
 /**
@@ -6432,6 +6612,8 @@ function BeginHeat(trackId) {
         CancelRun(kart); // a free-roaming run doesn't carry into the heat — its clock starts at GO
         kart.finished = false;
         kart.locked = true;
+        kart.progressWatch = undefined; // the DNF clock starts at GO
+        HideDnfWarning(kart);
         kart.podium = undefined; // off the podium into the next Grand Prix
         EndTestPreview(kart); // the real countdown takes over its HUD
         // Its own lined-up spot, not the start line's center — a respawn
@@ -6506,6 +6688,8 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.racing = false;
         kart.finished = false;
         kart.locked = false;
+        kart.progressWatch = undefined;
+        HideDnfWarning(kart);
         kart.podium = undefined; // the hub/tutorial button takes a melon down from the podium too
         EndTestPreview(kart); // the melon is let go just above
         // kart.inHub (and the hub modal) is deliberately left to the
@@ -6560,15 +6744,19 @@ function SendKartsOutOfRace(returning, spawn, label) {
 }
 
 /**
- * Shows one player's countdown_panel at `showClass` (one of
- * COUNTDOWN_SHOW_CLASSES). @param {number} slot @param {string} showClass
+ * Shows one player's countdown `remaining` seconds before GO: the current
+ * number falling in / standing, the one before it knocked out (see
+ * CountdownNumberState). @param {number} slot @param {number} remaining
  */
-function ShowCountdown(slot, showClass) {
+function ShowCountdown(slot, remaining) {
     const hud = GetSpeedHud();
+    const step = CountdownStep(remaining);
     hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", false);
-    for (const cls of COUNTDOWN_SHOW_CLASSES) {
-        hud?.SetHasClassForPlayer(slot, "countdown_panel", cls, cls === showClass);
-    }
+    COUNTDOWN_NUMBER_IDS.forEach((id, index) => {
+        const state = CountdownNumberState(index, step);
+        hud?.SetHasClassForPlayer(slot, id, "In", state === "In");
+        hud?.SetHasClassForPlayer(slot, id, "Out", state === "Out");
+    });
 }
 
 /**
@@ -6672,7 +6860,7 @@ function UpdateTestPreviews(now) {
             }
             if (remaining > -GO_DISPLAY_SECONDS) {
                 if (slot !== undefined) {
-                    ShowCountdown(slot, remaining > 0 ? `Show${Math.ceil(remaining)}` : "ShowGo");
+                    ShowCountdown(slot, remaining);
                 }
                 continue;
             }
@@ -6690,6 +6878,60 @@ function UpdateTestPreviews(now) {
         EndTestPreview(kart);
         kart.locked = false;
     }
+}
+
+/**
+ * The DNF rule (DNF_NO_PROGRESS_SECONDS): a racer who hasn't reached a new
+ * checkpoint or counted a lap for that long since GO or their last one is
+ * out — back to the hub like the user menu's "Exit Race", their Grand Prix
+ * standings so far kept. So nobody can hold up a heat for the others by
+ * stopping (or getting stuck); if every racer is out, the heat ends like
+ * one everyone left. The last DNF_WARNING_SECONDS are counted down on
+ * their HUD (dnf_warning). Finished racers are left alone.
+ * @param {import("../../core/kart-registry.js").Kart[]} racers @param {number} now
+ */
+function UpdateDnf(racers, now) {
+    for (const kart of racers) {
+        if (kart.finished) {
+            SetDnfWarning(kart, undefined, now);
+            continue;
+        }
+        kart.progressWatch = WatchProgress(kart.progressWatch, kart.checkpointIndex, kart.lapsCompleted, now);
+        const left = DnfSecondsLeft(kart.progressWatch, now, DNF_NO_PROGRESS_SECONDS);
+        if (left <= 0) {
+            Debug(`UpdateDnf: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} made no progress for ${DNF_NO_PROGRESS_SECONDS}s on track ${activeTrackId} — DNF, back to the hub`);
+            ReturnAllToHub([kart]);
+            continue;
+        }
+        SetDnfWarning(kart, DnfWarningValue(left, DNF_WARNING_SECONDS), now);
+    }
+}
+
+/**
+ * Shows `value` seconds on one racer's dnf_warning (hidden with undefined) —
+ * sent on change, and again every HUD_RESEND_SECONDS.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number | undefined} value @param {number} now
+ */
+function SetDnfWarning(kart, value, now) {
+    if (value === kart.dnfShown && now < (kart.dnfResendAt ?? 0)) {
+        return;
+    }
+    kart.dnfShown = value;
+    kart.dnfResendAt = now + HUD_RESEND_SECONDS;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot === undefined) {
+        return;
+    }
+    if (value !== undefined) {
+        GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "dnf_warning", "dnf", String(value));
+    }
+    GetSpeedHud()?.SetHasClassForPlayer(slot, "dnf_warning", "Hidden", value === undefined);
+}
+
+/** Hides a racer's dnf_warning right away — a new heat, or out of the race. @param {import("../../core/kart-registry.js").Kart} kart */
+function HideDnfWarning(kart) {
+    kart.dnfResendAt = undefined;
+    SetDnfWarning(kart, undefined, Instance.GetGameTime());
 }
 
 /** Drives the COUNTDOWN/RACING/BREAK timers and transitions — called once per Think tick (see core/think.js). */
@@ -6713,17 +6955,17 @@ function UpdateRaceFlow(now) {
             return;
         }
         const remaining = phaseEndTime - now;
-        const showClass = remaining > 0 ? `Show${Math.ceil(remaining)}` : "ShowGo";
         for (const kart of racers) {
             const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
             if (slot !== undefined) {
-                ShowCountdown(slot, showClass);
+                ShowCountdown(slot, remaining);
             }
         }
         if (remaining <= 0) {
             for (const kart of racers) {
                 kart.locked = false;
                 StartRun(kart, now); // the heat's time trial clock
+                kart.progressWatch = WatchProgress(undefined, kart.checkpointIndex, kart.lapsCompleted, now); // and the DNF one
             }
             // The "GO" image just shown above stays up for GO_DISPLAY_SECONDS —
             // hiding it in this same tick meant it was never actually seen.
@@ -6736,6 +6978,7 @@ function UpdateRaceFlow(now) {
     }
 
     if (phase === RacePhase.RACING) {
+        UpdateDnf(CurrentRacers(), now); // may send racers out — counted again below
         const racers = CurrentRacers();
         if (now >= phaseEndTime) {
             for (const kart of racers) {
@@ -8266,6 +8509,7 @@ function UpdateKart(slot, kart, dt) {
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.attackBoosting = false;
+        UpdateSpectatorHat(kart);
         return;
     }
 
