@@ -62,6 +62,8 @@ function TraceSphere(config) {
  *   health: number, lastVelocity: { x: number, y: number, z: number } | undefined,
  *   trackId: number | undefined, checkpointIndex: number, checkpointPosition: any, checkpointAngles: any,
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
+ *   progressWatch?: { checkpoint: number, laps: number, since: number }, // racing: when this racer last made progress, for the DNF rule — see WatchProgress in race/heat/logic.js
+ *   dnfShown?: number, dnfResendAt?: number, // what the dnf_warning shows (undefined: hidden) and when it's sent again — see UpdateDnf in race/heat/race-flow.js
  *   runStartTime?: number, // game time this kart's timed run started (unset: no run) — see race/time-trial/time-trial.js
  *   lastRun?: { trackId: number, time: number, newBest: boolean, at: number }, // last finished run, for the HUD
  *   finishRestartAt?: number, // game time a free-roaming finish sent the melon back to the start — see FINISH_RESTART_START_GUARD
@@ -85,15 +87,18 @@ function TraceSphere(config) {
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
  *   lastWallContact?: { time: number, normal: { x: number, y: number }, approach?: { x: number, y: number }, approachTime?: number }, // last wall touched in the air (probe or bounce), with how the melon came at it — see UpdateWallContact
  *   lastWallJump?: { time: number, normal: { x: number, y: number } }, // see CanWallJump
- *   bufferedWallJumpTime?: number, // a lift-zone jump press not yet used, fired on the next wall touch — see LIFT_ZONE_JUMP_BUFFER
+ *   bufferedWallJumpTime?: number, // a jump press in the air not yet used, fired once a wall jump is possible — see WALL_JUMP_BUFFER
+ *   bufferedGroundJumpTime?: number, // an air jump press that did nothing, fired on touching down — see GROUND_JUMP_BUFFER
  *   perfectBounceBoost?: boolean, // its speed above MAX_SPEED is from a PERFECT bounce — no boost trail for that, see fx/boost-trail/boost-trail.js
  *   attackBoosting?: boolean, // the attack boost is on this tick — shows the boost trail, see fx/boost-trail/boost-trail.js
  *   attackGuardUntil?: number, // until when engine pushes from attack are cancelled — see ATTACK_PUSH_GUARD_SECONDS
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
  *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
  *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
+ *   testPreview?: { kind: "countdown" | "finish" | "intro", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
+ *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
@@ -172,6 +177,11 @@ function DropKart(slot, kart) {
         kart.melon.Remove();
     }
     for (const entity of kart.boostTrail?.entities ?? []) {
+        if (entity.IsValid()) {
+            entity.Remove();
+        }
+    }
+    for (const entity of kart.spectatorHat ?? []) {
         if (entity.IsValid()) {
             entity.Remove();
         }
@@ -279,6 +289,11 @@ const GROUND_COYOTE_TIME = 0.08; // seconds a ground contact stays valid after l
 // doesn't count for this long after any jump. Otherwise a second press just
 // after taking off jumped again in mid-air.
 const GROUND_LIFTOFF_TIME = 0.15; // seconds
+// A jump pressed in the air up to this long before touching down jumps on
+// the touchdown (see BufferedGroundJump) — otherwise a press a tick or two
+// early was simply lost. Shorter than any real jump's airtime, so a second
+// press right after taking off can't turn into a jump on the next landing.
+const GROUND_JUMP_BUFFER = 0.1; // seconds
 
 // Wall jump: in the air, at a wall (a line trace in any of
 // WALL_PROBE_DIRECTIONS horizontal directions finds a steep surface within
@@ -316,7 +331,14 @@ const WALL_JUMP_CONTACT_RADIUS = 7; // units
 // so the press on the touch can land a tick late. (Lift zones: longer, see
 // LIFT_ZONE_WALL_JUMP_WINDOW.)
 const WALL_JUMP_WINDOW = 0.035; // seconds
-const WALL_JUMP_COOLDOWN = 0.45; // seconds between two wall jumps (was 0.3)
+// No cooldown between two wall jumps (there was one, 0.45 s): the next one
+// needs a new wall contact instead — the melon has left the wall it jumped
+// off and touched one again (see WallJumpBlockReason). A press too early for
+// that isn't lost: pressed up to this long before the melon can wall jump
+// (before touching the next wall, or while still at the last one), it fires
+// the wall jump the moment it can — everywhere, as it used to only in lift
+// zones.
+const WALL_JUMP_BUFFER = 0.2; // seconds
 const WALL_JUMP_CHARGES = 3; // wall jumps in a row, each full strength (was a 0..1 charge, half used per jump, weaker each time)
 const WALL_JUMP_RECHARGE_SECONDS = 2; // seconds to refill one wall jump — they refill one after the other, empty -> full = WALL_JUMP_CHARGES × this
 const WALL_JUMP_UP_SPEED = 240; // units/sec upward — well below the ground jump's JUMP_SPEED (was 380)
@@ -734,18 +756,9 @@ const LIFT_ZONE_NAME_PATTERN = /^lift_zone_(\d+(?:\.\d+)?)$/;
 const LIFT_ZONE_MIN_BOUNCE_SPEED = 450; // units/sec
 // Wall jumps in a lift zone cost no charge, are always full strength and
 // may follow a wall bounce at once (outside one, a press in the bounce's
-// jump-timing window is only timing). A narrow shaft has the melon at the
-// opposite wall sooner than WALL_JUMP_COOLDOWN, so there the cooldown is only
-// this (the next wall jump still needs the *other* wall, so one wall can't be
-// climbed alone) ...
-const LIFT_ZONE_WALL_JUMP_COOLDOWN = 0.1; // seconds
-// ... and a jump pressed up to this long *before* touching the next wall is
-// remembered and fires the wall jump the moment the melon touches it —
-// pressing a little early used to be lost (only presses after the contact
-// counted, within WALL_JUMP_WINDOW) ...
-const LIFT_ZONE_JUMP_BUFFER = 0.2; // seconds
-// ... and a wall contact stays jumpable this long, instead of the tick or
-// two of WALL_JUMP_WINDOW outside: shafts stay easy to climb.
+// jump-timing window is only timing). And a wall contact stays jumpable this
+// long, instead of the tick or two of WALL_JUMP_WINDOW outside: shafts stay
+// easy to climb.
 const LIFT_ZONE_WALL_JUMP_WINDOW = 0.2; // seconds
 
 // Wall-bounce prediction line (see fx/prediction/prediction.js).
@@ -896,8 +909,15 @@ const RacePhase = /** @type {const} */ ({
 const HUB_TRIGGER_NAME = "hub_start_trigger";
 
 const COUNTDOWN_SECONDS = 3;
-const GO_DISPLAY_SECONDS = 1; // how long "GO!" stays on screen once the countdown ends
+const GO_DISPLAY_SECONDS = 0.7; // how long "GO" stays on screen once the countdown ends — its grow-and-fade (speedometer.css) is done by .62s
 const BREAK_SECONDS = 10; // fixed by the original request
+// A racer who reaches no new checkpoint (and counts no lap) for this long
+// after GO or their last one is out of the Grand Prix (DNF) and back in the
+// hub — so one player who stops driving can't block a heat for everyone.
+const DNF_NO_PROGRESS_SECONDS = 60;
+// The last this-many seconds of that are counted down on the racer's HUD
+// (dnf_warning), so it doesn't come as a surprise.
+const DNF_WARNING_SECONDS = 15;
 // Spacing between racers teleported onto the same start line side-by-side,
 // so they don't spawn stacked on top of each other.
 const RACE_SPAWN_LATERAL_SPACING = 120;
@@ -1064,8 +1084,11 @@ const TELEPORT_UP_OFFSET = 40;
 const MELON_TEMPLATE_NAME = "melon_template";
 
 // How long the Melon Racer logo (intro_logo in speedometer.xml) shows after
-// a player picks a team, before their melon spawns at the intro.
-const INTRO_LOGO_SECONDS = 5;
+// a player picks a team, before their melon spawns at the intro. Its
+// animation (.IntroLogoImage in speedometer.css) has the logo out of the
+// picture after 2.85s — keep this a little longer than that, and shorter
+// than the animation itself (5s).
+const INTRO_LOGO_SECONDS = 3.2;
 
 // How far above the floor under a spawn entity (hub_spawn, intro_spawn) the
 // melon's origin appears — straight above it, no sideways offset (see
@@ -1089,6 +1112,13 @@ const FLOOR_TRACE_DOWN = 512;
 const HUB_SPAWN_NAME = "hub_spawn";
 const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
 const INTRO_SPAWN_NAME = "intro_spawn";
+
+// Where a joining player's melon appears is their own choice (the user
+// menu's "Start in Tutorial" toggle, kart/join-spot.js): intro_spawn (the
+// default) or straight at hub_spawn. Kept per player name in the addon's
+// save data under this key, next to the best times, so it survives
+// reconnects and map restarts: { [playerName]: { startInTutorial: false } }.
+const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
 
 // The frozen pawn (CSMoveType.NOCLIP: non-solid, but WASD still flies it)
 // stays where it spawned — see HoldPawn in kart/spawn.js. It's only put back
@@ -1344,6 +1374,17 @@ const HEARTBEAT_INTERVAL = 1; // seconds
 // Switching it on puts those eyes where the chase camera was: the pawn's
 // origin goes FREE_LOOK_EYE_HEIGHT below that spot (CS2's standing eye height).
 const FREE_LOOK_EYE_HEIGHT = 64;
+
+// The ghost avatar of a free-looking player: a fresh copy of this
+// point_template's entities (e.g. a hat prop_dynamic, "Not solid") hangs on
+// their flying pawn while free look is on — the pawn itself is invisible, so
+// it shows the others who's flying around. Optional: without it, no avatar.
+const SPECTATOR_HAT_TEMPLATE_NAME = "template_spectator_hat";
+// Where it hangs: this far above the pawn's origin (its feet) — at its eyes.
+const SPECTATOR_HAT_HEIGHT = FREE_LOOK_EYE_HEIGHT;
+// …and this far behind the eyes, against the view's yaw — so the player's
+// own camera (at the eyes) doesn't look out through it.
+const SPECTATOR_HAT_BACK = 48;
 
 // Movers: a func_movelinear whose name starts with "mover" goes back and
 // forth on its own — the script starts it (Open) when the map loads and
@@ -1892,10 +1933,8 @@ function ApplyBreakCameraZoom(kart, elapsed) {
  *   inLift: boolean,
  *   bounceUpSpeed: number, // upward kick of a wall bounce (u/s)
  *   minBounceSpeed: number, // a bounce leaves the wall at least this fast (u/s), 0 = no minimum
- *   wallJumpCooldown: number, // seconds between two wall jumps
  *   wallJumpWindow: number, // seconds a wall contact stays jumpable
  *   freeWallJumps: boolean, // wall jumps cost no charge, are full strength, may follow a bounce at once
- *   jumpBuffer: number, // seconds a jump press before touching a wall still counts, 0 = none
  *   ratedWallJumps: boolean, // wall jumps are rated by angle (boost, PERFECT kick, feedback) — not in lift or side-view zones
  *   wallJumpUpSpeed: number, // a wall jump's upward speed (u/s)
  *   wallJumpPushSpeed: number, // a wall jump's push away from the wall, at least (u/s)
@@ -1907,8 +1946,8 @@ function ApplyBreakCameraZoom(kart, elapsed) {
  * strongest lift zone it's in (undefined = not in one) and whether it's in a
  * side-view zone — there wall jumps aren't rated either (a 2D jump & run's
  * walls are jumped at whatever angle the plane allows) but go higher and
- * further (SIDE_VIEW_WALL_JUMP_*), with a lift zone's timing (short cooldown,
- * longer contact window, jump buffer) so wall-to-wall jumps chain, and like
+ * further (SIDE_VIEW_WALL_JUMP_*), with a lift zone's longer contact window
+ * so wall-to-wall jumps chain, and like
  * there they cost no charge (freeWallJumps).
  * @param {number | undefined} liftUpSpeed @param {boolean} [inSideView]
  * @returns {WallRules}
@@ -1919,10 +1958,8 @@ function WallRules(liftUpSpeed, inSideView = false) {
             inLift: false,
             bounceUpSpeed: WALL_BOUNCE_UP_SPEED,
             minBounceSpeed: 0,
-            wallJumpCooldown: inSideView ? LIFT_ZONE_WALL_JUMP_COOLDOWN : WALL_JUMP_COOLDOWN,
             wallJumpWindow: inSideView ? LIFT_ZONE_WALL_JUMP_WINDOW : WALL_JUMP_WINDOW,
             freeWallJumps: inSideView,
-            jumpBuffer: inSideView ? LIFT_ZONE_JUMP_BUFFER : 0,
             ratedWallJumps: !inSideView,
             wallJumpUpSpeed: inSideView ? SIDE_VIEW_WALL_JUMP_UP_SPEED : WALL_JUMP_UP_SPEED,
             wallJumpPushSpeed: inSideView ? SIDE_VIEW_WALL_JUMP_PUSH_SPEED : WALL_JUMP_PUSH_SPEED,
@@ -1933,10 +1970,8 @@ function WallRules(liftUpSpeed, inSideView = false) {
         // A lift zone never kicks weaker than outside one.
         bounceUpSpeed: Math.max(WALL_BOUNCE_UP_SPEED, liftUpSpeed),
         minBounceSpeed: LIFT_ZONE_MIN_BOUNCE_SPEED,
-        wallJumpCooldown: LIFT_ZONE_WALL_JUMP_COOLDOWN,
         wallJumpWindow: LIFT_ZONE_WALL_JUMP_WINDOW,
         freeWallJumps: true,
-        jumpBuffer: LIFT_ZONE_JUMP_BUFFER,
         ratedWallJumps: false,
         wallJumpUpSpeed: WALL_JUMP_UP_SPEED,
         wallJumpPushSpeed: WALL_JUMP_PUSH_SPEED,
@@ -2743,6 +2778,167 @@ function GetPodiumSpawnPoint(place) {
     return FindSpawnPoint(PodiumSpawnName(place));
 }
 
+// Pure time-trial rules — no cs_script import, so they're unit-testable in
+// Node (see test/race/time-trial.test.mjs). race/time-trial/time-trial.js applies them: starts
+// and stops a kart's run clock, and reads/writes the best times through
+// Instance.GetSaveData/SetSaveData.
+
+/**
+ * Best time (seconds) per track id per player name.
+ * @typedef {Record<string, Record<string, number>>} BestTimes
+ */
+
+/**
+ * "m:ss.cc", e.g. 83.456 -> "1:23.45". Truncated, not rounded, like a
+ * stopwatch — a run is never shown faster than it was.
+ * @param {number} seconds
+ */
+function FormatRaceTime(seconds) {
+    const centis = Math.floor(Math.max(0, seconds) * 100 + 1e-6);
+    const minutes = Math.floor(centis / 6000);
+    const secs = Math.floor(centis / 100) % 60;
+    const rest = centis % 100;
+    return `${minutes}:${String(secs).padStart(2, "0")}.${String(rest).padStart(2, "0")}`;
+}
+
+/**
+ * The addon's whole save data as an object — anything unreadable (empty on
+ * first run, or written by something else) counts as empty rather than
+ * throwing, so a broken file can't stop the script.
+ * @param {string} raw
+ * @returns {Record<string, any>}
+ */
+function ParseSaveData(raw) {
+    if (!raw) {
+        return {};
+    }
+    try {
+        const data = JSON.parse(raw);
+        return data && typeof data === "object" && !Array.isArray(data) ? data : {};
+    } catch {
+        return {};
+    }
+}
+
+/**
+ * The best times inside parsed save data (a fresh object if there are none).
+ * Drops entries that aren't positive numbers.
+ * @param {Record<string, any>} saveData
+ * @returns {BestTimes}
+ */
+function GetBestTimes(saveData) {
+    const raw = saveData[SAVE_DATA_BEST_TIMES_KEY];
+    /** @type {BestTimes} */
+    const best = {};
+    if (!raw || typeof raw !== "object") {
+        return best;
+    }
+    for (const [trackId, players] of Object.entries(raw)) {
+        if (!players || typeof players !== "object") {
+            continue;
+        }
+        for (const [name, time] of Object.entries(players)) {
+            if (typeof time === "number" && time > 0 && Number.isFinite(time)) {
+                (best[trackId] ??= {})[name] = time;
+            }
+        }
+    }
+    return best;
+}
+
+/**
+ * Records a finished run. Only a faster time than the player's best on
+ * that track replaces it.
+ * @param {BestTimes} best @param {number} trackId @param {string} playerName @param {number} time
+ * @returns {boolean} whether it's a new best
+ */
+function RecordRunTime(best, trackId, playerName, time) {
+    const previous = best[trackId]?.[playerName];
+    if (previous !== undefined && previous <= time) {
+        return false;
+    }
+    (best[trackId] ??= {})[playerName] = time;
+    return true;
+}
+
+// Pure rules of where a joining player's melon appears (kart/join-spot.js):
+// the "Start in Tutorial" setting inside the addon's parsed save data.
+
+/**
+ * Whether `playerName` starts in the tutorial when joining — true unless
+ * they switched it off (also for an unreadable entry).
+ * @param {Record<string, any>} saveData parsed, see ParseSaveData
+ * @param {string} playerName
+ */
+function StartsInTutorial(saveData, playerName) {
+    return saveData[SAVE_DATA_PLAYER_SETTINGS_KEY]?.[playerName]?.startInTutorial !== false;
+}
+
+/**
+ * `saveData` with `playerName`'s "Start in Tutorial" set to `on` — the rest
+ * (best times, other players, other settings) kept. The default (on) isn't
+ * stored, so players who never touched it leave no entry.
+ * @param {Record<string, any>} saveData parsed, see ParseSaveData
+ * @param {string} playerName @param {boolean} on
+ * @returns {Record<string, any>}
+ */
+function WithStartsInTutorial(saveData, playerName, on) {
+    const raw = saveData[SAVE_DATA_PLAYER_SETTINGS_KEY];
+    const all = raw && typeof raw === "object" && !Array.isArray(raw) ? { ...raw } : {};
+    const mine = { ...(all[playerName] && typeof all[playerName] === "object" ? all[playerName] : {}) };
+    if (on) {
+        delete mine.startInTutorial;
+    } else {
+        mine.startInTutorial = false;
+    }
+    if (Object.keys(mine).length > 0) {
+        all[playerName] = mine;
+    } else {
+        delete all[playerName];
+    }
+    return { ...saveData, [SAVE_DATA_PLAYER_SETTINGS_KEY]: all };
+}
+
+// Where a joining player's melon appears: the tutorial (intro_spawn, the
+// default) or straight in the hub — each player's own choice in the user
+// menu ("Start in Tutorial"), kept per player name in the addon's save data
+// (like the best times: the API has no stable player id). The rules are in
+// kart/join-spot-logic.js.
+
+/** @param {import("../core/kart-registry.js").Kart | { pawn: any }} kart */
+function PlayerName$1(kart) {
+    return kart.pawn.GetPlayerController()?.GetPlayerName() ?? "";
+}
+
+/** Whether this kart's player starts in the tutorial when joining. @param {import("../core/kart-registry.js").Kart} kart */
+function IsStartInTutorialOn(kart) {
+    return StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$1(kart));
+}
+
+/**
+ * Sets whether this kart's player starts in the tutorial next time they
+ * join, and saves it. @param {import("../core/kart-registry.js").Kart} kart @param {boolean} on
+ */
+function SetStartInTutorial(kart, on) {
+    // Re-read so the best times and everyone else's settings survive.
+    const data = WithStartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$1(kart), on);
+    Instance.SetSaveData(JSON.stringify(data));
+    Debug(`SetStartInTutorial: "${PlayerName$1(kart)}" starts ${on ? "in the tutorial" : "in the hub"} on join`);
+}
+
+/**
+ * Where a joining player's very first melon appears: intro_spawn (or the hub
+ * without one) — or hub_spawn if they switched "Start in Tutorial" off (the
+ * intro if the map has no hub_spawn).
+ * @param {any} pawn
+ */
+function GetJoinSpawnPoint(pawn) {
+    if (StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$1({ pawn }))) {
+        return GetIntroSpawnPoint();
+    }
+    return GetHubSpawnPoint() ?? GetIntroSpawnPoint();
+}
+
 // The one custom_hud_layout entity every HUD panel lives in (speedometer.xml),
 // plus the per-player input capture the modals share.
 
@@ -2845,6 +3041,120 @@ function HideMelonGlow(kart) {
     }
 }
 
+// Particle effects from point_templates, the one way every effect in
+// melon_drive is spawned: the break burst (health/breaking/effects.js), the
+// PERFECT spark (movement/wall-bounce/wall-bounce.js), the heal sparkle (health/heal/effect.js)
+// and the boost trail (fx/boost-trail/boost-trail.js).
+// Tested against the fake engine in test/fx/particles.test.mjs.
+//
+// Two engine quirks every caller would otherwise have to know about:
+// - ForceSpawn keeps each templated entity's Hammer offset from its
+//   point_template, so without moving them the effect plays wherever the
+//   template happens to sit relative to it (see PlaceAll).
+// - "Start Active" alone doesn't reliably play an info_particle_system
+//   spawned later from a point_template — it's started explicitly
+//   (StartParticles).
+
+/**
+ * A fresh copy of the named point_template's entities, spawned at
+ * `position` — still at their Hammer offsets, not started yet.
+ * @param {string} templateName @param {any} position @param {any} [angles]
+ * @param {{ warn?: boolean }} [options] warn: report a missing/broken
+ *   template with Instance.Msg (always in the console) instead of Debug —
+ *   for effects that are part of the map's contract, where silently
+ *   spawning nothing is the bug.
+ * @returns {any[]} empty if nothing spawned
+ */
+function SpawnFromTemplate(templateName, position, angles, { warn = false } = {}) {
+    const report = warn ? (/** @type {string} */ text) => Instance.Msg(`[melon_drive] ${text}`) : Debug;
+    const template = Instance.FindEntityByName(templateName);
+    if (!template) {
+        report(`SpawnFromTemplate: no point_template named "${templateName}" in the map`);
+        return [];
+    }
+    if (!(template instanceof PointTemplate)) {
+        report(`SpawnFromTemplate: "${templateName}" is a ${template.GetClassName()}, not a point_template`);
+        return [];
+    }
+    const spawned = template.ForceSpawn(position, angles) ?? [];
+    if (spawned.length === 0) {
+        report(`SpawnFromTemplate: ForceSpawn of "${templateName}" returned nothing — check its Template01.. entries in Hammer`);
+    }
+    return spawned;
+}
+
+/** @param {any} entity */
+function IsParticleSystem(entity) {
+    return entity.GetClassName() === "info_particle_system";
+}
+
+/** Moves every entity exactly onto `position` (undoing ForceSpawn's Hammer offsets). @param {any[]} entities @param {any} position */
+function PlaceAll(entities, position) {
+    for (const entity of entities) {
+        entity.Teleport({ position });
+    }
+}
+
+/** Starts every info_particle_system among `entities`. @param {any[]} entities */
+function StartParticles(entities) {
+    for (const entity of entities) {
+        if (IsParticleSystem(entity)) {
+            Instance.EntFireAtTarget({ target: entity, input: "Start" });
+        }
+    }
+}
+
+/**
+ * Stops every info_particle_system among `entities` that's still around:
+ * no new particles, the ones already out play to the end of their lifetime.
+ * @param {any[]} entities
+ */
+function StopParticles(entities) {
+    for (const entity of entities) {
+        if (entity.IsValid() && IsParticleSystem(entity)) {
+            Instance.EntFireAtTarget({ target: entity, input: "Stop" });
+        }
+    }
+}
+
+/**
+ * Removes `entities` after `seconds` (those still around — a parented one
+ * goes with its parent if that's removed first). Removing an
+ * info_particle_system ends its particles, so `seconds` must cover the
+ * effect's own duration.
+ * @param {any[]} entities @param {number} seconds
+ */
+function RemoveAfter(entities, seconds) {
+    Instance.Delay(seconds).then(() => {
+        for (const entity of entities) {
+            if (entity.IsValid()) {
+                entity.Remove();
+            }
+        }
+    });
+}
+
+/**
+ * The whole short-lived effect in one call: a fresh copy of the template,
+ * placed exactly at `position`, optionally riding along on `parent`,
+ * started, and removed after `lifetime` seconds.
+ * @param {string} templateName @param {any} position
+ * @param {{ lifetime: number, parent?: any, angles?: any, warn?: boolean }} options
+ * @returns {any[]} the spawned entities (empty if nothing spawned)
+ */
+function PlayParticleTemplate(templateName, position, { lifetime, parent, angles, warn }) {
+    const spawned = SpawnFromTemplate(templateName, position, angles, { warn });
+    PlaceAll(spawned, position);
+    if (parent) {
+        for (const entity of spawned) {
+            entity.SetParent(parent);
+        }
+    }
+    StartParticles(spawned);
+    RemoveAfter(spawned, lifetime);
+    return spawned;
+}
+
 // Free look: fly through the map with the player's own pawn instead of
 // driving. Toggled per player from the user menu (kart.freeLook, see
 // SetFreeLook); off by default. The pawn is NOCLIP anyway (FreezePawn), so
@@ -2852,7 +3162,9 @@ function HideMelonGlow(kart) {
 // flies it along the view, and the camera shows its eyes (DISABLED mode)
 // instead of chasing the melon. The melon waits where it was, frozen
 // (UpdateKart skips it; physics motion off), and switching back puts the
-// pawn back on its anchor and the chase camera back on the melon.
+// pawn back on its anchor and the chase camera back on the melon. While
+// it's on, a ghost avatar (SPECTATOR_HAT_TEMPLATE_NAME) hangs on the flying
+// pawn so the others see who it is.
 
 /** @param {import("../core/kart-registry.js").Kart} kart */
 function IsFreeLookOn(kart) {
@@ -2882,18 +3194,90 @@ function SetFreeLook(kart, on) {
     kart.lastVelocity = undefined;
     kart.prevLastVelocity = undefined;
     kart.settled = false;
+    RemoveSpectatorHat(kart);
     if (!kart.pawn.IsValid()) {
         return on;
     }
     if (on) {
         kart.pawn.Teleport({ position: ChaseCameraFeet(kart), velocity: { x: 0, y: 0, z: 0 } });
         kart.pawn.GetCustomCamera().SetMode(CustomCameraMode.DISABLED);
+        AttachSpectatorHat(kart);
     } else {
         kart.pawn.Teleport({ position: kart.pawnAnchor, velocity: { x: 0, y: 0, z: 0 } });
         ApplyCameraFollow(kart);
     }
     Debug(`SetFreeLook: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} free look ${on ? "on" : "off"}`);
     return on;
+}
+
+/**
+ * Hangs a fresh copy of the SPECTATOR_HAT_TEMPLATE_NAME template on the
+ * free-looking pawn (see SpectatorHatPose). Nothing if the map has no such
+ * template.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function AttachSpectatorHat(kart) {
+    const { position, angles } = SpectatorHatPose(kart);
+    const hat = SpawnFromTemplate(SPECTATOR_HAT_TEMPLATE_NAME, position, angles);
+    for (const entity of hat) {
+        entity.Teleport({ position, angles }); // ForceSpawn keeps its Hammer offset from the template
+        // In case it's left solid in Hammer: the melons' traces and other
+        // melons mustn't bump into a flying hat.
+        Instance.EntFireAtTarget({ target: entity, input: "DisableCollision" });
+    }
+    kart.spectatorHat = hat;
+}
+
+/**
+ * Keeps the ghost avatar on the flying pawn, every tick while free look is
+ * on. Moved by script, not parented: parented to the pawn it ended up right
+ * in the player's own camera, whatever offset it was given.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function UpdateSpectatorHat(kart) {
+    if (!kart.spectatorHat || !kart.pawn.IsValid()) {
+        return;
+    }
+    const pose = SpectatorHatPose(kart);
+    for (const entity of kart.spectatorHat) {
+        if (entity.IsValid()) {
+            entity.Move(pose);
+        }
+    }
+}
+
+/**
+ * Where the ghost avatar hangs: SPECTATOR_HAT_HEIGHT above the pawn's feet
+ * and SPECTATOR_HAT_BACK behind its eyes along the view's yaw (so the
+ * player's own camera doesn't look out through it), facing the view.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function SpectatorHatPose(kart) {
+    const feet = kart.pawn.GetAbsOrigin();
+    const yaw = kart.pawn.GetEyeAngles().yaw;
+    const rad = yaw * Math.PI / 180;
+    return {
+        position: {
+            x: feet.x - Math.cos(rad) * SPECTATOR_HAT_BACK,
+            y: feet.y - Math.sin(rad) * SPECTATOR_HAT_BACK,
+            z: feet.z + SPECTATOR_HAT_HEIGHT,
+        },
+        angles: { pitch: 0, yaw, roll: 0 },
+    };
+}
+
+/**
+ * Removes the free-look ghost avatar, if any — free look off, a new pawn
+ * (SetFreeLook), or the player leaving (DropKart does the same).
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function RemoveSpectatorHat(kart) {
+    for (const entity of kart.spectatorHat ?? []) {
+        if (entity.IsValid()) {
+            entity.Remove();
+        }
+    }
+    kart.spectatorHat = undefined;
 }
 
 /**
@@ -3143,7 +3527,7 @@ function ShowIntroLogoThenSpawn(slot, pawn) {
     if (now < end) {
         return;
     }
-    if (SetUpPlayerKart(pawn, GetIntroSpawnPoint())) {
+    if (SetUpPlayerKart(pawn, GetJoinSpawnPoint(pawn))) { // the intro, or the hub (the player's "Start in Tutorial" setting)
         SetIntroLogoVisible(slot, false);
         introLogoEnd.delete(slot);
     } else {
@@ -3151,7 +3535,7 @@ function ShowIntroLogoThenSpawn(slot, pawn) {
     }
 }
 
-/** @param {number} slot @param {boolean} visible */
+/** Shows or hides the Melon Racer logo (intro_logo) for one player — also the user menu's "Test Intro". @param {number} slot @param {boolean} visible */
 function SetIntroLogoVisible(slot, visible) {
     GetSpeedHud()?.SetHasClassForPlayer(slot, "intro_logo", "Hidden", !visible);
 }
@@ -3389,6 +3773,23 @@ function CanGroundJump({ grounded, lastGroundedTime, lastJumpTime }) {
 }
 
 /**
+ * Whether a jump press that did nothing (in the air) jumps now after all:
+ * pressed at most GROUND_JUMP_BUFFER ago, and the melon has touched down
+ * since — a ground contact newer than the press — so a ground jump is
+ * allowed now (CanGroundJump).
+ * @param {{ now: number, pressTime?: number, grounded: boolean, lastGroundedTime?: number, lastJumpTime?: number }} s
+ */
+function BufferedGroundJump({ now, pressTime, grounded, lastGroundedTime, lastJumpTime }) {
+    if (pressTime === undefined || now - pressTime > GROUND_JUMP_BUFFER) {
+        return false;
+    }
+    if (lastGroundedTime === undefined || lastGroundedTime <= pressTime) {
+        return false;
+    }
+    return CanGroundJump({ grounded, lastGroundedTime, lastJumpTime });
+}
+
+/**
  * The wall-jump charges (0..WALL_JUMP_CHARGES, fractional while one is
  * refilling) after `dt` seconds of refilling — one after the other,
  * WALL_JUMP_RECHARGE_SECONDS each.
@@ -3421,16 +3822,15 @@ function CanWallJump(s) {
  * @param {{
  *   now: number,
  *   grounded: boolean,
- *   wallContact?: { time: number, normal: { x: number, y: number } },
+ *   wallContact?: { time: number, normal: { x: number, y: number }, approachTime?: number }, // approachTime: when this contact started (WallApproach)
  *   lastWallJump?: { time: number, normal: { x: number, y: number } },
  *   lastGroundedTime?: number,
  *   charge: number, // wall jumps charged, see WALL_JUMP_CHARGES — at least one whole one needed
- *   cooldown?: number, // WALL_JUMP_COOLDOWN, shorter in a lift zone
  *   window?: number, // WALL_JUMP_WINDOW, longer in a lift zone
  *   bounceTiming?: boolean, // a wall bounce's jump-timing window is still open — this press is its timing, not a wall jump
  * }} s
  */
-function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN, window = WALL_JUMP_WINDOW, bounceTiming = false }) {
+function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, window = WALL_JUMP_WINDOW, bounceTiming = false }) {
     if (grounded) {
         return "on the ground";
     }
@@ -3449,8 +3849,10 @@ function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGro
     if (!lastWallJump) {
         return null;
     }
-    if (now - lastWallJump.time < cooldown) {
-        return `cooldown (${(now - lastWallJump.time).toFixed(2)}s since the last wall jump < ${cooldown}s)`;
+    // No cooldown: the melon has to have left the wall it jumped off and
+    // touched one again — a real new contact, not just time passing.
+    if ((wallContact.approachTime ?? wallContact.time) <= lastWallJump.time) {
+        return "still the contact of the last wall jump (leave the wall and touch one again)";
     }
     if (lastGroundedTime !== undefined && lastGroundedTime > lastWallJump.time) {
         return null; // touched ground since — any wall is fresh again
@@ -3645,120 +4047,6 @@ function UpdateMomentum(momentum, horizSpeed, now, boosted) {
     const chained = momentum.lastHitTime !== undefined && now - momentum.lastHitTime <= MOMENTUM_HIT_WINDOW;
     const steps = chained ? Math.min(momentum.steps + 1, MOMENTUM_MAX_STEPS) : momentum.steps;
     return { steps, armed: false, lastHitTime: now };
-}
-
-// Particle effects from point_templates, the one way every effect in
-// melon_drive is spawned: the break burst (health/breaking/effects.js), the
-// PERFECT spark (movement/wall-bounce/wall-bounce.js), the heal sparkle (health/heal/effect.js)
-// and the boost trail (fx/boost-trail/boost-trail.js).
-// Tested against the fake engine in test/fx/particles.test.mjs.
-//
-// Two engine quirks every caller would otherwise have to know about:
-// - ForceSpawn keeps each templated entity's Hammer offset from its
-//   point_template, so without moving them the effect plays wherever the
-//   template happens to sit relative to it (see PlaceAll).
-// - "Start Active" alone doesn't reliably play an info_particle_system
-//   spawned later from a point_template — it's started explicitly
-//   (StartParticles).
-
-/**
- * A fresh copy of the named point_template's entities, spawned at
- * `position` — still at their Hammer offsets, not started yet.
- * @param {string} templateName @param {any} position @param {any} [angles]
- * @param {{ warn?: boolean }} [options] warn: report a missing/broken
- *   template with Instance.Msg (always in the console) instead of Debug —
- *   for effects that are part of the map's contract, where silently
- *   spawning nothing is the bug.
- * @returns {any[]} empty if nothing spawned
- */
-function SpawnFromTemplate(templateName, position, angles, { warn = false } = {}) {
-    const report = warn ? (/** @type {string} */ text) => Instance.Msg(`[melon_drive] ${text}`) : Debug;
-    const template = Instance.FindEntityByName(templateName);
-    if (!template) {
-        report(`SpawnFromTemplate: no point_template named "${templateName}" in the map`);
-        return [];
-    }
-    if (!(template instanceof PointTemplate)) {
-        report(`SpawnFromTemplate: "${templateName}" is a ${template.GetClassName()}, not a point_template`);
-        return [];
-    }
-    const spawned = template.ForceSpawn(position, angles) ?? [];
-    if (spawned.length === 0) {
-        report(`SpawnFromTemplate: ForceSpawn of "${templateName}" returned nothing — check its Template01.. entries in Hammer`);
-    }
-    return spawned;
-}
-
-/** @param {any} entity */
-function IsParticleSystem(entity) {
-    return entity.GetClassName() === "info_particle_system";
-}
-
-/** Moves every entity exactly onto `position` (undoing ForceSpawn's Hammer offsets). @param {any[]} entities @param {any} position */
-function PlaceAll(entities, position) {
-    for (const entity of entities) {
-        entity.Teleport({ position });
-    }
-}
-
-/** Starts every info_particle_system among `entities`. @param {any[]} entities */
-function StartParticles(entities) {
-    for (const entity of entities) {
-        if (IsParticleSystem(entity)) {
-            Instance.EntFireAtTarget({ target: entity, input: "Start" });
-        }
-    }
-}
-
-/**
- * Stops every info_particle_system among `entities` that's still around:
- * no new particles, the ones already out play to the end of their lifetime.
- * @param {any[]} entities
- */
-function StopParticles(entities) {
-    for (const entity of entities) {
-        if (entity.IsValid() && IsParticleSystem(entity)) {
-            Instance.EntFireAtTarget({ target: entity, input: "Stop" });
-        }
-    }
-}
-
-/**
- * Removes `entities` after `seconds` (those still around — a parented one
- * goes with its parent if that's removed first). Removing an
- * info_particle_system ends its particles, so `seconds` must cover the
- * effect's own duration.
- * @param {any[]} entities @param {number} seconds
- */
-function RemoveAfter(entities, seconds) {
-    Instance.Delay(seconds).then(() => {
-        for (const entity of entities) {
-            if (entity.IsValid()) {
-                entity.Remove();
-            }
-        }
-    });
-}
-
-/**
- * The whole short-lived effect in one call: a fresh copy of the template,
- * placed exactly at `position`, optionally riding along on `parent`,
- * started, and removed after `lifetime` seconds.
- * @param {string} templateName @param {any} position
- * @param {{ lifetime: number, parent?: any, angles?: any, warn?: boolean }} options
- * @returns {any[]} the spawned entities (empty if nothing spawned)
- */
-function PlayParticleTemplate(templateName, position, { lifetime, parent, angles, warn }) {
-    const spawned = SpawnFromTemplate(templateName, position, angles, { warn });
-    PlaceAll(spawned, position);
-    if (parent) {
-        for (const entity of spawned) {
-            entity.SetParent(parent);
-        }
-    }
-    StartParticles(spawned);
-    RemoveAfter(spawned, lifetime);
-    return spawned;
 }
 
 // Pure health-bar math — no cs_script import, so it's unit-testable in
@@ -4511,6 +4799,9 @@ function ComputeWallBounce(kart, n, now) {
     if (!bounce) {
         return null;
     }
+    if (jumpFactor > 0 && kart.lastIdleJumpPressTime === kart.wallTimingPressTime) {
+        kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
+    }
     DebugLogBounce(kart, n, bounce.angle);
     // A PERFECT hit shows its own spark instead of the boost trail — see
     // ShouldShowBoostTrail. Any other rating's speed shows the trail again.
@@ -4848,8 +5139,8 @@ function GetWallJumpCharges(kart) {
 /**
  * Everything a jump press does this tick, applied to `v` (the velocity
  * UpdateKart is about to command, modified in place): the ground jump, the
- * wall-bounce timing credit, and the wall jump. Also fires a buffered wall
- * jump (lift zones) without a new press. (The charge refills in
+ * wall-bounce timing credit, and the wall jump. Also fires a buffered
+ * ground or wall jump without a new press. (The charge refills in
  * RechargeWallJumpCharge.)
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now
  * @param {boolean} grounded see UpdateGrounded @param {boolean} jumpPressed
@@ -4858,6 +5149,7 @@ function GetWallJumpCharges(kart) {
  */
 function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
     if (!jumpPressed) {
+        FireBufferedGroundJump(slot, kart, now, grounded, v);
         FireBufferedWallJump(slot, kart, now, grounded, v, rules);
         return;
     }
@@ -4874,21 +5166,23 @@ function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
     }
     // Wall timing — independent of the normal jump above (works in the air
     // too), purely about *when* it's pressed.
-    if (timingPress) {
-        UpgradePendingBounce(kart, now, v);
-    }
+    const timedBounce = timingPress && UpgradePendingBounce(kart, now, v);
     // Wall jump — after the bounce-timing upgrade, so that one's extra speed
     // isn't lost.
     const blockedBy = groundJump ? "ground jump instead" : TryWallJump(slot, kart, now, grounded, v, rules);
     LogWallJumpVerdict(slot, kart, blockedBy, rules.inLift);
-    // Neither a ground nor a wall jump: the press did nothing, so the next
-    // one soon after is mashing (see WallTimingPress).
-    if (!groundJump && blockedBy !== null) {
+    // Neither a ground nor a wall jump nor a bounce's timing: the press did
+    // nothing, so the next one soon after is mashing (see WallTimingPress).
+    const didNothing = !groundJump && blockedBy !== null && !timedBounce;
+    if (didNothing) {
         kart.lastIdleJumpPressTime = now;
     }
-    // In the air and not a wall jump yet: where there's a jump buffer (lift
-    // and side-view zones), remember the press — a wall touched soon after still gets it.
-    kart.bufferedWallJumpTime = blockedBy !== null && !grounded && rules.jumpBuffer > 0 ? now : undefined;
+    // Did nothing: if the melon touches down within GROUND_JUMP_BUFFER, it
+    // jumps then (FireBufferedGroundJump).
+    kart.bufferedGroundJumpTime = didNothing ? now : undefined;
+    // In the air and not a wall jump yet: remember the press — the next wall
+    // touched (or the wall jump becoming possible) soon after still gets it.
+    kart.bufferedWallJumpTime = didNothing && !grounded ? now : undefined;
 }
 
 /**
@@ -4897,15 +5191,16 @@ function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
  * upgrade it — more speed (the speed gain it'll settle damage for grows with
  * it; a perfect angle still makes that free).
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {{ x: number, y: number, z: number }} v
+ * @returns {boolean} whether it did — the press counted as the bounce's timing
  */
 function UpgradePendingBounce(kart, now, v) {
     const pending = kart.pendingBounce;
     if (!pending) {
-        return;
+        return false;
     }
     const lateFactor = JumpTimingFactor(now - pending.time);
     if (lateFactor <= pending.jumpFactor) {
-        return;
+        return false;
     }
     const ratio = JumpMultiplier(lateFactor) / JumpMultiplier(pending.jumpFactor);
     const before = Math.hypot(v.x, v.y);
@@ -4918,11 +5213,42 @@ function UpgradePendingBounce(kart, now, v) {
         kart.lastBounceInfo.jumpFactor = lateFactor;
     }
     kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), after);
+    return true;
 }
 
 /**
- * A jump pressed shortly *before* touching a wall (within rules.jumpBuffer,
- * lift and side-view zones only) fires the wall jump once the melon touches one.
+ * A jump pressed in the air shortly *before* touching down (within
+ * GROUND_JUMP_BUFFER) is a ground jump on the touchdown — see
+ * BufferedGroundJump.
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
+ * @param {{ x: number, y: number, z: number }} v
+ */
+function FireBufferedGroundJump(slot, kart, now, grounded, v) {
+    const pressed = kart.bufferedGroundJumpTime;
+    if (pressed === undefined) {
+        return;
+    }
+    if (now - pressed > GROUND_JUMP_BUFFER) {
+        kart.bufferedGroundJumpTime = undefined;
+        return;
+    }
+    if (!BufferedGroundJump({ now, pressTime: pressed, grounded, lastGroundedTime: kart.lastGroundedTime, lastJumpTime: kart.lastJumpTime })) {
+        return;
+    }
+    kart.bufferedGroundJumpTime = undefined;
+    kart.bufferedWallJumpTime = undefined; // the press is used up
+    v.z = JUMP_SPEED;
+    kart.lastJumpTime = now;
+    if (kart.lastIdleJumpPressTime === pressed) {
+        kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
+    }
+    Debug(`ground jump: slot ${slot} from a press ${(now - pressed).toFixed(3)}s before touching down`);
+}
+
+/**
+ * A jump pressed shortly *before* a wall jump is possible (within
+ * WALL_JUMP_BUFFER — before touching the next wall, or still at the one it
+ * last jumped off) fires the wall jump as soon as it is.
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
  * @param {{ x: number, y: number, z: number }} v @param {import("../../zones/lift/logic.js").WallRules} rules
  */
@@ -4931,13 +5257,14 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
     if (pressed === undefined) {
         return;
     }
-    if (now - pressed > rules.jumpBuffer) {
-        kart.bufferedWallJumpTime = undefined; // too long ago, or left the zone (no buffer outside)
+    if (now - pressed > WALL_JUMP_BUFFER) {
+        kart.bufferedWallJumpTime = undefined; // too long ago
         return;
     }
     const wallContact = kart.lastWallContact;
     if (wallContact && wallContact.time > pressed && TryWallJump(slot, kart, now, grounded, v, rules) === null) {
         kart.bufferedWallJumpTime = undefined;
+        kart.bufferedGroundJumpTime = undefined; // the press is used up
         if (kart.lastIdleJumpPressTime === pressed) {
             kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
         }
@@ -4960,7 +5287,8 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
  * the press is that bounce's timing and no wall jump — otherwise every
  * well-timed bounce also used up charge. Not in lift and side-view zones
  * (rules.freeWallJumps): there it costs no charge (none needed either),
- * may follow a bounce at once, and the cooldown is rules.wallJumpCooldown.
+ * may follow a bounce at once. No cooldown: the next wall jump needs a new
+ * wall contact (WallJumpBlockReason).
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
  * @param {{ x: number, y: number, z: number }} v modified in place @param {import("../../zones/lift/logic.js").WallRules} rules
  * @returns {string | null} why it didn't happen, or null if it did
@@ -4975,7 +5303,6 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
         lastWallJump: kart.lastWallJump,
         lastGroundedTime: kart.lastGroundedTime,
         charge,
-        cooldown: rules.wallJumpCooldown,
         window: rules.wallJumpWindow,
         bounceTiming: !rules.freeWallJumps && kart.pendingBounce !== undefined,
     });
@@ -5252,89 +5579,6 @@ function GetTrackConfig() {
 /** Track ids in race order (ascending), derived from whatever start triggers exist. */
 function GetTrackOrder() {
     return Object.keys(GetTrackConfig()).map(Number).sort((a, b) => a - b);
-}
-
-// Pure time-trial rules — no cs_script import, so they're unit-testable in
-// Node (see test/race/time-trial.test.mjs). race/time-trial/time-trial.js applies them: starts
-// and stops a kart's run clock, and reads/writes the best times through
-// Instance.GetSaveData/SetSaveData.
-
-/**
- * Best time (seconds) per track id per player name.
- * @typedef {Record<string, Record<string, number>>} BestTimes
- */
-
-/**
- * "m:ss.cc", e.g. 83.456 -> "1:23.45". Truncated, not rounded, like a
- * stopwatch — a run is never shown faster than it was.
- * @param {number} seconds
- */
-function FormatRaceTime(seconds) {
-    const centis = Math.floor(Math.max(0, seconds) * 100 + 1e-6);
-    const minutes = Math.floor(centis / 6000);
-    const secs = Math.floor(centis / 100) % 60;
-    const rest = centis % 100;
-    return `${minutes}:${String(secs).padStart(2, "0")}.${String(rest).padStart(2, "0")}`;
-}
-
-/**
- * The addon's whole save data as an object — anything unreadable (empty on
- * first run, or written by something else) counts as empty rather than
- * throwing, so a broken file can't stop the script.
- * @param {string} raw
- * @returns {Record<string, any>}
- */
-function ParseSaveData(raw) {
-    if (!raw) {
-        return {};
-    }
-    try {
-        const data = JSON.parse(raw);
-        return data && typeof data === "object" && !Array.isArray(data) ? data : {};
-    } catch {
-        return {};
-    }
-}
-
-/**
- * The best times inside parsed save data (a fresh object if there are none).
- * Drops entries that aren't positive numbers.
- * @param {Record<string, any>} saveData
- * @returns {BestTimes}
- */
-function GetBestTimes(saveData) {
-    const raw = saveData[SAVE_DATA_BEST_TIMES_KEY];
-    /** @type {BestTimes} */
-    const best = {};
-    if (!raw || typeof raw !== "object") {
-        return best;
-    }
-    for (const [trackId, players] of Object.entries(raw)) {
-        if (!players || typeof players !== "object") {
-            continue;
-        }
-        for (const [name, time] of Object.entries(players)) {
-            if (typeof time === "number" && time > 0 && Number.isFinite(time)) {
-                (best[trackId] ??= {})[name] = time;
-            }
-        }
-    }
-    return best;
-}
-
-/**
- * Records a finished run. Only a faster time than the player's best on
- * that track replaces it.
- * @param {BestTimes} best @param {number} trackId @param {string} playerName @param {number} time
- * @returns {boolean} whether it's a new best
- */
-function RecordRunTime(best, trackId, playerName, time) {
-    const previous = best[trackId]?.[playerName];
-    if (previous !== undefined && previous <= time) {
-        return false;
-    }
-    (best[trackId] ??= {})[playerName] = time;
-    return true;
 }
 
 // Time trial: every run over a track is timed, for every player on their
@@ -6084,14 +6328,87 @@ function BreakCountdownValue(remaining) {
 }
 
 /**
- * The digit images that show `value`: tens undefined below 10 (no leading
- * zero), at most two digits (above 99 shows 99).
- * @param {number} value
- * @returns {{ tens: number | undefined, ones: number }}
+ * Which step of the pre-race countdown shows `remaining` seconds before GO:
+ * 0 = "3", 1 = "2", 2 = "1", 3 = "GO" (at and after GO). Undefined above 3
+ * seconds — there's no number for those (COUNTDOWN_SECONDS > 3 shows nothing
+ * until 3).
+ * @param {number} remaining
+ * @returns {number | undefined}
  */
-function CountdownDigits(value) {
-    const clamped = Math.min(99, Math.max(0, Math.floor(value)));
-    return { tens: clamped >= 10 ? Math.floor(clamped / 10) : undefined, ones: clamped % 10 };
+function CountdownStep(remaining) {
+    if (remaining <= 0) {
+        return 3;
+    }
+    const seconds = Math.ceil(remaining);
+    return seconds <= 3 ? 3 - seconds : undefined;
+}
+
+/**
+ * What the countdown's number `index` (0 = "3" … 3 = "GO") does while step
+ * `step` is showing: "In" — it's the current one, falling in from the top
+ * and standing in the middle (GO instead grows from small to huge, fading
+ * out); "Out" — the one before it, knocked down out of the picture by the
+ * current one landing; undefined — not shown. GO doesn't fall in, so it
+ * knocks nothing out: the 1 is simply gone when GO appears in its place.
+ * @param {number} index @param {number | undefined} step see CountdownStep
+ * @returns {"In" | "Out" | undefined}
+ */
+function CountdownNumberState(index, step) {
+    if (step === undefined) {
+        return undefined;
+    }
+    if (index === step) {
+        return "In";
+    }
+    return index === step - 1 && step < 3 ? "Out" : undefined;
+}
+
+/**
+ * The break countdown's two number Labels take turns (the numbers change
+ * every second, so there's no Label per number like the start countdown's):
+ * `value` falls in on Label `value % 2` ("In"), and the other one — still
+ * showing value + 1 — is knocked out ("Out"), but only if that was the
+ * number shown just before (not on the first one).
+ * @param {number} value the number now, see BreakCountdownValue
+ * @param {number | undefined} previous the number shown before it, if any
+ * @returns {{ in: number, out: number | undefined }} Label indexes, 0 or 1
+ */
+function BreakCountdownLabels(value, previous) {
+    return { in: value % 2, out: previous === value + 1 ? (value + 1) % 2 : undefined };
+}
+
+/**
+ * Keeps track of when a racer last made progress (a new checkpoint or a
+ * lap): returns `watch` unchanged while `checkpoint`/`laps` are the same as
+ * it saw, else a fresh watch starting at `now`. Start one at GO with
+ * `watch` undefined.
+ * @param {{ checkpoint: number, laps: number, since: number } | undefined} watch
+ * @param {number} checkpoint @param {number} laps @param {number} now
+ */
+function WatchProgress(watch, checkpoint, laps, now) {
+    if (watch && watch.checkpoint === checkpoint && watch.laps === laps) {
+        return watch;
+    }
+    return { checkpoint, laps, since: now };
+}
+
+/**
+ * Seconds a racer has left to make progress before they're out (DNF) — at
+ * or below 0 they are. @param {{ since: number }} watch @param {number} now
+ * @param {number} limit DNF_NO_PROGRESS_SECONDS
+ */
+function DnfSecondsLeft(watch, now, limit) {
+    return limit - (now - watch.since);
+}
+
+/**
+ * What the racer's dnf_warning shows `left` seconds before they're out: the
+ * whole seconds, rounded up (so it never shows 0 while still racing), only
+ * within the last `warning` seconds — undefined before that.
+ * @param {number} left see DnfSecondsLeft @param {number} warning DNF_WARNING_SECONDS
+ */
+function DnfWarningValue(left, warning) {
+    return left > 0 && left <= warning ? Math.ceil(left) : undefined;
 }
 
 // The podium in the hub: once a Grand Prix has run to its last track and the
@@ -6197,36 +6514,43 @@ let activeTrackId = undefined;
 /** GetGameTime() at which the current COUNTDOWN/BREAK phase should end. */
 let phaseEndTime = 0;
 
-/** One class per countdown image on the HUD's countdown_panel (see
- * speedometer.xml/.css) — exactly one is set at a time. There's no image for
- * values above 3, so a COUNTDOWN_SECONDS > 3 shows nothing until 3.
+/** The countdown's numbers in countdown_panel (speedometer.xml), in order —
+ * index = CountdownStep. Each gets "In" or "Out" (CountdownNumberState),
+ * which plays its fall in / knock out animation (speedometer.css).
  */
-const COUNTDOWN_SHOW_CLASSES = ["Show3", "Show2", "Show1", "ShowGo"];
+const COUNTDOWN_NUMBER_IDS = ["count_3", "count_2", "count_1", "count_go"];
 
-/** Number the BREAK countdown last sent to each slot — the digit images are
- * only re-sent when it changes (one class per image, see speedometer.xml).
+/** Number the BREAK countdown last sent to each slot — only re-sent when
+ * it changes, each change being one number falling in.
  * @type {Map<number, number>} */
 const breakCountdownShown = new Map();
 
+/** The break countdown's two number Labels, taking turns — see BreakCountdownLabels. */
+const BREAK_NUMBER_IDS = ["break_num_0", "break_num_1"];
+
 /**
- * Shows `value` on one player's break_countdown (number-0..9 images, a tens
- * digit only from 10 up), or hides it with `value` undefined.
+ * Shows `value` on one player's break_countdown like the start countdown:
+ * it falls in, knocking out the number before it (see BreakCountdownLabels).
+ * Hidden with `value` undefined.
  * @param {number} slot @param {number | undefined} value
  */
 function SetBreakCountdown(slot, value) {
     const hud = GetSpeedHud();
+    const previous = breakCountdownShown.get(slot);
     if (value === undefined) {
         breakCountdownShown.delete(slot);
     } else {
         breakCountdownShown.set(slot, value);
     }
-    const digits = value === undefined ? undefined : CountdownDigits(value);
     hud?.SetHasClassForPlayer(slot, "break_countdown", "Hidden", value === undefined);
-    hud?.SetHasClassForPlayer(slot, "break_tens", "On", digits?.tens !== undefined);
-    for (let d = 0; d <= 9; d++) {
-        hud?.SetHasClassForPlayer(slot, `break_tens_${d}`, "On", digits?.tens === d);
-        hud?.SetHasClassForPlayer(slot, `break_ones_${d}`, "On", digits?.ones === d);
-    }
+    const labels = value === undefined ? undefined : BreakCountdownLabels(value, previous);
+    BREAK_NUMBER_IDS.forEach((id, index) => {
+        if (labels?.in === index) {
+            hud?.SetDialogVariableStringForPlayer(slot, id, "n", String(value));
+        }
+        hud?.SetHasClassForPlayer(slot, id, "In", labels?.in === index);
+        hud?.SetHasClassForPlayer(slot, id, "Out", labels?.out === index);
+    });
 }
 
 /**
@@ -6373,7 +6697,10 @@ function BeginHeat(trackId) {
         CancelRun(kart); // a free-roaming run doesn't carry into the heat — its clock starts at GO
         kart.finished = false;
         kart.locked = true;
+        kart.progressWatch = undefined; // the DNF clock starts at GO
+        HideDnfWarning(kart);
         kart.podium = undefined; // off the podium into the next Grand Prix
+        EndTestPreview(kart); // the real countdown takes over its HUD
         // Its own lined-up spot, not the start line's center — a respawn
         // before reaching checkpoint 1 (break, or the user menu's respawn
         // button during the countdown) would otherwise stack it on whoever
@@ -6446,7 +6773,10 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.racing = false;
         kart.finished = false;
         kart.locked = false;
+        kart.progressWatch = undefined;
+        HideDnfWarning(kart);
         kart.podium = undefined; // the hub/tutorial button takes a melon down from the podium too
+        EndTestPreview(kart); // the melon is let go just above
         // kart.inHub (and the hub modal) is deliberately left to the
         // hub_start_trigger's own hub_enter/hub_leave inputs: the teleport
         // below lands inside it and fires hub_enter from there. Forcing it
@@ -6498,10 +6828,202 @@ function SendKartsOutOfRace(returning, spawn, label) {
     });
 }
 
+/**
+ * Shows one player's countdown `remaining` seconds before GO: the current
+ * number falling in / standing, the one before it knocked out (see
+ * CountdownNumberState). @param {number} slot @param {number} remaining
+ */
+function ShowCountdown(slot, remaining) {
+    const hud = GetSpeedHud();
+    const step = CountdownStep(remaining);
+    hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", false);
+    COUNTDOWN_NUMBER_IDS.forEach((id, index) => {
+        const state = CountdownNumberState(index, step);
+        hud?.SetHasClassForPlayer(slot, id, "In", state === "In");
+        hud?.SetHasClassForPlayer(slot, id, "Out", state === "Out");
+    });
+}
+
+/**
+ * Developer (user menu "Test Countdown"): the heat's 3…2…1…GO for this one
+ * player, without a heat — the melon is held where it is until GO, like on
+ * the start grid. Doesn't touch the race phase or anyone else. Not for a
+ * racer (their HUD belongs to the heat), a breaking melon or one already
+ * playing a preview.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @returns {boolean} whether it started
+ */
+function TestCountdown(kart) {
+    if (kart.racing || kart.breaking || kart.testPreview) {
+        return false;
+    }
+    kart.testPreview = { kind: "countdown", endTime: Instance.GetGameTime() + COUNTDOWN_SECONDS };
+    kart.locked = true;
+    return true;
+}
+
+/**
+ * Developer (user menu "Test Finish"): what a racer sees on crossing the
+ * finish of the last lap — the FINISH image, "1ST · +10 PTS" under it and the
+ * BREAK countdown — for this one player, without a heat. Held in place
+ * meanwhile, like a finished racer. Same limits as TestCountdown.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @returns {boolean} whether it started
+ */
+function TestFinish(kart) {
+    if (kart.racing || kart.breaking || kart.testPreview) {
+        return false;
+    }
+    kart.testPreview = { kind: "finish", endTime: Instance.GetGameTime() + BREAK_SECONDS };
+    kart.locked = true;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot !== undefined) {
+        GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "finish_place", "place", `${OrdinalPlace(1)}  ·  +${HEAT_POINTS[0]} PTS`);
+        SetFinishImageVisible(slot, true);
+        breakCountdownShown.delete(slot);
+    }
+    return true;
+}
+
+/**
+ * Developer (user menu "Test Intro"): the Melon Racer logo a player sees on
+ * joining, for INTRO_LOGO_SECONDS, without rejoining — the melon held where
+ * it is behind it. Same limits as TestCountdown.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @returns {boolean} whether it started
+ */
+function TestIntro(kart) {
+    if (kart.racing || kart.breaking || kart.testPreview) {
+        return false;
+    }
+    kart.testPreview = { kind: "intro", endTime: Instance.GetGameTime() + INTRO_LOGO_SECONDS };
+    kart.locked = true;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot !== undefined) {
+        SetIntroLogoVisible(slot, true);
+    }
+    return true;
+}
+
+/**
+ * Stops a TestCountdown/TestFinish/TestIntro preview and hides whatever it
+ * showed. Leaves kart.locked to the caller.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function EndTestPreview(kart) {
+    if (!kart.testPreview) {
+        return;
+    }
+    kart.testPreview = undefined;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot === undefined) {
+        return;
+    }
+    GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
+    SetBreakCountdown(slot, undefined);
+    SetFinishImageVisible(slot, false);
+    SetIntroLogoVisible(slot, false);
+}
+
+/**
+ * Runs the TestCountdown/TestFinish/TestIntro previews: the same HUD as the
+ * real COUNTDOWN (GO shown for GO_DISPLAY_SECONDS), BREAK and join, then
+ * everything hidden again and the melon let go.
+ * @param {number} now
+ */
+function UpdateTestPreviews(now) {
+    for (const kart of karts.values()) {
+        const preview = kart.testPreview;
+        if (!preview) {
+            continue;
+        }
+        const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+        const remaining = preview.endTime - now;
+        if (preview.kind === "countdown") {
+            if (remaining <= 0 && kart.locked) {
+                kart.locked = false; // GO
+            }
+            if (remaining > -GO_DISPLAY_SECONDS) {
+                if (slot !== undefined) {
+                    ShowCountdown(slot, remaining);
+                }
+                continue;
+            }
+        } else if (preview.kind === "finish") {
+            if (remaining > 0) {
+                const value = BreakCountdownValue(remaining);
+                if (slot !== undefined && breakCountdownShown.get(slot) !== value) {
+                    SetBreakCountdown(slot, value);
+                }
+                continue;
+            }
+        } else if (remaining > 0) {
+            continue; // intro: the logo stays up
+        }
+        EndTestPreview(kart);
+        kart.locked = false;
+    }
+}
+
+/**
+ * The DNF rule (DNF_NO_PROGRESS_SECONDS): a racer who hasn't reached a new
+ * checkpoint or counted a lap for that long since GO or their last one is
+ * out — back to the hub like the user menu's "Exit Race", their Grand Prix
+ * standings so far kept. So nobody can hold up a heat for the others by
+ * stopping (or getting stuck); if every racer is out, the heat ends like
+ * one everyone left. The last DNF_WARNING_SECONDS are counted down on
+ * their HUD (dnf_warning). Finished racers are left alone.
+ * @param {import("../../core/kart-registry.js").Kart[]} racers @param {number} now
+ */
+function UpdateDnf(racers, now) {
+    for (const kart of racers) {
+        if (kart.finished) {
+            SetDnfWarning(kart, undefined, now);
+            continue;
+        }
+        kart.progressWatch = WatchProgress(kart.progressWatch, kart.checkpointIndex, kart.lapsCompleted, now);
+        const left = DnfSecondsLeft(kart.progressWatch, now, DNF_NO_PROGRESS_SECONDS);
+        if (left <= 0) {
+            Debug(`UpdateDnf: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} made no progress for ${DNF_NO_PROGRESS_SECONDS}s on track ${activeTrackId} — DNF, back to the hub`);
+            ReturnAllToHub([kart]);
+            continue;
+        }
+        SetDnfWarning(kart, DnfWarningValue(left, DNF_WARNING_SECONDS), now);
+    }
+}
+
+/**
+ * Shows `value` seconds on one racer's dnf_warning (hidden with undefined) —
+ * sent on change, and again every HUD_RESEND_SECONDS.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number | undefined} value @param {number} now
+ */
+function SetDnfWarning(kart, value, now) {
+    if (value === kart.dnfShown && now < (kart.dnfResendAt ?? 0)) {
+        return;
+    }
+    kart.dnfShown = value;
+    kart.dnfResendAt = now + HUD_RESEND_SECONDS;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot === undefined) {
+        return;
+    }
+    if (value !== undefined) {
+        GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "dnf_warning", "dnf", String(value));
+    }
+    GetSpeedHud()?.SetHasClassForPlayer(slot, "dnf_warning", "Hidden", value === undefined);
+}
+
+/** Hides a racer's dnf_warning right away — a new heat, or out of the race. @param {import("../../core/kart-registry.js").Kart} kart */
+function HideDnfWarning(kart) {
+    kart.dnfResendAt = undefined;
+    SetDnfWarning(kart, undefined, Instance.GetGameTime());
+}
+
 /** Drives the COUNTDOWN/RACING/BREAK timers and transitions — called once per Think tick (see core/think.js). */
 /** @param {number} now */
 function UpdateRaceFlow(now) {
     const hud = GetSpeedHud();
+    UpdateTestPreviews(now);
 
     if (phase === RacePhase.COUNTDOWN) {
         const racers = CurrentRacers();
@@ -6518,21 +7040,17 @@ function UpdateRaceFlow(now) {
             return;
         }
         const remaining = phaseEndTime - now;
-        const showClass = remaining > 0 ? `Show${Math.ceil(remaining)}` : "ShowGo";
         for (const kart of racers) {
             const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-            if (slot === undefined) {
-                continue;
-            }
-            hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", false);
-            for (const cls of COUNTDOWN_SHOW_CLASSES) {
-                hud?.SetHasClassForPlayer(slot, "countdown_panel", cls, cls === showClass);
+            if (slot !== undefined) {
+                ShowCountdown(slot, remaining);
             }
         }
         if (remaining <= 0) {
             for (const kart of racers) {
                 kart.locked = false;
                 StartRun(kart, now); // the heat's time trial clock
+                kart.progressWatch = WatchProgress(undefined, kart.checkpointIndex, kart.lapsCompleted, now); // and the DNF one
             }
             // The "GO" image just shown above stays up for GO_DISPLAY_SECONDS —
             // hiding it in this same tick meant it was never actually seen.
@@ -6545,6 +7063,7 @@ function UpdateRaceFlow(now) {
     }
 
     if (phase === RacePhase.RACING) {
+        UpdateDnf(CurrentRacers(), now); // may send racers out — counted again below
         const racers = CurrentRacers();
         if (now >= phaseEndTime) {
             for (const kart of racers) {
@@ -7427,6 +7946,7 @@ function SetUserMenuOpen(slot, kart, open) {
         // Refreshed on every open: a layout or script reload in tools mode
         // wipes what was set when the kart spawned.
         UpdateMelonGlowHud(slot, kart);
+        UpdateStartInTutorialHud(slot, kart);
         UpdatePredictionHud(slot, kart);
         UpdateCollisionDebugHud(slot, kart);
         UpdateFreeLookHud(slot, kart);
@@ -7457,6 +7977,22 @@ function UpdateMelonGlowHud(slot, kart) {
     const on = IsMelonGlowOn(kart);
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_glow_button", "glow_state", on ? "ON" : "OFF");
     hud.SetHasClassForPlayer(slot, "usermenu_glow_button", "ToggleOn", on);
+}
+
+/**
+ * The user menu's "Start in Tutorial" toggle button: its ON/OFF text and
+ * highlight (ON: the player's melon appears in the tutorial when they join,
+ * OFF: in the hub — kart/join-spot.js).
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+function UpdateStartInTutorialHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const on = IsStartInTutorialOn(kart);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_jointutorial_button", "jointutorial_state", on ? "ON" : "OFF");
+    hud.SetHasClassForPlayer(slot, "usermenu_jointutorial_button", "ToggleOn", on);
 }
 
 /**
@@ -7614,6 +8150,15 @@ function RegisterHudInputs() {
                 SetMelonGlow(kart, !IsMelonGlowOn(kart));
                 UpdateMelonGlowHud(slot, kart);
             }
+        } else if (event.buttonId === "usermenu_jointutorial_button") {
+            // Where this player's melon appears next time they join: the
+            // tutorial or the hub. Saved per player name (kart/join-spot.js).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart) {
+                SetStartInTutorial(kart, !IsStartInTutorialOn(kart));
+                UpdateStartInTutorialHud(slot, kart);
+            }
         } else if (event.buttonId === "usermenu_prediction_button") {
             // Per player: only this player's melon gets the line (drawn with
             // DebugLine in the default render mode, so tools mode only).
@@ -7664,6 +8209,27 @@ function RegisterHudInputs() {
             SetUserMenuOpen(slot, kart, false);
             ReturnAllToHub(racers);
             PlaceOnPodium(TestGrandPrix(racers), racers);
+        } else if (
+            event.buttonId === "usermenu_testcountdown_button" ||
+            event.buttonId === "usermenu_testfinish_button" ||
+            event.buttonId === "usermenu_testintro_button"
+        ) {
+            // Developer: the heat's countdown, what a racer sees at the
+            // finish, or the join logo, for the clicking player only — no
+            // heat, nobody else. Not while they race (the heat's HUD is
+            // theirs then).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (!kart) {
+                return;
+            }
+            const preview =
+                event.buttonId === "usermenu_testcountdown_button" ? TestCountdown : event.buttonId === "usermenu_testfinish_button" ? TestFinish : TestIntro;
+            if (preview(kart)) {
+                SetUserMenuOpen(slot, kart, false);
+            } else {
+                Debug(`${event.buttonId}: slot ${slot}, ignored (racing=${kart.racing}, breaking=${kart.breaking}, preview=${kart.testPreview?.kind})`);
+            }
         } else if (event.buttonId.startsWith("usermenu_color_")) {
             const key = event.buttonId.slice("usermenu_color_".length);
             const preset = COLOR_PRESETS[key];
@@ -8054,6 +8620,7 @@ function UpdateKart(slot, kart, dt) {
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.attackBoosting = false;
+        UpdateSpectatorHat(kart);
         return;
     }
 
@@ -8731,7 +9298,8 @@ function RegisterKartInputs() {
 }
 
 // A player's kart: spawning the melon and freezing the pawn (spawn.js), the
-// spawn entities (spawn-points.js), moving the melon on purpose
+// spawn entities (spawn-points.js) and where a joining player starts
+// (join-spot.js), moving the melon on purpose
 // (teleport.js), its look — paint and glow (look.js) — and the player
 // lifecycle / paint trigger inputs (inputs.js). The kart record itself and
 // the registry of all karts are in core/kart-registry.js.

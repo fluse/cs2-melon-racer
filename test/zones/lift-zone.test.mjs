@@ -4,7 +4,6 @@ import { BounceUpVelocity, WithMinSpeed } from "../../src/melon_drive/movement/w
 import { LiftZoneUpSpeed, WallRules } from "../../src/melon_drive/zones/lift/logic.js";
 import {
     WALL_BOUNCE_UP_SPEED,
-    WALL_JUMP_COOLDOWN,
     WALL_JUMP_WINDOW,
     WALL_JUMP_UP_SPEED,
     WALL_JUMP_PUSH_SPEED,
@@ -12,8 +11,6 @@ import {
     SIDE_VIEW_WALL_JUMP_PUSH_SPEED,
     LIFT_ZONE_UP_SPEED,
     LIFT_ZONE_MIN_BOUNCE_SPEED,
-    LIFT_ZONE_WALL_JUMP_COOLDOWN,
-    LIFT_ZONE_JUMP_BUFFER,
     LIFT_ZONE_WALL_JUMP_WINDOW,
     PERFECT_BOUNCE_UP_MULTIPLIER,
     BOUNCE_RATINGS,
@@ -62,37 +59,31 @@ test("wall rules outside a lift zone: the normal bounce and wall jump", () => {
         inLift: false,
         bounceUpSpeed: WALL_BOUNCE_UP_SPEED,
         minBounceSpeed: 0,
-        wallJumpCooldown: WALL_JUMP_COOLDOWN,
         wallJumpWindow: WALL_JUMP_WINDOW,
         freeWallJumps: false,
-        jumpBuffer: 0,
         ratedWallJumps: true,
         wallJumpUpSpeed: WALL_JUMP_UP_SPEED,
         wallJumpPushSpeed: WALL_JUMP_PUSH_SPEED,
     });
 });
 
-test("wall rules in a lift zone: its kick, minimum bounce speed, free wall jumps, short cooldown, longer contact window, jump buffer", () => {
+test("wall rules in a lift zone: its kick, minimum bounce speed, free wall jumps, longer contact window", () => {
     assert.deepEqual(WallRules(LIFT_ZONE_UP_SPEED), {
         inLift: true,
         bounceUpSpeed: Math.max(WALL_BOUNCE_UP_SPEED, LIFT_ZONE_UP_SPEED),
         minBounceSpeed: LIFT_ZONE_MIN_BOUNCE_SPEED,
-        wallJumpCooldown: LIFT_ZONE_WALL_JUMP_COOLDOWN,
         wallJumpWindow: LIFT_ZONE_WALL_JUMP_WINDOW,
         freeWallJumps: true,
-        jumpBuffer: LIFT_ZONE_JUMP_BUFFER,
         ratedWallJumps: false,
         wallJumpUpSpeed: WALL_JUMP_UP_SPEED,
         wallJumpPushSpeed: WALL_JUMP_PUSH_SPEED,
     });
 });
 
-test("wall rules in a side-view zone: wall jumps not rated but higher and further, with a lift zone's timing, costing no charge", () => {
+test("wall rules in a side-view zone: wall jumps not rated but higher and further, with a lift zone's contact window, costing no charge", () => {
     assert.deepEqual(WallRules(undefined, true), {
         ...WallRules(undefined),
-        wallJumpCooldown: LIFT_ZONE_WALL_JUMP_COOLDOWN,
         wallJumpWindow: LIFT_ZONE_WALL_JUMP_WINDOW,
-        jumpBuffer: LIFT_ZONE_JUMP_BUFFER,
         freeWallJumps: true,
         ratedWallJumps: false,
         wallJumpUpSpeed: SIDE_VIEW_WALL_JUMP_UP_SPEED,

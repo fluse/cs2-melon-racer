@@ -3,6 +3,7 @@ import { IsCollisionDebugOn } from "../dev/collision-debug.js";
 import { IsFreeLookOn } from "../dev/free-look.js";
 import { IsPredictionOn } from "../fx/prediction/prediction.js";
 import { IsMelonGlowOn } from "../kart/look.js";
+import { IsStartInTutorialOn } from "../kart/join-spot.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { CanRestartTimeTrial } from "../race/time-trial/time-trial.js";
 import { GetSpeedHud, SyncInputCapture } from "./layout.js";
@@ -25,6 +26,7 @@ export function SetUserMenuOpen(slot, kart, open) {
         // Refreshed on every open: a layout or script reload in tools mode
         // wipes what was set when the kart spawned.
         UpdateMelonGlowHud(slot, kart);
+        UpdateStartInTutorialHud(slot, kart);
         UpdatePredictionHud(slot, kart);
         UpdateCollisionDebugHud(slot, kart);
         UpdateFreeLookHud(slot, kart);
@@ -55,6 +57,22 @@ export function UpdateMelonGlowHud(slot, kart) {
     const on = IsMelonGlowOn(kart);
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_glow_button", "glow_state", on ? "ON" : "OFF");
     hud.SetHasClassForPlayer(slot, "usermenu_glow_button", "ToggleOn", on);
+}
+
+/**
+ * The user menu's "Start in Tutorial" toggle button: its ON/OFF text and
+ * highlight (ON: the player's melon appears in the tutorial when they join,
+ * OFF: in the hub — kart/join-spot.js).
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+export function UpdateStartInTutorialHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const on = IsStartInTutorialOn(kart);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_jointutorial_button", "jointutorial_state", on ? "ON" : "OFF");
+    hud.SetHasClassForPlayer(slot, "usermenu_jointutorial_button", "ToggleOn", on);
 }
 
 /**

@@ -33,6 +33,11 @@ export const GROUND_COYOTE_TIME = 0.08; // seconds a ground contact stays valid 
 // doesn't count for this long after any jump. Otherwise a second press just
 // after taking off jumped again in mid-air.
 export const GROUND_LIFTOFF_TIME = 0.15; // seconds
+// A jump pressed in the air up to this long before touching down jumps on
+// the touchdown (see BufferedGroundJump) — otherwise a press a tick or two
+// early was simply lost. Shorter than any real jump's airtime, so a second
+// press right after taking off can't turn into a jump on the next landing.
+export const GROUND_JUMP_BUFFER = 0.1; // seconds
 
 // Wall jump: in the air, at a wall (a line trace in any of
 // WALL_PROBE_DIRECTIONS horizontal directions finds a steep surface within
@@ -70,7 +75,14 @@ export const WALL_JUMP_CONTACT_RADIUS = 7; // units
 // so the press on the touch can land a tick late. (Lift zones: longer, see
 // LIFT_ZONE_WALL_JUMP_WINDOW.)
 export const WALL_JUMP_WINDOW = 0.035; // seconds
-export const WALL_JUMP_COOLDOWN = 0.45; // seconds between two wall jumps (was 0.3)
+// No cooldown between two wall jumps (there was one, 0.45 s): the next one
+// needs a new wall contact instead — the melon has left the wall it jumped
+// off and touched one again (see WallJumpBlockReason). A press too early for
+// that isn't lost: pressed up to this long before the melon can wall jump
+// (before touching the next wall, or while still at the last one), it fires
+// the wall jump the moment it can — everywhere, as it used to only in lift
+// zones.
+export const WALL_JUMP_BUFFER = 0.2; // seconds
 export const WALL_JUMP_CHARGES = 3; // wall jumps in a row, each full strength (was a 0..1 charge, half used per jump, weaker each time)
 export const WALL_JUMP_RECHARGE_SECONDS = 2; // seconds to refill one wall jump — they refill one after the other, empty -> full = WALL_JUMP_CHARGES × this
 export const WALL_JUMP_UP_SPEED = 240; // units/sec upward — well below the ground jump's JUMP_SPEED (was 380)

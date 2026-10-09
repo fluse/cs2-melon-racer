@@ -24,8 +24,15 @@ export const RacePhase = /** @type {const} */ ({
 export const HUB_TRIGGER_NAME = "hub_start_trigger";
 
 export const COUNTDOWN_SECONDS = 3;
-export const GO_DISPLAY_SECONDS = 1; // how long "GO!" stays on screen once the countdown ends
+export const GO_DISPLAY_SECONDS = 0.7; // how long "GO" stays on screen once the countdown ends — its grow-and-fade (speedometer.css) is done by .62s
 export const BREAK_SECONDS = 10; // fixed by the original request
+// A racer who reaches no new checkpoint (and counts no lap) for this long
+// after GO or their last one is out of the Grand Prix (DNF) and back in the
+// hub — so one player who stops driving can't block a heat for everyone.
+export const DNF_NO_PROGRESS_SECONDS = 60;
+// The last this-many seconds of that are counted down on the racer's HUD
+// (dnf_warning), so it doesn't come as a surprise.
+export const DNF_WARNING_SECONDS = 15;
 // Spacing between racers teleported onto the same start line side-by-side,
 // so they don't spawn stacked on top of each other.
 export const RACE_SPAWN_LATERAL_SPACING = 120;

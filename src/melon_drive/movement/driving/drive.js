@@ -36,6 +36,7 @@ import { ApplyJump, RechargeWallJumpCharge, GetWallJumpCharges } from "../jump/j
 import { UpdatePadFlight, TryPadLaunch } from "../../zones/jump-pad/jump-pad.js";
 import { UpdateGrounded, UpdateWallContact } from "../contact/contact.js";
 import { DrawCollisionDebug } from "../../dev/collision-debug.js";
+import { UpdateSpectatorHat } from "../../dev/free-look.js";
 import { ApplyImpactDamage } from "../../health/damage/damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage, WallBounceBreaksAtImpact } from "../wall-bounce/wall-bounce.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
@@ -76,6 +77,7 @@ export function UpdateKart(slot, kart, dt) {
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.attackBoosting = false;
+        UpdateSpectatorHat(kart);
         return;
     }
 

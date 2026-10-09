@@ -368,7 +368,8 @@ Example for the first public version:
   cover art — hub with paint pads, a race start with the 3-2-1 countdown, a
   PERFECT bounce with the HUD panel, the melon breaking apart, a view down a
   track, a NEW BEST time on the HUD. A short YouTube clip (30–60 s) of a heat is what sells a racing
-  mode best.
+  mode best. Candidates are collected in `docs/screenshots/` (in-game
+  captures, named by when they were taken).
 - **Cover image**: contest rule — no AI art on the page or in the map. The
   old cover was flagged as looking AI-made, so replace it with one made by
   hand (e.g. an in-game screenshot with the logo on top). It should be 16:9,

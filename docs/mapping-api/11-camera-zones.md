@@ -87,8 +87,7 @@ the melon from one fixed side, at a set distance. A/D drive left/right on
 screen, W drives the way the melon faces, S the other way, Space jumps. Wall
 jumps there aren't rated by angle (no boost, no PERFECT), as in a
 [lift zone](10-lift-zones.md), but always go a bit higher and further, and
-use a lift zone's timing (short cooldown, longer contact window, a press just
-before touching the wall counts) — and, as there, they use up no charges. The melon stays on the plane it entered on — nothing moves it towards or away
+use a lift zone's longer contact window — and, as there, they use up no charges. The melon stays on the plane it entered on — nothing moves it towards or away
 from the camera.
 
 | Setting | Value |

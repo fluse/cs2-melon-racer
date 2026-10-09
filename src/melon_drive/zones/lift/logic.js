@@ -4,7 +4,6 @@
 // just read the WallRules they're handed.
 import {
     WALL_BOUNCE_UP_SPEED,
-    WALL_JUMP_COOLDOWN,
     WALL_JUMP_WINDOW,
     WALL_JUMP_UP_SPEED,
     WALL_JUMP_PUSH_SPEED,
@@ -13,8 +12,6 @@ import {
     LIFT_ZONE_UP_SPEED,
     LIFT_ZONE_NAME_PATTERN,
     LIFT_ZONE_MIN_BOUNCE_SPEED,
-    LIFT_ZONE_WALL_JUMP_COOLDOWN,
-    LIFT_ZONE_JUMP_BUFFER,
     LIFT_ZONE_WALL_JUMP_WINDOW,
 } from "../../constants/index.js";
 
@@ -23,10 +20,8 @@ import {
  *   inLift: boolean,
  *   bounceUpSpeed: number, // upward kick of a wall bounce (u/s)
  *   minBounceSpeed: number, // a bounce leaves the wall at least this fast (u/s), 0 = no minimum
- *   wallJumpCooldown: number, // seconds between two wall jumps
  *   wallJumpWindow: number, // seconds a wall contact stays jumpable
  *   freeWallJumps: boolean, // wall jumps cost no charge, are full strength, may follow a bounce at once
- *   jumpBuffer: number, // seconds a jump press before touching a wall still counts, 0 = none
  *   ratedWallJumps: boolean, // wall jumps are rated by angle (boost, PERFECT kick, feedback) — not in lift or side-view zones
  *   wallJumpUpSpeed: number, // a wall jump's upward speed (u/s)
  *   wallJumpPushSpeed: number, // a wall jump's push away from the wall, at least (u/s)
@@ -38,8 +33,8 @@ import {
  * strongest lift zone it's in (undefined = not in one) and whether it's in a
  * side-view zone — there wall jumps aren't rated either (a 2D jump & run's
  * walls are jumped at whatever angle the plane allows) but go higher and
- * further (SIDE_VIEW_WALL_JUMP_*), with a lift zone's timing (short cooldown,
- * longer contact window, jump buffer) so wall-to-wall jumps chain, and like
+ * further (SIDE_VIEW_WALL_JUMP_*), with a lift zone's longer contact window
+ * so wall-to-wall jumps chain, and like
  * there they cost no charge (freeWallJumps).
  * @param {number | undefined} liftUpSpeed @param {boolean} [inSideView]
  * @returns {WallRules}
@@ -50,10 +45,8 @@ export function WallRules(liftUpSpeed, inSideView = false) {
             inLift: false,
             bounceUpSpeed: WALL_BOUNCE_UP_SPEED,
             minBounceSpeed: 0,
-            wallJumpCooldown: inSideView ? LIFT_ZONE_WALL_JUMP_COOLDOWN : WALL_JUMP_COOLDOWN,
             wallJumpWindow: inSideView ? LIFT_ZONE_WALL_JUMP_WINDOW : WALL_JUMP_WINDOW,
             freeWallJumps: inSideView,
-            jumpBuffer: inSideView ? LIFT_ZONE_JUMP_BUFFER : 0,
             ratedWallJumps: !inSideView,
             wallJumpUpSpeed: inSideView ? SIDE_VIEW_WALL_JUMP_UP_SPEED : WALL_JUMP_UP_SPEED,
             wallJumpPushSpeed: inSideView ? SIDE_VIEW_WALL_JUMP_PUSH_SPEED : WALL_JUMP_PUSH_SPEED,
@@ -64,10 +57,8 @@ export function WallRules(liftUpSpeed, inSideView = false) {
         // A lift zone never kicks weaker than outside one.
         bounceUpSpeed: Math.max(WALL_BOUNCE_UP_SPEED, liftUpSpeed),
         minBounceSpeed: LIFT_ZONE_MIN_BOUNCE_SPEED,
-        wallJumpCooldown: LIFT_ZONE_WALL_JUMP_COOLDOWN,
         wallJumpWindow: LIFT_ZONE_WALL_JUMP_WINDOW,
         freeWallJumps: true,
-        jumpBuffer: LIFT_ZONE_JUMP_BUFFER,
         ratedWallJumps: false,
         wallJumpUpSpeed: WALL_JUMP_UP_SPEED,
         wallJumpPushSpeed: WALL_JUMP_PUSH_SPEED,

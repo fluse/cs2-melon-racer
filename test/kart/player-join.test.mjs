@@ -10,7 +10,7 @@ import { world, Entity, CSPlayerPawn, PointTemplate, CustomCameraMode } from "..
 const { karts } = await import("../../src/melon_drive/core/kart-registry.js");
 const { SetUpPlayerKart, EnsurePlayerKarts, HoldPawn } = await import("../../src/melon_drive/kart/spawn.js");
 const { GetIntroSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
-const { MELON_TEMPLATE_NAME, INTRO_SPAWN_NAME, PAWN_DRIFT_TOLERANCE, INTRO_LOGO_SECONDS, SPEED_HUD_ENTITY_NAME } = await import("../../src/melon_drive/constants/index.js");
+const { MELON_TEMPLATE_NAME, INTRO_SPAWN_NAME, PAWN_DRIFT_TOLERANCE, INTRO_LOGO_SECONDS, SPEED_HUD_ENTITY_NAME, HUB_SPAWN_NAME, SAVE_DATA_PLAYER_SETTINGS_KEY } = await import("../../src/melon_drive/constants/index.js");
 
 const INTRO = { x: -2000, y: -900, z: 24 };
 const PLAYER_SPAWN = { x: 5000, y: 5000, z: 0 };
@@ -127,4 +127,18 @@ test("a weapon the engine gives the pawn back is taken away again — a knife sw
     pawn.weapons = [new Entity({ className: "weapon_knife" })];
     HoldPawn(kart);
     assert.equal(pawn.GetActiveWeapon(), undefined);
+});
+
+test("with \"Start in Tutorial\" off, a joining player's melon appears in the hub instead", () => {
+    const HUB = { x: 300, y: 600, z: 16 };
+    world.add(new Entity({ name: HUB_SPAWN_NAME, className: "info_player_start", origin: HUB }));
+    world.saveData = JSON.stringify({ [SAVE_DATA_PLAYER_SETTINGS_KEY]: { Player0: { startInTutorial: false } } });
+    AddPawn();
+    EnsurePlayerKarts();
+    world.time = INTRO_LOGO_SECONDS;
+    EnsurePlayerKarts();
+    const kart = karts.get(0);
+    assert.equal(kart.melon.GetAbsOrigin().x, HUB.x);
+    assert.equal(kart.melon.GetAbsOrigin().y, HUB.y);
+    assert.equal(kart.checkpointPosition.x, HUB.x, "the hub is its respawn point too");
 });

@@ -3,8 +3,11 @@
 export const MELON_TEMPLATE_NAME = "melon_template";
 
 // How long the Melon Racer logo (intro_logo in speedometer.xml) shows after
-// a player picks a team, before their melon spawns at the intro.
-export const INTRO_LOGO_SECONDS = 5;
+// a player picks a team, before their melon spawns at the intro. Its
+// animation (.IntroLogoImage in speedometer.css) has the logo out of the
+// picture after 2.85s — keep this a little longer than that, and shorter
+// than the animation itself (5s).
+export const INTRO_LOGO_SECONDS = 3.2;
 
 // How far above the floor under a spawn entity (hub_spawn, intro_spawn) the
 // melon's origin appears — straight above it, no sideways offset (see
@@ -28,6 +31,13 @@ export const FLOOR_TRACE_DOWN = 512;
 export const HUB_SPAWN_NAME = "hub_spawn";
 export const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
 export const INTRO_SPAWN_NAME = "intro_spawn";
+
+// Where a joining player's melon appears is their own choice (the user
+// menu's "Start in Tutorial" toggle, kart/join-spot.js): intro_spawn (the
+// default) or straight at hub_spawn. Kept per player name in the addon's
+// save data under this key, next to the best times, so it survives
+// reconnects and map restarts: { [playerName]: { startInTutorial: false } }.
+export const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
 
 // The frozen pawn (CSMoveType.NOCLIP: non-solid, but WASD still flies it)
 // stays where it spawned — see HoldPawn in kart/spawn.js. It's only put back

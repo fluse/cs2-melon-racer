@@ -5,15 +5,16 @@ import { Debug } from "../core/debug.js";
 import { karts, IsModerator } from "../core/kart-registry.js";
 import { RespawnKartAtCheckpoint } from "../kart/teleport.js";
 import { IsMelonGlowOn, SetMelonGlow, SetKartPaintColor } from "../kart/look.js";
+import { IsStartInTutorialOn, SetStartInTutorial } from "../kart/join-spot.js";
 import { IsPredictionOn, SetPrediction } from "../fx/prediction/prediction.js";
 import { IsCollisionDebugOn, SetCollisionDebug } from "../dev/collision-debug.js";
 import { IsFreeLookOn, SetFreeLook } from "../dev/free-look.js";
-import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial } from "../race/heat/race-flow.js";
+import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, TestCountdown, TestFinish, TestIntro } from "../race/heat/race-flow.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { PlaceOnPodium, TestGrandPrix } from "../race/podium/podium.js";
 import { GetSpeedHud } from "./layout.js";
 import { HideHubModal } from "./hub-modal/hub-modal.js";
-import { SetUserMenuOpen, UpdateCollisionDebugHud, UpdateFreeLookHud, UpdateMelonGlowHud, UpdatePredictionHud } from "./user-menu.js";
+import { SetUserMenuOpen, UpdateCollisionDebugHud, UpdateFreeLookHud, UpdateMelonGlowHud, UpdatePredictionHud, UpdateStartInTutorialHud } from "./user-menu.js";
 import { COLOR_PRESETS, RacePhase } from "../constants/index.js";
 
 export function RegisterHudInputs() {
@@ -104,6 +105,15 @@ export function RegisterHudInputs() {
                 SetMelonGlow(kart, !IsMelonGlowOn(kart));
                 UpdateMelonGlowHud(slot, kart);
             }
+        } else if (event.buttonId === "usermenu_jointutorial_button") {
+            // Where this player's melon appears next time they join: the
+            // tutorial or the hub. Saved per player name (kart/join-spot.js).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart) {
+                SetStartInTutorial(kart, !IsStartInTutorialOn(kart));
+                UpdateStartInTutorialHud(slot, kart);
+            }
         } else if (event.buttonId === "usermenu_prediction_button") {
             // Per player: only this player's melon gets the line (drawn with
             // DebugLine in the default render mode, so tools mode only).
@@ -154,6 +164,27 @@ export function RegisterHudInputs() {
             SetUserMenuOpen(slot, kart, false);
             ReturnAllToHub(racers);
             PlaceOnPodium(TestGrandPrix(racers), racers);
+        } else if (
+            event.buttonId === "usermenu_testcountdown_button" ||
+            event.buttonId === "usermenu_testfinish_button" ||
+            event.buttonId === "usermenu_testintro_button"
+        ) {
+            // Developer: the heat's countdown, what a racer sees at the
+            // finish, or the join logo, for the clicking player only — no
+            // heat, nobody else. Not while they race (the heat's HUD is
+            // theirs then).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (!kart) {
+                return;
+            }
+            const preview =
+                event.buttonId === "usermenu_testcountdown_button" ? TestCountdown : event.buttonId === "usermenu_testfinish_button" ? TestFinish : TestIntro;
+            if (preview(kart)) {
+                SetUserMenuOpen(slot, kart, false);
+            } else {
+                Debug(`${event.buttonId}: slot ${slot}, ignored (racing=${kart.racing}, breaking=${kart.breaking}, preview=${kart.testPreview?.kind})`);
+            }
         } else if (event.buttonId.startsWith("usermenu_color_")) {
             const key = event.buttonId.slice("usermenu_color_".length);
             const preset = COLOR_PRESETS[key];

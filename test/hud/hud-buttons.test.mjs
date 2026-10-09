@@ -169,6 +169,20 @@ test("toggle buttons switch that player's own setting and show ON/OFF", () => {
     }
 });
 
+test("start in tutorial button: saved per player name, ON by default, OFF sends their next join to the hub", async () => {
+    const { IsStartInTutorialOn } = await import("../../src/melon_drive/kart/join-spot.js");
+    assert.equal(IsStartInTutorialOn(a), true, "on by default");
+    Click(0, "usermenu_jointutorial_button");
+    assert.equal(IsStartInTutorialOn(a), false);
+    assert.equal(hud.Variable(0, "usermenu_jointutorial_button", "jointutorial_state"), "OFF");
+    assert.equal(hud.Has(0, "usermenu_jointutorial_button", "ToggleOn"), false);
+    assert.equal(IsStartInTutorialOn(b), true, "the other player's untouched");
+    assert.equal(JSON.parse(world.saveData)[C.SAVE_DATA_PLAYER_SETTINGS_KEY][a.pawn.GetPlayerController().GetPlayerName()].startInTutorial, false, "in the save data");
+    Click(0, "usermenu_jointutorial_button");
+    assert.equal(IsStartInTutorialOn(a), true);
+    assert.equal(hud.Variable(0, "usermenu_jointutorial_button", "jointutorial_state"), "ON");
+});
+
 test("free look button: switching it on closes the menu, switching it off doesn't open it", () => {
     SetUserMenuOpen(0, a, true);
     Click(0, "usermenu_freelook_button");
@@ -179,6 +193,44 @@ test("free look button: switching it on closes the menu, switching it off doesn'
     Click(0, "usermenu_freelook_button");
     assert.equal(a.freeLook, false);
     assert.equal(a.userMenuOpen, false);
+});
+
+test("free look: a ghost avatar from template_spectator_hat hangs on the flying pawn, gone again when it's off or the player leaves", async () => {
+    const { DropKart } = await import("../../src/melon_drive/core/kart-registry.js");
+    world.add(new PointTemplate({ name: C.SPECTATOR_HAT_TEMPLATE_NAME, spawn: () => [new Entity({ className: "prop_dynamic", origin: { x: 500, y: 0, z: 0 } })] }));
+    Click(0, "usermenu_freelook_button");
+    const [hat] = a.spectatorHat ?? [];
+    assert.ok(hat?.IsValid(), "spawned");
+    assert.equal(hat.GetParent(), undefined, "moved by script, not parented (parented it sat in the camera)");
+    const feet = a.pawn.GetAbsOrigin();
+    const yaw = a.pawn.GetEyeAngles().yaw * Math.PI / 180;
+    const at = hat.GetAbsOrigin();
+    assert.ok(Math.abs(at.x - (feet.x - Math.cos(yaw) * C.SPECTATOR_HAT_BACK)) < 1e-6
+        && Math.abs(at.y - (feet.y - Math.sin(yaw) * C.SPECTATOR_HAT_BACK)) < 1e-6
+        && at.z === feet.z + C.SPECTATOR_HAT_HEIGHT, "at eye height, a little behind the eyes, not at its Hammer offset");
+    assert.equal(b.spectatorHat, undefined, "only the free-looking player");
+
+    const { UpdateSpectatorHat } = await import("../../src/melon_drive/dev/free-look.js");
+    a.pawn.Teleport({ position: { x: 100, y: 200, z: 300 }, angles: { pitch: 0, yaw: 90, roll: 0 } });
+    UpdateSpectatorHat(a);
+    const moved = hat.GetAbsOrigin();
+    assert.ok(Math.abs(moved.x - 100) < 1e-6 && Math.abs(moved.y - (200 - C.SPECTATOR_HAT_BACK)) < 1e-6
+        && moved.z === 300 + C.SPECTATOR_HAT_HEIGHT, "follows the flying pawn, behind its current view");
+
+    Click(0, "usermenu_freelook_button");
+    assert.equal(hat.IsValid(), false, "removed when free look goes off");
+    assert.equal(a.spectatorHat, undefined);
+
+    Click(0, "usermenu_freelook_button");
+    const [again] = a.spectatorHat;
+    DropKart(0, a);
+    assert.equal(again.IsValid(), false, "removed when the player leaves");
+});
+
+test("free look without template_spectator_hat in the map: no avatar, free look still works", () => {
+    Click(0, "usermenu_freelook_button");
+    assert.equal(a.freeLook, true);
+    assert.deepEqual(a.spectatorHat, []);
 });
 
 test("color buttons paint that player's melon in the preset; an unknown color does nothing", () => {
@@ -193,7 +245,7 @@ test("color buttons paint that player's melon in the preset; an unknown color do
 });
 
 test("clicks from a player without a kart are ignored", () => {
-    for (const button of ["hub_close_button", "usermenu_close_button", "usermenu_respawn_button", "usermenu_restart_button", "usermenu_hub_button", "usermenu_tutorial_button", "usermenu_glow_button", "usermenu_freelook_button", "usermenu_color_red"]) {
+    for (const button of ["hub_close_button", "usermenu_close_button", "usermenu_respawn_button", "usermenu_restart_button", "usermenu_hub_button", "usermenu_tutorial_button", "usermenu_glow_button", "usermenu_jointutorial_button", "usermenu_freelook_button", "usermenu_color_red"]) {
         assert.doesNotThrow(() => Click(7, button), button);
     }
 });
@@ -218,4 +270,92 @@ test("test podium button: the clicker on place 1, the others after — never dur
     assert.equal(a.podium?.place, 2);
     assert.deepEqual(HorizontalSpot(b), [steps[1].x, steps[1].y]);
     assert.ok(world.fired.some((f) => f.name === PODIUM_CONFETTI_NAME && f.input === "Start"), "confetti");
+});
+
+/** Runs the race flow (and with it the test previews) at `time`. @param {number} time */
+function FlowAt(time) {
+    world.time = time;
+    flow.UpdateRaceFlow(time);
+}
+
+test("test countdown button: 3…2…1…GO for the clicker alone, held until GO — no heat", () => {
+    world.time = 50;
+    SetUserMenuOpen(1, b, true);
+    Click(1, "usermenu_testcountdown_button");
+    assert.equal(b.userMenuOpen, false, "the menu closes");
+    assert.equal(flow.phase, RacePhase.HUB, "no heat started");
+    assert.equal(b.locked, true, "held like on the start grid");
+    FlowAt(50 + 0.5);
+    assert.equal(hud.Has(1, "countdown_panel", "Hidden"), false);
+    assert.equal(hud.Has(1, `count_${Math.ceil(C.COUNTDOWN_SECONDS - 0.5)}`, "In"), true);
+    assert.equal(hud.Has(0, "countdown_panel", "Hidden"), undefined, "the other player sees nothing");
+    assert.equal(a.locked, false);
+    FlowAt(50 + C.COUNTDOWN_SECONDS);
+    assert.equal(hud.Has(1, "count_go", "In"), true, "GO");
+    assert.equal(b.locked, false, "let go at GO");
+    FlowAt(50 + C.COUNTDOWN_SECONDS + C.GO_DISPLAY_SECONDS + 0.01);
+    assert.equal(hud.Has(1, "countdown_panel", "Hidden"), true, "hidden again after GO");
+    assert.equal(b.testPreview, undefined);
+});
+
+test("test finish button: FINISH, the place and the break countdown for the clicker alone, held meanwhile", () => {
+    world.time = 50;
+    Click(1, "usermenu_testfinish_button");
+    assert.equal(flow.phase, RacePhase.HUB, "no heat started");
+    assert.equal(b.locked, true, "parked like a finished racer");
+    assert.equal(hud.Has(1, "finish_image", "Hidden"), false);
+    assert.ok(hud.Variable(1, "finish_place", "place").includes(`+${C.HEAT_POINTS[0]} PTS`), "1st place's points under it");
+    FlowAt(50 + 0.5);
+    assert.equal(hud.Has(1, "break_countdown", "Hidden"), false, "the break countdown runs");
+    assert.equal(hud.Has(0, "finish_image", "Hidden"), undefined, "the other player sees nothing");
+    FlowAt(50 + C.BREAK_SECONDS);
+    assert.equal(hud.Has(1, "finish_image", "Hidden"), true, "hidden again");
+    assert.equal(hud.Has(1, "break_countdown", "Hidden"), true);
+    assert.equal(b.locked, false, "let go");
+    assert.equal(b.testPreview, undefined);
+});
+
+test("test countdown/finish buttons: ignored while racing; the hub button ends a preview", () => {
+    a.inHub = b.inHub = true;
+    flow.TryStartRace();
+    Click(1, "usermenu_testcountdown_button");
+    Click(1, "usermenu_testfinish_button");
+    assert.equal(b.testPreview, undefined, "ignored in a heat");
+    flow.TryAbortRace();
+
+    Click(1, "usermenu_testfinish_button");
+    assert.equal(b.testPreview?.kind, "finish");
+    Click(1, "usermenu_hub_button");
+    assert.equal(b.testPreview, undefined, "the hub button ends it");
+    assert.equal(b.locked, false);
+    assert.equal(hud.Has(1, "finish_image", "Hidden"), true);
+});
+
+test("test intro button: the join logo for the clicker alone, held behind it", () => {
+    world.time = 50;
+    Click(1, "usermenu_testintro_button");
+    assert.equal(hud.Has(1, "intro_logo", "Hidden"), false, "the logo shows");
+    assert.equal(hud.Has(0, "intro_logo", "Hidden"), undefined, "the other player sees nothing");
+    assert.equal(b.locked, true);
+    FlowAt(50 + C.INTRO_LOGO_SECONDS / 2);
+    assert.equal(hud.Has(1, "intro_logo", "Hidden"), false, "still up");
+    FlowAt(50 + C.INTRO_LOGO_SECONDS);
+    assert.equal(hud.Has(1, "intro_logo", "Hidden"), true, "hidden again");
+    assert.equal(b.locked, false, "let go");
+    assert.equal(b.testPreview, undefined);
+});
+
+// Regression: a heat starting while Test Finish ran left its break
+// countdown on screen through the heat.
+test("a heat starting ends a running preview and hides all of it", () => {
+    world.time = 50;
+    Click(1, "usermenu_testfinish_button");
+    FlowAt(50 + 0.5);
+    assert.equal(hud.Has(1, "break_countdown", "Hidden"), false, "setup: the break countdown runs");
+    b.inHub = true;
+    flow.TryStartRace();
+    assert.equal(b.testPreview, undefined);
+    assert.equal(hud.Has(1, "break_countdown", "Hidden"), true, "no leftover break countdown");
+    assert.equal(hud.Has(1, "finish_image", "Hidden"), true);
+    assert.equal(b.locked, true, "held for the real countdown");
 });

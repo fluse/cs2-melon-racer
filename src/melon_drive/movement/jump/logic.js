@@ -6,7 +6,6 @@
 // for the design.
 import {
     WALL_JUMP_WINDOW,
-    WALL_JUMP_COOLDOWN,
     WALL_JUMP_UP_SPEED,
     WALL_JUMP_PUSH_SPEED,
     WALL_JUMP_SAME_WALL_DOT,
@@ -16,6 +15,7 @@ import {
     WALL_JUMP_PERFECT_UP_MULTIPLIER,
     BOUNCE_RATINGS,
     WALL_JUMP_APPROACH_MEMORY,
+    GROUND_JUMP_BUFFER,
 } from "../../constants/index.js";
 import { WallAngleFactor, GetBounceRating } from "../wall-bounce/logic.js";
 
@@ -30,6 +30,23 @@ export function CanGroundJump({ grounded, lastGroundedTime, lastJumpTime }) {
         return false;
     }
     return lastJumpTime === undefined || (lastGroundedTime !== undefined && lastGroundedTime > lastJumpTime);
+}
+
+/**
+ * Whether a jump press that did nothing (in the air) jumps now after all:
+ * pressed at most GROUND_JUMP_BUFFER ago, and the melon has touched down
+ * since — a ground contact newer than the press — so a ground jump is
+ * allowed now (CanGroundJump).
+ * @param {{ now: number, pressTime?: number, grounded: boolean, lastGroundedTime?: number, lastJumpTime?: number }} s
+ */
+export function BufferedGroundJump({ now, pressTime, grounded, lastGroundedTime, lastJumpTime }) {
+    if (pressTime === undefined || now - pressTime > GROUND_JUMP_BUFFER) {
+        return false;
+    }
+    if (lastGroundedTime === undefined || lastGroundedTime <= pressTime) {
+        return false;
+    }
+    return CanGroundJump({ grounded, lastGroundedTime, lastJumpTime });
 }
 
 /**
@@ -65,16 +82,15 @@ export function CanWallJump(s) {
  * @param {{
  *   now: number,
  *   grounded: boolean,
- *   wallContact?: { time: number, normal: { x: number, y: number } },
+ *   wallContact?: { time: number, normal: { x: number, y: number }, approachTime?: number }, // approachTime: when this contact started (WallApproach)
  *   lastWallJump?: { time: number, normal: { x: number, y: number } },
  *   lastGroundedTime?: number,
  *   charge: number, // wall jumps charged, see WALL_JUMP_CHARGES — at least one whole one needed
- *   cooldown?: number, // WALL_JUMP_COOLDOWN, shorter in a lift zone
  *   window?: number, // WALL_JUMP_WINDOW, longer in a lift zone
  *   bounceTiming?: boolean, // a wall bounce's jump-timing window is still open — this press is its timing, not a wall jump
  * }} s
  */
-export function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, cooldown = WALL_JUMP_COOLDOWN, window = WALL_JUMP_WINDOW, bounceTiming = false }) {
+export function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, lastGroundedTime, charge, window = WALL_JUMP_WINDOW, bounceTiming = false }) {
     if (grounded) {
         return "on the ground";
     }
@@ -93,8 +109,10 @@ export function WallJumpBlockReason({ now, grounded, wallContact, lastWallJump, 
     if (!lastWallJump) {
         return null;
     }
-    if (now - lastWallJump.time < cooldown) {
-        return `cooldown (${(now - lastWallJump.time).toFixed(2)}s since the last wall jump < ${cooldown}s)`;
+    // No cooldown: the melon has to have left the wall it jumped off and
+    // touched one again — a real new contact, not just time passing.
+    if ((wallContact.approachTime ?? wallContact.time) <= lastWallJump.time) {
+        return "still the contact of the last wall jump (leave the wall and touch one again)";
     }
     if (lastGroundedTime !== undefined && lastGroundedTime > lastWallJump.time) {
         return null; // touched ground since — any wall is fresh again

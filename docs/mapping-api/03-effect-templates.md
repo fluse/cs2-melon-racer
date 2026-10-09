@@ -22,6 +22,7 @@ the spawned copies onto the melon / crash site. Particle systems should have
 | `particle_health_template` | its **own** `info_particle_system` (`.vpcf`) | every entry into a [heal zone](09-heal-zones.md) | `HEAL_PARTICLE_LIFETIME` (2 s) | no heal effect |
 | `particle_boost_trail_template` | **2** `info_particle_system`s (`boost_trail.vpcf`, `boost_trail_juice.vpcf`) | boost above the trail speed | fades over `BOOST_TRAIL_FADE_SECONDS` (1 s) | no trail |
 | `prediction_dot_template` | 1 small dot entity | only with `PREDICTION_RENDER_MODE = "dots"` (default `"debug"`) | — | debug line |
+| `template_spectator_hat` | a model, e.g. a hat `prop_dynamic` ("Not solid") | a player switches [free look](#free-look-avatar) on | free look off / player leaves | no avatar |
 
 Two templates must never share one `info_particle_system` (a template copied
 in Hammer still playing the other one's effect) — `npm test` fails on it.
@@ -84,6 +85,19 @@ Nothing else may be in it — `npm test` fails on a third effect.
 `prediction_dot_template`: only used when `PREDICTION_RENDER_MODE` is
 `"dots"` (`fx/prediction/constants.js`, default `"debug"`). One small dot
 entity, e.g. a "Never Solid" `func_brush`.
+
+## Free look avatar
+
+`template_spectator_hat`: the ghost avatar of a player in free look (user
+menu, DEVELOPER). Their pawn flies around invisible, so a fresh copy of
+this template hangs on it — at eye height (`SPECTATOR_HAT_HEIGHT`, 64 units
+above the feet) and a little behind the eyes (`SPECTATOR_HAT_BACK`, 48 units,
+so the player's own view isn't through it), facing the view, flying along —
+and shows the others who
+it is. Removed when free look goes off or the player leaves. Where it sits in
+Hammer doesn't matter. Make the model **"Not solid"**: the script also sends
+it `DisableCollision`, but a solid hat would otherwise be a wall to melons
+and their traces.
 
 ---
 [← Core entities](02-core-entities.md) · [Mapping API](README.md) · [Tracks →](04-tracks.md)
