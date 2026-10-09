@@ -408,7 +408,9 @@
 					<!-- Left: what to do now (big buttons); then, each after a gap and
 					     a divider: settings, as toggle rows grouped by topic, and the
 					     developer aids. -->
-					<Panel class="UserMenuColumns">
+					<!-- The columns; the developer "Camera Settings" button swaps them for
+					     usermenu_camera_page below (SetCameraTuningPage, Hidden on each). -->
+					<Panel id="usermenu_main_page" class="UserMenuColumns">
 						<Panel class="UserMenuActions">
 							<Label class="UserMenuColumnTitle" text="ACTIONS" />
 							<Button id="usermenu_respawn_button" class="UserMenuActionButton UserMenuButtonGreen">
@@ -509,6 +511,12 @@
 								<Label class="UserMenuToggleName" text="Free Look" />
 								<Label class="UserMenuTogglePill" text="{s:freelook_state}" />
 							</Button>
+							<!-- Opens the camera page in place of these columns: distance and height
+							     of your own chase camera (dev/camera-tuning.js). -->
+							<Button id="usermenu_camera_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Camera Settings" />
+								<Label class="UserMenuTogglePill UserMenuRunPill" text="EDIT" />
+							</Button>
 							<!-- Plays the end of a Grand Prix: everyone to the hub, you on place 1,
 							     the others on 2 and 3 (usermenu_podium_button in hud/inputs.js).
 							     Ignored while a heat runs. -->
@@ -533,6 +541,139 @@
 							<Button id="usermenu_testintro_button" class="UserMenuToggle">
 								<Label class="UserMenuToggleName" text="Test Intro" />
 								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
+							</Button>
+						</Panel>
+					</Panel>
+
+					<!-- Developer camera page (dev/camera-tuning.js): your own chase camera's
+					     distance and height, CAMERA_TUNING_MIN..MAX, each with − / + (big and fine) and a
+					     clickable scale (one segment per CAMERA_TUNING_SCALE_STEP, lit up to
+					     the value — "On"). Values are logged to the console. -->
+					<Panel id="usermenu_camera_page" class="CameraTuningPage Hidden">
+						<Label class="UserMenuColumnTitle" text="DEVELOPER · CAMERA SETTINGS" />
+						<Label class="CameraTuningIntro" text="Your own chase camera only, until you leave or the map restarts. Each change is logged to the console." />
+						<Panel class="CameraTuningRow">
+							<Panel class="CameraTuningHeader">
+								<Label class="CameraTuningName" text="DISTANCE" />
+								<Label class="CameraTuningHelp" text="◀ closer   ·   further ▶   (default {s:camtune_distance_default})" />
+								<Label class="CameraTuningValue" text="{s:camtune_distance}" />
+							</Panel>
+							<Panel class="CameraTuningControls">
+								<Button id="camtune_distance_minus" class="CameraTuningStep"><Label class="CameraTuningStepLabel" text="−{s:camtune_step}" /></Button>
+								<Button id="camtune_distance_minus_fine" class="CameraTuningStep CameraTuningFine"><Label class="CameraTuningStepLabel" text="−{s:camtune_fine_step}" /></Button>
+								<Panel class="CameraTuningScale">
+									<Panel class="CameraTuningSegments">
+										<Button id="camtune_distance_seg_0" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_1" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_2" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_3" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_4" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_5" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_6" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_7" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_8" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_9" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_10" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_11" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_12" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_13" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_14" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_15" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_16" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_17" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_18" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_19" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_20" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_21" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_22" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_23" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_24" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_25" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_26" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_27" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_28" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_29" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_30" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_31" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_32" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_33" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_34" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_35" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_36" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_37" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_38" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_39" class="CameraTuningSegment" />
+										<Button id="camtune_distance_seg_40" class="CameraTuningSegment" />
+									</Panel>
+								</Panel>
+								<Button id="camtune_distance_plus_fine" class="CameraTuningStep CameraTuningFine"><Label class="CameraTuningStepLabel" text="+{s:camtune_fine_step}" /></Button>
+								<Button id="camtune_distance_plus" class="CameraTuningStep"><Label class="CameraTuningStepLabel" text="+{s:camtune_step}" /></Button>
+							</Panel>
+						</Panel>
+						<Panel class="CameraTuningRow">
+							<Panel class="CameraTuningHeader">
+								<Label class="CameraTuningName" text="HEIGHT" />
+								<Label class="CameraTuningHelp" text="◀ lower   ·   higher ▶   (default {s:camtune_height_default})" />
+								<Label class="CameraTuningValue" text="{s:camtune_height}" />
+							</Panel>
+							<Panel class="CameraTuningControls">
+								<Button id="camtune_height_minus" class="CameraTuningStep"><Label class="CameraTuningStepLabel" text="−{s:camtune_step}" /></Button>
+								<Button id="camtune_height_minus_fine" class="CameraTuningStep CameraTuningFine"><Label class="CameraTuningStepLabel" text="−{s:camtune_fine_step}" /></Button>
+								<Panel class="CameraTuningScale">
+									<Panel class="CameraTuningSegments">
+										<Button id="camtune_height_seg_0" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_1" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_2" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_3" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_4" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_5" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_6" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_7" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_8" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_9" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_10" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_11" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_12" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_13" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_14" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_15" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_16" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_17" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_18" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_19" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_20" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_21" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_22" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_23" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_24" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_25" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_26" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_27" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_28" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_29" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_30" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_31" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_32" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_33" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_34" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_35" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_36" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_37" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_38" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_39" class="CameraTuningSegment" />
+										<Button id="camtune_height_seg_40" class="CameraTuningSegment" />
+									</Panel>
+								</Panel>
+								<Button id="camtune_height_plus_fine" class="CameraTuningStep CameraTuningFine"><Label class="CameraTuningStepLabel" text="+{s:camtune_fine_step}" /></Button>
+								<Button id="camtune_height_plus" class="CameraTuningStep"><Label class="CameraTuningStepLabel" text="+{s:camtune_step}" /></Button>
+							</Panel>
+						</Panel>
+						<Panel class="CameraTuningFooter">
+							<Button id="camtune_back_button" class="UserMenuToggle CameraTuningFooterButton">
+								<Label class="UserMenuToggleName" text="◀ Back" />
+							</Button>
+							<Button id="camtune_reset_button" class="UserMenuToggle CameraTuningFooterButton">
+								<Label class="UserMenuToggleName" text="Reset to Default" />
 							</Button>
 						</Panel>
 					</Panel>

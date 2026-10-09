@@ -845,6 +845,24 @@ copy of the `template_spectator_hat` point_template, at eye height, flying
 along — so the others see who's flying around (the pawn itself is
 invisible). All of it in `dev/free-look.js`.
 
+## Camera settings (implemented, dev aid)
+
+The user menu's DEVELOPER column has **"Camera Settings"**: it swaps the
+menu's columns for a camera page where a player sets the chase camera's
+**distance** (behind the melon, negative = in front) and **height** for
+their own melon only, each on one scale from `CAMERA_TUNING_MIN` to
+`CAMERA_TUNING_MAX` (-50…350): − / + buttons in big and fine steps
+(`CAMERA_TUNING_STEP` 10, `CAMERA_TUNING_FINE_STEP` 1) and a
+clickable scale with a segment every `CAMERA_TUNING_SCALE_STEP` (10), filled up
+to the value. "Reset to Default" goes back to `CAMERA_DISTANCE`/
+`CAMERA_HEIGHT`, "Back" to the columns; the menu always reopens on its
+columns. Lift, podium and camera-zone zooms still add on top. Meant for
+trying out values in-game: not saved (gone on reconnect or a map restart),
+every change logged to the console (`[camera tuning] …`) to copy into
+`camera/follow/constants.js`. Constants: `dev/constants.js`; rules:
+`dev/camera-tuning-logic.js`, applied by `dev/camera-tuning.js` and
+`GetCameraOffsetFor` (`test/dev/camera-tuning.test.mjs`).
+
 ## Jump pads (implemented)
 
 A `trigger_multiple` (filtered to `prop_physics`) with `OnStartTouch` →

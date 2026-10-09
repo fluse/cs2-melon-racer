@@ -1,6 +1,7 @@
 import { CSInputs } from "cs_script/point_script";
 import { IsCollisionDebugOn } from "../dev/collision-debug.js";
 import { IsFreeLookOn } from "../dev/free-look.js";
+import { SetCameraTuningPage } from "../dev/camera-tuning.js";
 import { IsPredictionOn } from "../fx/prediction/prediction.js";
 import { IsMelonGlowOn } from "../kart/look.js";
 import { IsStartInTutorialOn } from "../kart/join-spot.js";
@@ -22,6 +23,8 @@ export function SetUserMenuOpen(slot, kart, open) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
+    // Always (re)opens on its columns, not on the camera page.
+    SetCameraTuningPage(slot, kart, false);
     if (open) {
         // Refreshed on every open: a layout or script reload in tools mode
         // wipes what was set when the kart spawned.

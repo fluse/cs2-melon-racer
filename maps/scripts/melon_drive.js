@@ -98,6 +98,8 @@ function TraceSphere(config) {
  *   testPreview?: { kind: "countdown" | "finish" | "intro", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
+ *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
+ *   cameraTuningPage?: boolean, // the user menu shows its camera page instead of its columns — see SetCameraTuningPage
  *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
@@ -1386,6 +1388,22 @@ const SPECTATOR_HAT_HEIGHT = FREE_LOOK_EYE_HEIGHT;
 // own camera (at the eyes) doesn't look out through it.
 const SPECTATOR_HAT_BACK = 48;
 
+// Camera tuning (dev/camera-tuning.js): the user menu's "Camera Settings"
+// page sets the chase camera's distance and height for the clicking player
+// only, to try out values for CAMERA_DISTANCE/CAMERA_HEIGHT in-game. Both
+// share one scale, in units (distance: behind the melon, negative = in
+// front of it; height: above FOLLOW_OFFSET, negative = lower).
+const CAMERA_TUNING_MIN = -50;
+const CAMERA_TUNING_MAX = 350;
+// What the − / + buttons change a value by: the outer pair a big step, the
+// inner pair a fine one.
+const CAMERA_TUNING_STEP = 10;
+const CAMERA_TUNING_FINE_STEP = 1;
+// The clickable scale between them: one segment every this many units,
+// CAMERA_TUNING_MIN..CAMERA_TUNING_MAX — 41 segments (camtune_<axis>_seg_<i>
+// in speedometer.xml).
+const CAMERA_TUNING_SCALE_STEP = 10;
+
 // Movers: a func_movelinear whose name starts with "mover" goes back and
 // forth on its own — the script starts it (Open) when the map loads and
 // after every round restart, and turns it round at each end (OnFullyOpen ->
@@ -1721,9 +1739,14 @@ function ZoneCameraOffset(base, state) {
 // camera-zone zooms (the other folders in camera/) all go through it. Walls pull the
 // camera in through ../wall-clip/ (eased), not the engine.
 
-/** The normal chase offset, before any zoom. @param {import("../../core/kart-registry.js").Kart} kart */
+/**
+ * The normal chase offset, before any zoom: CAMERA_DISTANCE/CAMERA_HEIGHT,
+ * or what this player set on the user menu's camera page (kart.cameraTuning,
+ * dev/camera-tuning.js).
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
 function GetCameraOffsetFor(kart) {
-    return { x: -CAMERA_DISTANCE, y: CAMERA_LATERAL, z: CAMERA_HEIGHT };
+    return { x: -(kart.cameraTuning?.distance ?? CAMERA_DISTANCE), y: CAMERA_LATERAL, z: kart.cameraTuning?.height ?? CAMERA_HEIGHT };
 }
 
 /**
@@ -7241,6 +7264,144 @@ function UpdateScoreboardInput(kart) {
     kart.scoreboardNextUpdate = undefined; // show it now, not on the next rebuild
 }
 
+// Pure rules for the user menu's camera tuning page — no cs_script import,
+// so it's unit-testable in Node (test/dev/camera-tuning.test.mjs).
+// camera-tuning.js next to it keeps the values on the kart and drives the HUD.
+
+/** A value kept on the scale, CAMERA_TUNING_MIN..CAMERA_TUNING_MAX. @param {number} value */
+function ClampCameraTuning(value) {
+    return Math.max(CAMERA_TUNING_MIN, Math.min(CAMERA_TUNING_MAX, value));
+}
+
+/** How many segments the scale has (one per CAMERA_TUNING_SCALE_STEP, both ends included). */
+function CameraTuningSegmentCount() {
+    return Math.floor((CAMERA_TUNING_MAX - CAMERA_TUNING_MIN) / CAMERA_TUNING_SCALE_STEP) + 1;
+}
+
+/** The value segment `index` stands for (0 = CAMERA_TUNING_MIN). @param {number} index */
+function CameraTuningSegmentValue(index) {
+    return ClampCameraTuning(CAMERA_TUNING_MIN + index * CAMERA_TUNING_SCALE_STEP);
+}
+
+/**
+ * Whether segment `index` is lit for `value`: the scale fills up from its
+ * low end to the value, like a bar.
+ * @param {number} index @param {number} value
+ */
+function IsCameraTuningSegmentLit(index, value) {
+    return CameraTuningSegmentValue(index) <= value;
+}
+
+// Camera tuning: the user menu's "Camera Settings" page (DEVELOPER column)
+// sets the chase camera's distance and height for the clicking player only
+// (kart.cameraTuning, read by GetCameraOffsetFor in camera/follow/follow.js),
+// to try out values for CAMERA_DISTANCE/CAMERA_HEIGHT in-game. Lift, podium
+// and camera-zone zooms still add on top. Not saved: gone on reconnect or a
+// map restart — every change is logged to the console, ready to copy into
+// camera/follow/constants.js.
+
+/** @typedef {"distance" | "height"} CameraTuningAxis */
+/** @type {CameraTuningAxis[]} */
+const AXES = ["distance", "height"];
+
+/**
+ * This player's chase camera distance and height: their tuned values, else
+ * the defaults.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function GetCameraTuning(kart) {
+    return { distance: kart.cameraTuning?.distance ?? CAMERA_DISTANCE, height: kart.cameraTuning?.height ?? CAMERA_HEIGHT };
+}
+
+/**
+ * Sets one value (kept on the scale) and shows it. Back on both defaults,
+ * the kart drops its tuning again.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {CameraTuningAxis} axis @param {number} value
+ */
+function SetCameraTuning(slot, kart, axis, value) {
+    const tuning = { ...GetCameraTuning(kart), [axis]: ClampCameraTuning(value) };
+    kart.cameraTuning = tuning.distance === CAMERA_DISTANCE && tuning.height === CAMERA_HEIGHT ? undefined : tuning;
+    Instance.Msg(`[camera tuning] slot ${slot}: distance ${tuning.distance}, height ${tuning.height} (CAMERA_DISTANCE/CAMERA_HEIGHT)`);
+    UpdateCameraTuningHud(slot, kart);
+}
+
+/**
+ * Switches the user menu between its normal columns and the camera page.
+ * The menu always opens on its columns (SetUserMenuOpen).
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {boolean} open
+ */
+function SetCameraTuningPage(slot, kart, open) {
+    kart.cameraTuningPage = open;
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    hud.SetHasClassForPlayer(slot, "usermenu_main_page", "Hidden", open);
+    hud.SetHasClassForPlayer(slot, "usermenu_camera_page", "Hidden", !open);
+    if (open) {
+        UpdateCameraTuningHud(slot, kart);
+    }
+}
+
+/**
+ * The camera page's numbers and its two scales, filled up to the values.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+function UpdateCameraTuningHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const tuning = GetCameraTuning(kart);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_distance", `${tuning.distance}`);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_height", `${tuning.height}`);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_distance_default", `${CAMERA_DISTANCE}`);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_height_default", `${CAMERA_HEIGHT}`);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_step", `${CAMERA_TUNING_STEP}`);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_fine_step", `${CAMERA_TUNING_FINE_STEP}`);
+    for (const axis of AXES) {
+        for (let i = 0; i < CameraTuningSegmentCount(); i++) {
+            hud.SetHasClassForPlayer(slot, `camtune_${axis}_seg_${i}`, "On", IsCameraTuningSegmentLit(i, tuning[axis]));
+        }
+    }
+}
+
+/**
+ * A click on the camera page (every button id starts with "camtune_"):
+ * back, reset, − / + (big or fine step) on an axis, or a segment of its scale.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {string} buttonId
+ * @returns {boolean} whether it was one of the page's buttons
+ */
+function HandleCameraTuningClick(slot, kart, buttonId) {
+    if (buttonId === "camtune_back_button") {
+        SetCameraTuningPage(slot, kart, false);
+        return true;
+    }
+    if (buttonId === "camtune_reset_button") {
+        SetCameraTuning(slot, kart, "distance", CAMERA_DISTANCE);
+        SetCameraTuning(slot, kart, "height", CAMERA_HEIGHT);
+        return true;
+    }
+    const match = /^camtune_(distance|height)_(minus|plus|minus_fine|plus_fine|seg_(\d+))$/.exec(buttonId);
+    if (!match) {
+        return false;
+    }
+    const axis = /** @type {CameraTuningAxis} */ (match[1]);
+    const current = GetCameraTuning(kart)[axis];
+    if (match[2] === "minus") {
+        SetCameraTuning(slot, kart, axis, current - CAMERA_TUNING_STEP);
+    } else if (match[2] === "plus") {
+        SetCameraTuning(slot, kart, axis, current + CAMERA_TUNING_STEP);
+    } else if (match[2] === "minus_fine") {
+        SetCameraTuning(slot, kart, axis, current - CAMERA_TUNING_FINE_STEP);
+    } else if (match[2] === "plus_fine") {
+        SetCameraTuning(slot, kart, axis, current + CAMERA_TUNING_FINE_STEP);
+    } else {
+        SetCameraTuning(slot, kart, axis, CameraTuningSegmentValue(Number(match[3])));
+    }
+    return true;
+}
+
 // Wall-bounce prediction line — see PREDICTION_* in fx/prediction/constants.js for the
 // design. Recomputed every tick from the melon's actual velocity (the same
 // direction the bounce itself measures its angle from), and its angle
@@ -7942,6 +8103,8 @@ function SetUserMenuOpen(slot, kart, open) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
+    // Always (re)opens on its columns, not on the camera page.
+    SetCameraTuningPage(slot, kart, false);
     if (open) {
         // Refreshed on every open: a layout or script reload in tools mode
         // wipes what was set when the kart spawned.
@@ -8189,6 +8352,21 @@ function RegisterHudInputs() {
                 if (on) {
                     SetUserMenuOpen(slot, kart, false);
                 }
+            }
+        } else if (event.buttonId === "usermenu_camera_button") {
+            // Developer: the camera page in place of the menu's columns —
+            // distance and height of this player's own chase camera
+            // (dev/camera-tuning.js).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart) {
+                SetCameraTuningPage(slot, kart, true);
+            }
+        } else if (event.buttonId.startsWith("camtune_")) {
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart && !HandleCameraTuningClick(slot, kart, event.buttonId)) {
+                Debug(`${event.buttonId}: no such camera page button, ignoring`);
             }
         } else if (event.buttonId === "usermenu_podium_button") {
             // Developer: the end of a Grand Prix without racing one — everyone
@@ -9522,7 +9700,7 @@ function RegisterRaceInputs() {
 }
 
 // Developer aids only: the user menu's collision debug view (collision-debug.js),
-// its free look (free-look.js) and the attack button log (attack-debug.js, with DEBUG on).
+// its free look (free-look.js), its camera settings page (camera-tuning.js) and the attack button log (attack-debug.js, with DEBUG on).
 
 // Movers (MOVER_* in world/mover/constants.js). Pure rules, no cs_script
 // import; world/mover/mover.js applies them (test/world/mover.test.mjs).

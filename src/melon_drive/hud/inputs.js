@@ -9,6 +9,7 @@ import { IsStartInTutorialOn, SetStartInTutorial } from "../kart/join-spot.js";
 import { IsPredictionOn, SetPrediction } from "../fx/prediction/prediction.js";
 import { IsCollisionDebugOn, SetCollisionDebug } from "../dev/collision-debug.js";
 import { IsFreeLookOn, SetFreeLook } from "../dev/free-look.js";
+import { HandleCameraTuningClick, SetCameraTuningPage } from "../dev/camera-tuning.js";
 import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, TestCountdown, TestFinish, TestIntro } from "../race/heat/race-flow.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { PlaceOnPodium, TestGrandPrix } from "../race/podium/podium.js";
@@ -144,6 +145,21 @@ export function RegisterHudInputs() {
                 if (on) {
                     SetUserMenuOpen(slot, kart, false);
                 }
+            }
+        } else if (event.buttonId === "usermenu_camera_button") {
+            // Developer: the camera page in place of the menu's columns —
+            // distance and height of this player's own chase camera
+            // (dev/camera-tuning.js).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart) {
+                SetCameraTuningPage(slot, kart, true);
+            }
+        } else if (event.buttonId.startsWith("camtune_")) {
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart && !HandleCameraTuningClick(slot, kart, event.buttonId)) {
+                Debug(`${event.buttonId}: no such camera page button, ignoring`);
             }
         } else if (event.buttonId === "usermenu_podium_button") {
             // Developer: the end of a Grand Prix without racing one — everyone

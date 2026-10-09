@@ -1348,6 +1348,139 @@
     color: #ffffff;
 }
 
+/* The developer camera page swaps places with the columns (one Hidden
+   class each, set by SetCameraTuningPage in dev/camera-tuning.js). */
+.UserMenuColumns.Hidden {
+    visibility: collapse;
+}
+
+.CameraTuningPage {
+    width: 100%;
+    flow-children: down;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.CameraTuningIntro {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #ffffff88;
+}
+
+.CameraTuningRow {
+    width: 100%;
+    margin-top: 22px;
+    flow-children: down;
+}
+
+/* Name left, a hint next to it, the current value big on the right. */
+.CameraTuningHeader {
+    width: 100%;
+    flow-children: right;
+}
+
+.CameraTuningName {
+    vertical-align: bottom;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: white;
+}
+
+.CameraTuningHelp {
+    vertical-align: bottom;
+    margin-left: 18px;
+    font-size: 12px;
+    color: #ffffff77;
+}
+
+.CameraTuningValue {
+    width: fill-parent-flow( 1.0 );
+    vertical-align: bottom;
+    text-align: right;
+    font-size: 30px;
+    font-weight: bold;
+    color: #7fd13b;
+}
+
+/* −10 −1 | scale (41 segments, lit up to the value) | +1 +10 */
+.CameraTuningControls {
+    width: 100%;
+    margin-top: 8px;
+    flow-children: right;
+}
+
+.CameraTuningStep {
+    width: 62px;
+    margin: 0px 2px;
+    height: 46px;
+    border-radius: 0px;
+    border: 1px solid #ffffff22;
+    background-color: #ffffff0a;
+
+    &:hover {
+        background-color: #ffffff1f;
+    }
+}
+
+/* The fine steps (±1) between the big ones and the scale: narrower, dimmer. */
+.CameraTuningStep.CameraTuningFine {
+    width: 50px;
+    background-color: #ffffff05;
+}
+
+.CameraTuningStepLabel {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+}
+
+.CameraTuningScale {
+    width: fill-parent-flow( 1.0 );
+    margin: 0px 10px;
+    flow-children: down;
+}
+
+.CameraTuningSegments {
+    width: 100%;
+    height: 46px;
+    flow-children: right;
+}
+
+/* No transitions on the toggled "On" (see the HUD notes in AGENTS.md). */
+.CameraTuningSegment {
+    width: fill-parent-flow( 1.0 );
+    height: 100%;
+    margin: 0px 1px;
+    min-width: 4px;
+    border-radius: 0px;
+    border: 1px solid #ffffff14;
+    background-color: #ffffff08;
+
+    &:hover {
+        border: 1px solid #7fd13b88;
+    }
+
+    &.On {
+        background-color: #3fae3fcc;
+    }
+}
+
+.CameraTuningFooter {
+    width: 100%;
+    margin-top: 28px;
+    flow-children: right;
+}
+
+.CameraTuningFooterButton {
+    width: 260px;
+    margin-right: 12px;
+}
+
 /* Melon Racer logo after picking a team, before the melon spawns — full
    screen, so the frozen first-person view behind it doesn't show. Fades out
    as the melon appears. Solid dark rind green (no alpha), behind the logo's

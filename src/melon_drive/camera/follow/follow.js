@@ -11,9 +11,14 @@ import { WallClippedOffset } from "../wall-clip/wall-clip.js";
 import { ZoneCameraClips, ZoneCameraOffset } from "../../zones/camera-zone/logic.js";
 import { CAMERA_LATERAL, CAMERA_DISTANCE, CAMERA_HEIGHT, CAMERA_OFFSET_RETURN_STRENGTH, FOLLOW_OFFSET } from "../../constants/index.js";
 
-/** The normal chase offset, before any zoom. @param {import("../../core/kart-registry.js").Kart} kart */
+/**
+ * The normal chase offset, before any zoom: CAMERA_DISTANCE/CAMERA_HEIGHT,
+ * or what this player set on the user menu's camera page (kart.cameraTuning,
+ * dev/camera-tuning.js).
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
 export function GetCameraOffsetFor(kart) {
-    return { x: -CAMERA_DISTANCE, y: CAMERA_LATERAL, z: CAMERA_HEIGHT };
+    return { x: -(kart.cameraTuning?.distance ?? CAMERA_DISTANCE), y: CAMERA_LATERAL, z: kart.cameraTuning?.height ?? CAMERA_HEIGHT };
 }
 
 /**

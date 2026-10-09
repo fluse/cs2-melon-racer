@@ -16,3 +16,19 @@ export const SPECTATOR_HAT_HEIGHT = FREE_LOOK_EYE_HEIGHT;
 // …and this far behind the eyes, against the view's yaw — so the player's
 // own camera (at the eyes) doesn't look out through it.
 export const SPECTATOR_HAT_BACK = 48;
+
+// Camera tuning (dev/camera-tuning.js): the user menu's "Camera Settings"
+// page sets the chase camera's distance and height for the clicking player
+// only, to try out values for CAMERA_DISTANCE/CAMERA_HEIGHT in-game. Both
+// share one scale, in units (distance: behind the melon, negative = in
+// front of it; height: above FOLLOW_OFFSET, negative = lower).
+export const CAMERA_TUNING_MIN = -50;
+export const CAMERA_TUNING_MAX = 350;
+// What the − / + buttons change a value by: the outer pair a big step, the
+// inner pair a fine one.
+export const CAMERA_TUNING_STEP = 10;
+export const CAMERA_TUNING_FINE_STEP = 1;
+// The clickable scale between them: one segment every this many units,
+// CAMERA_TUNING_MIN..CAMERA_TUNING_MAX — 41 segments (camtune_<axis>_seg_<i>
+// in speedometer.xml).
+export const CAMERA_TUNING_SCALE_STEP = 10;

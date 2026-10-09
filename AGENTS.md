@@ -68,7 +68,8 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              inputs.js (every button click)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
                                           #              boost-trail/, prediction/ (the guide line)
-                                          #   dev/       collision-debug.js (the user-menu collision debug view), free-look.js (the user-menu free look), attack-debug.js
+                                          #   dev/       collision-debug.js (the user-menu collision debug view), free-look.js (the user-menu free look),
+                                          #              camera-tuning.js (+ -logic.js: the user-menu camera page, own chase camera distance/height), attack-debug.js
                                           #   world/     mover/ (func_movelinear "mover…" started and kept going back and forth)
 src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
 test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one folder per src/melon_drive/ domain (movement/, race/, …): unit tests
