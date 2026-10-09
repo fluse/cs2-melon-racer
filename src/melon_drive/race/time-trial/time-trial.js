@@ -92,6 +92,11 @@ export function CanRestartTimeTrial(kart) {
     return !kart.racing && kart.trackId !== undefined;
 }
 
+/** Every player's best time on `trackId`, by player name. @param {number} trackId */
+export function GetTrackBestTimes(trackId) {
+    return BestTimes()[trackId] ?? {};
+}
+
 /** This player's best time on `trackId`, if any. @param {import("../../core/kart-registry.js").Kart} kart @param {number} trackId */
 export function GetBestTime(kart, trackId) {
     return BestTimes()[trackId]?.[PlayerName(kart)];

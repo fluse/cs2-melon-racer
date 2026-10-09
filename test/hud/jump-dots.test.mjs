@@ -1,8 +1,8 @@
-// The HUD's wall-jump dots (hud/jump-dots-logic.js), asserted in terms of
+// The HUD's wall-jump dots (hud/speedometer/logic.js), asserted in terms of
 // the constants.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { JumpDotFills } from "../../src/melon_drive/hud/jump-dots-logic.js";
+import { JumpDotFills } from "../../src/melon_drive/hud/speedometer/logic.js";
 import { JUMP_DOT_FILL_STEPS, WALL_JUMP_CHARGES } from "../../src/melon_drive/constants/index.js";
 
 const N = WALL_JUMP_CHARGES;

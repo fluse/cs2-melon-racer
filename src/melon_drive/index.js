@@ -33,7 +33,7 @@ import { Think } from "./core/think.js";
 import { RegisterKartInputs } from "./kart/index.js";
 import { RegisterBreakInputs } from "./health/index.js";
 import { RegisterZoneInputs } from "./zones/index.js";
-import { phase, activeTrackId, phaseEndTime, RestoreRaceFlowSnapshot, RegisterRaceInputs } from "./race/index.js";
+import { phase, activeTrackId, phaseEndTime, RestoreRaceFlowSnapshot, RegisterRaceInputs, grandPrix, RestoreGrandPrix } from "./race/index.js";
 import { RegisterHudInputs } from "./hud/index.js";
 import { RegisterAttackDebug } from "./dev/index.js";
 import { movers, RestoreMovers, RegisterMoverInputs } from "./world/index.js";
@@ -46,17 +46,18 @@ Instance.SetNextThink(Instance.GetGameTime());
 // melons are still alive in the world — the next respawn would then spawn
 // a *second* melon on top of the orphaned one and the two would violently
 // shove each other apart. Carry the existing tracking across the reload.
-// Race-flow phase/activeTrackId/phaseEndTime are carried the same way, so
+// Race-flow phase/activeTrackId/phaseEndTime (and the Grand Prix standings) are carried the same way, so
 // reloading mid-heat during dev iteration doesn't strand locked racers in a
 // phase that's forgotten it's supposed to unlock/advance them.
 Instance.OnScriptReload({
-    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers }),
+    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers, grandPrix }),
     after: (memory) => {
         if (memory?.karts) {
             for (const [slot, kart] of memory.karts) {
                 karts.set(slot, kart);
             }
             RestoreRaceFlowSnapshot(memory);
+            RestoreGrandPrix(memory.grandPrix);
             SetModeratorSlot(memory.moderatorSlot);
             RestoreMovers(memory.movers);
             Debug(`OnScriptReload: restored ${karts.size} kart(s), phase=${phase}, activeTrackId=${activeTrackId}, moderatorSlot=${moderatorSlot}`);

@@ -91,7 +91,7 @@
 
     padding: 10px 18px;
     background-color: #00000088;
-    border-radius: 24px;
+    border-radius: 0px;
 
     transition-property: opacity;
     transition-duration: .15s;
@@ -241,21 +241,15 @@
     color: #ffe066cc;
 }
 
-/* Hub "ready to start" prompt — shown while a kart stands in
-   hub_start_trigger. .WaitingForOthers swaps the button out for a "race in
-   progress" message once a heat is already running (see melon_drive.js). */
+/* Hub "start the Grand Prix" window (hud/hub-modal/) — shown while a kart
+   stands in hub_start_trigger: kicker + title, the heats as route cards
+   (icons from tools/make-route-icons.mjs), who rides along as
+   name chips, one big start button. .WaitingForOthers (a heat is running)
+   swaps it all for a waiting message, or the moderator's abort button. */
 .HubModal {
-    width: 360px;
+    width: 800px;
     horizontal-align: center;
     vertical-align: center;
-    margin-top: -80px;
-
-    flow-children: down;
-
-    padding: 24px;
-    background-color: #000000ee;
-    border: 1px solid #ffe066;
-    border-radius: 8px;
 
     transition-property: opacity;
     transition-duration: .15s;
@@ -266,90 +260,257 @@
     }
 }
 
+/* Like .UserMenuCard: the card's top edge runs through the logo banner's
+   middle (148px down), the logo is drawn after it, on top. */
+.HubCard {
+    width: 100%;
+    margin-top: 148px;
+    flow-children: down;
+
+    padding: 50px 32px 30px 32px;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #152012f4 ), to( #0b100af4 ) );
+    border: 2px solid #2f7a2f;
+    border-radius: 0px;
+    box-shadow: #000000aa 0px 18px 50px 0px;
+}
+
+.HubLogo {
+    horizontal-align: center;
+    vertical-align: top;
+    width: 520px;
+    height: 181px;
+}
+
 /* Dismisses the modal for just this player without leaving the hub trigger
-   (see hub_close_button in melon_drive.js) — they still get pulled into the
-   next heat that starts while they're standing in it, they just don't have
-   to stare at the prompt until then. Pulled up and right via negative
-   margin so it sits in the modal's corner instead of the padding box. */
+   (see hub_close_button in hud/inputs.js) — they still get pulled into the
+   next Grand Prix that starts while they're standing in it, they just
+   don't have to stare at the prompt until then. Top right corner of the
+   card, like the user menu's. */
 .HubCloseButton {
     horizontal-align: right;
     vertical-align: top;
-    margin-top: -12px;
-    margin-right: -12px;
-    padding-left: 3px;
-    width: 24px;
-    height: 24px;
+    margin-top: 162px;
+    margin-right: 14px;
+    width: 28px;
+    height: 28px;
 
-    border-radius: 12px;
-    background-color: #ffffff22;
+    border-radius: 0px;
+    background-color: #ffffff1a;
 
     transition-property: background-color;
     transition-duration: .1s;
     &:hover {
-        background-color: #ffffff44;
+        background-color: #ff5a5f88;
     }
 }
 
 .HubCloseIcon {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: bold;
     color: #ffffffcc;
     horizontal-align: center;
     vertical-align: center;
 }
 
-.HubTitle {
-    font-size: 24px;
+.HubKicker {
+    font-size: 13px;
     font-weight: bold;
-    color: white;
-    horizontal-align: center;
-    margin-bottom: 16px;
+    letter-spacing: 4px;
+    color: #ff7a7e;
 }
 
-.HubStartButton {
-    horizontal-align: center;
-    border-radius: 4px;
-    padding: 10px 20px;
-    font-size: 18px;
+.HubTitle {
+    font-size: 34px;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 18px;
+}
 
-    background-color: #ffe066;
-    color: black;
+/* A titled block: "HEATS · 3", "RACERS · 2". */
+.HubSection {
+    width: 100%;
+    flow-children: down;
+    margin-bottom: 20px;
+}
 
-    transition-property: background-color;
-    transition-duration: .1s;
-    &:hover {
-        background-color: #ffd633;
+.HubSectionTitle {
+    width: 100%;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #cfe8a8aa;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #ffffff1f;
+}
+
+/* The heats: one card per track, three to a row — 3 × (226 + 2 border
+   + 14 gap) fits the window's 736px inside its padding. */
+.HeatCards {
+    width: 100%;
+    flow-children: right-wrap;
+}
+
+.HeatCard {
+    width: 226px;
+    flow-children: down;
+    margin-right: 14px;
+    margin-bottom: 12px;
+    padding: 8px 8px 10px 8px;
+
+    border-radius: 0px;
+    background-color: #ffffff0d;
+    border: 1px solid #ffffff14;
+
+    &.Unused {
+        visibility: collapse;
     }
+}
+
+/* The route icon with the heat number over its top-left corner. */
+.HeatMapBox {
+    width: 210px;
+    height: 116px;
+    border-radius: 0px;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #0b0f0a ), to( #121a10 ) );
+}
+
+.HeatMap {
+    width: 210px;
+    height: 116px;
+}
+
+.HeatBadge {
+    margin: 6px 0px 0px 6px;
+    padding: 2px 8px;
+    border-radius: 0px;
+    background-color: #ff5a5f;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #ffffff;
+}
+
+.HeatName {
+    margin-top: 8px;
+    margin-left: 2px;
+    font-size: 19px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: white;
+}
+
+.HeatInfo {
+    margin-left: 2px;
+    margin-top: 2px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: #ffffff88;
+}
+
+/* Who rides along: a name chip each, the viewer's own tinted (Self:
+   transparent tint by default, the class sets the color). */
+.HubRacerChips {
+    width: 100%;
+    flow-children: right-wrap;
+}
+
+.HubRacerChip {
+    height: 34px;
+    margin-right: 8px;
+    margin-bottom: 8px;
+    padding: 0px 16px;
+    border-radius: 0px;
+    border: 2px solid #ffffff22;
+    background-color: #ffffff0a;
+
+    &.Unused {
+        visibility: collapse;
+    }
+
+    &.Self {
+        border: 2px solid #ffd84d;
+    }
+}
+
+.HubRacerName {
+    vertical-align: center;
+    font-size: 17px;
+    font-weight: bold;
+    color: white;
+}
+
+.HubRacersMore {
+    height: 34px;
+    padding-top: 7px;
+    font-size: 15px;
+    color: #ffffffaa;
+
+    &.Unused {
+        visibility: collapse;
+    }
+}
+
+/* Outlined like the user menu's buttons, in gold: the one thing to press. */
+.HubStartButton {
+    width: 100%;
+    height: 62px;
+    border-radius: 0px;
+    margin-top: 4px;
+    border: 2px solid #ffd84d;
+    background-color: #00000000;
+
+    &:hover {
+        background-color: #ffd84d26;
+    }
+}
+
+.HubStartButton Label {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: #ffffff;
 }
 
 .HubWaitingLabel {
     horizontal-align: center;
-    font-size: 16px;
+    font-size: 18px;
     color: #ffffffaa;
     visibility: collapse;
 }
 
-/* Moderator-only "abort the running heat" button — shown instead of
-   HubWaitingLabel while a heat is running, see .IsModerator below. */
+/* Moderator-only "abort the running Grand Prix" button — shown instead of
+   HubWaitingLabel while a heat is running, see .IsModerator below. Outlined
+   in banner red. */
 .HubAbortButton {
     visibility: collapse;
     horizontal-align: center;
-    border-radius: 4px;
-    padding: 10px 20px;
-    font-size: 18px;
-    margin-top: 8px;
+    border-radius: 0px;
+    padding: 12px 28px;
+    margin-top: 10px;
+    border: 2px solid #ff5a5f;
+    background-color: #00000000;
 
-    background-color: #e05c5c;
-    color: white;
-
-    transition-property: background-color;
-    transition-duration: .1s;
     &:hover {
-        background-color: #c94747;
+        background-color: #ff5a5f26;
     }
 }
 
+.HubAbortButton Label {
+    font-size: 18px;
+    font-weight: bold;
+    color: white;
+}
+
+/* A heat is running: no heats, racers or start — just the message. */
 .HubModal.WaitingForOthers {
+    width: 560px;
+
+    .HubSection {
+        visibility: collapse;
+    }
     .HubStartButton {
         visibility: collapse;
     }
@@ -421,6 +582,23 @@
 
     &.Hidden {
         opacity: 0;
+    }
+}
+
+/* The place and Grand Prix points under the finish image, "1ST  ·  +10 PTS"
+   (finish_place, see FinishKart) — between it and the break countdown. */
+.FinishPlace {
+    horizontal-align: center;
+    vertical-align: center;
+    margin-top: 24px;
+    font-size: 30px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #ffe066;
+    text-shadow: 3px 3px 4px #000000cc;
+
+    &.Hidden {
+        visibility: collapse;
     }
 }
 
@@ -725,13 +903,15 @@
 .BouncePanel.RatingMiss .BounceRating { color: #ff6666; }
 .BouncePanel.RatingMiss .BounceAngleSegment.Hit { background-color: #ff6666; }
 
-/* General user menu (USE to toggle) — a green-framed card with the Melon
-   Racer logo sitting on its top edge, over full-screen holo scanlines.
+/* General user menu (USE to toggle) — one wide card under the Melon Racer
+   logo, whose red banner sits on the card's top edge, over full-screen holo
+   scanlines. Colors follow the logo: rind green, banner red, cream.
    #user_menu fills the screen (it only fades, see SetUserMenuOpen for the
    Hidden toggle); UserMenuFrame inside it is just an unstyled wrapper (no
    flow-children), so the card, the logo and the close button can overlap:
-   the card starts UserMenuLogo's half-height down, the logo and close
-   button are drawn after it (later children on top). */
+   the card starts at the banner's middle, the logo and close button are
+   drawn after it (later children on top). Inside the card: ACTIONS on the
+   left, SETTINGS on the right, a gap and a divider between them. */
 .UserMenu {
     width: 100%;
     height: 100%;
@@ -746,7 +926,7 @@
 }
 
 .UserMenuFrame {
-    width: 560px; /* the logo's width — the card itself is narrower */
+    width: 940px;
     horizontal-align: center;
     vertical-align: center;
 }
@@ -793,173 +973,176 @@
 }
 
 .UserMenuCard {
-    width: 470px;
-    horizontal-align: center;
-    margin-top: 92px;
-    flow-children: down;
+    width: 100%;
+    margin-top: 148px;
+    padding: 50px 32px 30px 32px;
 
-    padding: 70px 12px 12px 12px;
-    background-color: #1c261ceb;
-    border: 2px solid #7fd13b;
-    border-radius: 10px;
-    box-shadow: #7fd13b66 0px 0px 14px 2px;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #152012f4 ), to( #0b100af4 ) );
+    border: 2px solid #2f7a2f;
+    border-radius: 0px;
+    box-shadow: #000000aa 0px 18px 50px 0px;
 }
 
-/* 846x295 source, scaled to keep its aspect. The lettering only fills about
-   84% of the image's width, so at 560px it's as wide as the 470px card; the
-   card starts at about the lettering's vertical middle. */
+/* 846x295 source at 520px wide, keeping its aspect. Its red banner spans
+   about 68%..97% of the height, so the card's top edge (148px down) runs
+   through the banner's middle. */
 .UserMenuLogo {
     horizontal-align: center;
     vertical-align: top;
-    width: 560px;
-    height: 195px;
+    width: 520px;
+    height: 181px;
 }
 
+/* Top right corner of the card. */
 .UserMenuCloseButton {
     horizontal-align: right;
     vertical-align: top;
-    /* Right under the lettering's right end, inside the card's corner. */
-    margin-top: 136px;
-    margin-right: 55px; /* (560 - 470) / 2 + 10 */
-    width: 24px;
-    height: 24px;
+    margin-top: 162px;
+    margin-right: 14px;
+    width: 28px;
+    height: 28px;
 
-    border-radius: 12px;
-    background-color: #ffffff22;
+    border-radius: 0px;
+    background-color: #ffffff1a;
 
     transition-property: background-color;
     transition-duration: .1s;
     &:hover {
-        background-color: #ffffff44;
+        background-color: #ff5a5f88;
     }
 }
 
 .UserMenuCloseIcon {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: bold;
     color: #ffffffcc;
     horizontal-align: center;
     vertical-align: center;
 }
 
-/* One card per section: icon and title row, then its controls. */
-.UserMenuSection {
+/* ACTIONS | divider | SETTINGS */
+.UserMenuColumns {
     width: 100%;
+    flow-children: right;
+}
+
+.UserMenuActions {
+    width: 380px;
     flow-children: down;
-    margin-top: 8px;
-    padding: 8px 10px 10px 10px;
-
-    background-color: #00000066;
-    border: 1px solid #ffffff1a;
-    border-radius: 6px;
-
-    &:first-child {
-        margin-top: 0px;
-    }
 }
 
-.UserMenuSectionHeader {
-    flow-children: right;
-    margin-bottom: 6px;
+.UserMenuDivider {
+    width: 1px;
+    height: 100%;
+    margin: 0px 32px;
+    background-color: #cfe8a826;
 }
 
-.UserMenuSectionIcon {
-    width: 16px;
-    height: 16px;
-    vertical-align: center;
-    margin-right: 7px;
-    opacity: 0.85;
+.UserMenuSettings {
+    width: fill-parent-flow( 1.0 );
+    flow-children: down;
 }
 
-.UserMenuSectionLabel {
-    font-size: 14px;
+.UserMenuColumnTitle {
+    width: 100%;
+    font-size: 13px;
     font-weight: bold;
-    letter-spacing: 1px;
-    color: #ffffffdd;
-    vertical-align: center;
+    letter-spacing: 4px;
+    color: #ff7a7e;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid #ffffff1f;
 }
 
-.UserMenuButtonRow {
-    width: 100%;
-    flow-children: right;
-}
-
+/* ACTIONS: big stacked buttons, outlined only — the outline's color says
+   what kind of action it is, a faint fill of it on hover. Icon and text
+   left-aligned. */
 .UserMenuActionButton {
-    height: 40px;
-    border-radius: 5px;
-    border: 1px solid #ffffff40;
-
-    background-color: #ffffff22;
-    transition-property: brightness, background-color;
-    transition-duration: .1s;
-    &:hover {
-        brightness: 1.25;
-    }
-}
-
-.UserMenuButtonHalf {
-    width: fill-parent-flow(1.0);
-    margin-left: 8px;
-    &:first-child {
-        margin-left: 0px;
-    }
-}
-
-.UserMenuButtonFull {
     width: 100%;
+    height: 62px;
+    margin-top: 10px;
+    border-radius: 0px;
+    border: 2px solid #cfe8a855;
+    background-color: #00000000;
 }
 
-/* "Restart Time Trial", under the NAVIGATION buttons — only during a
-   free-roaming time trial. */
+.UserMenuButtonGreen {
+    border: 2px solid #4fb84f;
+    &:hover { background-color: #4fb84f26; }
+}
+
+/* Leaves the current heat — banner red, so it isn't clicked by accident. */
+.UserMenuButtonRed {
+    border: 2px solid #ff5a5f;
+    &:hover { background-color: #ff5a5f26; }
+}
+
+.UserMenuButtonGold {
+    border: 2px solid #ffd84d;
+    &:hover { background-color: #ffd84d26; }
+}
+
+.UserMenuButtonPlain {
+    border: 2px solid #cfe8a855;
+    &:hover { background-color: #cfe8a81a; }
+}
+
+/* "Restart Time Trial" — only during a free-roaming time trial. */
 .UserMenuRestartRow {
-    margin-top: 8px;
+    width: 100%;
 
     &.Hidden {
         visibility: collapse;
     }
 }
 
-.UserMenuButtonGreen {
-    background-color: gradient( linear, 0% 0%, 0% 100%, from( #55a83d ), to( #2f7124 ) );
-}
-
-/* Leaves the current heat — red so it isn't clicked by accident. */
-.UserMenuButtonRed {
-    background-color: gradient( linear, 0% 0%, 0% 100%, from( #b23a36 ), to( #74201e ) );
-}
-
-.UserMenuButtonBlue {
-    background-color: gradient( linear, 0% 0%, 0% 100%, from( #4f8ae0 ), to( #2b5bb0 ) );
-}
-
-/* Icon and text, centered in the button. */
 .UserMenuButtonContent {
     flow-children: right;
-    horizontal-align: center;
     vertical-align: center;
-    max-width: 100%;
-    padding: 0px 8px;
+    padding: 0px 18px;
 }
 
 .UserMenuButtonIcon {
-    width: 20px;
-    height: 20px;
+    width: 30px;
+    height: 30px;
     vertical-align: center;
-    margin-right: 8px;
+    margin-right: 14px;
 }
 
 .UserMenuButtonLabel {
-    font-size: 15px;
+    font-size: 21px;
     font-weight: bold;
     color: white;
     vertical-align: center;
-    text-align: center;
-    max-width: 150px;
+}
+
+/* SETTINGS: a small header per group, then its controls. */
+.UserMenuGroupHeader {
+    flow-children: right;
+    margin-top: 16px;
+    margin-bottom: 8px;
+}
+
+.UserMenuGroupIcon {
+    width: 16px;
+    height: 16px;
+    vertical-align: center;
+    margin-right: 8px;
+    opacity: 0.8;
+}
+
+.UserMenuGroupLabel {
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #cfe8a8aa;
+    vertical-align: center;
 }
 
 .UserMenuColorRow {
     width: 100%;
     flow-children: right;
+    margin-bottom: 4px;
 }
 
 /* Plain flat swatches, not tied to melon_paint's r/g/b-in-the-name trigger
@@ -968,10 +1151,10 @@
    like it. Keep new swatches' class colors in sync with COLOR_PRESETS. */
 .ColorSwatch {
     width: fill-parent-flow(1.0);
-    height: 30px;
+    height: 34px;
     margin-left: 6px;
-    border-radius: 4px;
-    border: 2px solid #ffffff33;
+    border-radius: 0px;
+    border: 2px solid #ffffff2a;
 
     transition-property: border-color;
     transition-duration: .1s;
@@ -994,39 +1177,69 @@
 .ColorSwatchWhite { background-color: #ffffff; }
 .ColorSwatchBlack { background-color: #282828; }
 
-/* Full-width outlined settings toggle (collision debug). */
-.UserMenuOutlineButton {
+/* One setting per row: its name left, an ON/OFF pill right (the script
+   sets the pill's text and ToggleOn on the button, see hud/user-menu.js).
+   No transitions on the toggled parts (see the HUD notes in AGENTS.md). */
+.UserMenuToggle {
     width: 100%;
-    height: 30px;
-    border-radius: 4px;
-    border: 1px solid #ffffff66;
-    background-color: #00000066;
+    height: 42px;
+    margin-top: 6px;
+    border-radius: 0px;
+    border: 1px solid #ffffff14;
+    background-color: #ffffff0a;
 
-    transition-property: background-color;
-    transition-duration: .1s;
     &:hover {
-        background-color: #ffffff1a;
+        background-color: #ffffff17;
     }
 
     &.ToggleOn {
-        background-color: #44dd4455;
-        border-color: #7fd13b;
+        border: 1px solid #7fd13b88;
     }
 }
 
-.UserMenuOutlineLabel {
-    font-size: 14px;
-    font-weight: bold;
-    letter-spacing: 1px;
-    color: white;
-    horizontal-align: center;
+.UserMenuToggleName {
+    horizontal-align: left;
     vertical-align: center;
+    margin-left: 14px;
+    font-size: 15px;
+    font-weight: bold;
+    color: white;
+}
+
+/* Fixed width, so ON and OFF are the same size; text centered in it. The
+   letter-spacing also adds a gap after the last letter — the 2px of left
+   padding balance it. */
+.UserMenuTogglePill {
+    horizontal-align: right;
+    vertical-align: center;
+    margin-right: 10px;
+    width: 60px;
+    padding: 4px 0px 3px 2px;
+    text-align: center;
+    border-radius: 0px;
+    background-color: #ffffff1a;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #ffffffaa;
+}
+
+/* An action row (Test Podium): a gold outlined pill instead of ON/OFF. */
+.UserMenuTogglePill.UserMenuRunPill {
+    background-color: #00000000;
+    border: 1px solid #ffd84d;
+    color: #ffd84d;
+}
+
+.UserMenuToggle.ToggleOn .UserMenuTogglePill {
+    background-color: #3fae3f;
+    color: #ffffff;
 }
 
 /* Melon Racer logo after picking a team, before the melon spawns — full
    screen, so the frozen first-person view behind it doesn't show. Fades out
-   as the melon appears. Solid dark rind green (no alpha), matching the logo's
-   green letters and orange outline. */
+   as the melon appears. Solid dark rind green (no alpha), behind the logo's
+   melon slice and red banner (tools/make-logo.mjs). */
 .IntroLogo {
     width: 100%;
     height: 100%;
@@ -1047,4 +1260,163 @@
     vertical-align: center;
     width: 846px;
     height: 295px;
+}
+
+/* Scoreboard in place of CS2's own (#scoreboard, hud/scoreboard.js): only
+   while the engine sets HUD_SCOREBOARD_VISIBLE on an ancestor (Tab held).
+   Full screen and near-opaque so the default scoreboard under it doesn't
+   show through. No transition: the engine class flips instantly with Tab. */
+.Scoreboard {
+    width: 100%;
+    height: 100%;
+    background-color: #050805f2;
+    visibility: collapse;
+}
+
+.HUD_SCOREBOARD_VISIBLE .Scoreboard {
+    visibility: visible;
+}
+
+.ScoreboardFrame {
+    width: 820px;
+    horizontal-align: center;
+    vertical-align: center;
+}
+
+/* Like .UserMenuCard: the card's top edge runs through the logo banner's
+   middle (148px down), the logo is drawn after it, on top. */
+.ScoreboardCard {
+    width: 100%;
+    margin-top: 148px;
+    flow-children: down;
+
+    padding: 50px 32px 26px 32px;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #152012f4 ), to( #0b100af4 ) );
+    border: 2px solid #2f7a2f;
+    border-radius: 0px;
+    box-shadow: #000000aa 0px 18px 50px 0px;
+}
+
+.ScoreboardLogo {
+    horizontal-align: center;
+    vertical-align: top;
+    width: 520px;
+    height: 181px;
+}
+
+.ScoreboardTitle {
+    horizontal-align: center;
+    font-size: 30px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: white;
+}
+
+.ScoreboardSubtitle {
+    horizontal-align: center;
+    margin-top: 2px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: #ff7a7e;
+}
+
+/* "◀ A  ROUTE 2 / 3  D ▶" under the subtitle, time trial only. */
+.ScoreboardSwitch {
+    horizontal-align: center;
+    margin-top: -8px;
+    margin-bottom: 16px;
+    padding: 5px 16px;
+    border-radius: 0px;
+    border: 1px solid #cfe8a855;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #cfe8a8;
+
+    &.Unused {
+        visibility: collapse;
+    }
+}
+
+/* One line per player, and the column headers. Unused rows (fewer players
+   than SCOREBOARD_ROWS) collapse; the viewer's own row is outlined in gold
+   (Self), like the user menu's buttons — the outline is there but
+   transparent on every row, so marking one doesn't shift the layout. */
+.ScoreRow {
+    width: 100%;
+    height: 40px;
+    margin-top: 4px;
+    flow-children: right;
+    border-radius: 0px;
+    border: 2px solid #00000000;
+    background-color: #ffffff08;
+
+    &.Unused {
+        visibility: collapse;
+    }
+
+    &.Self {
+        border: 2px solid #ffd84d;
+    }
+}
+
+.ScoreRow Label {
+    vertical-align: center;
+    font-size: 20px;
+    font-weight: bold;
+    color: white;
+}
+
+.ScoreHeader {
+    height: 30px;
+    margin-top: 0px;
+    margin-bottom: 2px;
+    border-radius: 0px;
+    border: 0px solid #00000000;
+    border-bottom: 1px solid #ffffff1f;
+    background-color: #00000000;
+}
+
+.ScoreRow.ScoreHeader Label {
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: #cfe8a8aa;
+}
+
+.ScoreRank {
+    width: 64px;
+    text-align: center;
+}
+
+.ScoreName {
+    width: fill-parent-flow( 1 );
+    margin-left: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ScoreRow .ScorePoints {
+    width: 80px;
+    text-align: right;
+    color: #ffd84d;
+}
+
+.ScoreRow .ScoreHeat {
+    width: 90px;
+    text-align: right;
+}
+
+.ScoreRow .ScoreBest {
+    width: 140px;
+    margin-right: 12px;
+    text-align: right;
+    color: #cfe8a8;
+}
+
+/* Time trial: only rank, name and best time. */
+.Scoreboard.TimeTrial .ScorePoints,
+.Scoreboard.TimeTrial .ScoreHeat {
+    visibility: collapse;
 }

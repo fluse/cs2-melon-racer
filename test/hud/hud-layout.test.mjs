@@ -75,3 +75,24 @@ test("speedometer.xml's tags are balanced", () => {
     }
     assert.deepEqual(stack, [], "unclosed tags");
 });
+
+// A misplaced closing tag can leave one button inside another and the XML
+// still well-formed: the inner one's clicks then go to the outer one.
+test("no button in speedometer.xml sits inside another", () => {
+    const open = [];
+    const nested = [];
+    for (const m of layout.matchAll(/<(\/?)Button\b[^>]*?(?:id="([^"]*)")?[^>]*?(\/?)>/g)) {
+        const [, closing, id = "?", selfClosing] = m;
+        if (closing) {
+            open.pop();
+        } else {
+            if (open.length > 0) {
+                nested.push(`${id} inside ${open[open.length - 1]}`);
+            }
+            if (!selfClosing) {
+                open.push(id);
+            }
+        }
+    }
+    assert.deepEqual(nested, []);
+});

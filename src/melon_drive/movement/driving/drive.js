@@ -43,6 +43,7 @@ import { ApplyHealing } from "../../health/heal/index.js";
 import { CurrentWallRules, CurrentSideView, InWater, InJumpRechargeZone } from "../../zones/registry.js";
 import { ChargeInRechargeZone } from "../../zones/jump-recharge/logic.js";
 import { SideViewAxes, InitialFacing, SideViewInput, PlaneDepth, KeepOnPlane } from "../../zones/side-view/logic.js";
+import { PodiumHoldActive, PodiumHoldVelocity } from "../../race/podium/logic.js";
 
 /** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt */
 export function UpdateKart(slot, kart, dt) {
@@ -199,15 +200,25 @@ export function UpdateKart(slot, kart, dt) {
         }
     }
 
-    const forwardInput =
-        (pawn.IsInputPressed(CSInputs.FORWARD) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.BACK) ? 1 : 0);
-    const strafeInput =
-        (pawn.IsInputPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.LEFT) ? 1 : 0);
+    // On the hub's podium after a Grand Prix (race/podium/): jumping and
+    // looking around only — no driving, no attack boost, held over its spot.
+    if (kart.podium && !PodiumHoldActive(kart.podium, now)) {
+        kart.podium = undefined;
+    }
+    const podium = kart.podium;
+    const forwardInput = podium
+        ? 0
+        : (pawn.IsInputPressed(CSInputs.FORWARD) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.BACK) ? 1 : 0);
+    // A/D page the scoreboard while Tab is held (UpdateScoreboardInput) —
+    // no strafing then.
+    const strafeInput = podium || pawn.IsInputPressed(CSInputs.SHOW_SCORES)
+        ? 0
+        : (pawn.IsInputPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.LEFT) ? 1 : 0);
     const jumpPressed = pawn.WasInputJustPressed(CSInputs.JUMP);
     // Attack boost (ATTACK_BOOST_*): holding attack pushes along the look
     // direction and lifts the speed cap, paid for with health every tick —
     // no floor: boost until it's gone and the melon breaks.
-    const attackHeld = pawn.IsInputPressed(CSInputs.ATTACK);
+    const attackHeld = !podium && pawn.IsInputPressed(CSInputs.ATTACK);
     const boost = AttackBoost(kart.health, attackHeld, dt);
     kart.health = boost.health;
     kart.attackBoosting = boost.boosting; // shows the boost trail, see fx/boost-trail/boost-trail.js
@@ -341,6 +352,13 @@ export function UpdateKart(slot, kart, dt) {
     vx = v.x;
     vy = v.y;
     const vz = v.z;
+    // On the podium: whatever else happened, horizontally it only goes back
+    // over its spot (a jump goes straight up and comes down there).
+    if (podium) {
+        const hold = PodiumHoldVelocity(origin, podium.spot);
+        vx = hold.x;
+        vy = hold.y;
+    }
     // Side view: nothing moves the melon towards or away from the camera.
     if (sideView) {
         const kept = KeepOnPlane({ x: vx, y: vy }, sideView.view, sideView.depthError);

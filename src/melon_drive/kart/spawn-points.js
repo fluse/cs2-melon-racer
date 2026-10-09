@@ -3,7 +3,7 @@ import { Debug } from "../core/debug.js";
 import { TraceLine } from "../core/trace.js";
 import { ViewAnglesFacing } from "../zones/teleport/logic.js";
 import { NearestWithin } from "./spawn-points-logic.js";
-import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, TELEPORT_UP_OFFSET, FLOOR_TRACE_UP, FLOOR_TRACE_DOWN, START_SPAWN_SHARED_NAME, START_SPAWN_SHARED_MAX_DISTANCE, CHECKPOINT_SPAWN_SHARED_NAME, CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE, CheckpointSpawnName, StartSpawnName } from "../constants/index.js";
+import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, TELEPORT_UP_OFFSET, FLOOR_TRACE_UP, FLOOR_TRACE_DOWN, START_SPAWN_SHARED_NAME, START_SPAWN_SHARED_MAX_DISTANCE, CHECKPOINT_SPAWN_SHARED_NAME, CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE, CheckpointSpawnName, StartSpawnName, PodiumSpawnName } from "../constants/index.js";
 
 // The one place that turns a Hammer spawn entity into a melon position.
 // Every caller that puts a melon at the hub or the intro goes through here,
@@ -155,4 +155,13 @@ export function GetStartSpawnPoint(trackId, trigger) {
         position: Lifted(trigger.GetAbsOrigin(), TELEPORT_UP_OFFSET),
         angles: LevelAngles(trigger.GetAbsAngles().yaw),
     };
+}
+
+/**
+ * Where place `place` (1 = winner) stands on the hub's podium: the
+ * podium_spawn_<place> info_target, facing its yaw. Undefined without one.
+ * @param {number} place
+ */
+export function GetPodiumSpawnPoint(place) {
+    return FindSpawnPoint(PodiumSpawnName(place));
 }

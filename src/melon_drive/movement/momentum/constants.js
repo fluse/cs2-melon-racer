@@ -4,7 +4,7 @@
 // it to MAX_SPEED). The attack boost (and any other speed-cap boost, e.g. a
 // wall bounce's) neither counts as reaching the top speed nor breaks a run.
 // Rule: ../logic/momentum.js, applied in ../physics/drive.js.
-import { UNITS_TO_KMH } from "../../hud/constants.js";
+import { UNITS_TO_KMH } from "../../hud/speedometer/constants.js";
 
 // Top speed gained per step, as a fraction of MAX_SPEED (0.02 = +2 %).
 // Higher: a few quick hits make the melon much faster.

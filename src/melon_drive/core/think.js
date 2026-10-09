@@ -4,12 +4,12 @@ import { HEARTBEAT_INTERVAL } from "../constants/index.js";
 import { karts, EnsureModerator, DropKart } from "./kart-registry.js";
 import { SetUpPlayerKart, EnsurePlayerKarts, HoldPawn } from "../kart/spawn.js";
 import { GetHubSpawnPoint } from "../kart/spawn-points.js";
-import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud, UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, ApplyHubModalState } from "../hud/index.js";
+import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud, UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, UpdateScoreboardHud, UpdateScoreboardInput, ApplyHubModalState } from "../hud/index.js";
 import { UpdateKart } from "../movement/index.js";
 import { HandleMelonLost } from "../health/index.js";
 import { phase, UpdateRaceFlow } from "../race/heat/race-flow.js";
 import { UpdatePrediction, HidePrediction } from "../fx/prediction/prediction.js";
-import { UpdateLiftCamera, UpdateZoneCamera, UpdateSideViewCamera, UpdateFollowCamera } from "../camera/index.js";
+import { UpdateLiftCamera, UpdatePodiumCamera, UpdateZoneCamera, UpdateSideViewCamera, UpdateFollowCamera } from "../camera/index.js";
 import { UpdateBoostTrail, StopBoostTrail } from "../fx/boost-trail/boost-trail.js";
 
 let lastHeartbeatTime = 0;
@@ -72,6 +72,7 @@ export function Think() {
             UpdateUserMenu(slot, kart); // checked before UpdateKart's locked/breaking early-returns — USE works as an unstuck button
             UpdateKart(slot, kart, dt);
             UpdateLiftCamera(kart, dt);
+            UpdatePodiumCamera(kart, dt);
             UpdateZoneCamera(kart, dt);
             UpdateSideViewCamera(kart, dt);
             UpdateFollowCamera(kart, dt);
@@ -82,6 +83,8 @@ export function Think() {
             UpdateJumpHud(slot, kart);
             UpdateHealthHud(slot, kart);
             UpdateCheckpointHud(slot, kart);
+            UpdateScoreboardInput(kart);
+            UpdateScoreboardHud(slot, kart);
             if (kart.inHub) {
                 ApplyHubModalState(slot, phase);
             }

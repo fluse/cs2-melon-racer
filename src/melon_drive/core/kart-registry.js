@@ -24,6 +24,9 @@ import { predictionDotSet } from "./trace.js";
  *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
  *   hudHealthSegments?: number, hudJumpReady?: boolean[], // what the health bar / jump dots last sent to the HUD — see UpdateHealthHud/UpdateJumpHud
  *   hudResendAt?: { health?: number, jump?: number }, // when they send their whole state again — see HUD_RESEND_SECONDS
+ *   hubRacersResendAt?: number, hubRacersShown?: Record<string, string>, // the hub window's heats and racers: next full resend, and what it last sent — see UpdateHubLists
+ *   scoreboardPick?: number, // track the time trial board was paged to while Tab is held (unset: the viewer's own) — see UpdateScoreboardInput
+ *   scoreboardNextUpdate?: number, scoreboardResendAt?: number, scoreboardShown?: Record<string, string>, // the scoreboard's next rebuild, next full resend, and what it last sent — see UpdateScoreboardHud
  *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
@@ -36,6 +39,8 @@ import { predictionDotSet } from "./trace.js";
  *   attackGuardUntil?: number, // until when engine pushes from attack are cancelled — see ATTACK_PUSH_GUARD_SECONDS
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
  *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
+ *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
+ *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement

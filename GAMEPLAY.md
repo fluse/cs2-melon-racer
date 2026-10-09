@@ -23,7 +23,9 @@ respawns at its last checkpoint.
 3. **Hub** — players gather in `hub_start_trigger` and start a race
    together ("Hub → race → next-track flow").
 4. **Heats** — one per track in `trackId` order: countdown, race, break,
-   next track; after the last one everyone returns to the hub.
+   next track; after the last one everyone returns to the hub. Together
+   they're a **Grand Prix**: each heat's finishers score points by place,
+   the most points over all tracks wins ("Grand Prix — places & points").
 
 Nobody dies: `gamemode` aborts all player damage. Instead the melon breaks
 (health at 0, or a kill trigger) and respawns at its respawn point — see
@@ -375,7 +377,7 @@ ends. Below it "LAP 1/3", only on tracks with more than one lap. The
 checkpoint count (and the laps-to-win count used by the flow below) comes
 from that track's trigger names — see "Hub → race → next-track flow".
 Flag icons: `tools/make-icons.mjs` (`track-start`, `track-finish`); rule:
-`hud/checkpoint-strip-logic.js` (`test/hud/checkpoint-strip.test.mjs`), applied
+`hud/track/logic.js` (`test/hud/checkpoint-strip.test.mjs`), applied
 in `hud/`.
 
 **Switching tracks while free roaming:** crossing another track's start
@@ -419,9 +421,22 @@ run by `race/heat/`):
    the last track's heat ends. A `trigger_multiple` named
    `hub_start_trigger`, filtered to `prop_physics` like the checkpoints,
    fires `hub_enter`/`hub_leave` script inputs on touch/untouch. While a
-   kart is in it, that player sees a modal ("Start race" button) on the
-   HUD — or, if a heat is already running for other players, the message
-   "Race already in progress…" instead of the button. Clicking the button only starts
+   kart is in it, that player sees a modal ("Start Grand Prix" button) on
+   the HUD — or, if a heat is already running for other players, the
+   message "Grand Prix in progress…" instead of the button. **Named after
+   the Grand Prix, not a heat** (decided): the button starts the whole run
+   of heats. Above the button the modal shows the heats it runs — a card
+   per track in race order: heat number, route name, laps and checkpoints,
+   and an icon that fits the route's name (aqueduct, truss bridge, melon wedge; a
+   checkered flag for any other) — and who rides along: everyone in the
+   trigger right now, in join order, their own name highlighted
+   (`HUB_RACER_ROWS` chips, "+N MORE" for the rest). Rules:
+   `hud/hub-modal/logic.js` (`test/hud/hub-modal.test.mjs`). The icons
+   (`panorama/images/custom_game/routes/route_<trackId>.png`) and route
+   names (`hud/hub-modal/routes.js`, from the route prefab's file name) are
+   generated from the .vmap by `tools/make-route-icons.mjs` — re-run it after
+   adding or renaming a route (`test/map/route-icons.test.mjs` fails on a track
+   without them). Clicking the button only starts
    a heat if the phase is still `HUB`. `hub_enter`/`hub_leave` are accepted
    **only from `hub_start_trigger` itself** (checked by caller name, and in
    the .vmap by `test/map/map-io.test.mjs`): any other trigger that should just
@@ -477,6 +492,80 @@ run by `race/heat/`):
    track, teleports the whole group to `hub_spawn` and returns to phase
    `HUB`.
 
+## Grand Prix — places & points (decided, implemented)
+
+**Win condition.** The heats from the hub's "Start Grand Prix" to the group's
+return to the hub are one **Grand Prix**:
+
+- **Per heat:** finishers get places in the order they cross the finish of
+  the last lap, and points for them: `HEAT_POINTS` (10, 8, 6, 5, 4, 3, 2, 1
+  for 1st…8th), every place after that `HEAT_POINTS_FINISHER` (1). The place
+  shows under the FINISH image, "1ST · +10 PTS" (`finish_place`), until
+  the next heat or the hub.
+- **Overall winner:** the most points after the last track. Ties: more heat
+  wins, then the lower total time over the heats, then by name.
+- **Solo:** outside a Grand Prix the best time per track counts ("Time
+  trial").
+
+A moderator abort (or everyone leaving) ends it as *cancelled*; the
+standings so far stay. Players are told apart by slot + name for the
+Grand Prix's duration (`PlayerKey`), so someone who leaves keeps their
+row. The standings stay until the next Grand Prix starts. Constants:
+`race/grand-prix/constants.js`; rules: `race/grand-prix/logic.js`
+(`test/race/grand-prix.test.mjs`), applied by `race/grand-prix/grand-prix.js`
+from `race/heat/race-flow.js` (`test/race/grand-prix-flow.test.mjs`).
+
+**Podium in the hub (implemented).** After the last track the top 3 of
+the standings (`SortedStandings`) are put on the hub's podium instead of
+`hub_spawn`: one `info_target` per step, `podium_spawn_1` … `_3`, no
+triggers. They're **held there** (decided) for `PODIUM_HOLD_SECONDS`:
+jumping and looking around work, driving and the attack boost don't, and a
+melon off its spot is pulled back over it. The view is turned to look
+**at** the podium (the spots' yaw is the way the podium faces), and the
+chase camera eases further back meanwhile (`camera/podium-zoom/`). Their respawn point stays the
+hub, so the respawn, hub and tutorial buttons (and any teleport, or the next
+Grand Prix) take them down early. A racer who left leaves their step empty;
+a cancelled Grand Prix puts nobody up. For testing, the user menu's
+DEVELOPER group has "Test Podium": everyone to the hub, the clicking player
+onto place 1, the others in join order onto 2 and 3 — not while a heat
+runs (`TestGrandPrix` in `race/podium/podium.js`). Confetti: every
+`info_particle_system` named `particle_podium_confetti` (Start Active off)
+bursts as they're put up and again every `PODIUM_CONFETTI_INTERVAL`, and
+is stopped when the hold ends. Constants:
+`race/podium/constants.js`; rules: `race/podium/logic.js`
+(`test/race/podium.test.mjs`), applied by `race/podium/podium.js` and the
+hold in `movement/driving/drive.js` (`test/race/podium-flow.test.mjs`).
+Details for mappers: [Mapping API: podium](docs/mapping-api/05-hub.md#podium).
+
+## Scoreboard (implemented)
+
+CS2's own scoreboard knows nothing of points or times, and a custom HUD
+can't replace it — so the custom one covers it: `#scoreboard` in
+`speedometer.xml` shows while the engine sets `HUD_SCOREBOARD_VISIBLE`
+(Tab held), full screen on a near-opaque backdrop (pure CSS, the script
+can't tell whether Tab is held). What it shows, per viewer
+(`hud/scoreboard/logic.js`, `test/hud/scoreboard.test.mjs`):
+
+- **Grand Prix** — while one runs, and its final standings afterwards
+  ("FINAL" / "CANCELLED") while the viewer isn't on a track: rank, name,
+  points, place in the current/last heat, best time on that track. Players
+  who didn't start in it are listed after the racers, without a rank.
+- **Time trial** — otherwise (or when the viewer is on a track): the best
+  times on the viewer's track (else the last Grand Prix's last track, else
+  the first one), fastest first, saved times of players who aren't on the
+  map included. The subtitle names the route. **Paging** (decided): with
+  Tab held, A and D page to the previous/next track's best times
+  (wrapping around, "◀ A  ROUTE 2 / 3  D ▶" under the subtitle); letting go
+  of Tab forgets it, so every opening starts on the viewer's own track.
+  While Tab is held A/D don't strafe the melon. Not on the Grand Prix
+  board. `StepTrack` in `hud/scoreboard/logic.js`, `UpdateScoreboardInput`
+  in `hud/scoreboard/scoreboard.js`.
+
+`SCOREBOARD_ROWS` (12) rows; with more players the viewer's own row takes
+the last one. The viewer's row is tinted. Rebuilt every
+`SCOREBOARD_UPDATE_SECONDS` whether open or not, sent on change plus every
+`HUD_RESEND_SECONDS` (`hud/scoreboard/scoreboard.js`).
+
 ## Moderator (decided, implemented)
 
 The first player to get a kart (i.e. the first to join the map, tracked via
@@ -490,8 +579,8 @@ The moderator's one power is aborting a heat that's already running
 mistake or needs to be redone. There's no separate always-visible button for
 this: the moderator gets it the same way anyone reaches the hub's "start"
 modal — by standing in `hub_start_trigger`. While a heat is running, a
-non-moderator standing there sees the "Race already in progress…" message;
-the moderator sees a "Cancel race" button instead
+non-moderator standing there sees the "Grand Prix in progress…" message;
+the moderator sees a "Cancel Grand Prix" button instead
 (`hub_abort_button` in `speedometer.xml`, toggled via the `IsModerator` HUD
 class). Clicking it runs the same `ReturnAllToHub` + reset-to-`HUB` path a
 heat normally takes when it finishes on its own, just triggered early
@@ -626,7 +715,7 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   health). HUD: three round outlines stacked right of the speed
   panel (bottom center; bottom up, `jump_dot_<i>`), each filled white only
   while that charge is ready — used up or refilling shows just the outline. Rule:
-  `hud/jump-dots-logic.js` (`test/hud/jump-dots.test.mjs`). The ground jump has no cooldown to show. **Rated by
+  `hud/speedometer/logic.js` (`test/hud/jump-dots.test.mjs`). The ground jump has no cooldown to show. **Rated by
   angle, like a bounce** (decided): the angle the melon came at the wall
   (its approach, remembered when the wall contact starts and kept while it
   goes on — `WallApproach` — so a press a tick or two after the touch,
@@ -791,10 +880,13 @@ long fall lands hard enough for the engine to destroy the melon on impact.
   first join again (the kart is dropped on disconnect).
 - Returning to the hub uses `hub_spawn` (required — there's no fallback),
   facing `hub_spawn_facing` if placed, else `hub_spawn`'s own angles.
-- The user menu's "Play Tutorial" button ("LEARNING & TUTORIAL") sends that player back to
+- The user menu's "Play Tutorial" button sends that player back to
   `intro_spawn` (or `hub_spawn` without one) the same way its "Return to
-  hub" button works: it leaves a running heat, clears track progress, and
-  makes that spot the kart's respawn point.
+  Hub" button works: it leaves a running heat, clears track progress, and
+  makes that spot the kart's respawn point. While the player is signed up
+  for a heat, the hub button reads **"Exit Race"** (decided): it takes just
+  them out of the Grand Prix, the others race on, their standings so far
+  stay (`UpdateHubButtonHud` in `hud/user-menu.js`).
 - **Full health on every spawn** (decided): wherever a melon is sent on
   purpose — the user menu's hub, tutorial and respawn buttons,
   `hub_teleport`, a heat's start and its end, a checkpoint respawn after a
@@ -1006,6 +1098,3 @@ script). Constants:
   than disconnecting — the group is blocked until every racer finishes.
   Worth a "force-finish"/skip vote or a hard timeout once this is actually
   played with real groups.
-- **Winner recognition**: `lapsToWin` decides when a kart is *done* with a
-  heat, but nothing records or displays *who got there first* —
-  worth a "1st/2nd/3rd" HUD callout once this is played with real groups.

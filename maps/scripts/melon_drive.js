@@ -77,6 +77,9 @@ function TraceSphere(config) {
  *   lastBounceInfo?: { angle: number, angleFactor: number, jumpFactor: number }, // last bounce's result, for the HUD
  *   hudHealthSegments?: number, hudJumpReady?: boolean[], // what the health bar / jump dots last sent to the HUD — see UpdateHealthHud/UpdateJumpHud
  *   hudResendAt?: { health?: number, jump?: number }, // when they send their whole state again — see HUD_RESEND_SECONDS
+ *   hubRacersResendAt?: number, hubRacersShown?: Record<string, string>, // the hub window's heats and racers: next full resend, and what it last sent — see UpdateHubLists
+ *   scoreboardPick?: number, // track the time trial board was paged to while Tab is held (unset: the viewer's own) — see UpdateScoreboardInput
+ *   scoreboardNextUpdate?: number, scoreboardResendAt?: number, scoreboardShown?: Record<string, string>, // the scoreboard's next rebuild, next full resend, and what it last sent — see UpdateScoreboardHud
  *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
  *   lastGroundedTime?: number, // last tick the melon had ground contact — gates jumping, see UpdateGrounded
@@ -89,6 +92,8 @@ function TraceSphere(config) {
  *   attackGuardUntil?: number, // until when engine pushes from attack are cancelled — see ATTACK_PUSH_GUARD_SECONDS
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
  *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
+ *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
+ *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
@@ -660,11 +665,8 @@ const ATTACK_BOOST_HEALTH_PER_SECOND = 20; // was 10
 // Lower (0): only while held — a push landing just after release gets through.
 const ATTACK_PUSH_GUARD_SECONDS = 0.3;
 
-// HUD entity and the speed panel (km/h, health bar, jump dots) in speedometer.xml.
+// The speed panel (km/h, health bar, jump dots) in speedometer.xml.
 
-// Name of the custom_hud_layout entity (place one in Hammer pointing at
-// panorama/layout/custom_game/speedometer.vxml) that shows the speedometer.
-const SPEED_HUD_ENTITY_NAME = "speed_hud";
 // Hammer units/sec -> km/h (1 unit = 1 inch: units/sec * 0.0254 * 3.6).
 const UNITS_TO_KMH = 0.0254 * 3.6;
 
@@ -682,18 +684,6 @@ const JUMP_DOT_FILL_STEPS = 8;
 const HEALTH_BAR_SEGMENTS = 30;
 const HEALTH_LOW_FRACTION = 0.6;
 const HEALTH_CRITICAL_FRACTION = 0.3;
-// The health bar and jump dots send a class only when it changes — plus
-// their whole state again this often (seconds): a class sent before the
-// player's HUD had loaded (e.g. full jump charges right at spawn) was lost
-// and, never changing, never sent again.
-const HUD_RESEND_SECONDS = 1;
-
-// Checkpoint strip at the top of the screen (start flag -> numbered
-// checkpoints -> finish flag) — see CHECKPOINT_HUD_SLOTS panel ids
-// ("cp_slot_0" .. "cp_slot_{N-1}", each with a "cp_link_<i>" line before
-// it) in speedometer.xml. A track with more checkpoints shows a window of
-// this many that moves along with the kart (see hud/checkpoint-strip-logic.js).
-const CHECKPOINT_HUD_SLOTS = 12;
 
 // Momentum: reaching the top speed again and again in quick succession
 // raises that melon's own top speed, step by step — as long as it never
@@ -997,6 +987,50 @@ const FINISH_RESTART_START_GUARD = 0.25;
 // keep their own keys next to this one).
 const SAVE_DATA_BEST_TIMES_KEY = "bestTimes";
 
+// Grand Prix: the run of heats from the hub's "Start Grand Prix" to the group's
+// return to the hub. Every heat's finishers score points by the place they
+// crossed the line in; the totals over all tracks decide the overall
+// winner. See "Grand Prix — places & points" in GAMEPLAY.md.
+
+// Points for 1st, 2nd, 3rd, … in a heat.
+const HEAT_POINTS = [10, 8, 6, 5, 4, 3, 2, 1];
+// Every place past HEAT_POINTS still gets this much for finishing.
+const HEAT_POINTS_FINISHER = 1;
+
+// Podium in the hub: after a Grand Prix that ran to its last track, the top
+// three are put on it and held there for a while. See "Podium" in
+// GAMEPLAY.md.
+
+// How many places the podium has — one info_target per place.
+const PODIUM_PLACES = 3;
+// Where place <n> stands: an info_target named "podium_spawn_<n>"
+// ("podium_spawn_1" = the winner's step), on the floor under it. Its yaw is
+// the way the podium faces (towards the room): the melon is set down facing
+// it, the player's view the other way, so the chase camera looks at the
+// podium from the room. A place without one sends that racer to hub_spawn
+// like everyone else.
+const PODIUM_SPAWN_NAME_PATTERN = /^podium_spawn_([1-3])$/;
+/** @param {number} place */
+function PodiumSpawnName(place) {
+    return `podium_spawn_${place}`;
+}
+// How long they're held on their step (seconds): jumping and looking around
+// work, driving and the attack boost don't. The hub/tutorial/respawn buttons
+// and any teleport let them go earlier.
+const PODIUM_HOLD_SECONDS = 10;
+// How hard a held melon is pulled back over its spot (1/s: units/sec of
+// horizontal speed per unit it's off), e.g. after a jump that didn't land
+// straight — and at most this fast (units/sec).
+const PODIUM_PULL = 6;
+const PODIUM_PULL_MAX_SPEED = 200;
+// Confetti over the podium: every info_particle_system by this name (Start
+// Active off) gets Start once the top three are up there, again every
+// PODIUM_CONFETTI_INTERVAL seconds (a short Stop first, so a one-off burst
+// fires anew), and Stop when their hold ends. Optional.
+const PODIUM_CONFETTI_NAME = "particle_podium_confetti";
+const PODIUM_CONFETTI_INTERVAL = 2; // seconds between bursts
+const PODIUM_CONFETTI_RESTART_GAP = 0.1; // seconds between a burst's Stop and its Start
+
 // Teleporters and the lift applied to every trigger/destination teleport target.
 
 // Generic teleporters, same name-carries-the-config convention: a
@@ -1147,6 +1181,14 @@ const LIFT_CAMERA_EXTRA_DISTANCE = 220; // units further back
 const LIFT_CAMERA_EXTRA_HEIGHT = 30; // units higher up
 const LIFT_CAMERA_EASE_SECONDS = 0.6; // seconds to zoom fully out (or back in)
 
+// Podium (race/podium/): while a melon is held on its step, the chase camera
+// eases back and up by this much on top of the normal
+// CAMERA_DISTANCE/CAMERA_HEIGHT, so the whole podium is in view; it eases
+// back in once the hold ends. Walls don't pull it in meanwhile.
+const PODIUM_CAMERA_EXTRA_DISTANCE = 160; // units further back
+const PODIUM_CAMERA_EXTRA_HEIGHT = 40; // units higher up
+const PODIUM_CAMERA_EASE_SECONDS = 0.8; // seconds to zoom fully out (or back in)
+
 // The break camera (camera/break-zoom/break-zoom.js) uses the engine's own
 // wall clipping, unlike the normal chase camera (camera/wall-clip/) — this is
 // how fast it returns after a wall pulled it in
@@ -1253,6 +1295,49 @@ const SIDE_VIEW_TELEPORT_DISTANCE = 256;
 // tick or two after the teleport).
 const SIDE_VIEW_TELEPORT_CUT_SECONDS = 0.25;
 
+// The HUD entity, and what every panel shares. Each panel with its own
+// rules keeps its tunables in its folder (speedometer/, track/, scoreboard/).
+
+// Name of the custom_hud_layout entity (place one in Hammer pointing at
+// panorama/layout/custom_game/speedometer.vxml) that shows the whole HUD.
+const SPEED_HUD_ENTITY_NAME = "speed_hud";
+
+// Panels that send a class or text only when it changes send their whole
+// state again this often (seconds): a class sent before the player's HUD
+// had loaded (e.g. full jump charges right at spawn) was lost and, never
+// changing, never sent again.
+const HUD_RESEND_SECONDS = 1;
+
+// The track HUD: time trial panel and checkpoint strip in speedometer.xml.
+
+// Checkpoint strip at the top of the screen (start flag -> numbered
+// checkpoints -> finish flag) — see CHECKPOINT_HUD_SLOTS panel ids
+// ("cp_slot_0" .. "cp_slot_{N-1}", each with a "cp_link_<i>" line before
+// it) in speedometer.xml. A track with more checkpoints shows a window of
+// this many that moves along with the kart (see hud/track/logic.js).
+const CHECKPOINT_HUD_SLOTS = 12;
+
+// Scoreboard (shown while Tab is held, in place of CS2's own — see
+// hud/scoreboard/scoreboard.js).
+
+// This many player rows, "score_row_0" .. "score_row_{N-1}" in
+// speedometer.xml (add/remove them there when changing the count). With
+// more players the viewer's own row takes the last one.
+const SCOREBOARD_ROWS = 12;
+// How often each player's scoreboard is rebuilt (seconds) — it's filled in
+// whether it's open or not, so not every tick.
+const SCOREBOARD_UPDATE_SECONDS = 0.25;
+
+// The hub's "Start Grand Prix" window (hud/hub-modal/hub-modal.js). Its
+// heat cards are "hub_heat_<trackId>" for every track id up to MAX_TRACKS,
+// each with its route's icon from tools/make-route-icons.mjs.
+
+// This many rows in its racer list, "hub_racer_0" .. "hub_racer_{N-1}" in
+// speedometer.xml (add/remove them there when changing the count). With
+// more players in the start area the viewer's own row takes the last one,
+// and "+N MORE" counts the rest.
+const HUB_RACER_ROWS = 8;
+
 // Debug output timing.
 
 // Think's debug heartbeat log interval — see core/think.js.
@@ -1316,6 +1401,36 @@ function LiftCameraOffset(base, blend) {
         x: base.x - LIFT_CAMERA_EXTRA_DISTANCE * eased,
         y: base.y,
         z: base.z + LIFT_CAMERA_EXTRA_HEIGHT * eased,
+    };
+}
+
+// Pure rules for the podium camera zoom — no cs_script import, so it's
+// unit-testable in Node (see test/camera/podium-zoom.test.mjs).
+// podium-zoom.js next to it and ../follow/follow.js apply it.
+
+/**
+ * How far the podium camera is zoomed out after `dt` more seconds, 0
+ * (normal) to 1 (fully out): towards 1 while held on the podium, towards 0
+ * after, taking PODIUM_CAMERA_EASE_SECONDS for the whole way.
+ * @param {number} blend current value @param {boolean} onPodium @param {number} dt
+ */
+function PodiumCameraBlend(blend, onPodium, dt) {
+    const step = PODIUM_CAMERA_EASE_SECONDS > 0 ? Math.max(0, dt) / PODIUM_CAMERA_EASE_SECONDS : 1;
+    return onPodium ? Math.min(1, blend + step) : Math.max(0, blend - step);
+}
+
+/**
+ * The chase camera offset with the podium zoom on top: further back (x is
+ * forward, negative = behind) and higher, eased (smoothstep).
+ * @param {{ x: number, y: number, z: number }} base @param {number} blend see PodiumCameraBlend
+ */
+function PodiumCameraOffset(base, blend) {
+    const t = Math.max(0, Math.min(1, blend));
+    const eased = t * t * (3 - 2 * t);
+    return {
+        x: base.x - PODIUM_CAMERA_EXTRA_DISTANCE * eased,
+        y: base.y,
+        z: base.z + PODIUM_CAMERA_EXTRA_HEIGHT * eased,
     };
 }
 
@@ -1567,8 +1682,8 @@ function ZoneCameraOffset(base, state) {
 
 // The third-person chase camera: attaching it to the melon, its normal
 // offset (CAMERA_DISTANCE/CAMERA_HEIGHT), and the one place that writes
-// the follow config (SetFollowOffset) — the break, lift and camera-zone
-// zooms (the other folders in camera/) all go through it. Walls pull the
+// the follow config (SetFollowOffset) — the break, lift, podium and
+// camera-zone zooms (the other folders in camera/) all go through it. Walls pull the
 // camera in through ../wall-clip/ (eased), not the engine.
 
 /** The normal chase offset, before any zoom. @param {import("../../core/kart-registry.js").Kart} kart */
@@ -1623,7 +1738,7 @@ function UpdateFollowCamera(kart, dt) {
 function ApplyZonedFollowOffset(kart, dt) {
     const liftBlend = kart.liftCameraBlend ?? 0;
     const offset = ZonedFollowOffset(kart);
-    const clips = liftBlend === 0 && ZoneCameraClips(kart.zoneCamera);
+    const clips = liftBlend === 0 && (kart.podiumCameraBlend ?? 0) === 0 && ZoneCameraClips(kart.zoneCamera);
     if (!clips) {
         kart.cameraWallScale = undefined; // no wall pull-in out here; starts over once it's back on
     }
@@ -1641,7 +1756,8 @@ function ApplyZonedFollowOffset(kart, dt) {
  * @param {import("../../core/kart-registry.js").Kart} kart
  */
 function ZonedFollowOffset(kart) {
-    return ZoneCameraOffset(LiftCameraOffset(GetCameraOffsetFor(kart), kart.liftCameraBlend ?? 0), kart.zoneCamera);
+    const lifted = LiftCameraOffset(GetCameraOffsetFor(kart), kart.liftCameraBlend ?? 0);
+    return ZoneCameraOffset(PodiumCameraOffset(lifted, kart.podiumCameraBlend ?? 0), kart.zoneCamera);
 }
 
 /**
@@ -2002,6 +2118,72 @@ function UpdateLiftCamera(kart, dt) {
         return;
     }
     kart.liftCameraBlend = LiftCameraBlend(kart.liftCameraBlend ?? 0, InLiftZone(kart), dt);
+}
+
+// Pure podium rules — no cs_script import, so they're unit-testable in Node
+// (see test/race/podium.test.mjs). race/podium/podium.js puts the melons
+// there; movement/driving/drive.js holds them.
+
+/**
+ * A melon held on the podium: the spot it's pulled back over, and until when.
+ * @typedef {{ place: number, spot: { x: number, y: number, z: number }, until: number }} PodiumHold
+ */
+
+/**
+ * Who stands where: the first PODIUM_PLACES of the final standings (leader
+ * first, see SortedStandings), as long as they're still among `presentKeys`
+ * — a place whose racer has left stays empty, nobody moves up.
+ * @param {string[]} rankedKeys player keys, leader first
+ * @param {Set<string>} presentKeys player keys of the racers still on the map
+ * @returns {Map<string, number>} player key -> place (1 = winner)
+ */
+function PodiumPlaces(rankedKeys, presentKeys) {
+    /** @type {Map<string, number>} */
+    const places = new Map();
+    rankedKeys.slice(0, PODIUM_PLACES).forEach((key, i) => {
+        if (presentKeys.has(key)) {
+            places.set(key, i + 1);
+        }
+    });
+    return places;
+}
+
+/** Whether `hold` still holds the melon at `now`. @param {PodiumHold | undefined} hold @param {number} now */
+function PodiumHoldActive(hold, now) {
+    return hold !== undefined && now < hold.until;
+}
+
+/**
+ * The horizontal velocity that keeps a held melon over its spot: straight
+ * back towards it, PODIUM_PULL per unit it's off, at most
+ * PODIUM_PULL_MAX_SPEED. Zero right on it.
+ * @param {{ x: number, y: number }} origin @param {{ x: number, y: number }} spot
+ */
+function PodiumHoldVelocity(origin, spot) {
+    const dx = spot.x - origin.x;
+    const dy = spot.y - origin.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance === 0) {
+        return { x: 0, y: 0 };
+    }
+    const speed = Math.min(distance * PODIUM_PULL, PODIUM_PULL_MAX_SPEED);
+    return { x: (dx / distance) * speed, y: (dy / distance) * speed };
+}
+
+// Podium camera: zooms out while the melon is held on the hub's podium
+// (PODIUM_CAMERA_* in constants.js, the math in logic.js).
+
+/**
+ * Per tick: eases the chase camera out while the melon stands on the podium
+ * and back in after (UpdateFollowCamera in follow.js applies the zoom right
+ * after). Left alone while the melon is breaking — the break camera owns it.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
+ */
+function UpdatePodiumCamera(kart, dt) {
+    if (kart.breaking) {
+        return;
+    }
+    kart.podiumCameraBlend = PodiumCameraBlend(kart.podiumCameraBlend ?? 0, PodiumHoldActive(kart.podium, Instance.GetGameTime()), dt);
 }
 
 // Camera zones: zoom in or out while the melon is in a camera_enter/_leave
@@ -2371,7 +2553,7 @@ function LookAlongTravel(kart, sideView) {
 // Chase camera — one folder per feature: follow/ (the normal chase camera and
 // the one place that writes the follow config), wall-clip/ (eased pull-in at
 // walls), break-zoom/ (pull-back on a break), lift-zoom/ (zoom-out in lift
-// zones), zone-zoom/ (zoom in/out in camera zones), side-view/ (the fixed
+// zones), podium-zoom/ (zoom-out on the hub's podium), zone-zoom/ (zoom in/out in camera zones), side-view/ (the fixed
 // side camera in side-view zones). Other parts of
 // melon_drive import from here.
 
@@ -2556,6 +2738,15 @@ function GetStartSpawnPoint(trackId, trigger) {
         position: Lifted(trigger.GetAbsOrigin(), TELEPORT_UP_OFFSET),
         angles: LevelAngles(trigger.GetAbsAngles().yaw),
     };
+}
+
+/**
+ * Where place `place` (1 = winner) stands on the hub's podium: the
+ * podium_spawn_<place> info_target, facing its yaw. Undefined without one.
+ * @param {number} place
+ */
+function GetPodiumSpawnPoint(place) {
+    return FindSpawnPoint(PodiumSpawnName(place));
 }
 
 // The one custom_hud_layout entity every HUD panel lives in (speedometer.xml),
@@ -4022,6 +4213,7 @@ function RespawnKartAtCheckpoint(kart) {
     });
     FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
     kart.lastWallContact = undefined; // that wall is somewhere else now
+    kart.podium = undefined; // the respawn button (or a break) takes it down from the podium
     RestoreFullHealth(kart);
     // Cleared, not measured against zero: this is our own intentional
     // velocity reset, not a physical impact to react to.
@@ -4047,6 +4239,7 @@ function TeleportKartTo(kart, position, angles, velocity) {
     kart.melon.Teleport({ position, angles, velocity, angularVelocity: { x: 0, y: 0, z: 0 } });
     FacePlayerView(kart.pawn, angles.yaw);
     kart.lastWallContact = undefined; // that wall is somewhere else now
+    kart.podium = undefined; // not held over a spot it's been teleported away from
     kart.lastVelocity = undefined;
     kart.prevLastVelocity = undefined;
     kart.prevOrigin = undefined;
@@ -4911,7 +5104,7 @@ function JumpDotFills(charges, dots) {
 // The speed panel, bottom center: km/h, the health bar under it and the
 // wall-jump dots next to it.
 
-/** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart */
+/** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart */
 function UpdateSpeedHud(slot, kart) {
     const hud = GetSpeedHud();
     if (!hud) {
@@ -4937,7 +5130,7 @@ function UpdateSpeedHud(slot, kart) {
 /**
  * Whether `key`'s whole HUD state is due to be sent again (every
  * HUD_RESEND_SECONDS, and on the first call) — in between only changes are.
- * @param {import("../core/kart-registry.js").Kart} kart @param {"health" | "jump"} key
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {"health" | "jump"} key
  */
 function HudResendDue(kart, key) {
     const now = Instance.GetGameTime();
@@ -4956,7 +5149,7 @@ function HudResendDue(kart, key) {
  * dot changed (kart.hudJumpReady), and every dot again every
  * HUD_RESEND_SECONDS. One class per panel: several classes toggled on one
  * panel every tick never showed in-game.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
  */
 function UpdateJumpHud(slot, kart) {
     const hud = GetSpeedHud();
@@ -4978,7 +5171,7 @@ function UpdateJumpHud(slot, kart) {
  * default, the ones up to the health left shown with "On". Sent when the
  * count changed (kart.hudHealthSegments), and all of it again every
  * HUD_RESEND_SECONDS (see UpdateJumpHud).
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
  */
 function UpdateHealthHud(slot, kart) {
     const hud = GetSpeedHud();
@@ -5288,6 +5481,11 @@ function CanRestartTimeTrial(kart) {
     return !kart.racing && kart.trackId !== undefined;
 }
 
+/** Every player's best time on `trackId`, by player name. @param {number} trackId */
+function GetTrackBestTimes(trackId) {
+    return BestTimes()[trackId] ?? {};
+}
+
 /** This player's best time on `trackId`, if any. @param {import("../../core/kart-registry.js").Kart} kart @param {number} trackId */
 function GetBestTime(kart, trackId) {
     return BestTimes()[trackId]?.[PlayerName(kart)];
@@ -5338,10 +5536,10 @@ function CheckpointStrip(total, reached, maxSlots, done = false) {
  * clock, the player's best on the track, and for RUN_RESULT_SECONDS after a
  * finish (in a heat: until it's over) the finish time — and the checkpoint
  * strip top center (start -> checkpoints -> finish, see
- * hud/checkpoint-strip-logic.js) with the lap below it on multi-lap tracks. Shown
+ * hud/track/logic.js) with the lap below it on multi-lap tracks. Shown
  * while the kart is on a track — or, right after a free-roaming finish took
  * it off the track, while that result is up.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
  */
 function UpdateCheckpointHud(slot, kart) {
     const hud = GetSpeedHud();
@@ -5370,8 +5568,8 @@ function UpdateCheckpointHud(slot, kart) {
 }
 
 /**
- * @param {any} hud @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {number} trackId @param {number} now
- * @param {import("../core/kart-registry.js").Kart["lastRun"]} result the finish time to show, if any
+ * @param {any} hud @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} trackId @param {number} now
+ * @param {import("../../core/kart-registry.js").Kart["lastRun"]} result the finish time to show, if any
  */
 function UpdateRunPanel(hud, slot, kart, trackId, now, result) {
     const clock = kart.runStartTime !== undefined ? RunElapsed(kart, now) : result ? result.time : 0;
@@ -5411,6 +5609,408 @@ function UpdateCheckpointStrip(hud, slot, total, reached, done) {
     hud.SetHasClassForPlayer(slot, "cp_finish", "Reached", strip.finish === "reached");
 }
 
+// Pure Grand Prix rules — no cs_script import, so they're unit-testable in
+// Node (see test/race/grand-prix.test.mjs). race/grand-prix/grand-prix.js
+// holds the running Grand Prix and feeds it from the heat flow.
+
+/**
+ * One racer's tally. `key` tells players apart within a Grand Prix (player
+ * slot + name, see PlayerKey in grand-prix.js); `places`/`times` are per
+ * track id.
+ * @typedef {{ key: string, name: string, points: number, places: Record<string, number>, times: Record<string, number> }} Standing
+ */
+
+/**
+ * @typedef {{
+ *   trackIds: number[], // tracks raced so far, in order — the last one is the current/last heat
+ *   totalTracks: number, // how many heats this Grand Prix has
+ *   finishers: Record<string, number>, // finishers so far per track id
+ *   standings: Record<string, Standing>,
+ *   over: boolean, // back in the hub
+ *   cancelled: boolean, // ended early (moderator abort, everyone left)
+ * }} GrandPrix
+ */
+
+/**
+ * A fresh Grand Prix for `racers`, everyone on 0 points.
+ * @param {{ key: string, name: string }[]} racers @param {number} totalTracks
+ * @returns {GrandPrix}
+ */
+function NewGrandPrix(racers, totalTracks) {
+    /** @type {Record<string, Standing>} */
+    const standings = {};
+    for (const { key, name } of racers) {
+        standings[key] = { key, name, points: 0, places: {}, times: {} };
+    }
+    return { trackIds: [], totalTracks, finishers: {}, standings, over: false, cancelled: false };
+}
+
+/** Points for finishing a heat in `place` (1 = first). @param {number} place */
+function HeatPoints(place) {
+    return HEAT_POINTS[place - 1] ?? HEAT_POINTS_FINISHER;
+}
+
+/** A heat on `trackId` begins. @param {GrandPrix} gp @param {number} trackId */
+function BeginGrandPrixHeat(gp, trackId) {
+    if (gp.trackIds[gp.trackIds.length - 1] !== trackId) {
+        gp.trackIds.push(trackId);
+    }
+    gp.finishers[trackId] ??= 0;
+}
+
+/**
+ * A racer crossed the finish of their last lap on `trackId`: the next free
+ * place there, and its points. A racer who already has a place there keeps
+ * it (nothing is counted twice).
+ * @param {GrandPrix} gp @param {number} trackId @param {{ key: string, name: string }} racer @param {number | undefined} time
+ * @returns {{ place: number, points: number }}
+ */
+function RecordHeatFinish(gp, trackId, racer, time) {
+    const standing = (gp.standings[racer.key] ??= { key: racer.key, name: racer.name, points: 0, places: {}, times: {} });
+    const existing = standing.places[trackId];
+    if (existing !== undefined) {
+        return { place: existing, points: HeatPoints(existing) };
+    }
+    const place = (gp.finishers[trackId] ?? 0) + 1;
+    gp.finishers[trackId] = place;
+    const points = HeatPoints(place);
+    standing.places[trackId] = place;
+    standing.points += points;
+    if (time !== undefined) {
+        standing.times[trackId] = time;
+    }
+    return { place, points };
+}
+
+/** How many heats `standing` won. @param {Standing} standing */
+function Wins(standing) {
+    return Object.values(standing.places).filter((place) => place === 1).length;
+}
+
+/**
+ * The standings, leader first: most points, then most heat wins, then the
+ * lowest total time over the heats run, then by name.
+ * @param {GrandPrix} gp
+ * @returns {Standing[]}
+ */
+function SortedStandings(gp) {
+    const total = (/** @type {Standing} */ s) => Object.values(s.times).reduce((sum, t) => sum + t, 0);
+    return Object.values(gp.standings).sort(
+        (a, b) => b.points - a.points || Wins(b) - Wins(a) || total(a) - total(b) || a.name.localeCompare(b.name)
+    );
+}
+
+/** "1ST", "2ND", "3RD", "4TH", … "11TH", "21ST". @param {number} place */
+function OrdinalPlace(place) {
+    const tens = place % 100;
+    const suffix = tens >= 11 && tens <= 13 ? "TH" : ["TH", "ST", "ND", "RD"][place % 10] ?? "TH";
+    return `${place}${suffix}`;
+}
+
+// Pure rules of the scoreboard (hud/scoreboard/scoreboard.js): what it shows for one
+// viewer — the Grand Prix standings, or the best times on a track — as
+// ready-to-send strings. No cs_script import (test/hud/scoreboard.test.mjs).
+
+/**
+ * @typedef {{ rank: string, name: string, points: string, heat: string, best: string, self: boolean }} ScoreRow
+ * @typedef {{ grandPrixMode: boolean, title: string, subtitle: string, bestHeader: string, switcher: string, rows: ScoreRow[] }} Scoreboard
+ */
+
+const NONE = "–";
+const NO_TIME = "-:--.--";
+
+/**
+ * Which board a viewer sees. The Grand Prix standings while one is running,
+ * and its final standings afterwards — unless the viewer is on a track in a
+ * time trial, then that track's best times. The best-time column is for
+ * the heat's track in a Grand Prix, else the viewer's own track, else the
+ * last Grand Prix's last track, else the first track. In a time trial the
+ * viewer can page to another track (`pickedTrackId`, see StepTrack).
+ * @param {{ grandPrix: import("../../race/grand-prix/logic.js").GrandPrix | undefined, activeTrackId: number | undefined, kartTrackId: number | undefined, trackOrder: number[], pickedTrackId?: number }} input
+ */
+function ScoreboardView({ grandPrix, activeTrackId, kartTrackId, trackOrder, pickedTrackId }) {
+    const running = grandPrix !== undefined && !grandPrix.over;
+    const grandPrixMode = running || (grandPrix !== undefined && kartTrackId === undefined);
+    const lastGrandPrixTrack = grandPrix?.trackIds[grandPrix.trackIds.length - 1];
+    const picked = !grandPrixMode && pickedTrackId !== undefined && trackOrder.includes(pickedTrackId) ? pickedTrackId : undefined;
+    const boardTrackId = picked ?? (running ? activeTrackId : undefined) ?? kartTrackId ?? lastGrandPrixTrack ?? trackOrder[0];
+    return { grandPrixMode, boardTrackId };
+}
+
+/**
+ * The track `direction` (-1 / +1) steps from `current` in race order,
+ * wrapping around; the first track if `current` isn't one.
+ * @param {number[]} trackOrder @param {number | undefined} current @param {number} direction
+ */
+function StepTrack(trackOrder, current, direction) {
+    if (trackOrder.length === 0) {
+        return undefined;
+    }
+    const index = current !== undefined ? trackOrder.indexOf(current) : -1;
+    if (index === -1) {
+        return trackOrder[0];
+    }
+    return trackOrder[(index + direction + trackOrder.length) % trackOrder.length];
+}
+
+/**
+ * Ranks shared by equal entries: `same(a, b)` says whether b ties with the
+ * entry before it. [10, 8, 8, 5] -> 1, 2, 2, 4.
+ * @template T @param {T[]} sorted @param {(a: T, b: T) => boolean} same
+ */
+function SharedRanks(sorted, same) {
+    /** @type {number[]} */
+    const ranks = [];
+    sorted.forEach((entry, i) => {
+        ranks.push(i > 0 && same(sorted[i - 1], entry) ? ranks[i - 1] : i + 1);
+    });
+    return ranks;
+}
+
+/** @param {number | undefined} time */
+function TimeText(time) {
+    return time !== undefined ? FormatRaceTime(time) : NO_TIME;
+}
+
+/**
+ * Best time first, players without one after them, then by name.
+ * @param {{ name: string, best: number | undefined }} a @param {{ name: string, best: number | undefined }} b
+ */
+function ByBestTime(a, b) {
+    return (a.best ?? Infinity) - (b.best ?? Infinity) || a.name.localeCompare(b.name);
+}
+
+/**
+ * At most `maxRows` rows — if the viewer's own row would be cut off, it
+ * takes the last row's place.
+ * @param {ScoreRow[]} rows @param {number} maxRows
+ */
+function KeepSelf(rows, maxRows) {
+    if (rows.length <= maxRows) {
+        return rows;
+    }
+    const selfIndex = rows.findIndex((row) => row.self);
+    return selfIndex >= maxRows ? [...rows.slice(0, maxRows - 1), rows[selfIndex]] : rows.slice(0, maxRows);
+}
+
+/**
+ * The scoreboard one viewer sees.
+ * @param {{
+ *   grandPrix: import("../../race/grand-prix/logic.js").GrandPrix | undefined,
+ *   grandPrixMode: boolean, // from ScoreboardView
+ *   boardTrackId: number | undefined, // from ScoreboardView
+ *   players: { key: string, name: string }[], // everyone on the map now (Grand Prix key, see PlayerKey)
+ *   self: { key: string, name: string },
+ *   bestTimes: Record<string, number>, // best time on boardTrackId by player name, saved ones included
+ *   maxRows: number,
+ *   trackOrder?: number[], // every track — a time trial with more than one shows how to page through them
+ *   routeNames?: Record<number, string>, // route names by track id (hud/hub-modal/routes.js)
+ * }} input
+ * @returns {Scoreboard}
+ */
+function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self, bestTimes, maxRows, trackOrder = [], routeNames = {} }) {
+    const bestHeader = boardTrackId !== undefined ? `BEST T${boardTrackId}` : "BEST";
+    if (grandPrixMode && grandPrix) {
+        const heatTrack = grandPrix.trackIds[grandPrix.trackIds.length - 1];
+        const standings = SortedStandings(grandPrix);
+        const ranks = SharedRanks(standings, (a, b) => a.points === b.points && Wins(a) === Wins(b));
+        /** @type {ScoreRow[]} */
+        const rows = standings.map((standing, i) => {
+            const place = heatTrack !== undefined ? standing.places[heatTrack] : undefined;
+            return {
+                rank: String(ranks[i]),
+                name: standing.name,
+                points: String(standing.points),
+                heat: place !== undefined ? OrdinalPlace(place) : NONE,
+                best: TimeText(bestTimes[standing.name]),
+                self: standing.key === self.key,
+            };
+        });
+        // Players who didn't start in this Grand Prix, after its racers.
+        const watching = players
+            .filter((player) => !grandPrix.standings[player.key])
+            .map((player) => ({ ...player, best: bestTimes[player.name] }))
+            .sort(ByBestTime);
+        for (const player of watching) {
+            rows.push({ rank: NONE, name: player.name, points: NONE, heat: NONE, best: TimeText(player.best), self: player.key === self.key });
+        }
+        const heats = `${grandPrix.trackIds.length}/${grandPrix.totalTracks}`;
+        return {
+            grandPrixMode: true,
+            title: grandPrix.over ? (grandPrix.cancelled ? "GRAND PRIX — CANCELLED" : "GRAND PRIX — FINAL") : "GRAND PRIX",
+            subtitle: grandPrix.over ? `${heats} TRACKS RACED` : `TRACK ${heatTrack ?? NONE}  ·  HEAT ${heats}`,
+            bestHeader,
+            switcher: "",
+            rows: KeepSelf(rows, maxRows),
+        };
+    }
+
+    // Time trial: everyone with a saved time on the track, and everyone on
+    // the map without one.
+    const names = new Set([...Object.keys(bestTimes), ...players.map((player) => player.name)]);
+    const entries = [...names].map((name) => ({ name, best: bestTimes[name] })).sort(ByBestTime);
+    const ranks = SharedRanks(entries, (a, b) => a.best === b.best);
+    const route = boardTrackId !== undefined ? (routeNames[boardTrackId] ?? `Track ${boardTrackId}`).toUpperCase() : undefined;
+    const position = boardTrackId !== undefined ? trackOrder.indexOf(boardTrackId) + 1 : 0;
+    return {
+        grandPrixMode: false,
+        title: "TIME TRIAL",
+        subtitle: route !== undefined ? `${route}  ·  BEST TIMES` : "NO TRACKS",
+        bestHeader,
+        // Paging hint (hold Tab, A/D — see UpdateScoreboardInput).
+        switcher: trackOrder.length > 1 && position > 0 ? `◀  A      ROUTE ${position} / ${trackOrder.length}      D  ▶` : "",
+        rows: KeepSelf(
+            entries.map((entry, i) => ({
+                rank: entry.best !== undefined ? String(ranks[i]) : NONE,
+                name: entry.name,
+                points: NONE,
+                heat: NONE,
+                best: TimeText(entry.best),
+                self: entry.name === self.name,
+            })),
+            maxRows
+        ),
+    };
+}
+
+// AUTO-GENERATED by tools/make-route-icons.mjs from the route prefabs' file
+// names — re-run it after adding or renaming a route, don't hand-edit.
+// Track id -> the name the hub window shows for it.
+/** @type {Record<number, string>} */
+const ROUTE_NAMES = {
+    1: "Canals",
+    2: "Bridge",
+    3: "Side Slice"
+};
+
+// The running Grand Prix (or the last one, until the next starts — the
+// scoreboard shows its final standings in the hub). race/heat/race-flow.js
+// starts it with the hub's "Start Grand Prix", opens a heat per track and records
+// every finish; the rules are in logic.js.
+
+/** @type {import("./logic.js").GrandPrix | undefined} */
+let grandPrix = undefined;
+
+/**
+ * Tells players apart within a Grand Prix: slot plus name, so a player who
+ * leaves keeps their row, and someone joining into the same slot later
+ * doesn't take it over.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function PlayerKey(kart) {
+    const controller = kart.pawn.GetPlayerController();
+    return `${controller?.GetPlayerSlot() ?? "?"}:${controller?.GetPlayerName() ?? ""}`;
+}
+
+/** @param {import("../../core/kart-registry.js").Kart} kart */
+function Racer(kart) {
+    return { key: PlayerKey(kart), name: kart.pawn.GetPlayerController()?.GetPlayerName() ?? "" };
+}
+
+/**
+ * A new Grand Prix over `totalTracks` tracks for `racers` — replaces the
+ * previous one's standings.
+ * @param {import("../../core/kart-registry.js").Kart[]} racers @param {number} totalTracks
+ */
+function StartGrandPrix(racers, totalTracks) {
+    grandPrix = NewGrandPrix(racers.map(Racer), totalTracks);
+    Debug(`StartGrandPrix: ${racers.length} racer(s), ${totalTracks} track(s)`);
+}
+
+/** @param {number} trackId */
+function StartGrandPrixHeat(trackId) {
+    if (grandPrix && !grandPrix.over) {
+        BeginGrandPrixHeat(grandPrix, trackId);
+    }
+}
+
+/**
+ * A racer finished the heat on `trackId`: their place and points, or
+ * undefined without a running Grand Prix.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} trackId
+ */
+function RecordGrandPrixFinish(kart, trackId) {
+    if (!grandPrix || grandPrix.over) {
+        return undefined;
+    }
+    const time = kart.lastRun?.trackId === trackId ? kart.lastRun.time : undefined;
+    const result = RecordHeatFinish(grandPrix, trackId, Racer(kart), time);
+    Debug(`RecordGrandPrixFinish: "${Racer(kart).name}" ${OrdinalPlace(result.place)} on track ${trackId}, +${result.points}`);
+    return result;
+}
+
+/** The group is back in the hub — the standings stay for the scoreboard. @param {boolean} cancelled */
+function EndGrandPrix(cancelled) {
+    if (grandPrix && !grandPrix.over) {
+        grandPrix.over = true;
+        grandPrix.cancelled = cancelled;
+    }
+}
+
+/** Restores the Grand Prix from an OnScriptReload snapshot (see index.js). @param {import("./logic.js").GrandPrix | undefined} snapshot */
+function RestoreGrandPrix(snapshot) {
+    grandPrix = snapshot ?? grandPrix;
+}
+
+// Pure rules of the hub's "Start Grand Prix" window
+// (hud/hub-modal/hub-modal.js): the heats it starts and who's listed as
+// riding along. No cs_script import (test/hud/hub-modal.test.mjs).
+
+/**
+ * @typedef {{ name: string, self: boolean }} HubRacerRow
+ * @typedef {{ title: string, rows: HubRacerRow[], more: string }} HubRacerList
+ */
+
+/**
+ * The racer list for one viewer: everyone standing in the hub's start area
+ * — exactly who "Start Grand Prix" takes along — in join order, at most
+ * `maxRows`. A viewer who'd fall off the end takes the last row, so they
+ * always see themselves; "+N MORE" counts whoever isn't listed.
+ * @param {{ key: string, name: string }[]} inHub the players in the start area, in join order
+ * @param {string} selfKey the viewer's key @param {number} maxRows
+ * @returns {HubRacerList}
+ */
+function BuildHubRacerList(inHub, selfKey, maxRows) {
+    let shown = inHub.slice(0, maxRows);
+    const self = inHub.find((p) => p.key === selfKey);
+    if (self && !shown.includes(self)) {
+        shown = [...shown.slice(0, maxRows - 1), self];
+    }
+    const hidden = inHub.length - shown.length;
+    return {
+        title: `RACERS · ${inHub.length}`,
+        rows: shown.map((p) => ({ name: p.name, self: p.key === selfKey })),
+        more: hidden > 0 ? `+${hidden} MORE` : "",
+    };
+}
+
+/**
+ * @typedef {{ trackId: number, heat: string, name: string, info: string }} HeatCard
+ */
+
+/**
+ * One card per heat of the Grand Prix "Start" begins — a heat per track, in
+ * race order: "HEAT 1", the route's name (else "ROUTE <id>"), laps and
+ * checkpoints.
+ * @param {number[]} trackOrder track ids in race order
+ * @param {Record<number, { checkpoints: number, lapsToWin: number }>} config
+ * @param {Record<number, string>} names route names by track id
+ * @returns {HeatCard[]}
+ */
+function BuildHeatCards(trackOrder, config, names) {
+    return trackOrder.map((trackId, i) => {
+        const { checkpoints, lapsToWin } = config[trackId] ?? { checkpoints: 0, lapsToWin: 1 };
+        const laps = `${lapsToWin} ${lapsToWin === 1 ? "LAP" : "LAPS"}`;
+        const cps = checkpoints === 0 ? "NO CHECKPOINTS" : `${checkpoints} ${checkpoints === 1 ? "CHECKPOINT" : "CHECKPOINTS"}`;
+        return { trackId, heat: `HEAT ${i + 1}`, name: (names[trackId] ?? `Route ${trackId}`).toUpperCase(), info: `${laps}  ·  ${cps}` };
+    });
+}
+
+/** "3 HEATS", "1 HEAT". @param {number} count */
+function HeatsTitle(count) {
+    return `HEATS · ${count}`;
+}
+
 // Kept in sync every tick (see Think in core/think.js) as well as on hub_enter,
 // since a standing-in-hub player's WaitingForOthers/IsModerator state can
 // change underneath them — a heat starting/ending elsewhere, or the
@@ -5427,9 +6027,81 @@ function ApplyHubModalState(slot, currentPhase) {
     }
     hud.SetHasClassForPlayer(slot, "hub_modal", "WaitingForOthers", currentPhase !== RacePhase.HUB);
     hud.SetHasClassForPlayer(slot, "hub_modal", "IsModerator", IsModerator(slot));
+    UpdateHubLists(hud, slot);
 }
 
-/** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {typeof RacePhase[keyof typeof RacePhase]} currentPhase */
+/**
+ * What the window lists (rules in ./logic.js): the heats the Grand Prix
+ * runs, a card per track ("hub_heat_<trackId>": heat number, route name,
+ * laps and checkpoints, its route icon), and everyone in the start
+ * area right now — the same karts TryStartRace takes along —
+ * "hub_racer_<i>" with the viewer's own marked Self. Each value is sent
+ * only when it changes, plus everything again every HUD_RESEND_SECONDS (a
+ * value sent before the player's HUD had loaded is lost).
+ * @param {any} hud @param {number} slot
+ */
+function UpdateHubLists(hud, slot) {
+    const kart = karts.get(slot);
+    if (!kart) {
+        return;
+    }
+    const now = Instance.GetGameTime();
+    if (kart.hubRacersResendAt === undefined || now >= kart.hubRacersResendAt) {
+        kart.hubRacersResendAt = now + HUD_RESEND_SECONDS;
+        kart.hubRacersShown = {};
+    }
+    const shown = (kart.hubRacersShown ??= {});
+    /** @param {string} panel @param {string} name @param {string} value */
+    const SetText = (panel, name, value) => {
+        const key = `${panel}/${name}`;
+        if (shown[key] !== value) {
+            shown[key] = value;
+            hud.SetDialogVariableStringForPlayer(slot, panel, name, value);
+        }
+    };
+    /** @param {string} panel @param {string} cls @param {boolean} on */
+    const SetClass = (panel, cls, on) => {
+        const key = `${panel}.${cls}`;
+        const value = on ? "1" : "";
+        if (shown[key] !== value) {
+            shown[key] = value;
+            hud.SetHasClassForPlayer(slot, panel, cls, on);
+        }
+    };
+
+    const order = GetTrackOrder();
+    const cards = new Map(BuildHeatCards(order, GetTrackConfig(), ROUTE_NAMES).map((card) => [card.trackId, card]));
+    SetText("hub_heats", "title", HeatsTitle(order.length));
+    for (let trackId = 1; trackId <= MAX_TRACKS; trackId++) {
+        const card = cards.get(trackId);
+        const id = `hub_heat_${trackId}`;
+        SetClass(id, "Unused", !card);
+        if (card) {
+            SetText(id, "heat", card.heat);
+            SetText(id, "name", card.name);
+            SetText(id, "info", card.info);
+        }
+    }
+
+    const inHub = [...karts.entries()]
+        .filter(([, other]) => other.inHub && other.melon.IsValid())
+        .map(([otherSlot, other]) => ({ key: String(otherSlot), name: other.pawn.GetPlayerController()?.GetPlayerName() ?? "" }));
+    const list = BuildHubRacerList(inHub, String(slot), HUB_RACER_ROWS);
+    SetText("hub_racers", "title", list.title);
+    SetText("hub_racers_more", "more", list.more);
+    SetClass("hub_racers_more", "Unused", list.more === "");
+    for (let i = 0; i < HUB_RACER_ROWS; i++) {
+        const row = list.rows[i];
+        const id = `hub_racer_${i}`;
+        SetClass(id, "Unused", !row);
+        SetClass(id, "Self", Boolean(row?.self));
+        if (row) {
+            SetText(id, "name", row.name);
+        }
+    }
+}
+
+/** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {typeof RacePhase[keyof typeof RacePhase]} currentPhase */
 function ShowHubModal(slot, kart, currentPhase) {
     kart.hubModalOpen = true;
     const hud = GetSpeedHud();
@@ -5437,11 +6109,12 @@ function ShowHubModal(slot, kart, currentPhase) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "hub_modal", "Hidden", false);
+    kart.hubRacersResendAt = undefined; // the whole lists again, now that they're visible
     ApplyHubModalState(slot, currentPhase);
     SyncInputCapture(hud, slot, kart);
 }
 
-/** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart */
+/** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart */
 function HideHubModal(slot, kart) {
     kart.hubModalOpen = false;
     const hud = GetSpeedHud();
@@ -5450,6 +6123,658 @@ function HideHubModal(slot, kart) {
     }
     hud.SetHasClassForPlayer(slot, "hub_modal", "Hidden", true);
     SyncInputCapture(hud, slot, kart);
+}
+
+// Pure rules of the heat flow (no engine calls) — see race-flow.js.
+
+/**
+ * The number the BREAK countdown under the FINISH image shows, `remaining`
+ * seconds before the break ends: rounded, so it runs BREAK_SECONDS … 0 with
+ * every number but the first and the last up for a full second (0 for the
+ * break's last half second). Never below 0.
+ * @param {number} remaining
+ */
+function BreakCountdownValue(remaining) {
+    return Math.max(0, Math.round(remaining));
+}
+
+/**
+ * The digit images that show `value`: tens undefined below 10 (no leading
+ * zero), at most two digits (above 99 shows 99).
+ * @param {number} value
+ * @returns {{ tens: number | undefined, ones: number }}
+ */
+function CountdownDigits(value) {
+    const clamped = Math.min(99, Math.max(0, Math.floor(value)));
+    return { tens: clamped >= 10 ? Math.floor(clamped / 10) : undefined, ones: clamped % 10 };
+}
+
+// The podium in the hub: once a Grand Prix has run to its last track and the
+// group is back in the hub (race/heat/race-flow.js), the top three are moved
+// on from hub_spawn onto their podium_spawn_<place> and held there for
+// PODIUM_HOLD_SECONDS — jumping and looking around, no driving (the hold
+// itself is in movement/driving/drive.js). Their respawn point stays the
+// hub, so the hub/tutorial/respawn buttons take them down at once.
+
+/**
+ * Puts the top three of `gp` among `racers` (already sent to the hub) on
+ * the podium. Nothing for a cancelled Grand Prix.
+ * @param {import("../grand-prix/logic.js").GrandPrix | undefined} gp
+ * @param {import("../../core/kart-registry.js").Kart[]} racers
+ */
+function PlaceOnPodium(gp, racers) {
+    if (!gp || gp.cancelled) {
+        return;
+    }
+    const byKey = new Map(racers.map((kart) => [PlayerKey(kart), kart]));
+    const places = PodiumPlaces(SortedStandings(gp).map((s) => s.key), new Set(byKey.keys()));
+    const now = Instance.GetGameTime();
+    let placed = 0;
+    for (const [key, place] of places) {
+        const kart = byKey.get(key);
+        const spawn = GetPodiumSpawnPoint(place);
+        if (!kart || !spawn) {
+            Debug(`PlaceOnPodium: place ${place} stays at the hub spawn${spawn ? "" : " (no podium_spawn_" + place + " in the map)"}`);
+            continue;
+        }
+        // A melon still waiting for its respawn (broken in the last BREAK)
+        // isn't moved — it comes back at the hub.
+        if (!kart.melon.IsValid() || kart.breaking) {
+            continue;
+        }
+        kart.melon.Teleport({ position: spawn.position, angles: spawn.angles, velocity: { x: 0, y: 0, z: 0 }, angularVelocity: { x: 0, y: 0, z: 0 } });
+        // The view (and so the chase camera behind the melon) looks back at
+        // the podium from the side its steps face, not out from it.
+        FacePlayerView(kart.pawn, spawn.angles.yaw + 180);
+        kart.lastVelocity = undefined;
+        kart.settled = false;
+        kart.podium = { place, spot: spawn.position, until: now + PODIUM_HOLD_SECONDS };
+        placed++;
+        Debug(`PlaceOnPodium: "${kart.pawn.GetPlayerController()?.GetPlayerName()}" on place ${place}`);
+    }
+    if (placed > 0) {
+        PlayConfetti();
+    }
+}
+
+/**
+ * The confetti over the podium (PODIUM_CONFETTI_NAME, if placed): a burst
+ * now and every PODIUM_CONFETTI_INTERVAL seconds of the hold (each a Stop,
+ * then a Start PODIUM_CONFETTI_RESTART_GAP later, so a one-off effect fires
+ * again), off when the hold ends. All scheduled now, as delayed inputs.
+ */
+function PlayConfetti() {
+    const Fire = (/** @type {string} */ input, /** @type {number} */ delay) => Instance.EntFireAtName({ name: PODIUM_CONFETTI_NAME, input, delay });
+    for (const at of ConfettiBursts()) {
+        Fire("Stop", at);
+        Fire("Start", at + PODIUM_CONFETTI_RESTART_GAP);
+    }
+    Fire("Stop", PODIUM_HOLD_SECONDS);
+}
+
+/** When the bursts go off, in seconds from the podium's start: 0, every interval, all within the hold. */
+function ConfettiBursts() {
+    const bursts = [];
+    for (let at = 0; at + PODIUM_CONFETTI_RESTART_GAP < PODIUM_HOLD_SECONDS; at += PODIUM_CONFETTI_INTERVAL) {
+        bursts.push(at);
+    }
+    return bursts;
+}
+
+/**
+ * A finished one-heat Grand Prix in which `racers` crossed the line in the
+ * order given — for the user menu's developer "Test Podium" button, which
+ * plays the podium without racing a whole Grand Prix.
+ * @param {import("../../core/kart-registry.js").Kart[]} racers
+ */
+function TestGrandPrix(racers) {
+    const entries = racers.map((kart) => ({ key: PlayerKey(kart), name: kart.pawn.GetPlayerController()?.GetPlayerName() ?? "" }));
+    const gp = NewGrandPrix(entries, 1);
+    BeginGrandPrixHeat(gp, 0);
+    for (const entry of entries) {
+        RecordHeatFinish(gp, 0, entry, undefined);
+    }
+    gp.over = true;
+    return gp;
+}
+
+// --- Race flow: hub -> countdown -> racing -> break --------------------
+// See GAMEPLAY.md's "Hub -> race -> next-track flow" for the full design.
+// Lives here (not a separate point_script) because it's tightly coupled to
+// the same per-kart state as checkpoints/laps (the `Kart` typedef in
+// core/kart-registry.js, and race/checkpoints/checkpoints.js).
+
+/** @type {typeof RacePhase[keyof typeof RacePhase]} */
+let phase = RacePhase.HUB;
+/** Which track the current/last heat was run on — undefined while in HUB.
+ * @type {number | undefined} */
+let activeTrackId = undefined;
+/** GetGameTime() at which the current COUNTDOWN/BREAK phase should end. */
+let phaseEndTime = 0;
+
+/** One class per countdown image on the HUD's countdown_panel (see
+ * speedometer.xml/.css) — exactly one is set at a time. There's no image for
+ * values above 3, so a COUNTDOWN_SECONDS > 3 shows nothing until 3.
+ */
+const COUNTDOWN_SHOW_CLASSES = ["Show3", "Show2", "Show1", "ShowGo"];
+
+/** Number the BREAK countdown last sent to each slot — the digit images are
+ * only re-sent when it changes (one class per image, see speedometer.xml).
+ * @type {Map<number, number>} */
+const breakCountdownShown = new Map();
+
+/**
+ * Shows `value` on one player's break_countdown (number-0..9 images, a tens
+ * digit only from 10 up), or hides it with `value` undefined.
+ * @param {number} slot @param {number | undefined} value
+ */
+function SetBreakCountdown(slot, value) {
+    const hud = GetSpeedHud();
+    if (value === undefined) {
+        breakCountdownShown.delete(slot);
+    } else {
+        breakCountdownShown.set(slot, value);
+    }
+    const digits = value === undefined ? undefined : CountdownDigits(value);
+    hud?.SetHasClassForPlayer(slot, "break_countdown", "Hidden", value === undefined);
+    hud?.SetHasClassForPlayer(slot, "break_tens", "On", digits?.tens !== undefined);
+    for (let d = 0; d <= 9; d++) {
+        hud?.SetHasClassForPlayer(slot, `break_tens_${d}`, "On", digits?.tens === d);
+        hud?.SetHasClassForPlayer(slot, `break_ones_${d}`, "On", digits?.ones === d);
+    }
+}
+
+/**
+ * Restores phase/activeTrackId/phaseEndTime from an OnScriptReload snapshot
+ * (see index.js) — the counterpart write to these otherwise-internal `let`s
+ * for the one caller outside this module that legitimately needs to set them.
+ * @param {{ phase?: typeof RacePhase[keyof typeof RacePhase], activeTrackId?: number, phaseEndTime?: number } | undefined} snapshot
+ */
+function RestoreRaceFlowSnapshot(snapshot) {
+    if (!snapshot) {
+        return;
+    }
+    phase = snapshot.phase ?? phase;
+    activeTrackId = snapshot.activeTrackId;
+    phaseEndTime = snapshot.phaseEndTime ?? phaseEndTime;
+}
+
+function CurrentRacers() {
+    return [...karts.values()].filter((kart) => kart.racing);
+}
+
+/** Track id after `activeTrackId` in race order, or undefined if it was the last one. */
+function NextTrackId() {
+    if (activeTrackId === undefined) {
+        return undefined;
+    }
+    const order = GetTrackOrder();
+    const index = order.indexOf(activeTrackId);
+    if (index === -1 || index + 1 >= order.length) {
+        return undefined;
+    }
+    return order[index + 1];
+}
+
+function TryStartRace() {
+    if (phase !== RacePhase.HUB) {
+        Debug("TryStartRace: ignored, a heat is already running");
+        return;
+    }
+    const order = GetTrackOrder();
+    if (order.length === 0) {
+        Debug("TryStartRace: no start_<id> triggers found, ignoring");
+        return;
+    }
+    const racers = [...karts.values()].filter((kart) => kart.inHub && kart.melon.IsValid());
+    if (racers.length === 0) {
+        Debug("TryStartRace: no karts currently in the hub trigger, ignoring");
+        return;
+    }
+    for (const kart of racers) {
+        kart.racing = true;
+        const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+        if (slot !== undefined) {
+            HideHubModal(slot, kart);
+        }
+    }
+    Debug(`TryStartRace: starting heat on track ${order[0]} with ${racers.length} racer(s)`);
+    StartGrandPrix(racers, order.length);
+    BeginHeat(order[0]);
+}
+
+// Moderator-only: cuts a heat short from wherever it's at (COUNTDOWN,
+// RACING, or BREAK) and sends everyone back to the hub, same as a normal
+// heat ending — see "Moderator" in GAMEPLAY.md.
+function TryAbortRace() {
+    if (phase === RacePhase.HUB) {
+        Debug("TryAbortRace: ignored, no heat is running");
+        return;
+    }
+    Debug(`TryAbortRace: moderator aborted the heat on track ${activeTrackId}`);
+    EndGrandPrix(true);
+    ReturnAllToHub(CurrentRacers());
+    phase = RacePhase.HUB;
+    activeTrackId = undefined;
+}
+
+/**
+ * Spot `i` of `count` karts lined up side by side, centered on `center` and
+ * perpendicular to `angles`' facing — so a group teleported together doesn't
+ * spawn inside each other. Keeps `center`'s height as-is.
+ * @param {{ x: number, y: number, z: number }} center @param {{ yaw: number }} angles @param {number} i @param {number} count
+ */
+function LineUpPosition(center, angles, i, count) {
+    const rad = (angles.yaw * Math.PI) / 180;
+    const lateral = (i - (count - 1) / 2) * RACE_SPAWN_LATERAL_SPACING;
+    return {
+        x: center.x + Math.sin(rad) * lateral,
+        y: center.y - Math.cos(rad) * lateral,
+        z: center.z,
+    };
+}
+
+/** @param {number} trackId */
+function BeginHeat(trackId) {
+    const config = GetTrackConfig()[trackId];
+    const start = config && Instance.FindEntityByName(config.startEntityName);
+    if (!start) {
+        Debug(`BeginHeat: track ${trackId} has no start_${trackId} trigger, aborting heat back to HUB`);
+        // Route through ReturnAllToHub, not a bare phase reset: callers
+        // (TryStartRace, or the BREAK->next-heat transition) may already
+        // have marked these karts racing/hidden their hub modal before
+        // calling in here, and they'd otherwise be stranded with racing:true
+        // and no hub UI, silently swept into whatever heat starts next.
+        EndGrandPrix(true);
+        ReturnAllToHub(CurrentRacers());
+        phase = RacePhase.HUB;
+        activeTrackId = undefined;
+        return;
+    }
+    activeTrackId = trackId;
+    StartGrandPrixHeat(trackId);
+    // start_spawn_<trackId> if placed, else the nearest start_spawn, else the start trigger itself.
+    const { position: center, angles } = GetStartSpawnPoint(trackId, start);
+
+    const racers = CurrentRacers();
+    racers.forEach((kart, i) => {
+        const position = LineUpPosition(center, angles, i, racers.length);
+        SetFreeLook(kart, false); // a racer flying around would miss the countdown in a frozen melon
+        // A melon destroyed mid-BREAK is still pending its respawn (see
+        // HandleMelonLost) — skip the teleport rather than throw on a dead
+        // entity; that respawn lands it at the checkpointPosition set below.
+        if (kart.melon.IsValid()) {
+            kart.melon.Teleport({
+                position,
+                angles,
+                velocity: { x: 0, y: 0, z: 0 },
+            });
+        }
+        kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
+        RestoreFullHealth(kart); // every heat starts on a whole melon
+        kart.lastVelocity = undefined;
+        kart.settled = false;
+        kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
+        kart.pendingBounce = undefined;
+        // trackId is set directly instead of waiting for the physical
+        // start_<trackId> trigger touch to report it, so the
+        // checkpoint/lap panel is already visible ("0/N", lap "1/M") the
+        // moment the countdown starts instead of popping in a tick later —
+        // and crossing the start line after GO then changes nothing (see
+        // ApplyStartTouch).
+        kart.trackId = trackId;
+        kart.checkpointIndex = 0;
+        kart.lapsCompleted = 0;
+        CancelRun(kart); // a free-roaming run doesn't carry into the heat — its clock starts at GO
+        kart.finished = false;
+        kart.locked = true;
+        kart.podium = undefined; // off the podium into the next Grand Prix
+        // Its own lined-up spot, not the start line's center — a respawn
+        // before reaching checkpoint 1 (break, or the user menu's respawn
+        // button during the countdown) would otherwise stack it on whoever
+        // is standing in the middle.
+        kart.checkpointPosition = position;
+        kart.checkpointAngles = angles;
+        FacePlayerView(kart.pawn, angles.yaw);
+        SetFinishImageVisible(kart.pawn.GetPlayerController()?.GetPlayerSlot(), false);
+    });
+
+    phase = RacePhase.COUNTDOWN;
+    phaseEndTime = Instance.GetGameTime() + COUNTDOWN_SECONDS;
+    Debug(`BeginHeat: track ${trackId}, ${racers.length} racer(s), countdown started`);
+}
+
+/**
+ * Shows or hides the big "FINISH" image (finish_image in speedometer.xml)
+ * and the place under it ("1ST · +10 PTS", finish_place — set by FinishKart)
+ * for one player. @param {number | undefined} slot @param {boolean} visible
+ */
+function SetFinishImageVisible(slot, visible) {
+    if (slot !== undefined) {
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_image", "Hidden", !visible);
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_place", "Hidden", !visible);
+    }
+}
+
+/** A kart reached lapsToWin — park it (still locked) until the whole heat ends. */
+/** @param {import("../../core/kart-registry.js").Kart} kart */
+function FinishKart(kart) {
+    kart.finished = true;
+    kart.locked = true;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    // The place this racer crossed the line in, and the Grand Prix points for it.
+    const result = activeTrackId !== undefined ? RecordGrandPrixFinish(kart, activeTrackId) : undefined;
+    if (slot !== undefined) {
+        GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "finish_place", "place", result ? `${OrdinalPlace(result.place)}  ·  +${result.points} PTS` : "");
+    }
+    // Shown the moment this racer crosses the line, not only once the whole
+    // heat is over — stays up through BREAK until the next heat/the hub.
+    SetFinishImageVisible(slot, true);
+    Debug(`FinishKart: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} finished track ${activeTrackId}`);
+}
+
+/** @param {import("../../core/kart-registry.js").Kart[]} returning */
+function ReturnAllToHub(returning) {
+    SendKartsOutOfRace(returning, GetHubSpawnPoint(), "hub");
+}
+
+/**
+ * The user menu's "Play Tutorial": same as the hub button (leaves a
+ * running heat, respawn point moves along), just landing at intro_spawn —
+ * or the hub, if the map has no intro_spawn.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function SendKartToTutorial(kart) {
+    SendKartsOutOfRace([kart], GetIntroSpawnPoint(), "tutorial");
+}
+
+/**
+ * Takes karts out of any heat and teleports them (lined up side by side)
+ * to `spawn`, which also becomes their respawn point.
+ * @param {import("../../core/kart-registry.js").Kart[]} returning
+ * @param {import("../../kart/spawn-points.js").SpawnPoint | undefined} spawn where to put them
+ * @param {string} label for the debug log
+ */
+function SendKartsOutOfRace(returning, spawn, label) {
+    Debug(`SendKartsOutOfRace: sending ${returning.length} kart(s) to the ${label} at ${spawn ? JSON.stringify(spawn.position) : "nowhere (spawn entity missing)"}`);
+    returning.forEach((kart, i) => {
+        kart.racing = false;
+        kart.finished = false;
+        kart.locked = false;
+        kart.podium = undefined; // the hub/tutorial button takes a melon down from the podium too
+        // kart.inHub (and the hub modal) is deliberately left to the
+        // hub_start_trigger's own hub_enter/hub_leave inputs: the teleport
+        // below lands inside it and fires hub_enter from there. Forcing it
+        // here left inHub stuck at true whenever the melon ended up outside
+        // the trigger volume — hub_leave never fires for a trigger that was
+        // never entered — and that kart then got pulled into the next heat
+        // from anywhere on the map.
+        // Leaving the heat also leaves its track: without this the HUD kept
+        // showing the old track's checkpoint/lap panel in the hub, and a
+        // break or the user menu's respawn button would send the kart right
+        // back onto that track's last checkpoint.
+        kart.trackId = undefined;
+        kart.checkpointIndex = 0;
+        kart.lapsCompleted = 0;
+        CancelRun(kart);
+        if (spawn) {
+            const spawnAngles = spawn.angles;
+            const spawnPosition = LineUpPosition(spawn.position, spawnAngles, i, returning.length);
+            kart.checkpointPosition = spawnPosition;
+            kart.checkpointAngles = spawnAngles;
+            FacePlayerView(kart.pawn, spawnAngles.yaw);
+            // Same dead-melon guard as BeginHeat — its pending respawn lands
+            // it at the checkpointPosition just set.
+            if (kart.melon.IsValid()) {
+                kart.melon.Teleport({
+                    position: spawnPosition,
+                    angles: spawnAngles,
+                    velocity: { x: 0, y: 0, z: 0 },
+                });
+            }
+        }
+        kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
+        // Arrives whole — hub/tutorial button, hub_teleport, a heat ending.
+        RestoreFullHealth(kart);
+        kart.lastVelocity = undefined;
+        kart.settled = false;
+        kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
+        kart.pendingBounce = undefined;
+        const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+        if (slot === undefined) {
+            return;
+        }
+        // Both labels, since ReturnAllToHub can now be reached from any
+        // non-HUB phase (a moderator abort can land mid-COUNTDOWN, not just
+        // after a heat finishes normally in BREAK).
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
+        SetBreakCountdown(slot, undefined);
+        SetFinishImageVisible(slot, false);
+    });
+}
+
+/** Drives the COUNTDOWN/RACING/BREAK timers and transitions — called once per Think tick (see core/think.js). */
+/** @param {number} now */
+function UpdateRaceFlow(now) {
+    const hud = GetSpeedHud();
+
+    if (phase === RacePhase.COUNTDOWN) {
+        const racers = CurrentRacers();
+        if (racers.length === 0) {
+            // Everyone who was in this heat disconnected/despawned before it
+            // even started — nothing left to count down for. Without this,
+            // the countdown would still finish into RACING below and then
+            // get permanently stuck there (see the RACING branch's own
+            // "nobody left" check), bricking the race flow for everyone.
+            Debug("UpdateRaceFlow: all racers left during countdown, aborting heat back to HUB");
+            EndGrandPrix(true);
+            phase = RacePhase.HUB;
+            activeTrackId = undefined;
+            return;
+        }
+        const remaining = phaseEndTime - now;
+        const showClass = remaining > 0 ? `Show${Math.ceil(remaining)}` : "ShowGo";
+        for (const kart of racers) {
+            const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+            if (slot === undefined) {
+                continue;
+            }
+            hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", false);
+            for (const cls of COUNTDOWN_SHOW_CLASSES) {
+                hud?.SetHasClassForPlayer(slot, "countdown_panel", cls, cls === showClass);
+            }
+        }
+        if (remaining <= 0) {
+            for (const kart of racers) {
+                kart.locked = false;
+                StartRun(kart, now); // the heat's time trial clock
+            }
+            // The "GO" image just shown above stays up for GO_DISPLAY_SECONDS —
+            // hiding it in this same tick meant it was never actually seen.
+            // RACING reuses phaseEndTime as the moment to hide it.
+            phase = RacePhase.RACING;
+            phaseEndTime = now + GO_DISPLAY_SECONDS;
+            Debug(`UpdateRaceFlow: countdown finished for track ${activeTrackId}, GO`);
+        }
+        return;
+    }
+
+    if (phase === RacePhase.RACING) {
+        const racers = CurrentRacers();
+        if (now >= phaseEndTime) {
+            for (const kart of racers) {
+                const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+                if (slot !== undefined) {
+                    hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
+                }
+            }
+            phaseEndTime = Infinity; // hidden — don't re-hide every tick
+        }
+        if (racers.length === 0) {
+            // Same "everyone left" case as COUNTDOWN above, but mid-race:
+            // without this, an empty heat sits in RACING forever since
+            // `racers.every(...)` on an empty array is vacuously true only
+            // when length is also checked, and TryStartRace refuses to start
+            // a new heat while phase isn't HUB.
+            Debug("UpdateRaceFlow: all racers left mid-heat, aborting back to HUB");
+            EndGrandPrix(true);
+            phase = RacePhase.HUB;
+            activeTrackId = undefined;
+            return;
+        }
+        if (racers.every((kart) => kart.finished)) {
+            phase = RacePhase.BREAK;
+            phaseEndTime = now + BREAK_SECONDS;
+            // The countdown itself is drawn by the BREAK branch below, under
+            // the finish_image FinishKart already shows.
+            breakCountdownShown.clear();
+            Debug(`UpdateRaceFlow: heat on track ${activeTrackId} complete, break started`);
+        }
+        return;
+    }
+
+    if (phase === RacePhase.BREAK && now < phaseEndTime) {
+        // Counting down to the next track / the hub: BREAK_SECONDS … 0 in
+        // number images under the finish image, re-sent only on change.
+        const value = BreakCountdownValue(phaseEndTime - now);
+        for (const kart of CurrentRacers()) {
+            const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+            if (slot !== undefined && breakCountdownShown.get(slot) !== value) {
+                SetBreakCountdown(slot, value);
+            }
+        }
+        return;
+    }
+
+    if (phase === RacePhase.BREAK) {
+        const racers = CurrentRacers();
+        const nextTrackId = NextTrackId();
+        if (nextTrackId !== undefined) {
+            for (const kart of racers) {
+                const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+                if (slot !== undefined) {
+                    SetBreakCountdown(slot, undefined);
+                }
+            }
+            BeginHeat(nextTrackId);
+        } else {
+            EndGrandPrix(false);
+            ReturnAllToHub(racers);
+            // The top three go on from the hub spawn onto the podium.
+            PlaceOnPodium(grandPrix, racers);
+            phase = RacePhase.HUB;
+            activeTrackId = undefined;
+            Debug("UpdateRaceFlow: last track done, group returned to hub");
+        }
+    }
+}
+
+/**
+ * The scoreboard (#scoreboard in speedometer.xml), in place of CS2's own:
+ * the CSS shows it while the engine's HUD_SCOREBOARD_VISIBLE class is set
+ * (Tab held), covering the default one. This only fills it in — the Grand
+ * Prix standings or a track's best times (hud/scoreboard/logic.js), a row
+ * per player ("score_row_<i>", SCOREBOARD_ROWS of them), the viewer's own
+ * row marked Self. Rebuilt every SCOREBOARD_UPDATE_SECONDS whether it's
+ * open or not (script can't tell), each value sent only when it changes,
+ * plus everything again every HUD_RESEND_SECONDS (a value sent before the
+ * player's HUD had loaded is lost).
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function UpdateScoreboardHud(slot, kart) {
+    const now = Instance.GetGameTime();
+    if (kart.scoreboardNextUpdate !== undefined && now < kart.scoreboardNextUpdate) {
+        return;
+    }
+    kart.scoreboardNextUpdate = now + SCOREBOARD_UPDATE_SECONDS;
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    if (kart.scoreboardResendAt === undefined || now >= kart.scoreboardResendAt) {
+        kart.scoreboardResendAt = now + HUD_RESEND_SECONDS;
+        kart.scoreboardShown = {};
+    }
+    const shown = (kart.scoreboardShown ??= {});
+    /** @param {string} panel @param {string} name @param {string} value */
+    const SetText = (panel, name, value) => {
+        const key = `${panel}/${name}`;
+        if (shown[key] !== value) {
+            shown[key] = value;
+            hud.SetDialogVariableStringForPlayer(slot, panel, name, value);
+        }
+    };
+    /** @param {string} panel @param {string} cls @param {boolean} on */
+    const SetClass = (panel, cls, on) => {
+        const key = `${panel}.${cls}`;
+        const value = on ? "1" : "";
+        if (shown[key] !== value) {
+            shown[key] = value;
+            hud.SetHasClassForPlayer(slot, panel, cls, on);
+        }
+    };
+
+    const trackOrder = GetTrackOrder();
+    const { grandPrixMode, boardTrackId } = ScoreboardView({ grandPrix, activeTrackId, kartTrackId: kart.trackId, trackOrder, pickedTrackId: kart.scoreboardPick });
+    const players = [...karts.values()].map((other) => ({ key: PlayerKey(other), name: other.pawn.GetPlayerController()?.GetPlayerName() ?? "" }));
+    const board = BuildScoreboard({
+        grandPrix,
+        grandPrixMode,
+        boardTrackId,
+        players,
+        self: { key: PlayerKey(kart), name: kart.pawn.GetPlayerController()?.GetPlayerName() ?? "" },
+        bestTimes: boardTrackId !== undefined ? GetTrackBestTimes(boardTrackId) : {},
+        maxRows: SCOREBOARD_ROWS,
+        trackOrder,
+        routeNames: ROUTE_NAMES,
+    });
+
+    SetClass("scoreboard", "TimeTrial", !board.grandPrixMode);
+    SetText("scoreboard", "title", board.title);
+    SetText("scoreboard", "subtitle", board.subtitle);
+    SetText("scoreboard", "best_header", board.bestHeader);
+    SetText("score_switch", "switcher", board.switcher);
+    SetClass("score_switch", "Unused", board.switcher === "");
+    for (let i = 0; i < SCOREBOARD_ROWS; i++) {
+        const row = board.rows[i];
+        const id = `score_row_${i}`;
+        SetClass(id, "Unused", !row);
+        SetClass(id, "Self", Boolean(row?.self));
+        if (row) {
+            SetText(id, "rank", row.rank);
+            SetText(id, "name", row.name);
+            SetText(id, "points", row.points);
+            SetText(id, "heat", row.heat);
+            SetText(id, "best", row.best);
+        }
+    }
+}
+
+/**
+ * Paging the time trial board through the tracks: while the scoreboard is
+ * open (Tab held, SHOW_SCORES), A shows the previous track's best times and
+ * D the next one's, wrapping around. Every opening starts on the viewer's
+ * own track again (the pick is dropped when Tab is let go). Per tick, from
+ * core/think.js — a tap is only seen on the tick it happens.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function UpdateScoreboardInput(kart) {
+    const pawn = kart.pawn;
+    if (!pawn.IsInputPressed(CSInputs.SHOW_SCORES)) {
+        kart.scoreboardPick = undefined;
+        return;
+    }
+    const direction = (pawn.WasInputJustPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.WasInputJustPressed(CSInputs.LEFT) ? 1 : 0);
+    if (direction === 0) {
+        return;
+    }
+    const trackOrder = GetTrackOrder();
+    const { grandPrixMode, boardTrackId } = ScoreboardView({ grandPrix, activeTrackId, kartTrackId: kart.trackId, trackOrder, pickedTrackId: kart.scoreboardPick });
+    if (grandPrixMode) {
+        return;
+    }
+    kart.scoreboardPick = StepTrack(trackOrder, boardTrackId, direction);
+    kart.scoreboardNextUpdate = undefined; // show it now, not on the next rebuild
 }
 
 // Wall-bounce prediction line — see PREDICTION_* in fx/prediction/constants.js for the
@@ -5670,442 +6995,6 @@ function DrawDebugPrediction(start, end, drawFirstLeg, outPoints, color, dt) {
     }
     if (outPoints.length > 0) {
         Instance.DebugLine({ start: end, end: outPoints[outPoints.length - 1], duration, color });
-    }
-}
-
-// Pure rules of the heat flow (no engine calls) — see race-flow.js.
-
-/**
- * The number the BREAK countdown under the FINISH image shows, `remaining`
- * seconds before the break ends: rounded, so it runs BREAK_SECONDS … 0 with
- * every number but the first and the last up for a full second (0 for the
- * break's last half second). Never below 0.
- * @param {number} remaining
- */
-function BreakCountdownValue(remaining) {
-    return Math.max(0, Math.round(remaining));
-}
-
-/**
- * The digit images that show `value`: tens undefined below 10 (no leading
- * zero), at most two digits (above 99 shows 99).
- * @param {number} value
- * @returns {{ tens: number | undefined, ones: number }}
- */
-function CountdownDigits(value) {
-    const clamped = Math.min(99, Math.max(0, Math.floor(value)));
-    return { tens: clamped >= 10 ? Math.floor(clamped / 10) : undefined, ones: clamped % 10 };
-}
-
-// --- Race flow: hub -> countdown -> racing -> break --------------------
-// See GAMEPLAY.md's "Hub -> race -> next-track flow" for the full design.
-// Lives here (not a separate point_script) because it's tightly coupled to
-// the same per-kart state as checkpoints/laps (the `Kart` typedef in
-// core/kart-registry.js, and race/checkpoints/checkpoints.js).
-
-/** @type {typeof RacePhase[keyof typeof RacePhase]} */
-let phase = RacePhase.HUB;
-/** Which track the current/last heat was run on — undefined while in HUB.
- * @type {number | undefined} */
-let activeTrackId = undefined;
-/** GetGameTime() at which the current COUNTDOWN/BREAK phase should end. */
-let phaseEndTime = 0;
-
-/** One class per countdown image on the HUD's countdown_panel (see
- * speedometer.xml/.css) — exactly one is set at a time. There's no image for
- * values above 3, so a COUNTDOWN_SECONDS > 3 shows nothing until 3.
- */
-const COUNTDOWN_SHOW_CLASSES = ["Show3", "Show2", "Show1", "ShowGo"];
-
-/** Number the BREAK countdown last sent to each slot — the digit images are
- * only re-sent when it changes (one class per image, see speedometer.xml).
- * @type {Map<number, number>} */
-const breakCountdownShown = new Map();
-
-/**
- * Shows `value` on one player's break_countdown (number-0..9 images, a tens
- * digit only from 10 up), or hides it with `value` undefined.
- * @param {number} slot @param {number | undefined} value
- */
-function SetBreakCountdown(slot, value) {
-    const hud = GetSpeedHud();
-    if (value === undefined) {
-        breakCountdownShown.delete(slot);
-    } else {
-        breakCountdownShown.set(slot, value);
-    }
-    const digits = value === undefined ? undefined : CountdownDigits(value);
-    hud?.SetHasClassForPlayer(slot, "break_countdown", "Hidden", value === undefined);
-    hud?.SetHasClassForPlayer(slot, "break_tens", "On", digits?.tens !== undefined);
-    for (let d = 0; d <= 9; d++) {
-        hud?.SetHasClassForPlayer(slot, `break_tens_${d}`, "On", digits?.tens === d);
-        hud?.SetHasClassForPlayer(slot, `break_ones_${d}`, "On", digits?.ones === d);
-    }
-}
-
-/**
- * Restores phase/activeTrackId/phaseEndTime from an OnScriptReload snapshot
- * (see index.js) — the counterpart write to these otherwise-internal `let`s
- * for the one caller outside this module that legitimately needs to set them.
- * @param {{ phase?: typeof RacePhase[keyof typeof RacePhase], activeTrackId?: number, phaseEndTime?: number } | undefined} snapshot
- */
-function RestoreRaceFlowSnapshot(snapshot) {
-    if (!snapshot) {
-        return;
-    }
-    phase = snapshot.phase ?? phase;
-    activeTrackId = snapshot.activeTrackId;
-    phaseEndTime = snapshot.phaseEndTime ?? phaseEndTime;
-}
-
-function CurrentRacers() {
-    return [...karts.values()].filter((kart) => kart.racing);
-}
-
-/** Track id after `activeTrackId` in race order, or undefined if it was the last one. */
-function NextTrackId() {
-    if (activeTrackId === undefined) {
-        return undefined;
-    }
-    const order = GetTrackOrder();
-    const index = order.indexOf(activeTrackId);
-    if (index === -1 || index + 1 >= order.length) {
-        return undefined;
-    }
-    return order[index + 1];
-}
-
-function TryStartRace() {
-    if (phase !== RacePhase.HUB) {
-        Debug("TryStartRace: ignored, a heat is already running");
-        return;
-    }
-    const order = GetTrackOrder();
-    if (order.length === 0) {
-        Debug("TryStartRace: no start_<id> triggers found, ignoring");
-        return;
-    }
-    const racers = [...karts.values()].filter((kart) => kart.inHub && kart.melon.IsValid());
-    if (racers.length === 0) {
-        Debug("TryStartRace: no karts currently in the hub trigger, ignoring");
-        return;
-    }
-    for (const kart of racers) {
-        kart.racing = true;
-        const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-        if (slot !== undefined) {
-            HideHubModal(slot, kart);
-        }
-    }
-    Debug(`TryStartRace: starting heat on track ${order[0]} with ${racers.length} racer(s)`);
-    BeginHeat(order[0]);
-}
-
-// Moderator-only: cuts a heat short from wherever it's at (COUNTDOWN,
-// RACING, or BREAK) and sends everyone back to the hub, same as a normal
-// heat ending — see "Moderator" in GAMEPLAY.md.
-function TryAbortRace() {
-    if (phase === RacePhase.HUB) {
-        Debug("TryAbortRace: ignored, no heat is running");
-        return;
-    }
-    Debug(`TryAbortRace: moderator aborted the heat on track ${activeTrackId}`);
-    ReturnAllToHub(CurrentRacers());
-    phase = RacePhase.HUB;
-    activeTrackId = undefined;
-}
-
-/**
- * Spot `i` of `count` karts lined up side by side, centered on `center` and
- * perpendicular to `angles`' facing — so a group teleported together doesn't
- * spawn inside each other. Keeps `center`'s height as-is.
- * @param {{ x: number, y: number, z: number }} center @param {{ yaw: number }} angles @param {number} i @param {number} count
- */
-function LineUpPosition(center, angles, i, count) {
-    const rad = (angles.yaw * Math.PI) / 180;
-    const lateral = (i - (count - 1) / 2) * RACE_SPAWN_LATERAL_SPACING;
-    return {
-        x: center.x + Math.sin(rad) * lateral,
-        y: center.y - Math.cos(rad) * lateral,
-        z: center.z,
-    };
-}
-
-/** @param {number} trackId */
-function BeginHeat(trackId) {
-    const config = GetTrackConfig()[trackId];
-    const start = config && Instance.FindEntityByName(config.startEntityName);
-    if (!start) {
-        Debug(`BeginHeat: track ${trackId} has no start_${trackId} trigger, aborting heat back to HUB`);
-        // Route through ReturnAllToHub, not a bare phase reset: callers
-        // (TryStartRace, or the BREAK->next-heat transition) may already
-        // have marked these karts racing/hidden their hub modal before
-        // calling in here, and they'd otherwise be stranded with racing:true
-        // and no hub UI, silently swept into whatever heat starts next.
-        ReturnAllToHub(CurrentRacers());
-        phase = RacePhase.HUB;
-        activeTrackId = undefined;
-        return;
-    }
-    activeTrackId = trackId;
-    // start_spawn_<trackId> if placed, else the nearest start_spawn, else the start trigger itself.
-    const { position: center, angles } = GetStartSpawnPoint(trackId, start);
-
-    const racers = CurrentRacers();
-    racers.forEach((kart, i) => {
-        const position = LineUpPosition(center, angles, i, racers.length);
-        SetFreeLook(kart, false); // a racer flying around would miss the countdown in a frozen melon
-        // A melon destroyed mid-BREAK is still pending its respawn (see
-        // HandleMelonLost) — skip the teleport rather than throw on a dead
-        // entity; that respawn lands it at the checkpointPosition set below.
-        if (kart.melon.IsValid()) {
-            kart.melon.Teleport({
-                position,
-                angles,
-                velocity: { x: 0, y: 0, z: 0 },
-            });
-        }
-        kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
-        RestoreFullHealth(kart); // every heat starts on a whole melon
-        kart.lastVelocity = undefined;
-        kart.settled = false;
-        kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
-        kart.pendingBounce = undefined;
-        // trackId is set directly instead of waiting for the physical
-        // start_<trackId> trigger touch to report it, so the
-        // checkpoint/lap panel is already visible ("0/N", lap "1/M") the
-        // moment the countdown starts instead of popping in a tick later —
-        // and crossing the start line after GO then changes nothing (see
-        // ApplyStartTouch).
-        kart.trackId = trackId;
-        kart.checkpointIndex = 0;
-        kart.lapsCompleted = 0;
-        CancelRun(kart); // a free-roaming run doesn't carry into the heat — its clock starts at GO
-        kart.finished = false;
-        kart.locked = true;
-        // Its own lined-up spot, not the start line's center — a respawn
-        // before reaching checkpoint 1 (break, or the user menu's respawn
-        // button during the countdown) would otherwise stack it on whoever
-        // is standing in the middle.
-        kart.checkpointPosition = position;
-        kart.checkpointAngles = angles;
-        FacePlayerView(kart.pawn, angles.yaw);
-        SetFinishImageVisible(kart.pawn.GetPlayerController()?.GetPlayerSlot(), false);
-    });
-
-    phase = RacePhase.COUNTDOWN;
-    phaseEndTime = Instance.GetGameTime() + COUNTDOWN_SECONDS;
-    Debug(`BeginHeat: track ${trackId}, ${racers.length} racer(s), countdown started`);
-}
-
-/**
- * Shows or hides the big "FINISH" image (finish_image in speedometer.xml)
- * for one player. @param {number | undefined} slot @param {boolean} visible
- */
-function SetFinishImageVisible(slot, visible) {
-    if (slot !== undefined) {
-        GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_image", "Hidden", !visible);
-    }
-}
-
-/** A kart reached lapsToWin — park it (still locked) until the whole heat ends. */
-/** @param {import("../../core/kart-registry.js").Kart} kart */
-function FinishKart(kart) {
-    kart.finished = true;
-    kart.locked = true;
-    // Shown the moment this racer crosses the line, not only once the whole
-    // heat is over — stays up through BREAK until the next heat/the hub.
-    SetFinishImageVisible(kart.pawn.GetPlayerController()?.GetPlayerSlot(), true);
-    Debug(`FinishKart: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} finished track ${activeTrackId}`);
-}
-
-/** @param {import("../../core/kart-registry.js").Kart[]} returning */
-function ReturnAllToHub(returning) {
-    SendKartsOutOfRace(returning, GetHubSpawnPoint(), "hub");
-}
-
-/**
- * The user menu's "Play Tutorial": same as the hub button (leaves a
- * running heat, respawn point moves along), just landing at intro_spawn —
- * or the hub, if the map has no intro_spawn.
- * @param {import("../../core/kart-registry.js").Kart} kart
- */
-function SendKartToTutorial(kart) {
-    SendKartsOutOfRace([kart], GetIntroSpawnPoint(), "tutorial");
-}
-
-/**
- * Takes karts out of any heat and teleports them (lined up side by side)
- * to `spawn`, which also becomes their respawn point.
- * @param {import("../../core/kart-registry.js").Kart[]} returning
- * @param {import("../../kart/spawn-points.js").SpawnPoint | undefined} spawn where to put them
- * @param {string} label for the debug log
- */
-function SendKartsOutOfRace(returning, spawn, label) {
-    Debug(`SendKartsOutOfRace: sending ${returning.length} kart(s) to the ${label} at ${spawn ? JSON.stringify(spawn.position) : "nowhere (spawn entity missing)"}`);
-    returning.forEach((kart, i) => {
-        kart.racing = false;
-        kart.finished = false;
-        kart.locked = false;
-        // kart.inHub (and the hub modal) is deliberately left to the
-        // hub_start_trigger's own hub_enter/hub_leave inputs: the teleport
-        // below lands inside it and fires hub_enter from there. Forcing it
-        // here left inHub stuck at true whenever the melon ended up outside
-        // the trigger volume — hub_leave never fires for a trigger that was
-        // never entered — and that kart then got pulled into the next heat
-        // from anywhere on the map.
-        // Leaving the heat also leaves its track: without this the HUD kept
-        // showing the old track's checkpoint/lap panel in the hub, and a
-        // break or the user menu's respawn button would send the kart right
-        // back onto that track's last checkpoint.
-        kart.trackId = undefined;
-        kart.checkpointIndex = 0;
-        kart.lapsCompleted = 0;
-        CancelRun(kart);
-        if (spawn) {
-            const spawnAngles = spawn.angles;
-            const spawnPosition = LineUpPosition(spawn.position, spawnAngles, i, returning.length);
-            kart.checkpointPosition = spawnPosition;
-            kart.checkpointAngles = spawnAngles;
-            FacePlayerView(kart.pawn, spawnAngles.yaw);
-            // Same dead-melon guard as BeginHeat — its pending respawn lands
-            // it at the checkpointPosition just set.
-            if (kart.melon.IsValid()) {
-                kart.melon.Teleport({
-                    position: spawnPosition,
-                    angles: spawnAngles,
-                    velocity: { x: 0, y: 0, z: 0 },
-                });
-            }
-        }
-        kart.teleportGen = (kart.teleportGen ?? 0) + 1; // ?? 0: karts carried over a hot reload from before this field existed
-        // Arrives whole — hub/tutorial button, hub_teleport, a heat ending.
-        RestoreFullHealth(kart);
-        kart.lastVelocity = undefined;
-        kart.settled = false;
-        kart.speedCap = undefined; // back to plain MAX_SPEED — no carrying a wall-bounce boost through a teleport
-        kart.pendingBounce = undefined;
-        const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-        if (slot === undefined) {
-            return;
-        }
-        // Both labels, since ReturnAllToHub can now be reached from any
-        // non-HUB phase (a moderator abort can land mid-COUNTDOWN, not just
-        // after a heat finishes normally in BREAK).
-        GetSpeedHud()?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
-        SetBreakCountdown(slot, undefined);
-        SetFinishImageVisible(slot, false);
-    });
-}
-
-/** Drives the COUNTDOWN/RACING/BREAK timers and transitions — called once per Think tick (see core/think.js). */
-/** @param {number} now */
-function UpdateRaceFlow(now) {
-    const hud = GetSpeedHud();
-
-    if (phase === RacePhase.COUNTDOWN) {
-        const racers = CurrentRacers();
-        if (racers.length === 0) {
-            // Everyone who was in this heat disconnected/despawned before it
-            // even started — nothing left to count down for. Without this,
-            // the countdown would still finish into RACING below and then
-            // get permanently stuck there (see the RACING branch's own
-            // "nobody left" check), bricking the race flow for everyone.
-            Debug("UpdateRaceFlow: all racers left during countdown, aborting heat back to HUB");
-            phase = RacePhase.HUB;
-            activeTrackId = undefined;
-            return;
-        }
-        const remaining = phaseEndTime - now;
-        const showClass = remaining > 0 ? `Show${Math.ceil(remaining)}` : "ShowGo";
-        for (const kart of racers) {
-            const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-            if (slot === undefined) {
-                continue;
-            }
-            hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", false);
-            for (const cls of COUNTDOWN_SHOW_CLASSES) {
-                hud?.SetHasClassForPlayer(slot, "countdown_panel", cls, cls === showClass);
-            }
-        }
-        if (remaining <= 0) {
-            for (const kart of racers) {
-                kart.locked = false;
-                StartRun(kart, now); // the heat's time trial clock
-            }
-            // The "GO" image just shown above stays up for GO_DISPLAY_SECONDS —
-            // hiding it in this same tick meant it was never actually seen.
-            // RACING reuses phaseEndTime as the moment to hide it.
-            phase = RacePhase.RACING;
-            phaseEndTime = now + GO_DISPLAY_SECONDS;
-            Debug(`UpdateRaceFlow: countdown finished for track ${activeTrackId}, GO`);
-        }
-        return;
-    }
-
-    if (phase === RacePhase.RACING) {
-        const racers = CurrentRacers();
-        if (now >= phaseEndTime) {
-            for (const kart of racers) {
-                const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-                if (slot !== undefined) {
-                    hud?.SetHasClassForPlayer(slot, "countdown_panel", "Hidden", true);
-                }
-            }
-            phaseEndTime = Infinity; // hidden — don't re-hide every tick
-        }
-        if (racers.length === 0) {
-            // Same "everyone left" case as COUNTDOWN above, but mid-race:
-            // without this, an empty heat sits in RACING forever since
-            // `racers.every(...)` on an empty array is vacuously true only
-            // when length is also checked, and TryStartRace refuses to start
-            // a new heat while phase isn't HUB.
-            Debug("UpdateRaceFlow: all racers left mid-heat, aborting back to HUB");
-            phase = RacePhase.HUB;
-            activeTrackId = undefined;
-            return;
-        }
-        if (racers.every((kart) => kart.finished)) {
-            phase = RacePhase.BREAK;
-            phaseEndTime = now + BREAK_SECONDS;
-            // The countdown itself is drawn by the BREAK branch below, under
-            // the finish_image FinishKart already shows.
-            breakCountdownShown.clear();
-            Debug(`UpdateRaceFlow: heat on track ${activeTrackId} complete, break started`);
-        }
-        return;
-    }
-
-    if (phase === RacePhase.BREAK && now < phaseEndTime) {
-        // Counting down to the next track / the hub: BREAK_SECONDS … 0 in
-        // number images under the finish image, re-sent only on change.
-        const value = BreakCountdownValue(phaseEndTime - now);
-        for (const kart of CurrentRacers()) {
-            const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-            if (slot !== undefined && breakCountdownShown.get(slot) !== value) {
-                SetBreakCountdown(slot, value);
-            }
-        }
-        return;
-    }
-
-    if (phase === RacePhase.BREAK) {
-        const racers = CurrentRacers();
-        const nextTrackId = NextTrackId();
-        if (nextTrackId !== undefined) {
-            for (const kart of racers) {
-                const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
-                if (slot !== undefined) {
-                    SetBreakCountdown(slot, undefined);
-                }
-            }
-            BeginHeat(nextTrackId);
-        } else {
-            ReturnAllToHub(racers);
-            phase = RacePhase.HUB;
-            activeTrackId = undefined;
-            Debug("UpdateRaceFlow: last track done, group returned to hub");
-        }
     }
 }
 
@@ -6596,8 +7485,19 @@ function SetUserMenuOpen(slot, kart, open) {
         UpdatePredictionHud(slot, kart);
         UpdateCollisionDebugHud(slot, kart);
         UpdateFreeLookHud(slot, kart);
+        UpdateHubButtonHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
+}
+
+/**
+ * The hub button's label: "Exit Race" while the player is signed up for a
+ * heat (kart.racing — the button takes just them out of it, see
+ * usermenu_hub_button in hud/inputs.js), else "Return to Hub".
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+function UpdateHubButtonHud(slot, kart) {
+    GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "usermenu_hub_button", "hub_label", kart.racing ? "Exit Race" : "Return to Hub");
 }
 
 /**
@@ -6672,8 +7572,9 @@ function UpdateUserMenu(slot, kart) {
     }
     if (kart.userMenuOpen) {
         // Every tick while open: the time trial can start or end (finish,
-        // a heat, the hub) with the menu up.
+        // a heat, the hub) with the menu up, and so can the player's heat.
         GetSpeedHud()?.SetHasClassForPlayer(slot, "usermenu_restart_row", "Hidden", !CanRestartTimeTrial(kart));
+        UpdateHubButtonHud(slot, kart);
     }
 }
 
@@ -6799,6 +7700,25 @@ function RegisterHudInputs() {
                     SetUserMenuOpen(slot, kart, false);
                 }
             }
+        } else if (event.buttonId === "usermenu_podium_button") {
+            // Developer: the end of a Grand Prix without racing one — everyone
+            // to the hub, then the clicking player onto place 1 and the others
+            // in join order onto 2 and 3, held there, confetti on. Not while
+            // a heat runs (it would pull its racers out).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (!kart) {
+                return;
+            }
+            if (phase !== RacePhase.HUB) {
+                Debug(`usermenu_podium_button: slot ${slot}, ignored — a heat is running (phase=${phase})`);
+                return;
+            }
+            const racers = [kart, ...[...karts.values()].filter((other) => other !== kart && other.melon.IsValid())];
+            Debug(`usermenu_podium_button: slot ${slot} plays the podium with ${racers.length} player(s)`);
+            SetUserMenuOpen(slot, kart, false);
+            ReturnAllToHub(racers);
+            PlaceOnPodium(TestGrandPrix(racers), racers);
         } else if (event.buttonId.startsWith("usermenu_color_")) {
             const key = event.buttonId.slice("usermenu_color_".length);
             const preset = COLOR_PRESETS[key];
@@ -6814,9 +7734,11 @@ function RegisterHudInputs() {
     });
 }
 
-// The custom HUD (panorama/layout/custom_game/speedometer.xml), one file per
-// panel: speedometer.js (speed, jump and health bars), bounce-panel.js,
-// track.js (time trial clock + checkpoint strip), hub-modal.js, user-menu.js.
+// The custom HUD (panorama/layout/custom_game/speedometer.xml). A panel
+// with its own rules has its own folder — speedometer/ (speed, jump and
+// health bars), track/ (time trial clock + checkpoint strip), scoreboard/
+// (Tab: Grand Prix points, best times), hub-modal/ ("Start Grand
+// Prix": the heats and who rides along) — the others are one file each: bounce-panel.js, user-menu.js.
 // layout.js finds the custom_hud_layout entity; inputs.js handles every
 // button click.
 
@@ -7311,15 +8233,25 @@ function UpdateKart(slot, kart, dt) {
         }
     }
 
-    const forwardInput =
-        (pawn.IsInputPressed(CSInputs.FORWARD) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.BACK) ? 1 : 0);
-    const strafeInput =
-        (pawn.IsInputPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.LEFT) ? 1 : 0);
+    // On the hub's podium after a Grand Prix (race/podium/): jumping and
+    // looking around only — no driving, no attack boost, held over its spot.
+    if (kart.podium && !PodiumHoldActive(kart.podium, now)) {
+        kart.podium = undefined;
+    }
+    const podium = kart.podium;
+    const forwardInput = podium
+        ? 0
+        : (pawn.IsInputPressed(CSInputs.FORWARD) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.BACK) ? 1 : 0);
+    // A/D page the scoreboard while Tab is held (UpdateScoreboardInput) —
+    // no strafing then.
+    const strafeInput = podium || pawn.IsInputPressed(CSInputs.SHOW_SCORES)
+        ? 0
+        : (pawn.IsInputPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.IsInputPressed(CSInputs.LEFT) ? 1 : 0);
     const jumpPressed = pawn.WasInputJustPressed(CSInputs.JUMP);
     // Attack boost (ATTACK_BOOST_*): holding attack pushes along the look
     // direction and lifts the speed cap, paid for with health every tick —
     // no floor: boost until it's gone and the melon breaks.
-    const attackHeld = pawn.IsInputPressed(CSInputs.ATTACK);
+    const attackHeld = !podium && pawn.IsInputPressed(CSInputs.ATTACK);
     const boost = AttackBoost(kart.health, attackHeld, dt);
     kart.health = boost.health;
     kart.attackBoosting = boost.boosting; // shows the boost trail, see fx/boost-trail/boost-trail.js
@@ -7453,6 +8385,13 @@ function UpdateKart(slot, kart, dt) {
     vx = v.x;
     vy = v.y;
     const vz = v.z;
+    // On the podium: whatever else happened, horizontally it only goes back
+    // over its spot (a jump goes straight up and comes down there).
+    if (podium) {
+        const hold = PodiumHoldVelocity(origin, podium.spot);
+        vx = hold.x;
+        vy = hold.y;
+    }
     // Side view: nothing moves the melon towards or away from the camera.
     if (sideView) {
         const kept = KeepOnPlane({ x: vx, y: vy }, sideView.view, sideView.depthError);
@@ -7708,6 +8647,7 @@ function Think() {
             UpdateUserMenu(slot, kart); // checked before UpdateKart's locked/breaking early-returns — USE works as an unstuck button
             UpdateKart(slot, kart, dt);
             UpdateLiftCamera(kart, dt);
+            UpdatePodiumCamera(kart, dt);
             UpdateZoneCamera(kart, dt);
             UpdateSideViewCamera(kart, dt);
             UpdateFollowCamera(kart, dt);
@@ -7718,6 +8658,8 @@ function Think() {
             UpdateJumpHud(slot, kart);
             UpdateHealthHud(slot, kart);
             UpdateCheckpointHud(slot, kart);
+            UpdateScoreboardInput(kart);
+            UpdateScoreboardHud(slot, kart);
             if (kart.inHub) {
                 ApplyHubModalState(slot, phase);
             }
@@ -8058,7 +9000,8 @@ function RegisterHeatInputs() {
 
 // Racing: the tracks read from trigger names (track-config.js), checkpoint and
 // lap progress (checkpoints/), the time trial clock and best times
-// (time-trial/), and the hub -> countdown -> racing -> break flow (heat/).
+// (time-trial/), the hub -> countdown -> racing -> break flow (heat/), and
+// the Grand Prix places and points over its heats (grand-prix/).
 
 function RegisterRaceInputs() {
     RegisterCheckpointAndFinishInputs();
@@ -8173,17 +9116,18 @@ Instance.SetNextThink(Instance.GetGameTime());
 // melons are still alive in the world — the next respawn would then spawn
 // a *second* melon on top of the orphaned one and the two would violently
 // shove each other apart. Carry the existing tracking across the reload.
-// Race-flow phase/activeTrackId/phaseEndTime are carried the same way, so
+// Race-flow phase/activeTrackId/phaseEndTime (and the Grand Prix standings) are carried the same way, so
 // reloading mid-heat during dev iteration doesn't strand locked racers in a
 // phase that's forgotten it's supposed to unlock/advance them.
 Instance.OnScriptReload({
-    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers }),
+    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers, grandPrix }),
     after: (memory) => {
         if (memory?.karts) {
             for (const [slot, kart] of memory.karts) {
                 karts.set(slot, kart);
             }
             RestoreRaceFlowSnapshot(memory);
+            RestoreGrandPrix(memory.grandPrix);
             SetModeratorSlot(memory.moderatorSlot);
             RestoreMovers(memory.movers);
             Debug(`OnScriptReload: restored ${karts.size} kart(s), phase=${phase}, activeTrackId=${activeTrackId}, moderatorSlot=${moderatorSlot}`);

@@ -3,14 +3,14 @@
 import { Instance } from "cs_script/point_script";
 // Straight from jump.js, not movement/index.js: the HUD is imported by
 // camera/, which the movement files import — going through the index would make a cycle.
-import { GetWallJumpCharges } from "../movement/jump/jump.js";
-import { JumpDotFills } from "./jump-dots-logic.js";
-import { HealthBarState } from "../health/damage/logic.js";
-import { MomentumMaxSpeed } from "../movement/momentum/logic.js";
-import { GetSpeedHud } from "./layout.js";
-import { UNITS_TO_KMH, JUMP_DOT_FILL_STEPS, WALL_JUMP_CHARGES, HEALTH_BAR_SEGMENTS, HUD_RESEND_SECONDS, PERFECT_BOUNCE_FLASH_SECONDS, PERFECT_BOUNCE_ANGLE_FACTOR } from "../constants/index.js";
+import { GetWallJumpCharges } from "../../movement/jump/jump.js";
+import { JumpDotFills } from "./logic.js";
+import { HealthBarState } from "../../health/damage/logic.js";
+import { MomentumMaxSpeed } from "../../movement/momentum/logic.js";
+import { GetSpeedHud } from "../layout.js";
+import { UNITS_TO_KMH, JUMP_DOT_FILL_STEPS, WALL_JUMP_CHARGES, HEALTH_BAR_SEGMENTS, HUD_RESEND_SECONDS, PERFECT_BOUNCE_FLASH_SECONDS, PERFECT_BOUNCE_ANGLE_FACTOR } from "../../constants/index.js";
 
-/** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart */
+/** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart */
 export function UpdateSpeedHud(slot, kart) {
     const hud = GetSpeedHud();
     if (!hud) {
@@ -36,7 +36,7 @@ export function UpdateSpeedHud(slot, kart) {
 /**
  * Whether `key`'s whole HUD state is due to be sent again (every
  * HUD_RESEND_SECONDS, and on the first call) — in between only changes are.
- * @param {import("../core/kart-registry.js").Kart} kart @param {"health" | "jump"} key
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {"health" | "jump"} key
  */
 function HudResendDue(kart, key) {
     const now = Instance.GetGameTime();
@@ -55,7 +55,7 @@ function HudResendDue(kart, key) {
  * dot changed (kart.hudJumpReady), and every dot again every
  * HUD_RESEND_SECONDS. One class per panel: several classes toggled on one
  * panel every tick never showed in-game.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
  */
 export function UpdateJumpHud(slot, kart) {
     const hud = GetSpeedHud();
@@ -77,7 +77,7 @@ export function UpdateJumpHud(slot, kart) {
  * default, the ones up to the health left shown with "On". Sent when the
  * count changed (kart.hudHealthSegments), and all of it again every
  * HUD_RESEND_SECONDS (see UpdateJumpHud).
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
  */
 export function UpdateHealthHud(slot, kart) {
     const hud = GetSpeedHud();
