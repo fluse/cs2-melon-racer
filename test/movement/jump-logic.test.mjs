@@ -5,7 +5,6 @@ import assert from "node:assert/strict";
 import { CanGroundJump, BufferedGroundJump, CanWallJump, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter } from "../../src/melon_drive/movement/jump/logic.js";
 import {
     WALL_JUMP_WINDOW,
-    WALL_JUMP_COOLDOWN,
     WALL_JUMP_UP_SPEED,
     WALL_JUMP_PUSH_SPEED,
     WALL_JUMP_CHARGES,
@@ -35,16 +34,18 @@ test("wall jump: not on the ground, not without a wall, not after the window", (
 });
 
 test("wall jump: can't climb the same wall forever", () => {
-    const later = 10 + WALL_JUMP_COOLDOWN + 0.01;
+    const later = 10.5;
     const s = { now: later, grounded: false, wallContact: { time: later, normal: wallA }, lastWallJump: { time: 10, normal: wallA }, charge: WALL_JUMP_CHARGES };
     assert.equal(CanWallJump(s), false, "same wall again");
     assert.equal(CanWallJump({ ...s, wallContact: { time: later, normal: wallB } }), true, "the opposite wall chains");
     assert.equal(CanWallJump({ ...s, lastGroundedTime: 10.1 }), true, "touched ground since — same wall is fine again");
 });
 
-test("wall jump: cooldown between two wall jumps", () => {
-    const s = { now: 10 + WALL_JUMP_COOLDOWN / 2, grounded: false, wallContact: { time: 10.1, normal: wallB }, lastWallJump: { time: 10, normal: wallA }, charge: WALL_JUMP_CHARGES };
-    assert.equal(CanWallJump(s), false);
+test("wall jump: no cooldown, but a new wall contact since the last wall jump", () => {
+    const s = { now: 10.02, grounded: false, wallContact: { time: 10.02, normal: wallB, approachTime: 10.02 }, lastWallJump: { time: 10, normal: wallA }, charge: WALL_JUMP_CHARGES };
+    assert.equal(CanWallJump(s), true, "the opposite wall right after");
+    assert.equal(CanWallJump({ ...s, wallContact: { ...s.wallContact, approachTime: 10 } }), false, "still the contact it jumped off");
+    assert.equal(CanWallJump({ ...s, lastGroundedTime: 10.01, wallContact: { ...s.wallContact, approachTime: 10 } }), false, "touching ground doesn't make it a new contact");
 });
 
 test("wall jump: not while a wall bounce's jump-timing window is open", () => {

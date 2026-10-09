@@ -23,16 +23,7 @@ export const LIFT_ZONE_NAME_PATTERN = /^lift_zone_(\d+(?:\.\d+)?)$/;
 export const LIFT_ZONE_MIN_BOUNCE_SPEED = 450; // units/sec
 // Wall jumps in a lift zone cost no charge, are always full strength and
 // may follow a wall bounce at once (outside one, a press in the bounce's
-// jump-timing window is only timing). A narrow shaft has the melon at the
-// opposite wall sooner than WALL_JUMP_COOLDOWN, so there the cooldown is only
-// this (the next wall jump still needs the *other* wall, so one wall can't be
-// climbed alone) ...
-export const LIFT_ZONE_WALL_JUMP_COOLDOWN = 0.1; // seconds
-// ... and a jump pressed up to this long *before* touching the next wall is
-// remembered and fires the wall jump the moment the melon touches it —
-// pressing a little early used to be lost (only presses after the contact
-// counted, within WALL_JUMP_WINDOW) ...
-export const LIFT_ZONE_JUMP_BUFFER = 0.2; // seconds
-// ... and a wall contact stays jumpable this long, instead of the tick or
-// two of WALL_JUMP_WINDOW outside: shafts stay easy to climb.
+// jump-timing window is only timing). And a wall contact stays jumpable this
+// long, instead of the tick or two of WALL_JUMP_WINDOW outside: shafts stay
+// easy to climb.
 export const LIFT_ZONE_WALL_JUMP_WINDOW = 0.2; // seconds

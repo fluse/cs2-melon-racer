@@ -9,7 +9,7 @@ import { CanGroundJump, BufferedGroundJump, WallJumpBlockReason, WallJumpVelocit
 import { JumpTimingFactor, JumpMultiplier, WallTimingPress } from "../wall-bounce/logic.js";
 import { MomentumMaxSpeed } from "../momentum/logic.js";
 import { PlayPerfectSpark } from "../wall-bounce/wall-bounce.js";
-import { JUMP_SPEED, GROUND_JUMP_BUFFER, BOUNCE_RATINGS, WALL_JUMP_CHARGES } from "../../constants/index.js";
+import { JUMP_SPEED, GROUND_JUMP_BUFFER, WALL_JUMP_BUFFER, BOUNCE_RATINGS, WALL_JUMP_CHARGES } from "../../constants/index.js";
 import { LogJumpPress, LogWallJumpVerdict } from "../../dev/collision-debug.js";
 
 /**
@@ -57,8 +57,8 @@ export function GetWallJumpCharges(kart) {
 /**
  * Everything a jump press does this tick, applied to `v` (the velocity
  * UpdateKart is about to command, modified in place): the ground jump, the
- * wall-bounce timing credit, and the wall jump. Also fires a buffered wall
- * jump (lift zones) without a new press. (The charge refills in
+ * wall-bounce timing credit, and the wall jump. Also fires a buffered
+ * ground or wall jump without a new press. (The charge refills in
  * RechargeWallJumpCharge.)
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now
  * @param {boolean} grounded see UpdateGrounded @param {boolean} jumpPressed
@@ -98,9 +98,9 @@ export function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
     // Did nothing: if the melon touches down within GROUND_JUMP_BUFFER, it
     // jumps then (FireBufferedGroundJump).
     kart.bufferedGroundJumpTime = didNothing ? now : undefined;
-    // In the air and not a wall jump yet: where there's a jump buffer (lift
-    // and side-view zones), remember the press — a wall touched soon after still gets it.
-    kart.bufferedWallJumpTime = blockedBy !== null && !grounded && rules.jumpBuffer > 0 ? now : undefined;
+    // In the air and not a wall jump yet: remember the press — the next wall
+    // touched (or the wall jump becoming possible) soon after still gets it.
+    kart.bufferedWallJumpTime = didNothing && !grounded ? now : undefined;
 }
 
 /**
@@ -154,6 +154,7 @@ function FireBufferedGroundJump(slot, kart, now, grounded, v) {
         return;
     }
     kart.bufferedGroundJumpTime = undefined;
+    kart.bufferedWallJumpTime = undefined; // the press is used up
     v.z = JUMP_SPEED;
     kart.lastJumpTime = now;
     if (kart.lastIdleJumpPressTime === pressed) {
@@ -163,8 +164,9 @@ function FireBufferedGroundJump(slot, kart, now, grounded, v) {
 }
 
 /**
- * A jump pressed shortly *before* touching a wall (within rules.jumpBuffer,
- * lift and side-view zones only) fires the wall jump once the melon touches one.
+ * A jump pressed shortly *before* a wall jump is possible (within
+ * WALL_JUMP_BUFFER — before touching the next wall, or still at the one it
+ * last jumped off) fires the wall jump as soon as it is.
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
  * @param {{ x: number, y: number, z: number }} v @param {import("../../zones/lift/logic.js").WallRules} rules
  */
@@ -173,13 +175,14 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
     if (pressed === undefined) {
         return;
     }
-    if (now - pressed > rules.jumpBuffer) {
-        kart.bufferedWallJumpTime = undefined; // too long ago, or left the zone (no buffer outside)
+    if (now - pressed > WALL_JUMP_BUFFER) {
+        kart.bufferedWallJumpTime = undefined; // too long ago
         return;
     }
     const wallContact = kart.lastWallContact;
     if (wallContact && wallContact.time > pressed && TryWallJump(slot, kart, now, grounded, v, rules) === null) {
         kart.bufferedWallJumpTime = undefined;
+        kart.bufferedGroundJumpTime = undefined; // the press is used up
         if (kart.lastIdleJumpPressTime === pressed) {
             kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
         }
@@ -202,7 +205,8 @@ function FireBufferedWallJump(slot, kart, now, grounded, v, rules) {
  * the press is that bounce's timing and no wall jump — otherwise every
  * well-timed bounce also used up charge. Not in lift and side-view zones
  * (rules.freeWallJumps): there it costs no charge (none needed either),
- * may follow a bounce at once, and the cooldown is rules.wallJumpCooldown.
+ * may follow a bounce at once. No cooldown: the next wall jump needs a new
+ * wall contact (WallJumpBlockReason).
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} now @param {boolean} grounded
  * @param {{ x: number, y: number, z: number }} v modified in place @param {import("../../zones/lift/logic.js").WallRules} rules
  * @returns {string | null} why it didn't happen, or null if it did
@@ -217,7 +221,6 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
         lastWallJump: kart.lastWallJump,
         lastGroundedTime: kart.lastGroundedTime,
         charge,
-        cooldown: rules.wallJumpCooldown,
         window: rules.wallJumpWindow,
         bounceTiming: !rules.freeWallJumps && kart.pendingBounce !== undefined,
     });

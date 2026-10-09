@@ -259,9 +259,7 @@ bounces are skipped.
   them; bounces there leave the wall with at least
   `LIFT_ZONE_MIN_BOUNCE_SPEED` (a head-on MISS would otherwise be too slow
   to reach the far wall), and wall jumps there cost no charge (and need none), aren't rated by angle, are always
-  full strength, have a shorter cooldown (`LIFT_ZONE_WALL_JUMP_COOLDOWN`)
-  and fire from a press made shortly before touching the wall
-  (`LIFT_ZONE_JUMP_BUFFER`); a wall contact there also stays jumpable
+  full strength; a wall contact there also stays jumpable
   longer (`LIFT_ZONE_WALL_JUMP_WINDOW`, 0.2 s, instead of a tick or two). While in a lift zone the chase camera eases back and
   up (`LIFT_CAMERA_*` in `camera/lift-zoom/constants.js`) so the climb stays in view,
   looking through walls instead of being pulled in by them.
@@ -753,8 +751,16 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   melon's center is 6.7 from it, so 7 just covers that — a melon resting
   tip-first at a wall (~8) doesn't count, but one moving into it does,
   thanks to the one tick of travel added (16 would let a wall ~9 units off
-  the melon's surface count). A wall bounce also counts as a contact. `WALL_JUMP_COOLDOWN`
-  between two wall jumps, and one
+  the melon's surface count). A wall bounce also counts as a contact.
+  **No cooldown between two wall jumps** (decided): the next one needs a
+  **new wall contact** — the melon has left the wall it jumped off and
+  touched one again (the contact's start, `approachTime`, is later than
+  the last wall jump), so pressing again while still at that wall does
+  nothing, while the opposite wall of a corridor counts at once. **Jump
+  buffer everywhere** (decided, as it used to be in lift zones only): a press
+  in the air that did nothing is kept for `WALL_JUMP_BUFFER` (0.2 s) and
+  fires the wall jump as soon as one is possible (the next wall touched,
+  a charge refilled) — so a press a little too early isn't lost. One
   wall can't be climbed forever: the next wall jump needs ground contact
   first or a different wall (`WALL_JUMP_SAME_WALL_DOT`) — bouncing between
   two facing walls chains. The same press still counts as wall-bounce
@@ -1050,10 +1056,9 @@ camera looks, Hammer yaw; defaults `SIDE_VIEW_*`). Inside:
   that a wall jump **isn't rated** (decided): no angle rating, boost or
   feedback, as in a lift zone — instead it always goes a bit higher and
   further (`SIDE_VIEW_WALL_JUMP_UP_SPEED`/`_PUSH_SPEED` instead of
-  `WALL_JUMP_UP_SPEED`/`_PUSH_SPEED`), and with a lift zone's timing so
-  jumps from wall to wall chain: the shorter `LIFT_ZONE_WALL_JUMP_COOLDOWN`,
-  the longer `LIFT_ZONE_WALL_JUMP_WINDOW` and a press up to
-  `LIFT_ZONE_JUMP_BUFFER` before touching the wall fires on the touch.
+  `WALL_JUMP_UP_SPEED`/`_PUSH_SPEED`), and with a lift zone's longer
+  contact window (`LIFT_ZONE_WALL_JUMP_WINDOW`) so jumps from wall to wall
+  chain.
   As in a lift zone they cost no charge (and need none, decided) and may
   follow a bounce at once.
 - The melon stays on the plane it entered on: speed towards/away from the

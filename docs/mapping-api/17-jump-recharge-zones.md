@@ -45,7 +45,7 @@ raise it in a copy of the file.
 
 ## Rules
 
-- Only the charges: cooldown, contact and same-wall rules of a wall jump
+- Only the charges: the new-contact, contact-window and same-wall rules of a wall jump
   stay as they are (in a [lift zone](10-lift-zones.md) or a
   [side-view zone](11-camera-zones.md#side-view-zones) theirs).
 - The jump icons next to the speed panel fill up at once.
