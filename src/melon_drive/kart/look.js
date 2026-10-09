@@ -19,7 +19,7 @@ export function ShowMelonPaint(kart) {
 
 /**
  * Whether this kart's melon glows: on by default, unless its player switched
- * it off in the user menu (see UpdateMelonGlowHud in hud/).
+ * it off in the user menu (see USER_MENU_TOGGLES in hud/user-menu.js).
  * @param {import("../core/kart-registry.js").Kart} kart
  */
 export function IsMelonGlowOn(kart) {

@@ -17,7 +17,8 @@ export const SPECTATOR_HAT_HEIGHT = FREE_LOOK_EYE_HEIGHT;
 // own camera (at the eyes) doesn't look out through it.
 export const SPECTATOR_HAT_BACK = 48;
 
-// Camera tuning (dev/camera-tuning.js): the user menu's "Camera Settings"
+// Camera tuning (dev/camera-tuning.js, its scale CAMERA_TUNING_SCALE in
+// dev/tuning-scale-logic.js): the user menu's "Camera Settings"
 // page sets the chase camera's distance and height for the clicking player
 // only, to try out values for CAMERA_DISTANCE/CAMERA_HEIGHT in-game. Both
 // share one scale, in units (distance: behind the melon, negative = in
@@ -32,3 +33,18 @@ export const CAMERA_TUNING_FINE_STEP = 1;
 // CAMERA_TUNING_MIN..CAMERA_TUNING_MAX — 41 segments (camtune_<axis>_seg_<i>
 // in speedometer.xml).
 export const CAMERA_TUNING_SCALE_STEP = 10;
+
+// Physics tuning (dev/physics-tuning.js, its scale PHYSICS_TUNING_SCALE in
+// dev/tuning-scale-logic.js): the user menu's "Physics Settings"
+// page scales the clicking player's own melon physics — top speed,
+// acceleration, jump, attack boost, gravity — each in percent of its
+// default (MAX_SPEED, FORWARD_ACCEL…, JUMP_SPEED, ATTACK_BOOST_*, GRAVITY).
+export const PHYSICS_TUNING_MIN = 0; // percent
+export const PHYSICS_TUNING_MAX = 300; // percent
+// What the − / + buttons change a value by (percent): big and fine step.
+export const PHYSICS_TUNING_STEP = 10;
+export const PHYSICS_TUNING_FINE_STEP = 1;
+// The clickable scale: one segment every this many percent,
+// PHYSICS_TUNING_MIN..PHYSICS_TUNING_MAX — 31 segments
+// (phytune_<key>_seg_<i> in speedometer.xml).
+export const PHYSICS_TUNING_SCALE_STEP = 10;

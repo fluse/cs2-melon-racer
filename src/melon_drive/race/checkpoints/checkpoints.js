@@ -10,6 +10,7 @@ import { StartRun, FinishRun, CancelRun, CanRestartTimeTrial } from "../time-tri
 // Straight from teleport.js, not movement/index.js: that index pulls in the
 // whole physics tree, which imports race/heat/race-flow.js — a cycle through here.
 import { RespawnKartAtCheckpoint } from "../../kart/teleport.js";
+import { SetFreeLook } from "../../dev/free-look.js";
 
 // Start line: a trigger_multiple named "start_<trackId>[_laps<M>]",
 // filtered to the melon (prop_physics) so the frozen/parked pawn can't
@@ -216,6 +217,9 @@ export function RestartTimeTrial(kart) {
         Debug(`RestartTimeTrial: not now (trackId=${trackId}, racing=${kart.racing}, breaking=${kart.breaking}, locked=${kart.locked})`);
         return false;
     }
+    // Back to driving: a free-looking player's restart ends free look (pawn
+    // back on its anchor, chase camera on the melon) before the melon moves.
+    SetFreeLook(kart, false);
     if (!SendToTrackStart(kart, trackId)) {
         return false;
     }

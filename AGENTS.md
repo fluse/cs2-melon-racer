@@ -65,11 +65,13 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #   hud/       layout.js (the custom_hud_layout), one folder per panel with its own rules: speedometer/ (km/h, health bar, jump dots),
                                           #              track/ (time trial + checkpoint strip), scoreboard/ (Tab: Grand Prix standings / best times,
                                           #              in place of CS2's own), hub-modal/ ("Start Grand Prix": heat cards + who rides along; routes.js is generated); one file per panel without: bounce-panel.js, user-menu.js;
-                                          #              inputs.js (every button click)
+                                          #              inputs.js (every button click: one table per kind of button, HandleHudClick dispatches)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
                                           #              boost-trail/, prediction/ (the guide line)
                                           #   dev/       collision-debug.js (the user-menu collision debug view), free-look.js (the user-menu free look),
-                                          #              camera-tuning.js (+ -logic.js: the user-menu camera page, own chase camera distance/height), attack-debug.js
+                                          #              camera-tuning.js (the user-menu camera page, own chase camera distance/height),
+                                          #              physics-tuning.js (+ -logic.js: the user-menu physics page, own melon physics in percent),
+                                          #              tuning-scale.js (+ -logic.js: the slider both pages share), test-effects.js (Test Break/Perfect Bounce/Heal), attack-debug.js
                                           #   world/     mover/ (func_movelinear "mover…" started and kept going back and forth)
 src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
 test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one folder per src/melon_drive/ domain (movement/, race/, …): unit tests
@@ -91,8 +93,11 @@ tools/make-route-icons.mjs               # generates the hub window's route card
                                           #   (panorama/images/custom_game/routes/route_<trackId>.png) + route names (src/melon_drive/hud/hub-modal/routes.js,
                                           #   from route_<name>.vmap) — re-run after adding/renaming a route (test/map/route-icons.test.mjs)
 tools/make-logo-model.mjs                # extrudes MELON RACER (Bungee, slanted like the logo, lime green outline ring around them) into models/melon_racer/logo_text.obj + .vmdl
-                                          #   + materials/melon_racer/logo_text_outline.vmat, letters in holo_dashes.vmat (opentype.js + earcut + clipper-lib, devDependencies);
+                                          #   + materials/melon_racer/logo_text_{face,outline,holo}.vmat (holo = an opaque copy of holo_dashes for the letter fronts) (opentype.js + earcut + clipper-lib, devDependencies);
                                           #   OBJ is written Y-up (ModelDoc rotates OBJ axes) — re-run, then compile the .vmdl with resourcecompiler.exe
+tools/make-checkpoint-model.mjs          # the checkpoint gate's frame (glowing pillars, beam, floating diamond) as models/melon_racer/checkpoint_gate.vmdl
+                                          #   (+ _physics.obj collision, materials/melon_racer/checkpoint_gate_{body,trim,glow}.vmat); same footprint as the prefab's old poles
+tools/model.mjs                          # shared by the model generators: mesh builder (extrude, triangles), .obj/.vmdl/.vmat writers
 tools/make-decal.mjs                     # generates materials/melon_racer/<decal>_{color,trans}.png for every decal in its DECALS list
                                           #   (HUD logo, rawDecals/*.png|jpg — JPG via Windows System.Drawing; can key out a baked-in checkerboard, writes <name>_transparent.png)
 rawDecals/*.png                          # new source images for decals (make-decal.mjs input); once done, the tool moves

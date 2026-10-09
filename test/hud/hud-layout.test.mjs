@@ -33,13 +33,25 @@ test("every image speedometer.xml shows exists in panorama/images", () => {
     assert.deepEqual(missing, []);
 });
 
-test("every button in speedometer.xml has a click handler in the script", () => {
+test("every button in speedometer.xml has a click handler in the script", async () => {
+    await import("../helpers/register-cs-script.mjs");
+    const { IsHandledButton } = await import("../../src/melon_drive/hud/inputs.js");
     const buttonIds = [...layout.matchAll(/<Button\s+id="([^"]+)"/g)].map((m) => m[1]);
     assert.ok(buttonIds.includes("usermenu_tutorial_button"), "sanity: the tutorial button is in the layout");
-    const exact = new Set([...source.matchAll(/buttonId === "([^"]+)"/g)].map((m) => m[1]));
-    const prefixes = [...source.matchAll(/buttonId\.startsWith\("([^"]+)"\)/g)].map((m) => m[1]);
-    const unhandled = buttonIds.filter((id) => !exact.has(id) && !prefixes.some((p) => id.startsWith(p)));
-    assert.deepEqual(unhandled, []);
+    assert.ok(!IsHandledButton("no_such_button"), "sanity: not everything counts as handled");
+    assert.deepEqual(buttonIds.filter((id) => !IsHandledButton(id)), []);
+});
+
+// The tables in hud/user-menu.js address panels by id from a variable, which
+// the literal-id check above can't see.
+test("every user menu toggle and developer page in hud/user-menu.js exists in speedometer.xml", async () => {
+    await import("../helpers/register-cs-script.mjs");
+    const { USER_MENU_TOGGLES, USER_MENU_PAGES } = await import("../../src/melon_drive/hud/user-menu.js");
+    const ids = [...Object.keys(USER_MENU_TOGGLES), ...Object.values(USER_MENU_PAGES).map((p) => p.panel), "usermenu_main_page"];
+    assert.deepEqual(ids.filter((id) => !layoutIds.has(id)), []);
+    for (const [id, { variable }] of Object.entries(USER_MENU_TOGGLES)) {
+        assert.ok(layout.includes(`{s:${variable}}`), `${id}'s pill shows {s:${variable}}`);
+    }
 });
 
 // Numbered panels the script addresses by a template ("cp_slot_<i>") aren't

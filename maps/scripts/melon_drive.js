@@ -99,7 +99,8 @@ function TraceSphere(config) {
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
- *   cameraTuningPage?: boolean, // the user menu shows its camera page instead of its columns — see SetCameraTuningPage
+ *   physicsTuning?: Partial<Record<import("../dev/physics-tuning-logic.js").PhysicsTuningKey, number>>, // this player's own melon physics in percent of the defaults, from the user menu's physics page — see dev/physics-tuning.js
+ *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the developer page the user menu shows in place of its columns, if any — see SetUserMenuPage
  *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
@@ -1388,7 +1389,8 @@ const SPECTATOR_HAT_HEIGHT = FREE_LOOK_EYE_HEIGHT;
 // own camera (at the eyes) doesn't look out through it.
 const SPECTATOR_HAT_BACK = 48;
 
-// Camera tuning (dev/camera-tuning.js): the user menu's "Camera Settings"
+// Camera tuning (dev/camera-tuning.js, its scale CAMERA_TUNING_SCALE in
+// dev/tuning-scale-logic.js): the user menu's "Camera Settings"
 // page sets the chase camera's distance and height for the clicking player
 // only, to try out values for CAMERA_DISTANCE/CAMERA_HEIGHT in-game. Both
 // share one scale, in units (distance: behind the melon, negative = in
@@ -1403,6 +1405,21 @@ const CAMERA_TUNING_FINE_STEP = 1;
 // CAMERA_TUNING_MIN..CAMERA_TUNING_MAX — 41 segments (camtune_<axis>_seg_<i>
 // in speedometer.xml).
 const CAMERA_TUNING_SCALE_STEP = 10;
+
+// Physics tuning (dev/physics-tuning.js, its scale PHYSICS_TUNING_SCALE in
+// dev/tuning-scale-logic.js): the user menu's "Physics Settings"
+// page scales the clicking player's own melon physics — top speed,
+// acceleration, jump, attack boost, gravity — each in percent of its
+// default (MAX_SPEED, FORWARD_ACCEL…, JUMP_SPEED, ATTACK_BOOST_*, GRAVITY).
+const PHYSICS_TUNING_MIN = 0; // percent
+const PHYSICS_TUNING_MAX = 300; // percent
+// What the − / + buttons change a value by (percent): big and fine step.
+const PHYSICS_TUNING_STEP = 10;
+const PHYSICS_TUNING_FINE_STEP = 1;
+// The clickable scale: one segment every this many percent,
+// PHYSICS_TUNING_MIN..PHYSICS_TUNING_MAX — 31 segments
+// (phytune_<key>_seg_<i> in speedometer.xml).
+const PHYSICS_TUNING_SCALE_STEP = 10;
 
 // Movers: a func_movelinear whose name starts with "mover" goes back and
 // forth on its own — the script starts it (Open) when the map loads and
@@ -3027,7 +3044,7 @@ function ShowMelonPaint(kart) {
 
 /**
  * Whether this kart's melon glows: on by default, unless its player switched
- * it off in the user menu (see UpdateMelonGlowHud in hud/).
+ * it off in the user menu (see USER_MENU_TOGGLES in hud/user-menu.js).
  * @param {import("../core/kart-registry.js").Kart} kart
  */
 function IsMelonGlowOn(kart) {
@@ -4014,6 +4031,45 @@ function FreshApproach(contact, now) {
     return contact.approachTime !== undefined && now - contact.approachTime <= WALL_JUMP_APPROACH_MEMORY ? contact.approach : undefined;
 }
 
+// Pure rules for the user menu's physics tuning page — no cs_script import,
+// so the driving rules can read a kart's factors and Node can test them
+// (test/dev/physics-tuning.test.mjs). physics-tuning.js next to it keeps the
+// values on the kart and drives the HUD; the scale itself is
+// tuning-scale-logic.js.
+
+/** @typedef {"maxSpeed" | "accel" | "jump" | "boost" | "gravity"} PhysicsTuningKey */
+/** The page's rows, top to bottom. @type {PhysicsTuningKey[]} */
+const PHYSICS_TUNING_KEYS = ["maxSpeed", "accel", "jump", "boost", "gravity"];
+
+/**
+ * A kart's factor for one value: its percent on the physics page / 100,
+ * 1 (the default) when it never changed it.
+ * @param {{ physicsTuning?: Partial<Record<PhysicsTuningKey, number>> }} kart @param {PhysicsTuningKey} key
+ */
+function PhysicsFactor(kart, key) {
+    return (kart.physicsTuning?.[key] ?? 100) / 100;
+}
+
+/**
+ * The extra vertical velocity change this tick for a gravity factor: the
+ * engine pulls with `gravity` anyway, the script adds the rest (factor 2:
+ * as much again downwards; 0: cancels it — the melon floats).
+ * @param {number} factor @param {number} gravity the engine's pull (GRAVITY) @param {number} dt
+ */
+function ExtraGravityDelta(factor, gravity, dt) {
+    return -(factor - 1) * gravity * dt;
+}
+
+/**
+ * The attack boost's speed cap for a kart's factors: the top speed plus the
+ * boost's headroom above it (ATTACK_BOOST_MAX_SPEED − MAX_SPEED), both
+ * scaled — so a faster melon still boosts above its own top speed.
+ * @param {number} topSpeed the kart's top speed (scaled) @param {number} headroom @param {number} boostFactor
+ */
+function BoostMaxSpeed(topSpeed, headroom, boostFactor) {
+    return topSpeed + headroom * boostFactor;
+}
+
 // Momentum — repeatedly reaching the top speed raises it (MOMENTUM_* in
 // movement/momentum/constants.js). Pure rule, no cs_script import; movement/driving/drive.js
 // applies it (test/movement/momentum.test.mjs).
@@ -4035,11 +4091,30 @@ function NewMomentum() {
 }
 
 /**
- * The top speed with `momentum`'s steps (plain MAX_SPEED without any).
+ * The top speed with `momentum`'s steps (plain `baseMax` without any).
  * @param {MomentumState | undefined} momentum
+ * @param {number} [baseMax] the top speed without steps — MAX_SPEED, or a kart's own (KartMaxSpeed)
  */
-function MomentumMaxSpeed(momentum) {
-    return MAX_SPEED * (1 + MOMENTUM_STEP * (momentum?.steps ?? 0));
+function MomentumMaxSpeed(momentum, baseMax = MAX_SPEED) {
+    return baseMax * (1 + MOMENTUM_STEP * (momentum?.steps ?? 0));
+}
+
+/**
+ * A kart's top speed without momentum: MAX_SPEED, scaled by its physics
+ * page's "Max Speed" (dev/physics-tuning.js).
+ * @param {{ physicsTuning?: any }} kart
+ */
+function KartBaseMaxSpeed(kart) {
+    return MAX_SPEED * PhysicsFactor(kart, "maxSpeed");
+}
+
+/**
+ * A kart's current top speed: its own base (KartBaseMaxSpeed) with its
+ * momentum steps.
+ * @param {{ momentum?: MomentumState, physicsTuning?: any }} kart
+ */
+function KartMaxSpeed(kart) {
+    return MomentumMaxSpeed(kart.momentum, KartBaseMaxSpeed(kart));
 }
 
 /**
@@ -4051,16 +4126,17 @@ function MomentumMaxSpeed(momentum) {
  * MOMENTUM_HIT_WINDOW of the previous one adds a step.
  * @param {MomentumState | undefined} momentum @param {number} horizSpeed the melon's horizontal speed this tick (after the cap)
  * @param {number} now game time @param {boolean} boosted
+ * @param {number} [baseMax] the top speed without steps (MomentumMaxSpeed)
  * @returns {MomentumState}
  */
-function UpdateMomentum(momentum, horizSpeed, now, boosted) {
+function UpdateMomentum(momentum, horizSpeed, now, boosted, baseMax = MAX_SPEED) {
     if (!momentum || horizSpeed < MOMENTUM_MIN_SPEED) {
         return NewMomentum();
     }
     if (boosted) {
         return { ...momentum, armed: false };
     }
-    const max = MomentumMaxSpeed(momentum);
+    const max = MomentumMaxSpeed(momentum, baseMax);
     if (horizSpeed < max * (1 - MOMENTUM_REARM_DIP)) {
         return momentum.armed ? momentum : { ...momentum, armed: true };
     }
@@ -4246,7 +4322,7 @@ function TryPadLaunch(slot, kart, now, jumpPressed, v, lookDir) {
     kart.lastJumpTime = now;
     kart.padFlight = { launchTime: now };
     // Faster than the top speed, like a wall-bounce boost — decays at BOOST_DECAY.
-    kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(v.x, v.y));
+    kart.speedCap = Math.max(kart.speedCap ?? KartMaxSpeed(kart), Math.hypot(v.x, v.y));
     Debug(`jump pad: slot ${slot} launched (${launched.z.toFixed(0)} u/s up, ${Math.hypot(v.x, v.y).toFixed(0)} u/s horizontal)`);
     return true;
 }
@@ -5184,7 +5260,7 @@ function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
     const timingPress = RegisterWallTimingPress(kart, now);
     LogJumpPress(slot, kart, now, grounded, groundJump, timingPress);
     if (groundJump) {
-        v.z = JUMP_SPEED;
+        v.z = JUMP_SPEED * PhysicsFactor(kart, "jump"); // scaled by the physics page (dev/physics-tuning.js)
         kart.lastJumpTime = now;
     }
     // Wall timing — independent of the normal jump above (works in the air
@@ -5235,7 +5311,7 @@ function UpgradePendingBounce(kart, now, v) {
     if (kart.lastBounceInfo) {
         kart.lastBounceInfo.jumpFactor = lateFactor;
     }
-    kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), after);
+    kart.speedCap = Math.max(kart.speedCap ?? KartMaxSpeed(kart), after);
     return true;
 }
 
@@ -5260,7 +5336,7 @@ function FireBufferedGroundJump(slot, kart, now, grounded, v) {
     }
     kart.bufferedGroundJumpTime = undefined;
     kart.bufferedWallJumpTime = undefined; // the press is used up
-    v.z = JUMP_SPEED;
+    v.z = JUMP_SPEED * PhysicsFactor(kart, "jump"); // scaled by the physics page (dev/physics-tuning.js)
     kart.lastJumpTime = now;
     if (kart.lastIdleJumpPressTime === pressed) {
         kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
@@ -5354,7 +5430,7 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
         v.y = boosted.y;
         v.z = Math.max(v.z, jump.z * bonus.up);
         if (bonus.speed > 1) {
-            kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(v.x, v.y));
+            kart.speedCap = Math.max(kart.speedCap ?? KartMaxSpeed(kart), Math.hypot(v.x, v.y));
         }
         // Same feedback as a bounce: the bounce panel and speedometer flash
         // (jump timing full — it was jumped), a PERFECT's spark instead of the
@@ -5412,7 +5488,7 @@ function UpdateSpeedHud(slot, kart) {
     // Wall-bounce feedback: Boosted while a bounce has the melon above its
     // normal top speed (momentum included — that's earned, not a boost), PerfectBounce as a short flash after a bounce that
     // was clean enough to cost (almost) no health.
-    hud.SetHasClassForPlayer(slot, "speed_panel", "Boosted", horizSpeed > MomentumMaxSpeed(kart.momentum) + 1);
+    hud.SetHasClassForPlayer(slot, "speed_panel", "Boosted", horizSpeed > KartMaxSpeed(kart) + 1);
     const info = kart.lastBounceInfo;
     const perfectFlash =
         info !== undefined &&
@@ -7264,32 +7340,115 @@ function UpdateScoreboardInput(kart) {
     kart.scoreboardNextUpdate = undefined; // show it now, not on the next rebuild
 }
 
-// Pure rules for the user menu's camera tuning page — no cs_script import,
-// so it's unit-testable in Node (test/dev/camera-tuning.test.mjs).
-// camera-tuning.js next to it keeps the values on the kart and drives the HUD.
+// Pure rules shared by the user menu's tuning pages (camera-tuning.js,
+// physics-tuning.js): a value on a scale with − / + buttons in a big and a
+// fine step and a clickable row of segments, filled up to the value. No
+// cs_script import — tested in Node (test/dev/tuning-scale.test.mjs);
+// tuning-scale.js next to it draws a scale on the HUD.
 
-/** A value kept on the scale, CAMERA_TUNING_MIN..CAMERA_TUNING_MAX. @param {number} value */
-function ClampCameraTuning(value) {
-    return Math.max(CAMERA_TUNING_MIN, Math.min(CAMERA_TUNING_MAX, value));
+/**
+ * @typedef {{
+ *   min: number, max: number, // the scale's ends
+ *   step: number, fineStep: number, // what the outer and inner − / + buttons change a value by
+ *   segmentStep: number, // one clickable segment every this much, min..max
+ * }} TuningScale
+ */
+
+/** The camera page's scale (units). @type {TuningScale} */
+const CAMERA_TUNING_SCALE = {
+    min: CAMERA_TUNING_MIN,
+    max: CAMERA_TUNING_MAX,
+    step: CAMERA_TUNING_STEP,
+    fineStep: CAMERA_TUNING_FINE_STEP,
+    segmentStep: CAMERA_TUNING_SCALE_STEP,
+};
+
+/** The physics page's scale (percent). @type {TuningScale} */
+const PHYSICS_TUNING_SCALE = {
+    min: PHYSICS_TUNING_MIN,
+    max: PHYSICS_TUNING_MAX,
+    step: PHYSICS_TUNING_STEP,
+    fineStep: PHYSICS_TUNING_FINE_STEP,
+    segmentStep: PHYSICS_TUNING_SCALE_STEP,
+};
+
+/** A value kept on the scale. @param {TuningScale} scale @param {number} value */
+function ClampOnScale(scale, value) {
+    return Math.max(scale.min, Math.min(scale.max, value));
 }
 
-/** How many segments the scale has (one per CAMERA_TUNING_SCALE_STEP, both ends included). */
-function CameraTuningSegmentCount() {
-    return Math.floor((CAMERA_TUNING_MAX - CAMERA_TUNING_MIN) / CAMERA_TUNING_SCALE_STEP) + 1;
+/** How many segments the scale has (both ends included). @param {TuningScale} scale */
+function ScaleSegmentCount(scale) {
+    return Math.floor((scale.max - scale.min) / scale.segmentStep) + 1;
 }
 
-/** The value segment `index` stands for (0 = CAMERA_TUNING_MIN). @param {number} index */
-function CameraTuningSegmentValue(index) {
-    return ClampCameraTuning(CAMERA_TUNING_MIN + index * CAMERA_TUNING_SCALE_STEP);
+/** The value segment `index` stands for (0 = the low end). @param {TuningScale} scale @param {number} index */
+function ScaleSegmentValue(scale, index) {
+    return ClampOnScale(scale, scale.min + index * scale.segmentStep);
+}
+
+/** Whether segment `index` is lit for `value` (filled up from the low end). @param {TuningScale} scale @param {number} index @param {number} value */
+function IsScaleSegmentLit(scale, index, value) {
+    return ScaleSegmentValue(scale, index) <= value;
 }
 
 /**
- * Whether segment `index` is lit for `value`: the scale fills up from its
- * low end to the value, like a bar.
- * @param {number} index @param {number} value
+ * @typedef {{ row: string, action: "minus" | "plus" | "minus_fine" | "plus_fine" } | { row: string, action: "segment", segment: number }} TuningButton
  */
-function IsCameraTuningSegmentLit(index, value) {
-    return CameraTuningSegmentValue(index) <= value;
+
+/**
+ * Which row and control a tuning page's button is: its id is
+ * `<prefix><row>_minus|plus|minus_fine|plus_fine|seg_<i>` (e.g.
+ * "camtune_height_plus_fine", "phytune_jump_seg_12"). undefined for any
+ * other id.
+ * @param {string} prefix @param {string} buttonId @returns {TuningButton | undefined}
+ */
+function ParseTuningButton(prefix, buttonId) {
+    if (!buttonId.startsWith(prefix)) {
+        return undefined;
+    }
+    const match = /^([a-z]+)_(minus_fine|plus_fine|minus|plus|seg_(\d+))$/.exec(buttonId.slice(prefix.length));
+    if (!match) {
+        return undefined;
+    }
+    if (match[3] !== undefined) {
+        return { row: match[1], action: "segment", segment: Number(match[3]) };
+    }
+    return { row: match[1], action: /** @type {"minus" | "plus" | "minus_fine" | "plus_fine"} */ (match[2]) };
+}
+
+/**
+ * The value after clicking `button` on a row now at `current`: a step up or
+ * down, or straight to a segment's value — kept on the scale.
+ * @param {TuningScale} scale @param {number} current @param {TuningButton} button
+ */
+function TunedValue(scale, current, button) {
+    switch (button.action) {
+        case "minus":
+            return ClampOnScale(scale, current - scale.step);
+        case "plus":
+            return ClampOnScale(scale, current + scale.step);
+        case "minus_fine":
+            return ClampOnScale(scale, current - scale.fineStep);
+        case "plus_fine":
+            return ClampOnScale(scale, current + scale.fineStep);
+        case "segment":
+            return ScaleSegmentValue(scale, button.segment);
+    }
+}
+
+// Draws a tuning page's scale on the HUD (the rules are in
+// tuning-scale-logic.js): every segment `<idPrefix>seg_<i>` gets "On" up to
+// the value.
+
+/**
+ * @param {any} hud the custom_hud_layout @param {number} slot
+ * @param {string} idPrefix e.g. "camtune_height_" @param {import("./tuning-scale-logic.js").TuningScale} scale @param {number} value
+ */
+function UpdateTuningScaleHud(hud, slot, idPrefix, scale, value) {
+    for (let i = 0; i < ScaleSegmentCount(scale); i++) {
+        hud.SetHasClassForPlayer(slot, `${idPrefix}seg_${i}`, "On", IsScaleSegmentLit(scale, i, value));
+    }
 }
 
 // Camera tuning: the user menu's "Camera Settings" page (DEVELOPER column)
@@ -7298,7 +7457,9 @@ function IsCameraTuningSegmentLit(index, value) {
 // to try out values for CAMERA_DISTANCE/CAMERA_HEIGHT in-game. Lift, podium
 // and camera-zone zooms still add on top. Not saved: gone on reconnect or a
 // map restart — every change is logged to the console, ready to copy into
-// camera/follow/constants.js.
+// camera/follow/constants.js. The scale is the shared one
+// (tuning-scale-logic.js); opening/closing the page is SetUserMenuPage in
+// hud/user-menu.js.
 
 /** @typedef {"distance" | "height"} CameraTuningAxis */
 /** @type {CameraTuningAxis[]} */
@@ -7314,33 +7475,14 @@ function GetCameraTuning(kart) {
 }
 
 /**
- * Sets one value (kept on the scale) and shows it. Back on both defaults,
- * the kart drops its tuning again.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {CameraTuningAxis} axis @param {number} value
+ * Sets the values and shows them. Back on both defaults, the kart drops its
+ * tuning again.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {{ distance: number, height: number }} tuning
  */
-function SetCameraTuning(slot, kart, axis, value) {
-    const tuning = { ...GetCameraTuning(kart), [axis]: ClampCameraTuning(value) };
+function SetCameraTuning(slot, kart, tuning) {
     kart.cameraTuning = tuning.distance === CAMERA_DISTANCE && tuning.height === CAMERA_HEIGHT ? undefined : tuning;
     Instance.Msg(`[camera tuning] slot ${slot}: distance ${tuning.distance}, height ${tuning.height} (CAMERA_DISTANCE/CAMERA_HEIGHT)`);
     UpdateCameraTuningHud(slot, kart);
-}
-
-/**
- * Switches the user menu between its normal columns and the camera page.
- * The menu always opens on its columns (SetUserMenuOpen).
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {boolean} open
- */
-function SetCameraTuningPage(slot, kart, open) {
-    kart.cameraTuningPage = open;
-    const hud = GetSpeedHud();
-    if (!hud) {
-        return;
-    }
-    hud.SetHasClassForPlayer(slot, "usermenu_main_page", "Hidden", open);
-    hud.SetHasClassForPlayer(slot, "usermenu_camera_page", "Hidden", !open);
-    if (open) {
-        UpdateCameraTuningHud(slot, kart);
-    }
 }
 
 /**
@@ -7357,48 +7499,118 @@ function UpdateCameraTuningHud(slot, kart) {
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_height", `${tuning.height}`);
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_distance_default", `${CAMERA_DISTANCE}`);
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_height_default", `${CAMERA_HEIGHT}`);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_step", `${CAMERA_TUNING_STEP}`);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_fine_step", `${CAMERA_TUNING_FINE_STEP}`);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_step", `${CAMERA_TUNING_SCALE.step}`);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_fine_step", `${CAMERA_TUNING_SCALE.fineStep}`);
     for (const axis of AXES) {
-        for (let i = 0; i < CameraTuningSegmentCount(); i++) {
-            hud.SetHasClassForPlayer(slot, `camtune_${axis}_seg_${i}`, "On", IsCameraTuningSegmentLit(i, tuning[axis]));
-        }
+        UpdateTuningScaleHud(hud, slot, `camtune_${axis}_`, CAMERA_TUNING_SCALE, tuning[axis]);
     }
 }
 
 /**
- * A click on the camera page (every button id starts with "camtune_"):
- * back, reset, − / + (big or fine step) on an axis, or a segment of its scale.
+ * A click on the camera page's controls (button ids "camtune_…"): reset,
+ * or − / + (big or fine step) or a segment on an axis.
  * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {string} buttonId
- * @returns {boolean} whether it was one of the page's buttons
+ * @returns {boolean} whether it was one of them
  */
 function HandleCameraTuningClick(slot, kart, buttonId) {
-    if (buttonId === "camtune_back_button") {
-        SetCameraTuningPage(slot, kart, false);
-        return true;
-    }
     if (buttonId === "camtune_reset_button") {
-        SetCameraTuning(slot, kart, "distance", CAMERA_DISTANCE);
-        SetCameraTuning(slot, kart, "height", CAMERA_HEIGHT);
+        SetCameraTuning(slot, kart, { distance: CAMERA_DISTANCE, height: CAMERA_HEIGHT });
         return true;
     }
-    const match = /^camtune_(distance|height)_(minus|plus|minus_fine|plus_fine|seg_(\d+))$/.exec(buttonId);
-    if (!match) {
+    const button = ParseTuningButton("camtune_", buttonId);
+    const axis = AXES.find((a) => a === button?.row);
+    if (!button || !axis) {
         return false;
     }
-    const axis = /** @type {CameraTuningAxis} */ (match[1]);
-    const current = GetCameraTuning(kart)[axis];
-    if (match[2] === "minus") {
-        SetCameraTuning(slot, kart, axis, current - CAMERA_TUNING_STEP);
-    } else if (match[2] === "plus") {
-        SetCameraTuning(slot, kart, axis, current + CAMERA_TUNING_STEP);
-    } else if (match[2] === "minus_fine") {
-        SetCameraTuning(slot, kart, axis, current - CAMERA_TUNING_FINE_STEP);
-    } else if (match[2] === "plus_fine") {
-        SetCameraTuning(slot, kart, axis, current + CAMERA_TUNING_FINE_STEP);
-    } else {
-        SetCameraTuning(slot, kart, axis, CameraTuningSegmentValue(Number(match[3])));
+    const tuning = GetCameraTuning(kart);
+    SetCameraTuning(slot, kart, { ...tuning, [axis]: TunedValue(CAMERA_TUNING_SCALE, tuning[axis], button) });
+    return true;
+}
+
+// Physics tuning: the user menu's "Physics Settings" page (DEVELOPER column)
+// scales the clicking player's own melon physics — top speed, acceleration,
+// jump, attack boost, gravity — each in percent of its default
+// (kart.physicsTuning, read through PhysicsFactor in physics-tuning-logic.js
+// by movement/). To try out values in-game: not saved (gone on reconnect or
+// a map restart), every change logged to the console with the resulting
+// value, ready to copy into the constants. The scale is the shared one
+// (tuning-scale-logic.js); opening/closing the page is SetUserMenuPage in
+// hud/user-menu.js.
+
+/** @typedef {import("./physics-tuning-logic.js").PhysicsTuningKey} PhysicsTuningKey */
+
+/**
+ * Per row: its id part in speedometer.xml (phytune_<id>_…), and the
+ * constant it scales with its default — shown next to the percent.
+ * @type {Record<PhysicsTuningKey, { id: string, constant: string, base: number, unit: string }>}
+ */
+const ROWS = {
+    maxSpeed: { id: "maxspeed", constant: "MAX_SPEED", base: MAX_SPEED, unit: "u/s" },
+    accel: { id: "accel", constant: "FORWARD_ACCEL", base: FORWARD_ACCEL, unit: "u/s²" },
+    jump: { id: "jump", constant: "JUMP_SPEED", base: JUMP_SPEED, unit: "u/s" },
+    boost: { id: "boost", constant: "ATTACK_BOOST_ACCEL", base: ATTACK_BOOST_ACCEL, unit: "u/s²" },
+    gravity: { id: "gravity", constant: "GRAVITY", base: GRAVITY, unit: "u/s²" },
+};
+
+/** @param {import("../core/kart-registry.js").Kart} kart @param {PhysicsTuningKey} key */
+function Percent(kart, key) {
+    return Math.round(PhysicsFactor(kart, key) * 100);
+}
+
+/**
+ * Sets one value and shows it. Back on 100 % for every value, the kart
+ * drops its tuning again.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {PhysicsTuningKey} key @param {number} percent
+ */
+function SetPhysicsTuning(slot, kart, key, percent) {
+    const tuning = { ...kart.physicsTuning, [key]: percent };
+    kart.physicsTuning = PHYSICS_TUNING_KEYS.every((k) => (tuning[k] ?? 100) === 100) ? undefined : tuning;
+    const row = ROWS[key];
+    Instance.Msg(`[physics tuning] slot ${slot}: ${key} ${Percent(kart, key)} % = ${row.constant} ${Math.round(row.base * PhysicsFactor(kart, key))}`);
+    UpdatePhysicsTuningHud(slot, kart);
+}
+
+/**
+ * The physics page's numbers ("130 % · 845 u/s") and its scales, filled up
+ * to the values.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+function UpdatePhysicsTuningHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
     }
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_physics_page", "phytune_step", `${PHYSICS_TUNING_SCALE.step}`);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_physics_page", "phytune_fine_step", `${PHYSICS_TUNING_SCALE.fineStep}`);
+    for (const key of PHYSICS_TUNING_KEYS) {
+        const row = ROWS[key];
+        const percent = Percent(kart, key);
+        const value = Math.round(row.base * PhysicsFactor(kart, key));
+        hud.SetDialogVariableStringForPlayer(slot, "usermenu_physics_page", `phytune_${row.id}`, `${percent} % · ${value} ${row.unit}`);
+        hud.SetDialogVariableStringForPlayer(slot, "usermenu_physics_page", `phytune_${row.id}_default`, `${row.base} ${row.unit}`);
+        UpdateTuningScaleHud(hud, slot, `phytune_${row.id}_`, PHYSICS_TUNING_SCALE, percent);
+    }
+}
+
+/**
+ * A click on the physics page's controls (button ids "phytune_…"): reset,
+ * or − / + (big or fine step) or a segment on a row.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {string} buttonId
+ * @returns {boolean} whether it was one of them
+ */
+function HandlePhysicsTuningClick(slot, kart, buttonId) {
+    if (buttonId === "phytune_reset_button") {
+        kart.physicsTuning = undefined;
+        Instance.Msg(`[physics tuning] slot ${slot}: everything back to 100 %`);
+        UpdatePhysicsTuningHud(slot, kart);
+        return true;
+    }
+    const button = ParseTuningButton("phytune_", buttonId);
+    const key = PHYSICS_TUNING_KEYS.find((k) => ROWS[k].id === button?.row);
+    if (!button || !key) {
+        return false;
+    }
+    SetPhysicsTuning(slot, kart, key, TunedValue(PHYSICS_TUNING_SCALE, Percent(kart, key), button));
     return true;
 }
 
@@ -7513,7 +7725,7 @@ function PointsAlong(a, b, count) {
 
 /**
  * Whether this kart's player has the line switched on (user menu toggle,
- * off by default — see UpdatePredictionHud in hud/).
+ * off by default — see USER_MENU_TOGGLES in hud/user-menu.js).
  * @param {import("../../core/kart-registry.js").Kart} kart
  */
 function IsPredictionOn(kart) {
@@ -7999,6 +8211,9 @@ function RestartTimeTrial(kart) {
         Debug(`RestartTimeTrial: not now (trackId=${trackId}, racing=${kart.racing}, breaking=${kart.breaking}, locked=${kart.locked})`);
         return false;
     }
+    // Back to driving: a free-looking player's restart ends free look (pawn
+    // back on its anchor, chase camera on the melon) before the melon moves.
+    SetFreeLook(kart, false);
     if (!SendToTrackStart(kart, trackId)) {
         return false;
     }
@@ -8090,11 +8305,42 @@ function RegisterCheckpointAndFinishInputs() {
 }
 
 // User menu: press USE anywhere (regardless of race phase) to open a small
-// panel with actions/settings that aren't tied to any single map trigger —
-// currently "respawn at last checkpoint" and a color picker, with room to
-// add more rows later (see "usermenu_*" buttonId handling in hud/inputs.js's
-// OnCustomHudClicked). Deliberately independent of kart.locked/breaking so
-// it also works as an unstuck button while the melon is frozen.
+// panel with actions/settings that aren't tied to any single map trigger
+// (see the button tables in hud/inputs.js's OnCustomHudClicked).
+// Deliberately independent of kart.locked/breaking so it also works as an
+// unstuck button while the melon is frozen.
+
+/**
+ * The ON/OFF settings: per button, the dialog variable its pill shows and
+ * whether it's on for a kart. One row each in speedometer.xml; clicking one
+ * is in hud/inputs.js (USER_MENU_TOGGLE_CLICKS).
+ * @type {Record<string, { variable: string, isOn: (kart: import("../core/kart-registry.js").Kart) => boolean }>}
+ */
+const USER_MENU_TOGGLES = {
+    // Outline glow around the player's own melon (kart/look.js).
+    usermenu_glow_button: { variable: "glow_state", isOn: IsMelonGlowOn },
+    // Where the melon appears on joining: tutorial or hub (kart/join-spot.js).
+    usermenu_jointutorial_button: { variable: "jointutorial_state", isOn: IsStartInTutorialOn },
+    // The wall-bounce guide line (fx/prediction/).
+    usermenu_prediction_button: { variable: "prediction_state", isOn: IsPredictionOn },
+    // The collision debug view (dev/collision-debug.js).
+    usermenu_collisiondebug_button: { variable: "collisiondebug_state", isOn: IsCollisionDebugOn },
+    // Free look (dev/free-look.js).
+    usermenu_freelook_button: { variable: "freelook_state", isOn: IsFreeLookOn },
+};
+
+/**
+ * The developer pages the menu can show in place of its columns: per page,
+ * its panel in speedometer.xml and what to refresh when it opens.
+ * @typedef {"camera" | "physics" | "triggers"} UserMenuPage
+ * @type {Record<UserMenuPage, { panel: string, refresh?: (slot: number, kart: import("../core/kart-registry.js").Kart) => void }>}
+ */
+const USER_MENU_PAGES = {
+    camera: { panel: "usermenu_camera_page", refresh: UpdateCameraTuningHud }, // dev/camera-tuning.js
+    physics: { panel: "usermenu_physics_page", refresh: UpdatePhysicsTuningHud }, // dev/physics-tuning.js
+    triggers: { panel: "usermenu_triggers_page" }, // Test Podium/Countdown/…, clicks in hud/inputs.js
+};
+
 /** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {boolean} open */
 function SetUserMenuOpen(slot, kart, open) {
     kart.userMenuOpen = open;
@@ -8103,19 +8349,37 @@ function SetUserMenuOpen(slot, kart, open) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
-    // Always (re)opens on its columns, not on the camera page.
-    SetCameraTuningPage(slot, kart, false);
+    // Always (re)opens on its columns, not on one of its developer pages.
+    SetUserMenuPage(slot, kart, undefined);
     if (open) {
         // Refreshed on every open: a layout or script reload in tools mode
         // wipes what was set when the kart spawned.
-        UpdateMelonGlowHud(slot, kart);
-        UpdateStartInTutorialHud(slot, kart);
-        UpdatePredictionHud(slot, kart);
-        UpdateCollisionDebugHud(slot, kart);
-        UpdateFreeLookHud(slot, kart);
+        for (const buttonId of Object.keys(USER_MENU_TOGGLES)) {
+            UpdateToggleHud(slot, kart, buttonId);
+        }
         UpdateHubButtonHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
+}
+
+/**
+ * Shows one developer page in place of the menu's columns, or (undefined)
+ * the columns again. Every page panel is set, so whichever was open closes.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {UserMenuPage | undefined} page
+ */
+function SetUserMenuPage(slot, kart, page) {
+    kart.userMenuPage = page;
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    hud.SetHasClassForPlayer(slot, "usermenu_main_page", "Hidden", page !== undefined);
+    for (const [name, { panel }] of Object.entries(USER_MENU_PAGES)) {
+        hud.SetHasClassForPlayer(slot, panel, "Hidden", name !== page);
+    }
+    if (page) {
+        USER_MENU_PAGES[page].refresh?.(slot, kart);
+    }
 }
 
 /**
@@ -8129,76 +8393,19 @@ function UpdateHubButtonHud(slot, kart) {
 }
 
 /**
- * The user menu's glow toggle button: its ON/OFF text and highlight.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ * One ON/OFF setting's button (USER_MENU_TOGGLES): its pill text and the
+ * ToggleOn highlight.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {string} buttonId
  */
-function UpdateMelonGlowHud(slot, kart) {
+function UpdateToggleHud(slot, kart, buttonId) {
     const hud = GetSpeedHud();
-    if (!hud) {
+    const toggle = USER_MENU_TOGGLES[buttonId];
+    if (!hud || !toggle) {
         return;
     }
-    const on = IsMelonGlowOn(kart);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_glow_button", "glow_state", on ? "ON" : "OFF");
-    hud.SetHasClassForPlayer(slot, "usermenu_glow_button", "ToggleOn", on);
-}
-
-/**
- * The user menu's "Start in Tutorial" toggle button: its ON/OFF text and
- * highlight (ON: the player's melon appears in the tutorial when they join,
- * OFF: in the hub — kart/join-spot.js).
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
- */
-function UpdateStartInTutorialHud(slot, kart) {
-    const hud = GetSpeedHud();
-    if (!hud) {
-        return;
-    }
-    const on = IsStartInTutorialOn(kart);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_jointutorial_button", "jointutorial_state", on ? "ON" : "OFF");
-    hud.SetHasClassForPlayer(slot, "usermenu_jointutorial_button", "ToggleOn", on);
-}
-
-/**
- * The user menu's guide line (prediction line) toggle button: its ON/OFF
- * text and highlight.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
- */
-function UpdatePredictionHud(slot, kart) {
-    const hud = GetSpeedHud();
-    if (!hud) {
-        return;
-    }
-    const on = IsPredictionOn(kart);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_prediction_button", "prediction_state", on ? "ON" : "OFF");
-    hud.SetHasClassForPlayer(slot, "usermenu_prediction_button", "ToggleOn", on);
-}
-
-/**
- * The user menu's collision debug toggle button: its ON/OFF text and highlight.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
- */
-function UpdateCollisionDebugHud(slot, kart) {
-    const hud = GetSpeedHud();
-    if (!hud) {
-        return;
-    }
-    const on = IsCollisionDebugOn(kart);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_collisiondebug_button", "collisiondebug_state", on ? "ON" : "OFF");
-    hud.SetHasClassForPlayer(slot, "usermenu_collisiondebug_button", "ToggleOn", on);
-}
-
-/**
- * The user menu's free look toggle button: its ON/OFF text and highlight.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
- */
-function UpdateFreeLookHud(slot, kart) {
-    const hud = GetSpeedHud();
-    if (!hud) {
-        return;
-    }
-    const on = IsFreeLookOn(kart);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_freelook_button", "freelook_state", on ? "ON" : "OFF");
-    hud.SetHasClassForPlayer(slot, "usermenu_freelook_button", "ToggleOn", on);
+    const on = toggle.isOn(kart);
+    hud.SetDialogVariableStringForPlayer(slot, buttonId, toggle.variable, on ? "ON" : "OFF");
+    hud.SetHasClassForPlayer(slot, buttonId, "ToggleOn", on);
 }
 
 /** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart */
@@ -8222,203 +8429,295 @@ function UpdateUserMenu(slot, kart) {
     }
 }
 
+// The user menu's test triggers for effects (DEVELOPER → "Test Triggers"):
+// a break, a PERFECT wall bounce's feedback and the heal effect, on the
+// clicking player's own melon, without crashing, hitting a wall at 45° or
+// finding a heal zone. Each uses the same code the real thing runs. Not
+// while racing (a heat's melon isn't for testing) or with the melon broken.
+
+/**
+ * Whether a test effect may play on this kart's melon now.
+ * @param {import("../core/kart-registry.js").Kart} kart @param {string} what for the log
+ */
+function CanTestEffect(kart, what) {
+    if (kart.racing || kart.breaking || kart.locked || !kart.melon.IsValid()) {
+        Debug(`${what}: not now (racing=${kart.racing}, breaking=${kart.breaking}, locked=${kart.locked})`);
+        return false;
+    }
+    return true;
+}
+
+/**
+ * "Test Break": the melon breaks where it is — break effects and pieces,
+ * break camera, and after BREAK_RESPAWN_DELAY the respawn at its respawn
+ * point, like any break. Ends free look first (the break camera needs the
+ * chase camera). Returns whether it broke.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+function TestBreak(slot, kart) {
+    if (!CanTestEffect(kart, "TestBreak")) {
+        return false;
+    }
+    SetFreeLook(kart, false);
+    const v = kart.melon.GetAbsVelocity();
+    const speed = Math.hypot(v.x, v.y, v.z);
+    // Standing still the pieces still need a direction to fly out along.
+    BreakMelon(slot, kart, speed > 1 ? v : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+    return true;
+}
+
+/**
+ * "Test Perfect Bounce": what a PERFECT wall bounce shows — the spark, the
+ * bounce panel (45°, perfectly timed) and the speedometer's flash. Only the
+ * feedback: no speed, no kick. Returns whether it played.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function TestPerfectBounce(kart) {
+    if (!CanTestEffect(kart, "TestPerfectBounce")) {
+        return false;
+    }
+    PlayPerfectSpark(kart);
+    kart.lastBounceTime = Instance.GetGameTime();
+    kart.lastBounceInfo = { angle: WALL_BOUNCE_OPTIMAL_ANGLE, angleFactor: 1, jumpFactor: 1 };
+    return true;
+}
+
+/**
+ * "Test Heal": the heal zone's effect on the melon, and its health refilled
+ * (so the health bar shows it). Returns whether it played.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function TestHeal(kart) {
+    if (!CanTestEffect(kart, "TestHeal")) {
+        return false;
+    }
+    PlayHealEffect(kart);
+    RestoreFullHealth(kart);
+    return true;
+}
+
 // Every button click in the HUD layout (OnCustomHudClicked): the hub modal's
-// start/close/abort buttons and the user menu's rows.
+// start/close/abort buttons and the user menu's rows. One table per kind of
+// button — plain actions, ON/OFF settings, developer pages, test triggers,
+// and id prefixes — and one dispatcher (HandleHudClick) that looks up the
+// clicking player's kart for them once.
+
+/** @typedef {import("../core/kart-registry.js").Kart} Kart */
+
+/**
+ * Buttons that don't need the clicker to have a kart.
+ * @type {Record<string, (slot: number) => void>}
+ */
+const SLOT_BUTTONS = {
+    hub_start_button: () => TryStartRace(),
+    // Moderator only: ends the running Grand Prix for everyone.
+    hub_abort_button: (slot) => {
+        if (IsModerator(slot)) {
+            TryAbortRace();
+        } else {
+            Debug(`hub_abort_button: slot ${slot} clicked but isn't the moderator, ignoring`);
+        }
+    },
+};
+
+/**
+ * Plain actions on the clicker's own kart.
+ * @type {Record<string, (slot: number, kart: Kart) => void>}
+ */
+const KART_BUTTONS = {
+    // Dismiss just for the player who clicked it — doesn't touch kart.inHub,
+    // so they're still pulled into the next heat that starts while they're
+    // standing in hub_start_trigger.
+    hub_close_button: (slot, kart) => HideHubModal(slot, kart),
+    usermenu_close_button: (slot, kart) => SetUserMenuOpen(slot, kart, false),
+    usermenu_respawn_button: (slot, kart) => {
+        if (kart.breaking) {
+            // Already mid-respawn from a break — it's about to land at this
+            // same checkpoint on its own, nothing for this click to do.
+            Debug(`usermenu_respawn_button: slot ${slot} kart is already breaking/respawning, ignoring`);
+            return;
+        }
+        if (kart.locked) {
+            // Held on the start grid for the countdown, or parked after
+            // finishing — it isn't going anywhere that respawning would fix,
+            // and mid-countdown it'd just teleport a racer around the grid.
+            Debug(`usermenu_respawn_button: slot ${slot} kart is locked, ignoring`);
+            return;
+        }
+        // Back to driving: a free-looking player's respawn ends free look
+        // (pawn back on its anchor, chase camera on the melon) first.
+        SetFreeLook(kart, false);
+        RespawnKartAtCheckpoint(kart);
+        SetUserMenuOpen(slot, kart, false);
+    },
+    usermenu_restart_button: (slot, kart) => {
+        if (RestartTimeTrial(kart)) {
+            SetUserMenuOpen(slot, kart, false);
+        }
+    },
+    // Self-service pull-out: just this racer leaves the heat, everyone else
+    // keeps going — unlike hub_abort_button, which is moderator-only and ends
+    // it for the whole group. ReturnAllToHub already supports a single-kart
+    // list (it's the same path a disconnecting racer takes).
+    usermenu_hub_button: (slot, kart) => {
+        Debug(`usermenu_hub_button: slot ${slot} returning to hub (racing=${kart.racing}, phase=${phase})`);
+        SetUserMenuOpen(slot, kart, false);
+        ReturnAllToHub([kart]);
+    },
+    // Same self-service pull-out as the hub button above, to intro_spawn.
+    usermenu_tutorial_button: (slot, kart) => {
+        Debug(`usermenu_tutorial_button: slot ${slot} going to the tutorial (racing=${kart.racing}, phase=${phase})`);
+        SetUserMenuOpen(slot, kart, false);
+        SendKartToTutorial(kart);
+    },
+};
+
+/**
+ * The ON/OFF settings (their pills: USER_MENU_TOGGLES in user-menu.js): what
+ * a click switches. Returns whether the menu should close.
+ * @type {Record<string, (kart: Kart) => boolean | void>}
+ */
+const TOGGLE_BUTTONS = {
+    // Only this player's own melon (everyone still sees whatever glow a melon
+    // has — the engine's Glow isn't per viewer).
+    usermenu_glow_button: (kart) => void SetMelonGlow(kart, !IsMelonGlowOn(kart)),
+    // Where this player's melon appears next time they join. Saved per
+    // player name (kart/join-spot.js).
+    usermenu_jointutorial_button: (kart) => void SetStartInTutorial(kart, !IsStartInTutorialOn(kart)),
+    // Only this player's melon gets the line (DebugLine in the default
+    // render mode, so tools mode only).
+    usermenu_prediction_button: (kart) => void SetPrediction(kart, !IsPredictionOn(kart)),
+    // Only this player's melon is drawn/logged (tools mode only).
+    usermenu_collisiondebug_button: (kart) => void SetCollisionDebug(kart, !IsCollisionDebugOn(kart)),
+    // This player flies their own pawn around, their melon waits frozen.
+    // Switching it on closes the menu so the mouse looks around right away.
+    usermenu_freelook_button: (kart) => SetFreeLook(kart, !IsFreeLookOn(kart)), // true = it is on now
+};
+
+/**
+ * Buttons that open a developer page in place of the menu's columns
+ * (SetUserMenuPage), and each page's Back button.
+ * @type {Record<string, import("./user-menu.js").UserMenuPage | undefined>}
+ */
+const PAGE_BUTTONS = {
+    usermenu_camera_button: "camera",
+    usermenu_physics_button: "physics",
+    usermenu_triggers_button: "triggers",
+    camtune_back_button: undefined,
+    phytune_back_button: undefined,
+    triggers_back_button: undefined,
+};
+
+/**
+ * The "Test Triggers" page: each plays something for the clicking player
+ * and returns whether it started — then the menu closes so it's in view.
+ * Not while they race (the heat's HUD and melon are theirs then).
+ * @type {Record<string, (slot: number, kart: Kart) => boolean>}
+ */
+const TEST_TRIGGER_BUTTONS = {
+    // The end of a Grand Prix without racing one — everyone to the hub, then
+    // the clicking player onto place 1 and the others in join order onto 2
+    // and 3, held there, confetti on. Not while a heat runs (it would pull
+    // its racers out).
+    usermenu_podium_button: (slot, kart) => {
+        if (phase !== RacePhase.HUB) {
+            return false;
+        }
+        const racers = [kart, ...[...karts.values()].filter((other) => other !== kart && other.melon.IsValid())];
+        Debug(`usermenu_podium_button: slot ${slot} plays the podium with ${racers.length} player(s)`);
+        ReturnAllToHub(racers);
+        PlaceOnPodium(TestGrandPrix(racers), racers);
+        return true;
+    },
+    // The heat's countdown, what a racer sees at the finish, or the join logo
+    // (race/heat/race-flow.js).
+    usermenu_testcountdown_button: (slot, kart) => TestCountdown(kart),
+    usermenu_testfinish_button: (slot, kart) => TestFinish(kart),
+    usermenu_testintro_button: (slot, kart) => TestIntro(kart),
+    // A break, a PERFECT bounce's feedback or the heal effect on the melon
+    // (dev/test-effects.js).
+    usermenu_testbreak_button: (slot, kart) => TestBreak(slot, kart),
+    usermenu_testbounce_button: (slot, kart) => TestPerfectBounce(kart),
+    usermenu_testheal_button: (slot, kart) => TestHeal(kart),
+};
+
+/**
+ * Buttons handled by id prefix: the color swatches and the tuning pages'
+ * controls. Each returns whether the id was one of its buttons.
+ * @type {[string, (slot: number, kart: Kart, buttonId: string) => boolean][]}
+ */
+const PREFIX_BUTTONS = [
+    [
+        "usermenu_color_",
+        (slot, kart, buttonId) => {
+            const preset = COLOR_PRESETS[buttonId.slice("usermenu_color_".length)];
+            if (preset) {
+                SetKartPaintColor(kart, preset);
+            }
+            return Boolean(preset);
+        },
+    ],
+    ["camtune_", HandleCameraTuningClick], // dev/camera-tuning.js
+    ["phytune_", HandlePhysicsTuningClick], // dev/physics-tuning.js
+];
+
+/**
+ * Whether a button id has a handler here (exactly, or by prefix) — every
+ * button in speedometer.xml must (test/hud/hud-layout.test.mjs).
+ * @param {string} buttonId
+ */
+function IsHandledButton(buttonId) {
+    return (
+        buttonId in SLOT_BUTTONS ||
+        buttonId in KART_BUTTONS ||
+        buttonId in TOGGLE_BUTTONS ||
+        buttonId in PAGE_BUTTONS ||
+        buttonId in TEST_TRIGGER_BUTTONS ||
+        PREFIX_BUTTONS.some(([prefix]) => buttonId.startsWith(prefix))
+    );
+}
+
+/**
+ * One click on the melon HUD by the player in `slot`.
+ * @param {number} slot @param {string} buttonId
+ */
+function HandleHudClick(slot, buttonId) {
+    if (buttonId in SLOT_BUTTONS) {
+        SLOT_BUTTONS[buttonId](slot);
+        return;
+    }
+    const kart = karts.get(slot);
+    if (!kart) {
+        return; // every other button acts on the clicker's own kart
+    }
+    if (buttonId in KART_BUTTONS) {
+        KART_BUTTONS[buttonId](slot, kart);
+    } else if (buttonId in TOGGLE_BUTTONS) {
+        const close = TOGGLE_BUTTONS[buttonId](kart);
+        UpdateToggleHud(slot, kart, buttonId);
+        if (close) {
+            SetUserMenuOpen(slot, kart, false);
+        }
+    } else if (buttonId in PAGE_BUTTONS) {
+        SetUserMenuPage(slot, kart, PAGE_BUTTONS[buttonId]);
+    } else if (buttonId in TEST_TRIGGER_BUTTONS) {
+        if (TEST_TRIGGER_BUTTONS[buttonId](slot, kart)) {
+            SetUserMenuOpen(slot, kart, false);
+        } else {
+            Debug(`${buttonId}: slot ${slot}, ignored (racing=${kart.racing}, breaking=${kart.breaking}, phase=${phase}, preview=${kart.testPreview?.kind})`);
+        }
+    } else {
+        const entry = PREFIX_BUTTONS.find(([prefix]) => buttonId.startsWith(prefix));
+        if (!entry?.[1](slot, kart, buttonId)) {
+            Debug(`${buttonId}: no such button, ignoring`);
+        }
+    }
+}
 
 function RegisterHudInputs() {
     Instance.OnCustomHudClicked((event) => {
-        if (event.layout !== GetSpeedHud()) {
-            return;
-        }
-        if (event.buttonId === "hub_start_button") {
-            TryStartRace();
-        } else if (event.buttonId === "hub_close_button") {
-            // Dismiss just for the player who clicked it — doesn't touch
-            // kart.inHub, so they're still pulled into the next heat that starts
-            // while they're standing in hub_start_trigger, same as before.
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (kart) {
-                HideHubModal(slot, kart);
-            }
-        } else if (event.buttonId === "hub_abort_button") {
-            const slot = event.player.GetPlayerSlot();
-            if (IsModerator(slot)) {
-                TryAbortRace();
-            } else {
-                Debug(`hub_abort_button: slot ${slot} clicked but isn't the moderator, ignoring`);
-            }
-        } else if (event.buttonId === "usermenu_close_button") {
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (kart) {
-                SetUserMenuOpen(slot, kart, false);
-            }
-        } else if (event.buttonId === "usermenu_respawn_button") {
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (!kart) {
-                return;
-            }
-            if (kart.breaking) {
-                // Already mid-respawn from a break — it's about to land at this
-                // same checkpoint on its own, nothing for this click to do.
-                Debug(`usermenu_respawn_button: slot ${slot} kart is already breaking/respawning, ignoring`);
-                return;
-            }
-            if (kart.locked) {
-                // Held on the start grid for the countdown, or parked after
-                // finishing — it isn't going anywhere that respawning would fix,
-                // and mid-countdown it'd just teleport a racer around the grid.
-                Debug(`usermenu_respawn_button: slot ${slot} kart is locked, ignoring`);
-                return;
-            }
-            RespawnKartAtCheckpoint(kart);
-            SetUserMenuOpen(slot, kart, false);
-        } else if (event.buttonId === "usermenu_restart_button") {
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (kart && RestartTimeTrial(kart)) {
-                SetUserMenuOpen(slot, kart, false);
-            }
-        } else if (event.buttonId === "usermenu_hub_button") {
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (!kart) {
-                return;
-            }
-            // Self-service pull-out: just this racer leaves the heat, everyone
-            // else keeps going — unlike hub_abort_button, which is moderator-only
-            // and ends it for the whole group. ReturnAllToHub already supports a
-            // single-kart list (it's the same path a disconnecting racer takes).
-            Debug(`usermenu_hub_button: slot ${slot} returning to hub (racing=${kart.racing}, phase=${phase})`);
-            SetUserMenuOpen(slot, kart, false);
-            ReturnAllToHub([kart]);
-        } else if (event.buttonId === "usermenu_tutorial_button") {
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (!kart) {
-                return;
-            }
-            // Same self-service pull-out as the hub button above, to intro_spawn.
-            Debug(`usermenu_tutorial_button: slot ${slot} going to the tutorial (racing=${kart.racing}, phase=${phase})`);
-            SetUserMenuOpen(slot, kart, false);
-            SendKartToTutorial(kart);
-        } else if (event.buttonId === "usermenu_glow_button") {
-            // Per player: only this player's own melon (everyone still sees
-            // whatever glow a melon has — the engine's Glow isn't per viewer).
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (kart) {
-                SetMelonGlow(kart, !IsMelonGlowOn(kart));
-                UpdateMelonGlowHud(slot, kart);
-            }
-        } else if (event.buttonId === "usermenu_jointutorial_button") {
-            // Where this player's melon appears next time they join: the
-            // tutorial or the hub. Saved per player name (kart/join-spot.js).
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (kart) {
-                SetStartInTutorial(kart, !IsStartInTutorialOn(kart));
-                UpdateStartInTutorialHud(slot, kart);
-            }
-        } else if (event.buttonId === "usermenu_prediction_button") {
-            // Per player: only this player's melon gets the line (drawn with
-            // DebugLine in the default render mode, so tools mode only).
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (kart) {
-                SetPrediction(kart, !IsPredictionOn(kart));
-                UpdatePredictionHud(slot, kart);
-            }
-        } else if (event.buttonId === "usermenu_collisiondebug_button") {
-            // Per player: only this player's melon is drawn/logged (debug
-            // draws themselves only show in tools mode).
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (kart) {
-                SetCollisionDebug(kart, !IsCollisionDebugOn(kart));
-                UpdateCollisionDebugHud(slot, kart);
-            }
-        } else if (event.buttonId === "usermenu_freelook_button") {
-            // Per player: this player flies their own pawn around, their
-            // melon waits frozen (dev/free-look.js). Switching it on closes
-            // the menu so the mouse looks around right away.
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (kart) {
-                const on = SetFreeLook(kart, !IsFreeLookOn(kart));
-                UpdateFreeLookHud(slot, kart);
-                if (on) {
-                    SetUserMenuOpen(slot, kart, false);
-                }
-            }
-        } else if (event.buttonId === "usermenu_camera_button") {
-            // Developer: the camera page in place of the menu's columns —
-            // distance and height of this player's own chase camera
-            // (dev/camera-tuning.js).
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (kart) {
-                SetCameraTuningPage(slot, kart, true);
-            }
-        } else if (event.buttonId.startsWith("camtune_")) {
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (kart && !HandleCameraTuningClick(slot, kart, event.buttonId)) {
-                Debug(`${event.buttonId}: no such camera page button, ignoring`);
-            }
-        } else if (event.buttonId === "usermenu_podium_button") {
-            // Developer: the end of a Grand Prix without racing one — everyone
-            // to the hub, then the clicking player onto place 1 and the others
-            // in join order onto 2 and 3, held there, confetti on. Not while
-            // a heat runs (it would pull its racers out).
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (!kart) {
-                return;
-            }
-            if (phase !== RacePhase.HUB) {
-                Debug(`usermenu_podium_button: slot ${slot}, ignored — a heat is running (phase=${phase})`);
-                return;
-            }
-            const racers = [kart, ...[...karts.values()].filter((other) => other !== kart && other.melon.IsValid())];
-            Debug(`usermenu_podium_button: slot ${slot} plays the podium with ${racers.length} player(s)`);
-            SetUserMenuOpen(slot, kart, false);
-            ReturnAllToHub(racers);
-            PlaceOnPodium(TestGrandPrix(racers), racers);
-        } else if (
-            event.buttonId === "usermenu_testcountdown_button" ||
-            event.buttonId === "usermenu_testfinish_button" ||
-            event.buttonId === "usermenu_testintro_button"
-        ) {
-            // Developer: the heat's countdown, what a racer sees at the
-            // finish, or the join logo, for the clicking player only — no
-            // heat, nobody else. Not while they race (the heat's HUD is
-            // theirs then).
-            const slot = event.player.GetPlayerSlot();
-            const kart = karts.get(slot);
-            if (!kart) {
-                return;
-            }
-            const preview =
-                event.buttonId === "usermenu_testcountdown_button" ? TestCountdown : event.buttonId === "usermenu_testfinish_button" ? TestFinish : TestIntro;
-            if (preview(kart)) {
-                SetUserMenuOpen(slot, kart, false);
-            } else {
-                Debug(`${event.buttonId}: slot ${slot}, ignored (racing=${kart.racing}, breaking=${kart.breaking}, preview=${kart.testPreview?.kind})`);
-            }
-        } else if (event.buttonId.startsWith("usermenu_color_")) {
-            const key = event.buttonId.slice("usermenu_color_".length);
-            const preset = COLOR_PRESETS[key];
-            if (!preset) {
-                Debug(`usermenu_color_${key}: no such color preset, ignoring`);
-                return;
-            }
-            const kart = karts.get(event.player.GetPlayerSlot());
-            if (kart) {
-                SetKartPaintColor(kart, preset);
-            }
+        if (event.layout === GetSpeedHud()) {
+            HandleHudClick(event.player.GetPlayerSlot(), event.buttonId);
         }
     });
 }
@@ -8784,7 +9083,7 @@ function UpdateKart(slot, kart, dt) {
         melon.Move({ velocity: { x: 0, y: 0, z: vel.z } });
         kart.lastVelocity = undefined;
         kart.settled = false;
-        kart.speedCap = MAX_SPEED;
+        kart.speedCap = KartBaseMaxSpeed(kart);
         kart.momentum = undefined; // standing still — the momentum run is over
         kart.attackBoosting = false;
         kart.pendingBounce = undefined; // parked/finished — a bounce's leftover damage no longer matters
@@ -8889,7 +9188,7 @@ function UpdateKart(slot, kart, dt) {
             kart.lastBounceTime = now;
             // Read by UpdateBounceHud for the angle/timing feedback panel.
             kart.lastBounceInfo = { angle: bounce.angle, angleFactor: bounce.angleFactor, jumpFactor: bounce.jumpFactor };
-            kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(bounceVelocity.x, bounceVelocity.y));
+            kart.speedCap = Math.max(kart.speedCap ?? KartMaxSpeed(kart), Math.hypot(bounceVelocity.x, bounceVelocity.y));
             // Damage waits until the jump-timing window has closed (see the
             // top of the non-locked path, and the late-jump case below) —
             // a jump just *after* the hit can still improve its quality.
@@ -9037,9 +9336,12 @@ function UpdateKart(slot, kart, dt) {
     }
 
     if (driveForward !== 0 || driveStrafe !== 0) {
-        const forwardAccel = driveForward > 0 ? FORWARD_ACCEL : REVERSE_ACCEL;
-        let ax = forwardDir.x * driveForward * forwardAccel + rightDir.x * driveStrafe * STRAFE_ACCEL;
-        let ay = forwardDir.y * driveForward * forwardAccel + rightDir.y * driveStrafe * STRAFE_ACCEL;
+        // All three scaled by the physics page's "Acceleration" (dev/physics-tuning.js).
+        const accelFactor = PhysicsFactor(kart, "accel");
+        const forwardAccel = (driveForward > 0 ? FORWARD_ACCEL : REVERSE_ACCEL) * accelFactor;
+        const strafeAccel = STRAFE_ACCEL * accelFactor;
+        let ax = forwardDir.x * driveForward * forwardAccel + rightDir.x * driveStrafe * strafeAccel;
+        let ay = forwardDir.y * driveForward * forwardAccel + rightDir.y * driveStrafe * strafeAccel;
         vx += ax * dt;
         vy += ay * dt;
     } else if (!boost.boosting) {
@@ -9052,9 +9354,13 @@ function UpdateKart(slot, kart, dt) {
     }
 
     if (boost.boosting) {
-        vx += forwardDir.x * ATTACK_BOOST_ACCEL * dt;
-        vy += forwardDir.y * ATTACK_BOOST_ACCEL * dt;
-        kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), ATTACK_BOOST_MAX_SPEED);
+        // Push and headroom above the top speed scaled by the physics page's
+        // "Boost" (dev/physics-tuning.js).
+        const boostFactor = PhysicsFactor(kart, "boost");
+        vx += forwardDir.x * ATTACK_BOOST_ACCEL * boostFactor * dt;
+        vy += forwardDir.y * ATTACK_BOOST_ACCEL * boostFactor * dt;
+        const boostMax = BoostMaxSpeed(KartBaseMaxSpeed(kart), ATTACK_BOOST_MAX_SPEED - MAX_SPEED, boostFactor);
+        kart.speedCap = Math.max(kart.speedCap ?? KartMaxSpeed(kart), boostMax);
     }
 
     // Jump press (ground jump / wall jump / wall-bounce timing) — see
@@ -9074,7 +9380,10 @@ function UpdateKart(slot, kart, dt) {
     }
     vx = v.x;
     vy = v.y;
-    const vz = v.z;
+    // The physics page's "Gravity" (dev/physics-tuning.js): the engine pulls
+    // with GRAVITY regardless, the script adds the difference. Ground
+    // contact still reads right — it compares against this command.
+    const vz = v.z + ExtraGravityDelta(PhysicsFactor(kart, "gravity"), GRAVITY, dt);
     // On the podium: whatever else happened, horizontally it only goes back
     // over its spot (a jump goes straight up and comes down there).
     if (podium) {
@@ -9094,7 +9403,7 @@ function UpdateKart(slot, kart, dt) {
     // or the attack boost can lift it (see BOOST_DECAY): decays back down
     // every tick, and never stays above the melon's actual speed so a lost
     // boost can't be re-earned just by accelerating again.
-    const momentumMax = MomentumMaxSpeed(kart.momentum);
+    const momentumMax = KartMaxSpeed(kart);
     const speedCap = kart.speedCap ?? momentumMax;
     let horizSpeed = Math.hypot(vx, vy);
     if (horizSpeed > speedCap) {
@@ -9106,8 +9415,8 @@ function UpdateKart(slot, kart, dt) {
     // Boosts don't count towards momentum (neither the attack boost nor a
     // cap a bounce/boost has lifted above the momentum top speed).
     const boosted = boost.boosting || speedCap > momentumMax + 1e-6;
-    kart.momentum = UpdateMomentum(kart.momentum, horizSpeed, now, boosted);
-    kart.speedCap = Math.max(MomentumMaxSpeed(kart.momentum), Math.min(speedCap - BOOST_DECAY * dt, horizSpeed));
+    kart.momentum = UpdateMomentum(kart.momentum, horizSpeed, now, boosted, KartBaseMaxSpeed(kart));
+    kart.speedCap = Math.max(KartMaxSpeed(kart), Math.min(speedCap - BOOST_DECAY * dt, horizSpeed));
 
     melon.Move({ velocity: { x: vx, y: vy, z: vz } });
     // What we commanded this tick — compared against the actual velocity
@@ -9235,7 +9544,7 @@ function UpdateBoostTrail(kart) {
     const horizSpeed = Math.hypot(velocity.x, velocity.y);
     // Measured against the melon's own top speed: speed earned by momentum
     // (MOMENTUM_*) isn't a boost and shows no trail.
-    const normalMax = MomentumMaxSpeed(kart.momentum);
+    const normalMax = KartMaxSpeed(kart);
     // A PERFECT bounce's speed shows no trail — until that boost is used up
     // (back to normal speed) or the attack boost takes over.
     if (kart.attackBoosting || horizSpeed <= normalMax + BOOST_TRAIL_STOP_MARGIN) {
@@ -9700,7 +10009,7 @@ function RegisterRaceInputs() {
 }
 
 // Developer aids only: the user menu's collision debug view (collision-debug.js),
-// its free look (free-look.js), its camera settings page (camera-tuning.js) and the attack button log (attack-debug.js, with DEBUG on).
+// its free look (free-look.js), its camera and physics settings pages (camera-tuning.js, physics-tuning.js) and the attack button log (attack-debug.js, with DEBUG on).
 
 // Movers (MOVER_* in world/mover/constants.js). Pure rules, no cs_script
 // import; world/mover/mover.js applies them (test/world/mover.test.mjs).

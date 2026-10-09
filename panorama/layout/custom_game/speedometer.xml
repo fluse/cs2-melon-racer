@@ -409,7 +409,8 @@
 					     a divider: settings, as toggle rows grouped by topic, and the
 					     developer aids. -->
 					<!-- The columns; the developer "Camera Settings" button swaps them for
-					     usermenu_camera_page below (SetCameraTuningPage, Hidden on each). -->
+					     usermenu_camera_page / usermenu_physics_page / usermenu_triggers_page below
+					     (SetUserMenuPage in hud/user-menu.js; Hidden on each). -->
 					<Panel id="usermenu_main_page" class="UserMenuColumns">
 						<Panel class="UserMenuActions">
 							<Label class="UserMenuColumnTitle" text="ACTIONS" />
@@ -517,6 +518,418 @@
 								<Label class="UserMenuToggleName" text="Camera Settings" />
 								<Label class="UserMenuTogglePill UserMenuRunPill" text="EDIT" />
 							</Button>
+							<!-- Opens the physics page in place of these columns: your own melon's
+							     top speed, acceleration, jump, boost and gravity in percent (dev/physics-tuning.js). -->
+							<Button id="usermenu_physics_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Physics Settings" />
+								<Label class="UserMenuTogglePill UserMenuRunPill" text="EDIT" />
+							</Button>
+							<!-- Opens the test triggers page in place of these columns: previews of
+							     the podium, countdown, finish and intro (SetUserMenuPage in hud/user-menu.js). -->
+							<Button id="usermenu_triggers_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Test Triggers" />
+								<Label class="UserMenuTogglePill UserMenuRunPill" text="OPEN" />
+							</Button>
+						</Panel>
+					</Panel>
+
+					<!-- Developer camera page (dev/camera-tuning.js): your own chase camera's
+					     distance and height, CAMERA_TUNING_MIN..MAX, each with − / + (big and fine) and a
+					     clickable scale (one segment per CAMERA_TUNING_SCALE_STEP, lit up to
+					     the value — "On"). Values are logged to the console. -->
+					<Panel id="usermenu_camera_page" class="TuningPage Hidden">
+						<Label class="UserMenuColumnTitle" text="DEVELOPER · CAMERA SETTINGS" />
+						<Label class="TuningIntro" text="Your own chase camera only, until you leave or the map restarts. Each change is logged to the console." />
+						<Panel class="TuningRow">
+							<Panel class="TuningHeader">
+								<Label class="TuningName" text="DISTANCE" />
+								<Label class="TuningHelp" text="◀ closer   ·   further ▶   (default {s:camtune_distance_default})" />
+								<Label class="TuningValue" text="{s:camtune_distance}" />
+							</Panel>
+							<Panel class="TuningControls">
+								<Button id="camtune_distance_minus" class="TuningStep"><Label class="TuningStepLabel" text="−{s:camtune_step}" /></Button>
+								<Button id="camtune_distance_minus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="−{s:camtune_fine_step}" /></Button>
+								<Panel class="TuningScale">
+									<Panel class="TuningSegments">
+										<Button id="camtune_distance_seg_0" class="TuningSegment" />
+										<Button id="camtune_distance_seg_1" class="TuningSegment" />
+										<Button id="camtune_distance_seg_2" class="TuningSegment" />
+										<Button id="camtune_distance_seg_3" class="TuningSegment" />
+										<Button id="camtune_distance_seg_4" class="TuningSegment" />
+										<Button id="camtune_distance_seg_5" class="TuningSegment" />
+										<Button id="camtune_distance_seg_6" class="TuningSegment" />
+										<Button id="camtune_distance_seg_7" class="TuningSegment" />
+										<Button id="camtune_distance_seg_8" class="TuningSegment" />
+										<Button id="camtune_distance_seg_9" class="TuningSegment" />
+										<Button id="camtune_distance_seg_10" class="TuningSegment" />
+										<Button id="camtune_distance_seg_11" class="TuningSegment" />
+										<Button id="camtune_distance_seg_12" class="TuningSegment" />
+										<Button id="camtune_distance_seg_13" class="TuningSegment" />
+										<Button id="camtune_distance_seg_14" class="TuningSegment" />
+										<Button id="camtune_distance_seg_15" class="TuningSegment" />
+										<Button id="camtune_distance_seg_16" class="TuningSegment" />
+										<Button id="camtune_distance_seg_17" class="TuningSegment" />
+										<Button id="camtune_distance_seg_18" class="TuningSegment" />
+										<Button id="camtune_distance_seg_19" class="TuningSegment" />
+										<Button id="camtune_distance_seg_20" class="TuningSegment" />
+										<Button id="camtune_distance_seg_21" class="TuningSegment" />
+										<Button id="camtune_distance_seg_22" class="TuningSegment" />
+										<Button id="camtune_distance_seg_23" class="TuningSegment" />
+										<Button id="camtune_distance_seg_24" class="TuningSegment" />
+										<Button id="camtune_distance_seg_25" class="TuningSegment" />
+										<Button id="camtune_distance_seg_26" class="TuningSegment" />
+										<Button id="camtune_distance_seg_27" class="TuningSegment" />
+										<Button id="camtune_distance_seg_28" class="TuningSegment" />
+										<Button id="camtune_distance_seg_29" class="TuningSegment" />
+										<Button id="camtune_distance_seg_30" class="TuningSegment" />
+										<Button id="camtune_distance_seg_31" class="TuningSegment" />
+										<Button id="camtune_distance_seg_32" class="TuningSegment" />
+										<Button id="camtune_distance_seg_33" class="TuningSegment" />
+										<Button id="camtune_distance_seg_34" class="TuningSegment" />
+										<Button id="camtune_distance_seg_35" class="TuningSegment" />
+										<Button id="camtune_distance_seg_36" class="TuningSegment" />
+										<Button id="camtune_distance_seg_37" class="TuningSegment" />
+										<Button id="camtune_distance_seg_38" class="TuningSegment" />
+										<Button id="camtune_distance_seg_39" class="TuningSegment" />
+										<Button id="camtune_distance_seg_40" class="TuningSegment" />
+									</Panel>
+								</Panel>
+								<Button id="camtune_distance_plus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="+{s:camtune_fine_step}" /></Button>
+								<Button id="camtune_distance_plus" class="TuningStep"><Label class="TuningStepLabel" text="+{s:camtune_step}" /></Button>
+							</Panel>
+						</Panel>
+						<Panel class="TuningRow">
+							<Panel class="TuningHeader">
+								<Label class="TuningName" text="HEIGHT" />
+								<Label class="TuningHelp" text="◀ lower   ·   higher ▶   (default {s:camtune_height_default})" />
+								<Label class="TuningValue" text="{s:camtune_height}" />
+							</Panel>
+							<Panel class="TuningControls">
+								<Button id="camtune_height_minus" class="TuningStep"><Label class="TuningStepLabel" text="−{s:camtune_step}" /></Button>
+								<Button id="camtune_height_minus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="−{s:camtune_fine_step}" /></Button>
+								<Panel class="TuningScale">
+									<Panel class="TuningSegments">
+										<Button id="camtune_height_seg_0" class="TuningSegment" />
+										<Button id="camtune_height_seg_1" class="TuningSegment" />
+										<Button id="camtune_height_seg_2" class="TuningSegment" />
+										<Button id="camtune_height_seg_3" class="TuningSegment" />
+										<Button id="camtune_height_seg_4" class="TuningSegment" />
+										<Button id="camtune_height_seg_5" class="TuningSegment" />
+										<Button id="camtune_height_seg_6" class="TuningSegment" />
+										<Button id="camtune_height_seg_7" class="TuningSegment" />
+										<Button id="camtune_height_seg_8" class="TuningSegment" />
+										<Button id="camtune_height_seg_9" class="TuningSegment" />
+										<Button id="camtune_height_seg_10" class="TuningSegment" />
+										<Button id="camtune_height_seg_11" class="TuningSegment" />
+										<Button id="camtune_height_seg_12" class="TuningSegment" />
+										<Button id="camtune_height_seg_13" class="TuningSegment" />
+										<Button id="camtune_height_seg_14" class="TuningSegment" />
+										<Button id="camtune_height_seg_15" class="TuningSegment" />
+										<Button id="camtune_height_seg_16" class="TuningSegment" />
+										<Button id="camtune_height_seg_17" class="TuningSegment" />
+										<Button id="camtune_height_seg_18" class="TuningSegment" />
+										<Button id="camtune_height_seg_19" class="TuningSegment" />
+										<Button id="camtune_height_seg_20" class="TuningSegment" />
+										<Button id="camtune_height_seg_21" class="TuningSegment" />
+										<Button id="camtune_height_seg_22" class="TuningSegment" />
+										<Button id="camtune_height_seg_23" class="TuningSegment" />
+										<Button id="camtune_height_seg_24" class="TuningSegment" />
+										<Button id="camtune_height_seg_25" class="TuningSegment" />
+										<Button id="camtune_height_seg_26" class="TuningSegment" />
+										<Button id="camtune_height_seg_27" class="TuningSegment" />
+										<Button id="camtune_height_seg_28" class="TuningSegment" />
+										<Button id="camtune_height_seg_29" class="TuningSegment" />
+										<Button id="camtune_height_seg_30" class="TuningSegment" />
+										<Button id="camtune_height_seg_31" class="TuningSegment" />
+										<Button id="camtune_height_seg_32" class="TuningSegment" />
+										<Button id="camtune_height_seg_33" class="TuningSegment" />
+										<Button id="camtune_height_seg_34" class="TuningSegment" />
+										<Button id="camtune_height_seg_35" class="TuningSegment" />
+										<Button id="camtune_height_seg_36" class="TuningSegment" />
+										<Button id="camtune_height_seg_37" class="TuningSegment" />
+										<Button id="camtune_height_seg_38" class="TuningSegment" />
+										<Button id="camtune_height_seg_39" class="TuningSegment" />
+										<Button id="camtune_height_seg_40" class="TuningSegment" />
+									</Panel>
+								</Panel>
+								<Button id="camtune_height_plus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="+{s:camtune_fine_step}" /></Button>
+								<Button id="camtune_height_plus" class="TuningStep"><Label class="TuningStepLabel" text="+{s:camtune_step}" /></Button>
+							</Panel>
+						</Panel>
+						<Panel class="TuningFooter">
+							<Button id="camtune_back_button" class="UserMenuToggle TuningFooterButton">
+								<Label class="UserMenuToggleName" text="◀ Back" />
+							</Button>
+							<Button id="camtune_reset_button" class="UserMenuToggle TuningFooterButton">
+								<Label class="UserMenuToggleName" text="Reset to Default" />
+							</Button>
+						</Panel>
+					</Panel>
+
+					<!-- Developer physics page (dev/physics-tuning.js): your own melon's physics,
+					     each in percent of its default, PHYSICS_TUNING_MIN..MAX, with − / + (big
+					     and fine) and a clickable scale (one segment per PHYSICS_TUNING_SCALE_STEP,
+					     lit up to the value — "On"). Values are logged to the console. -->
+					<Panel id="usermenu_physics_page" class="TuningPage Hidden">
+						<Label class="UserMenuColumnTitle" text="DEVELOPER · PHYSICS SETTINGS" />
+						<Label class="TuningIntro" text="Your own melon only, in percent of the default, until you leave or the map restarts. Each change is logged to the console." />
+						<Panel class="TuningRow TuningRowCompact">
+							<Panel class="TuningHeader">
+								<Label class="TuningName" text="MAX SPEED" />
+								<Label class="TuningHelp" text="top speed without boost (default {s:phytune_maxspeed_default})" />
+								<Label class="TuningValue" text="{s:phytune_maxspeed}" />
+							</Panel>
+							<Panel class="TuningControls">
+								<Button id="phytune_maxspeed_minus" class="TuningStep"><Label class="TuningStepLabel" text="−{s:phytune_step}" /></Button>
+								<Button id="phytune_maxspeed_minus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="−{s:phytune_fine_step}" /></Button>
+								<Panel class="TuningScale">
+									<Panel class="TuningSegments">
+										<Button id="phytune_maxspeed_seg_0" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_1" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_2" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_3" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_4" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_5" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_6" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_7" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_8" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_9" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_10" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_11" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_12" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_13" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_14" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_15" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_16" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_17" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_18" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_19" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_20" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_21" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_22" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_23" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_24" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_25" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_26" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_27" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_28" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_29" class="TuningSegment" />
+										<Button id="phytune_maxspeed_seg_30" class="TuningSegment" />
+									</Panel>
+								</Panel>
+								<Button id="phytune_maxspeed_plus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="+{s:phytune_fine_step}" /></Button>
+								<Button id="phytune_maxspeed_plus" class="TuningStep"><Label class="TuningStepLabel" text="+{s:phytune_step}" /></Button>
+							</Panel>
+						</Panel>
+						<Panel class="TuningRow TuningRowCompact">
+							<Panel class="TuningHeader">
+								<Label class="TuningName" text="ACCELERATION" />
+								<Label class="TuningHelp" text="W / S / A / D (default {s:phytune_accel_default})" />
+								<Label class="TuningValue" text="{s:phytune_accel}" />
+							</Panel>
+							<Panel class="TuningControls">
+								<Button id="phytune_accel_minus" class="TuningStep"><Label class="TuningStepLabel" text="−{s:phytune_step}" /></Button>
+								<Button id="phytune_accel_minus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="−{s:phytune_fine_step}" /></Button>
+								<Panel class="TuningScale">
+									<Panel class="TuningSegments">
+										<Button id="phytune_accel_seg_0" class="TuningSegment" />
+										<Button id="phytune_accel_seg_1" class="TuningSegment" />
+										<Button id="phytune_accel_seg_2" class="TuningSegment" />
+										<Button id="phytune_accel_seg_3" class="TuningSegment" />
+										<Button id="phytune_accel_seg_4" class="TuningSegment" />
+										<Button id="phytune_accel_seg_5" class="TuningSegment" />
+										<Button id="phytune_accel_seg_6" class="TuningSegment" />
+										<Button id="phytune_accel_seg_7" class="TuningSegment" />
+										<Button id="phytune_accel_seg_8" class="TuningSegment" />
+										<Button id="phytune_accel_seg_9" class="TuningSegment" />
+										<Button id="phytune_accel_seg_10" class="TuningSegment" />
+										<Button id="phytune_accel_seg_11" class="TuningSegment" />
+										<Button id="phytune_accel_seg_12" class="TuningSegment" />
+										<Button id="phytune_accel_seg_13" class="TuningSegment" />
+										<Button id="phytune_accel_seg_14" class="TuningSegment" />
+										<Button id="phytune_accel_seg_15" class="TuningSegment" />
+										<Button id="phytune_accel_seg_16" class="TuningSegment" />
+										<Button id="phytune_accel_seg_17" class="TuningSegment" />
+										<Button id="phytune_accel_seg_18" class="TuningSegment" />
+										<Button id="phytune_accel_seg_19" class="TuningSegment" />
+										<Button id="phytune_accel_seg_20" class="TuningSegment" />
+										<Button id="phytune_accel_seg_21" class="TuningSegment" />
+										<Button id="phytune_accel_seg_22" class="TuningSegment" />
+										<Button id="phytune_accel_seg_23" class="TuningSegment" />
+										<Button id="phytune_accel_seg_24" class="TuningSegment" />
+										<Button id="phytune_accel_seg_25" class="TuningSegment" />
+										<Button id="phytune_accel_seg_26" class="TuningSegment" />
+										<Button id="phytune_accel_seg_27" class="TuningSegment" />
+										<Button id="phytune_accel_seg_28" class="TuningSegment" />
+										<Button id="phytune_accel_seg_29" class="TuningSegment" />
+										<Button id="phytune_accel_seg_30" class="TuningSegment" />
+									</Panel>
+								</Panel>
+								<Button id="phytune_accel_plus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="+{s:phytune_fine_step}" /></Button>
+								<Button id="phytune_accel_plus" class="TuningStep"><Label class="TuningStepLabel" text="+{s:phytune_step}" /></Button>
+							</Panel>
+						</Panel>
+						<Panel class="TuningRow TuningRowCompact">
+							<Panel class="TuningHeader">
+								<Label class="TuningName" text="JUMP" />
+								<Label class="TuningHelp" text="ground jump, upward speed (default {s:phytune_jump_default})" />
+								<Label class="TuningValue" text="{s:phytune_jump}" />
+							</Panel>
+							<Panel class="TuningControls">
+								<Button id="phytune_jump_minus" class="TuningStep"><Label class="TuningStepLabel" text="−{s:phytune_step}" /></Button>
+								<Button id="phytune_jump_minus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="−{s:phytune_fine_step}" /></Button>
+								<Panel class="TuningScale">
+									<Panel class="TuningSegments">
+										<Button id="phytune_jump_seg_0" class="TuningSegment" />
+										<Button id="phytune_jump_seg_1" class="TuningSegment" />
+										<Button id="phytune_jump_seg_2" class="TuningSegment" />
+										<Button id="phytune_jump_seg_3" class="TuningSegment" />
+										<Button id="phytune_jump_seg_4" class="TuningSegment" />
+										<Button id="phytune_jump_seg_5" class="TuningSegment" />
+										<Button id="phytune_jump_seg_6" class="TuningSegment" />
+										<Button id="phytune_jump_seg_7" class="TuningSegment" />
+										<Button id="phytune_jump_seg_8" class="TuningSegment" />
+										<Button id="phytune_jump_seg_9" class="TuningSegment" />
+										<Button id="phytune_jump_seg_10" class="TuningSegment" />
+										<Button id="phytune_jump_seg_11" class="TuningSegment" />
+										<Button id="phytune_jump_seg_12" class="TuningSegment" />
+										<Button id="phytune_jump_seg_13" class="TuningSegment" />
+										<Button id="phytune_jump_seg_14" class="TuningSegment" />
+										<Button id="phytune_jump_seg_15" class="TuningSegment" />
+										<Button id="phytune_jump_seg_16" class="TuningSegment" />
+										<Button id="phytune_jump_seg_17" class="TuningSegment" />
+										<Button id="phytune_jump_seg_18" class="TuningSegment" />
+										<Button id="phytune_jump_seg_19" class="TuningSegment" />
+										<Button id="phytune_jump_seg_20" class="TuningSegment" />
+										<Button id="phytune_jump_seg_21" class="TuningSegment" />
+										<Button id="phytune_jump_seg_22" class="TuningSegment" />
+										<Button id="phytune_jump_seg_23" class="TuningSegment" />
+										<Button id="phytune_jump_seg_24" class="TuningSegment" />
+										<Button id="phytune_jump_seg_25" class="TuningSegment" />
+										<Button id="phytune_jump_seg_26" class="TuningSegment" />
+										<Button id="phytune_jump_seg_27" class="TuningSegment" />
+										<Button id="phytune_jump_seg_28" class="TuningSegment" />
+										<Button id="phytune_jump_seg_29" class="TuningSegment" />
+										<Button id="phytune_jump_seg_30" class="TuningSegment" />
+									</Panel>
+								</Panel>
+								<Button id="phytune_jump_plus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="+{s:phytune_fine_step}" /></Button>
+								<Button id="phytune_jump_plus" class="TuningStep"><Label class="TuningStepLabel" text="+{s:phytune_step}" /></Button>
+							</Panel>
+						</Panel>
+						<Panel class="TuningRow TuningRowCompact">
+							<Panel class="TuningHeader">
+								<Label class="TuningName" text="BOOST" />
+								<Label class="TuningHelp" text="attack boost push and speed above max (default {s:phytune_boost_default})" />
+								<Label class="TuningValue" text="{s:phytune_boost}" />
+							</Panel>
+							<Panel class="TuningControls">
+								<Button id="phytune_boost_minus" class="TuningStep"><Label class="TuningStepLabel" text="−{s:phytune_step}" /></Button>
+								<Button id="phytune_boost_minus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="−{s:phytune_fine_step}" /></Button>
+								<Panel class="TuningScale">
+									<Panel class="TuningSegments">
+										<Button id="phytune_boost_seg_0" class="TuningSegment" />
+										<Button id="phytune_boost_seg_1" class="TuningSegment" />
+										<Button id="phytune_boost_seg_2" class="TuningSegment" />
+										<Button id="phytune_boost_seg_3" class="TuningSegment" />
+										<Button id="phytune_boost_seg_4" class="TuningSegment" />
+										<Button id="phytune_boost_seg_5" class="TuningSegment" />
+										<Button id="phytune_boost_seg_6" class="TuningSegment" />
+										<Button id="phytune_boost_seg_7" class="TuningSegment" />
+										<Button id="phytune_boost_seg_8" class="TuningSegment" />
+										<Button id="phytune_boost_seg_9" class="TuningSegment" />
+										<Button id="phytune_boost_seg_10" class="TuningSegment" />
+										<Button id="phytune_boost_seg_11" class="TuningSegment" />
+										<Button id="phytune_boost_seg_12" class="TuningSegment" />
+										<Button id="phytune_boost_seg_13" class="TuningSegment" />
+										<Button id="phytune_boost_seg_14" class="TuningSegment" />
+										<Button id="phytune_boost_seg_15" class="TuningSegment" />
+										<Button id="phytune_boost_seg_16" class="TuningSegment" />
+										<Button id="phytune_boost_seg_17" class="TuningSegment" />
+										<Button id="phytune_boost_seg_18" class="TuningSegment" />
+										<Button id="phytune_boost_seg_19" class="TuningSegment" />
+										<Button id="phytune_boost_seg_20" class="TuningSegment" />
+										<Button id="phytune_boost_seg_21" class="TuningSegment" />
+										<Button id="phytune_boost_seg_22" class="TuningSegment" />
+										<Button id="phytune_boost_seg_23" class="TuningSegment" />
+										<Button id="phytune_boost_seg_24" class="TuningSegment" />
+										<Button id="phytune_boost_seg_25" class="TuningSegment" />
+										<Button id="phytune_boost_seg_26" class="TuningSegment" />
+										<Button id="phytune_boost_seg_27" class="TuningSegment" />
+										<Button id="phytune_boost_seg_28" class="TuningSegment" />
+										<Button id="phytune_boost_seg_29" class="TuningSegment" />
+										<Button id="phytune_boost_seg_30" class="TuningSegment" />
+									</Panel>
+								</Panel>
+								<Button id="phytune_boost_plus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="+{s:phytune_fine_step}" /></Button>
+								<Button id="phytune_boost_plus" class="TuningStep"><Label class="TuningStepLabel" text="+{s:phytune_step}" /></Button>
+							</Panel>
+						</Panel>
+						<Panel class="TuningRow TuningRowCompact">
+							<Panel class="TuningHeader">
+								<Label class="TuningName" text="GRAVITY" />
+								<Label class="TuningHelp" text="pull downwards (default {s:phytune_gravity_default})" />
+								<Label class="TuningValue" text="{s:phytune_gravity}" />
+							</Panel>
+							<Panel class="TuningControls">
+								<Button id="phytune_gravity_minus" class="TuningStep"><Label class="TuningStepLabel" text="−{s:phytune_step}" /></Button>
+								<Button id="phytune_gravity_minus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="−{s:phytune_fine_step}" /></Button>
+								<Panel class="TuningScale">
+									<Panel class="TuningSegments">
+										<Button id="phytune_gravity_seg_0" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_1" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_2" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_3" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_4" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_5" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_6" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_7" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_8" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_9" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_10" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_11" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_12" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_13" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_14" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_15" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_16" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_17" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_18" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_19" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_20" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_21" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_22" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_23" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_24" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_25" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_26" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_27" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_28" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_29" class="TuningSegment" />
+										<Button id="phytune_gravity_seg_30" class="TuningSegment" />
+									</Panel>
+								</Panel>
+								<Button id="phytune_gravity_plus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="+{s:phytune_fine_step}" /></Button>
+								<Button id="phytune_gravity_plus" class="TuningStep"><Label class="TuningStepLabel" text="+{s:phytune_step}" /></Button>
+							</Panel>
+						</Panel>
+						<Panel class="TuningFooter">
+							<Button id="phytune_back_button" class="UserMenuToggle TuningFooterButton">
+								<Label class="UserMenuToggleName" text="◀ Back" />
+							</Button>
+							<Button id="phytune_reset_button" class="UserMenuToggle TuningFooterButton">
+								<Label class="UserMenuToggleName" text="Reset to Default" />
+							</Button>
+						</Panel>
+					</Panel>
+
+					<!-- Developer test triggers page (SetUserMenuPage in hud/user-menu.js):
+					     previews of what a player only sees at certain moments. Each one closes
+					     the menu when it starts. -->
+					<Panel id="usermenu_triggers_page" class="TuningPage TriggersPage Hidden">
+						<Label class="UserMenuColumnTitle" text="DEVELOPER · TEST TRIGGERS" />
+						<Label class="TuningIntro" text="Plays a moment or an effect for you alone (the podium puts everyone up). Not while you race." />
+						<Panel class="TriggersList">
 							<!-- Plays the end of a Grand Prix: everyone to the hub, you on place 1,
 							     the others on 2 and 3 (usermenu_podium_button in hud/inputs.js).
 							     Ignored while a heat runs. -->
@@ -542,138 +955,27 @@
 								<Label class="UserMenuToggleName" text="Test Intro" />
 								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
 							</Button>
-						</Panel>
-					</Panel>
-
-					<!-- Developer camera page (dev/camera-tuning.js): your own chase camera's
-					     distance and height, CAMERA_TUNING_MIN..MAX, each with − / + (big and fine) and a
-					     clickable scale (one segment per CAMERA_TUNING_SCALE_STEP, lit up to
-					     the value — "On"). Values are logged to the console. -->
-					<Panel id="usermenu_camera_page" class="CameraTuningPage Hidden">
-						<Label class="UserMenuColumnTitle" text="DEVELOPER · CAMERA SETTINGS" />
-						<Label class="CameraTuningIntro" text="Your own chase camera only, until you leave or the map restarts. Each change is logged to the console." />
-						<Panel class="CameraTuningRow">
-							<Panel class="CameraTuningHeader">
-								<Label class="CameraTuningName" text="DISTANCE" />
-								<Label class="CameraTuningHelp" text="◀ closer   ·   further ▶   (default {s:camtune_distance_default})" />
-								<Label class="CameraTuningValue" text="{s:camtune_distance}" />
-							</Panel>
-							<Panel class="CameraTuningControls">
-								<Button id="camtune_distance_minus" class="CameraTuningStep"><Label class="CameraTuningStepLabel" text="−{s:camtune_step}" /></Button>
-								<Button id="camtune_distance_minus_fine" class="CameraTuningStep CameraTuningFine"><Label class="CameraTuningStepLabel" text="−{s:camtune_fine_step}" /></Button>
-								<Panel class="CameraTuningScale">
-									<Panel class="CameraTuningSegments">
-										<Button id="camtune_distance_seg_0" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_1" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_2" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_3" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_4" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_5" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_6" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_7" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_8" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_9" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_10" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_11" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_12" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_13" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_14" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_15" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_16" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_17" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_18" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_19" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_20" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_21" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_22" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_23" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_24" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_25" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_26" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_27" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_28" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_29" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_30" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_31" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_32" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_33" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_34" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_35" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_36" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_37" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_38" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_39" class="CameraTuningSegment" />
-										<Button id="camtune_distance_seg_40" class="CameraTuningSegment" />
-									</Panel>
-								</Panel>
-								<Button id="camtune_distance_plus_fine" class="CameraTuningStep CameraTuningFine"><Label class="CameraTuningStepLabel" text="+{s:camtune_fine_step}" /></Button>
-								<Button id="camtune_distance_plus" class="CameraTuningStep"><Label class="CameraTuningStepLabel" text="+{s:camtune_step}" /></Button>
-							</Panel>
-						</Panel>
-						<Panel class="CameraTuningRow">
-							<Panel class="CameraTuningHeader">
-								<Label class="CameraTuningName" text="HEIGHT" />
-								<Label class="CameraTuningHelp" text="◀ lower   ·   higher ▶   (default {s:camtune_height_default})" />
-								<Label class="CameraTuningValue" text="{s:camtune_height}" />
-							</Panel>
-							<Panel class="CameraTuningControls">
-								<Button id="camtune_height_minus" class="CameraTuningStep"><Label class="CameraTuningStepLabel" text="−{s:camtune_step}" /></Button>
-								<Button id="camtune_height_minus_fine" class="CameraTuningStep CameraTuningFine"><Label class="CameraTuningStepLabel" text="−{s:camtune_fine_step}" /></Button>
-								<Panel class="CameraTuningScale">
-									<Panel class="CameraTuningSegments">
-										<Button id="camtune_height_seg_0" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_1" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_2" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_3" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_4" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_5" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_6" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_7" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_8" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_9" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_10" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_11" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_12" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_13" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_14" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_15" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_16" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_17" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_18" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_19" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_20" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_21" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_22" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_23" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_24" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_25" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_26" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_27" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_28" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_29" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_30" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_31" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_32" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_33" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_34" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_35" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_36" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_37" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_38" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_39" class="CameraTuningSegment" />
-										<Button id="camtune_height_seg_40" class="CameraTuningSegment" />
-									</Panel>
-								</Panel>
-								<Button id="camtune_height_plus_fine" class="CameraTuningStep CameraTuningFine"><Label class="CameraTuningStepLabel" text="+{s:camtune_fine_step}" /></Button>
-								<Button id="camtune_height_plus" class="CameraTuningStep"><Label class="CameraTuningStepLabel" text="+{s:camtune_step}" /></Button>
-							</Panel>
-						</Panel>
-						<Panel class="CameraTuningFooter">
-							<Button id="camtune_back_button" class="UserMenuToggle CameraTuningFooterButton">
-								<Label class="UserMenuToggleName" text="◀ Back" />
+							<!-- Your melon breaks where it is: effects, pieces, break camera, then the
+							     respawn at your respawn point (TestBreak in dev/test-effects.js). -->
+							<Button id="usermenu_testbreak_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Test Break" />
+								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
 							</Button>
-							<Button id="camtune_reset_button" class="UserMenuToggle CameraTuningFooterButton">
-								<Label class="UserMenuToggleName" text="Reset to Default" />
+							<!-- A PERFECT bounce's feedback only: spark, bounce panel, speedometer flash
+							     — no speed (TestPerfectBounce). -->
+							<Button id="usermenu_testbounce_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Test Perfect Bounce" />
+								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
+							</Button>
+							<!-- The heal zone's effect on your melon, health refilled (TestHeal). -->
+							<Button id="usermenu_testheal_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Test Heal" />
+								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
+							</Button>
+						</Panel>
+						<Panel class="TuningFooter">
+							<Button id="triggers_back_button" class="UserMenuToggle TuningFooterButton">
+								<Label class="UserMenuToggleName" text="◀ Back" />
 							</Button>
 						</Panel>
 					</Panel>

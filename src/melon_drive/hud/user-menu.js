@@ -1,7 +1,8 @@
 import { CSInputs } from "cs_script/point_script";
 import { IsCollisionDebugOn } from "../dev/collision-debug.js";
 import { IsFreeLookOn } from "../dev/free-look.js";
-import { SetCameraTuningPage } from "../dev/camera-tuning.js";
+import { UpdateCameraTuningHud } from "../dev/camera-tuning.js";
+import { UpdatePhysicsTuningHud } from "../dev/physics-tuning.js";
 import { IsPredictionOn } from "../fx/prediction/prediction.js";
 import { IsMelonGlowOn } from "../kart/look.js";
 import { IsStartInTutorialOn } from "../kart/join-spot.js";
@@ -10,11 +11,42 @@ import { CanRestartTimeTrial } from "../race/time-trial/time-trial.js";
 import { GetSpeedHud, SyncInputCapture } from "./layout.js";
 
 // User menu: press USE anywhere (regardless of race phase) to open a small
-// panel with actions/settings that aren't tied to any single map trigger —
-// currently "respawn at last checkpoint" and a color picker, with room to
-// add more rows later (see "usermenu_*" buttonId handling in hud/inputs.js's
-// OnCustomHudClicked). Deliberately independent of kart.locked/breaking so
-// it also works as an unstuck button while the melon is frozen.
+// panel with actions/settings that aren't tied to any single map trigger
+// (see the button tables in hud/inputs.js's OnCustomHudClicked).
+// Deliberately independent of kart.locked/breaking so it also works as an
+// unstuck button while the melon is frozen.
+
+/**
+ * The ON/OFF settings: per button, the dialog variable its pill shows and
+ * whether it's on for a kart. One row each in speedometer.xml; clicking one
+ * is in hud/inputs.js (USER_MENU_TOGGLE_CLICKS).
+ * @type {Record<string, { variable: string, isOn: (kart: import("../core/kart-registry.js").Kart) => boolean }>}
+ */
+export const USER_MENU_TOGGLES = {
+    // Outline glow around the player's own melon (kart/look.js).
+    usermenu_glow_button: { variable: "glow_state", isOn: IsMelonGlowOn },
+    // Where the melon appears on joining: tutorial or hub (kart/join-spot.js).
+    usermenu_jointutorial_button: { variable: "jointutorial_state", isOn: IsStartInTutorialOn },
+    // The wall-bounce guide line (fx/prediction/).
+    usermenu_prediction_button: { variable: "prediction_state", isOn: IsPredictionOn },
+    // The collision debug view (dev/collision-debug.js).
+    usermenu_collisiondebug_button: { variable: "collisiondebug_state", isOn: IsCollisionDebugOn },
+    // Free look (dev/free-look.js).
+    usermenu_freelook_button: { variable: "freelook_state", isOn: IsFreeLookOn },
+};
+
+/**
+ * The developer pages the menu can show in place of its columns: per page,
+ * its panel in speedometer.xml and what to refresh when it opens.
+ * @typedef {"camera" | "physics" | "triggers"} UserMenuPage
+ * @type {Record<UserMenuPage, { panel: string, refresh?: (slot: number, kart: import("../core/kart-registry.js").Kart) => void }>}
+ */
+export const USER_MENU_PAGES = {
+    camera: { panel: "usermenu_camera_page", refresh: UpdateCameraTuningHud }, // dev/camera-tuning.js
+    physics: { panel: "usermenu_physics_page", refresh: UpdatePhysicsTuningHud }, // dev/physics-tuning.js
+    triggers: { panel: "usermenu_triggers_page" }, // Test Podium/Countdown/…, clicks in hud/inputs.js
+};
+
 /** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {boolean} open */
 export function SetUserMenuOpen(slot, kart, open) {
     kart.userMenuOpen = open;
@@ -23,19 +55,37 @@ export function SetUserMenuOpen(slot, kart, open) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
-    // Always (re)opens on its columns, not on the camera page.
-    SetCameraTuningPage(slot, kart, false);
+    // Always (re)opens on its columns, not on one of its developer pages.
+    SetUserMenuPage(slot, kart, undefined);
     if (open) {
         // Refreshed on every open: a layout or script reload in tools mode
         // wipes what was set when the kart spawned.
-        UpdateMelonGlowHud(slot, kart);
-        UpdateStartInTutorialHud(slot, kart);
-        UpdatePredictionHud(slot, kart);
-        UpdateCollisionDebugHud(slot, kart);
-        UpdateFreeLookHud(slot, kart);
+        for (const buttonId of Object.keys(USER_MENU_TOGGLES)) {
+            UpdateToggleHud(slot, kart, buttonId);
+        }
         UpdateHubButtonHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
+}
+
+/**
+ * Shows one developer page in place of the menu's columns, or (undefined)
+ * the columns again. Every page panel is set, so whichever was open closes.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {UserMenuPage | undefined} page
+ */
+export function SetUserMenuPage(slot, kart, page) {
+    kart.userMenuPage = page;
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    hud.SetHasClassForPlayer(slot, "usermenu_main_page", "Hidden", page !== undefined);
+    for (const [name, { panel }] of Object.entries(USER_MENU_PAGES)) {
+        hud.SetHasClassForPlayer(slot, panel, "Hidden", name !== page);
+    }
+    if (page) {
+        USER_MENU_PAGES[page].refresh?.(slot, kart);
+    }
 }
 
 /**
@@ -49,76 +99,19 @@ export function UpdateHubButtonHud(slot, kart) {
 }
 
 /**
- * The user menu's glow toggle button: its ON/OFF text and highlight.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ * One ON/OFF setting's button (USER_MENU_TOGGLES): its pill text and the
+ * ToggleOn highlight.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {string} buttonId
  */
-export function UpdateMelonGlowHud(slot, kart) {
+export function UpdateToggleHud(slot, kart, buttonId) {
     const hud = GetSpeedHud();
-    if (!hud) {
+    const toggle = USER_MENU_TOGGLES[buttonId];
+    if (!hud || !toggle) {
         return;
     }
-    const on = IsMelonGlowOn(kart);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_glow_button", "glow_state", on ? "ON" : "OFF");
-    hud.SetHasClassForPlayer(slot, "usermenu_glow_button", "ToggleOn", on);
-}
-
-/**
- * The user menu's "Start in Tutorial" toggle button: its ON/OFF text and
- * highlight (ON: the player's melon appears in the tutorial when they join,
- * OFF: in the hub — kart/join-spot.js).
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
- */
-export function UpdateStartInTutorialHud(slot, kart) {
-    const hud = GetSpeedHud();
-    if (!hud) {
-        return;
-    }
-    const on = IsStartInTutorialOn(kart);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_jointutorial_button", "jointutorial_state", on ? "ON" : "OFF");
-    hud.SetHasClassForPlayer(slot, "usermenu_jointutorial_button", "ToggleOn", on);
-}
-
-/**
- * The user menu's guide line (prediction line) toggle button: its ON/OFF
- * text and highlight.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
- */
-export function UpdatePredictionHud(slot, kart) {
-    const hud = GetSpeedHud();
-    if (!hud) {
-        return;
-    }
-    const on = IsPredictionOn(kart);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_prediction_button", "prediction_state", on ? "ON" : "OFF");
-    hud.SetHasClassForPlayer(slot, "usermenu_prediction_button", "ToggleOn", on);
-}
-
-/**
- * The user menu's collision debug toggle button: its ON/OFF text and highlight.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
- */
-export function UpdateCollisionDebugHud(slot, kart) {
-    const hud = GetSpeedHud();
-    if (!hud) {
-        return;
-    }
-    const on = IsCollisionDebugOn(kart);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_collisiondebug_button", "collisiondebug_state", on ? "ON" : "OFF");
-    hud.SetHasClassForPlayer(slot, "usermenu_collisiondebug_button", "ToggleOn", on);
-}
-
-/**
- * The user menu's free look toggle button: its ON/OFF text and highlight.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
- */
-export function UpdateFreeLookHud(slot, kart) {
-    const hud = GetSpeedHud();
-    if (!hud) {
-        return;
-    }
-    const on = IsFreeLookOn(kart);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_freelook_button", "freelook_state", on ? "ON" : "OFF");
-    hud.SetHasClassForPlayer(slot, "usermenu_freelook_button", "ToggleOn", on);
+    const on = toggle.isOn(kart);
+    hud.SetDialogVariableStringForPlayer(slot, buttonId, toggle.variable, on ? "ON" : "OFF");
+    hud.SetHasClassForPlayer(slot, buttonId, "ToggleOn", on);
 }
 
 /** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart */

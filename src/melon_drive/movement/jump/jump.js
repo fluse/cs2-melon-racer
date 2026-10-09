@@ -7,7 +7,8 @@
 import { Debug } from "../../core/debug.js";
 import { CanGroundJump, BufferedGroundJump, WallJumpBlockReason, WallJumpVelocity, RechargeWallJump, WallJumpChargeAfter, WallJumpAngle, WallJumpRatingMultipliers, WallJumpBoostedVelocity, FreshApproach } from "./logic.js";
 import { JumpTimingFactor, JumpMultiplier, WallTimingPress } from "../wall-bounce/logic.js";
-import { MomentumMaxSpeed } from "../momentum/logic.js";
+import { KartMaxSpeed } from "../momentum/logic.js";
+import { PhysicsFactor } from "../../dev/physics-tuning-logic.js";
 import { PlayPerfectSpark } from "../wall-bounce/wall-bounce.js";
 import { JUMP_SPEED, GROUND_JUMP_BUFFER, WALL_JUMP_BUFFER, BOUNCE_RATINGS, WALL_JUMP_CHARGES } from "../../constants/index.js";
 import { LogJumpPress, LogWallJumpVerdict } from "../../dev/collision-debug.js";
@@ -79,7 +80,7 @@ export function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
     const timingPress = RegisterWallTimingPress(kart, now);
     LogJumpPress(slot, kart, now, grounded, groundJump, timingPress);
     if (groundJump) {
-        v.z = JUMP_SPEED;
+        v.z = JUMP_SPEED * PhysicsFactor("jump"); // scaled by the physics page (dev/physics-tuning.js)
         kart.lastJumpTime = now;
     }
     // Wall timing — independent of the normal jump above (works in the air
@@ -130,7 +131,7 @@ function UpgradePendingBounce(kart, now, v) {
     if (kart.lastBounceInfo) {
         kart.lastBounceInfo.jumpFactor = lateFactor;
     }
-    kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), after);
+    kart.speedCap = Math.max(kart.speedCap ?? KartMaxSpeed(kart), after);
     return true;
 }
 
@@ -155,7 +156,7 @@ function FireBufferedGroundJump(slot, kart, now, grounded, v) {
     }
     kart.bufferedGroundJumpTime = undefined;
     kart.bufferedWallJumpTime = undefined; // the press is used up
-    v.z = JUMP_SPEED;
+    v.z = JUMP_SPEED * PhysicsFactor("jump"); // scaled by the physics page (dev/physics-tuning.js)
     kart.lastJumpTime = now;
     if (kart.lastIdleJumpPressTime === pressed) {
         kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
@@ -249,7 +250,7 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
         v.y = boosted.y;
         v.z = Math.max(v.z, jump.z * bonus.up);
         if (bonus.speed > 1) {
-            kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(v.x, v.y));
+            kart.speedCap = Math.max(kart.speedCap ?? KartMaxSpeed(kart), Math.hypot(v.x, v.y));
         }
         // Same feedback as a bounce: the bounce panel and speedometer flash
         // (jump timing full — it was jumped), a PERFECT's spark instead of the

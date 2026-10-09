@@ -4,11 +4,14 @@
 // to try out values for CAMERA_DISTANCE/CAMERA_HEIGHT in-game. Lift, podium
 // and camera-zone zooms still add on top. Not saved: gone on reconnect or a
 // map restart — every change is logged to the console, ready to copy into
-// camera/follow/constants.js.
+// camera/follow/constants.js. The scale is the shared one
+// (tuning-scale-logic.js); opening/closing the page is SetUserMenuPage in
+// hud/user-menu.js.
 import { Instance } from "cs_script/point_script";
 import { GetSpeedHud } from "../hud/layout.js";
-import { ClampCameraTuning, CameraTuningSegmentCount, CameraTuningSegmentValue, IsCameraTuningSegmentLit } from "./camera-tuning-logic.js";
-import { CAMERA_DISTANCE, CAMERA_HEIGHT, CAMERA_TUNING_STEP, CAMERA_TUNING_FINE_STEP } from "../constants/index.js";
+import { CAMERA_TUNING_SCALE, ParseTuningButton, TunedValue } from "./tuning-scale-logic.js";
+import { UpdateTuningScaleHud } from "./tuning-scale.js";
+import { CAMERA_DISTANCE, CAMERA_HEIGHT } from "../constants/index.js";
 
 /** @typedef {"distance" | "height"} CameraTuningAxis */
 /** @type {CameraTuningAxis[]} */
@@ -24,33 +27,14 @@ export function GetCameraTuning(kart) {
 }
 
 /**
- * Sets one value (kept on the scale) and shows it. Back on both defaults,
- * the kart drops its tuning again.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {CameraTuningAxis} axis @param {number} value
+ * Sets the values and shows them. Back on both defaults, the kart drops its
+ * tuning again.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {{ distance: number, height: number }} tuning
  */
-function SetCameraTuning(slot, kart, axis, value) {
-    const tuning = { ...GetCameraTuning(kart), [axis]: ClampCameraTuning(value) };
+function SetCameraTuning(slot, kart, tuning) {
     kart.cameraTuning = tuning.distance === CAMERA_DISTANCE && tuning.height === CAMERA_HEIGHT ? undefined : tuning;
     Instance.Msg(`[camera tuning] slot ${slot}: distance ${tuning.distance}, height ${tuning.height} (CAMERA_DISTANCE/CAMERA_HEIGHT)`);
     UpdateCameraTuningHud(slot, kart);
-}
-
-/**
- * Switches the user menu between its normal columns and the camera page.
- * The menu always opens on its columns (SetUserMenuOpen).
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {boolean} open
- */
-export function SetCameraTuningPage(slot, kart, open) {
-    kart.cameraTuningPage = open;
-    const hud = GetSpeedHud();
-    if (!hud) {
-        return;
-    }
-    hud.SetHasClassForPlayer(slot, "usermenu_main_page", "Hidden", open);
-    hud.SetHasClassForPlayer(slot, "usermenu_camera_page", "Hidden", !open);
-    if (open) {
-        UpdateCameraTuningHud(slot, kart);
-    }
 }
 
 /**
@@ -67,47 +51,30 @@ export function UpdateCameraTuningHud(slot, kart) {
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_height", `${tuning.height}`);
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_distance_default", `${CAMERA_DISTANCE}`);
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_height_default", `${CAMERA_HEIGHT}`);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_step", `${CAMERA_TUNING_STEP}`);
-    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_fine_step", `${CAMERA_TUNING_FINE_STEP}`);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_step", `${CAMERA_TUNING_SCALE.step}`);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_camera_page", "camtune_fine_step", `${CAMERA_TUNING_SCALE.fineStep}`);
     for (const axis of AXES) {
-        for (let i = 0; i < CameraTuningSegmentCount(); i++) {
-            hud.SetHasClassForPlayer(slot, `camtune_${axis}_seg_${i}`, "On", IsCameraTuningSegmentLit(i, tuning[axis]));
-        }
+        UpdateTuningScaleHud(hud, slot, `camtune_${axis}_`, CAMERA_TUNING_SCALE, tuning[axis]);
     }
 }
 
 /**
- * A click on the camera page (every button id starts with "camtune_"):
- * back, reset, − / + (big or fine step) on an axis, or a segment of its scale.
+ * A click on the camera page's controls (button ids "camtune_…"): reset,
+ * or − / + (big or fine step) or a segment on an axis.
  * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {string} buttonId
- * @returns {boolean} whether it was one of the page's buttons
+ * @returns {boolean} whether it was one of them
  */
 export function HandleCameraTuningClick(slot, kart, buttonId) {
-    if (buttonId === "camtune_back_button") {
-        SetCameraTuningPage(slot, kart, false);
-        return true;
-    }
     if (buttonId === "camtune_reset_button") {
-        SetCameraTuning(slot, kart, "distance", CAMERA_DISTANCE);
-        SetCameraTuning(slot, kart, "height", CAMERA_HEIGHT);
+        SetCameraTuning(slot, kart, { distance: CAMERA_DISTANCE, height: CAMERA_HEIGHT });
         return true;
     }
-    const match = /^camtune_(distance|height)_(minus|plus|minus_fine|plus_fine|seg_(\d+))$/.exec(buttonId);
-    if (!match) {
+    const button = ParseTuningButton("camtune_", buttonId);
+    const axis = AXES.find((a) => a === button?.row);
+    if (!button || !axis) {
         return false;
     }
-    const axis = /** @type {CameraTuningAxis} */ (match[1]);
-    const current = GetCameraTuning(kart)[axis];
-    if (match[2] === "minus") {
-        SetCameraTuning(slot, kart, axis, current - CAMERA_TUNING_STEP);
-    } else if (match[2] === "plus") {
-        SetCameraTuning(slot, kart, axis, current + CAMERA_TUNING_STEP);
-    } else if (match[2] === "minus_fine") {
-        SetCameraTuning(slot, kart, axis, current - CAMERA_TUNING_FINE_STEP);
-    } else if (match[2] === "plus_fine") {
-        SetCameraTuning(slot, kart, axis, current + CAMERA_TUNING_FINE_STEP);
-    } else {
-        SetCameraTuning(slot, kart, axis, CameraTuningSegmentValue(Number(match[3])));
-    }
+    const tuning = GetCameraTuning(kart);
+    SetCameraTuning(slot, kart, { ...tuning, [axis]: TunedValue(CAMERA_TUNING_SCALE, tuning[axis], button) });
     return true;
 }

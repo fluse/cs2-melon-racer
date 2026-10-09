@@ -6,7 +6,7 @@ import { Instance } from "cs_script/point_script";
 import { GetWallJumpCharges } from "../../movement/jump/jump.js";
 import { JumpDotFills } from "./logic.js";
 import { HealthBarState } from "../../health/damage/logic.js";
-import { MomentumMaxSpeed } from "../../movement/momentum/logic.js";
+import { KartMaxSpeed } from "../../movement/momentum/logic.js";
 import { GetSpeedHud } from "../layout.js";
 import { UNITS_TO_KMH, JUMP_DOT_FILL_STEPS, WALL_JUMP_CHARGES, HEALTH_BAR_SEGMENTS, HUD_RESEND_SECONDS, PERFECT_BOUNCE_FLASH_SECONDS, PERFECT_BOUNCE_ANGLE_FACTOR } from "../../constants/index.js";
 
@@ -23,7 +23,7 @@ export function UpdateSpeedHud(slot, kart) {
     // Wall-bounce feedback: Boosted while a bounce has the melon above its
     // normal top speed (momentum included — that's earned, not a boost), PerfectBounce as a short flash after a bounce that
     // was clean enough to cost (almost) no health.
-    hud.SetHasClassForPlayer(slot, "speed_panel", "Boosted", horizSpeed > MomentumMaxSpeed(kart.momentum) + 1);
+    hud.SetHasClassForPlayer(slot, "speed_panel", "Boosted", horizSpeed > KartMaxSpeed(kart) + 1);
     const info = kart.lastBounceInfo;
     const perfectFlash =
         info !== undefined &&

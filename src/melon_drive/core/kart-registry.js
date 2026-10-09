@@ -46,7 +46,7 @@ import { predictionDotSet } from "./trace.js";
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
- *   cameraTuningPage?: boolean, // the user menu shows its camera page instead of its columns — see SetCameraTuningPage
+ *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the developer page the user menu shows in place of its columns, if any — see SetUserMenuPage
  *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement

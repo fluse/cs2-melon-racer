@@ -11,5 +11,5 @@ export { UpdateBounceHud } from "./bounce-panel.js";
 export { UpdateCheckpointHud } from "./track/track.js";
 export { UpdateScoreboardHud, UpdateScoreboardInput } from "./scoreboard/scoreboard.js";
 export { ApplyHubModalState, ShowHubModal, HideHubModal } from "./hub-modal/hub-modal.js";
-export { SetUserMenuOpen, UpdateMelonGlowHud, UpdatePredictionHud, UpdateCollisionDebugHud, UpdateUserMenu } from "./user-menu.js";
+export { SetUserMenuOpen, SetUserMenuPage, UpdateToggleHud, UpdateUserMenu } from "./user-menu.js";
 export { RegisterHudInputs } from "./inputs.js";

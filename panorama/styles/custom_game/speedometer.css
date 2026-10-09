@@ -1348,13 +1348,14 @@
     color: #ffffff;
 }
 
-/* The developer camera page swaps places with the columns (one Hidden
-   class each, set by SetCameraTuningPage in dev/camera-tuning.js). */
+/* The developer pages (camera, physics, test triggers) swap places with the
+   columns (one Hidden class each, set by SetUserMenuPage in
+   hud/user-menu.js). All are built from the same Tuning* rows. */
 .UserMenuColumns.Hidden {
     visibility: collapse;
 }
 
-.CameraTuningPage {
+.TuningPage {
     width: 100%;
     flow-children: down;
 
@@ -1363,25 +1364,40 @@
     }
 }
 
-.CameraTuningIntro {
+.TuningIntro {
     margin-top: 6px;
     font-size: 13px;
     color: #ffffff88;
 }
 
-.CameraTuningRow {
+.TuningRow {
     width: 100%;
     margin-top: 22px;
     flow-children: down;
 }
 
+/* The physics page's five rows: closer together and lower, so the card
+   stays on screen. */
+.TuningRow.TuningRowCompact {
+    margin-top: 12px;
+}
+
+.TuningRowCompact .TuningValue {
+    font-size: 22px;
+}
+
+.TuningRowCompact .TuningStep,
+.TuningRowCompact .TuningSegments {
+    height: 34px;
+}
+
 /* Name left, a hint next to it, the current value big on the right. */
-.CameraTuningHeader {
+.TuningHeader {
     width: 100%;
     flow-children: right;
 }
 
-.CameraTuningName {
+.TuningName {
     vertical-align: bottom;
     font-size: 15px;
     font-weight: bold;
@@ -1389,14 +1405,14 @@
     color: white;
 }
 
-.CameraTuningHelp {
+.TuningHelp {
     vertical-align: bottom;
     margin-left: 18px;
     font-size: 12px;
     color: #ffffff77;
 }
 
-.CameraTuningValue {
+.TuningValue {
     width: fill-parent-flow( 1.0 );
     vertical-align: bottom;
     text-align: right;
@@ -1406,13 +1422,13 @@
 }
 
 /* −10 −1 | scale (41 segments, lit up to the value) | +1 +10 */
-.CameraTuningControls {
+.TuningControls {
     width: 100%;
     margin-top: 8px;
     flow-children: right;
 }
 
-.CameraTuningStep {
+.TuningStep {
     width: 62px;
     margin: 0px 2px;
     height: 46px;
@@ -1426,12 +1442,12 @@
 }
 
 /* The fine steps (±1) between the big ones and the scale: narrower, dimmer. */
-.CameraTuningStep.CameraTuningFine {
+.TuningStep.TuningFine {
     width: 50px;
     background-color: #ffffff05;
 }
 
-.CameraTuningStepLabel {
+.TuningStepLabel {
     horizontal-align: center;
     vertical-align: center;
     font-size: 16px;
@@ -1439,20 +1455,20 @@
     color: white;
 }
 
-.CameraTuningScale {
+.TuningScale {
     width: fill-parent-flow( 1.0 );
     margin: 0px 10px;
     flow-children: down;
 }
 
-.CameraTuningSegments {
+.TuningSegments {
     width: 100%;
     height: 46px;
     flow-children: right;
 }
 
 /* No transitions on the toggled "On" (see the HUD notes in AGENTS.md). */
-.CameraTuningSegment {
+.TuningSegment {
     width: fill-parent-flow( 1.0 );
     height: 100%;
     margin: 0px 1px;
@@ -1470,13 +1486,20 @@
     }
 }
 
-.CameraTuningFooter {
+/* The test triggers page: its RUN rows in a narrower list. */
+.TriggersList {
+    width: 560px;
+    margin-top: 10px;
+    flow-children: down;
+}
+
+.TuningFooter {
     width: 100%;
     margin-top: 28px;
     flow-children: right;
 }
 
-.CameraTuningFooterButton {
+.TuningFooterButton {
     width: 260px;
     margin-right: 12px;
 }

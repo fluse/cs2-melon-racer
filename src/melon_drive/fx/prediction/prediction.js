@@ -127,7 +127,7 @@ function PointsAlong(a, b, count) {
 
 /**
  * Whether this kart's player has the line switched on (user menu toggle,
- * off by default — see UpdatePredictionHud in hud/).
+ * off by default — see USER_MENU_TOGGLES in hud/user-menu.js).
  * @param {import("../../core/kart-registry.js").Kart} kart
  */
 export function IsPredictionOn(kart) {

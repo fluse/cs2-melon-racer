@@ -2,6 +2,7 @@
 // movement/momentum/constants.js). Pure rule, no cs_script import; movement/driving/drive.js
 // applies it (test/movement/momentum.test.mjs).
 import { MAX_SPEED } from "../driving/constants.js";
+import { PhysicsFactor } from "../../dev/physics-tuning-logic.js";
 import {
     MOMENTUM_STEP,
     MOMENTUM_MAX_STEPS,
@@ -27,11 +28,29 @@ export function NewMomentum() {
 }
 
 /**
- * The top speed with `momentum`'s steps (plain MAX_SPEED without any).
+ * The top speed with `momentum`'s steps (plain `baseMax` without any).
  * @param {MomentumState | undefined} momentum
+ * @param {number} [baseMax] the top speed without steps — MAX_SPEED, or the tuned one (BaseMaxSpeed)
  */
-export function MomentumMaxSpeed(momentum) {
-    return MAX_SPEED * (1 + MOMENTUM_STEP * (momentum?.steps ?? 0));
+export function MomentumMaxSpeed(momentum, baseMax = MAX_SPEED) {
+    return baseMax * (1 + MOMENTUM_STEP * (momentum?.steps ?? 0));
+}
+
+/**
+ * The top speed without momentum: MAX_SPEED, scaled by the physics page's
+ * "Max Speed" (dev/physics-tuning.js, the same for every melon).
+ */
+export function BaseMaxSpeed() {
+    return MAX_SPEED * PhysicsFactor("maxSpeed");
+}
+
+/**
+ * A kart's current top speed: the base (BaseMaxSpeed) with its momentum
+ * steps.
+ * @param {{ momentum?: MomentumState }} kart
+ */
+export function KartMaxSpeed(kart) {
+    return MomentumMaxSpeed(kart.momentum, BaseMaxSpeed());
 }
 
 /**
@@ -43,16 +62,17 @@ export function MomentumMaxSpeed(momentum) {
  * MOMENTUM_HIT_WINDOW of the previous one adds a step.
  * @param {MomentumState | undefined} momentum @param {number} horizSpeed the melon's horizontal speed this tick (after the cap)
  * @param {number} now game time @param {boolean} boosted
+ * @param {number} [baseMax] the top speed without steps (MomentumMaxSpeed)
  * @returns {MomentumState}
  */
-export function UpdateMomentum(momentum, horizSpeed, now, boosted) {
+export function UpdateMomentum(momentum, horizSpeed, now, boosted, baseMax = MAX_SPEED) {
     if (!momentum || horizSpeed < MOMENTUM_MIN_SPEED) {
         return NewMomentum();
     }
     if (boosted) {
         return { ...momentum, armed: false };
     }
-    const max = MomentumMaxSpeed(momentum);
+    const max = MomentumMaxSpeed(momentum, baseMax);
     if (horizSpeed < max * (1 - MOMENTUM_REARM_DIP)) {
         return momentum.armed ? momentum : { ...momentum, armed: true };
     }

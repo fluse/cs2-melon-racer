@@ -5,7 +5,7 @@
 // already out fade instead of vanishing. Tested in test/fx/boost-trail.test.mjs.
 import { SpawnFromTemplate, PlaceAll, StartParticles, StopParticles, RemoveAfter } from "../particles.js";
 import { ShouldShowBoostTrail } from "./logic.js";
-import { MomentumMaxSpeed } from "../../movement/momentum/logic.js";
+import { KartMaxSpeed } from "../../movement/momentum/logic.js";
 import { BOOST_TRAIL_TEMPLATE_NAME, BOOST_TRAIL_FADE_SECONDS, BOOST_TRAIL_STOP_MARGIN } from "../../constants/index.js";
 
 /**
@@ -21,7 +21,7 @@ export function UpdateBoostTrail(kart) {
     const horizSpeed = Math.hypot(velocity.x, velocity.y);
     // Measured against the melon's own top speed: speed earned by momentum
     // (MOMENTUM_*) isn't a boost and shows no trail.
-    const normalMax = MomentumMaxSpeed(kart.momentum);
+    const normalMax = KartMaxSpeed(kart);
     // A PERFECT bounce's speed shows no trail — until that boost is used up
     // (back to normal speed) or the attack boost takes over.
     if (kart.attackBoosting || horizSpeed <= normalMax + BOOST_TRAIL_STOP_MARGIN) {

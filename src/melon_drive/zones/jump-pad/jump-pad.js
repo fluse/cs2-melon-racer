@@ -3,7 +3,7 @@
 // are in ../logic/jump-pad.js; which pad the melon is on, in zones.js.
 import { Debug } from "../../core/debug.js";
 import { ShouldPadLaunch, PadLaunchVelocity, PadFlightAfter } from "./logic.js";
-import { MomentumMaxSpeed } from "../../movement/momentum/logic.js";
+import { KartMaxSpeed } from "../../movement/momentum/logic.js";
 import { CurrentJumpPad } from "../registry.js";
 
 /**
@@ -48,7 +48,7 @@ export function TryPadLaunch(slot, kart, now, jumpPressed, v, lookDir) {
     kart.lastJumpTime = now;
     kart.padFlight = { launchTime: now };
     // Faster than the top speed, like a wall-bounce boost — decays at BOOST_DECAY.
-    kart.speedCap = Math.max(kart.speedCap ?? MomentumMaxSpeed(kart.momentum), Math.hypot(v.x, v.y));
+    kart.speedCap = Math.max(kart.speedCap ?? KartMaxSpeed(kart), Math.hypot(v.x, v.y));
     Debug(`jump pad: slot ${slot} launched (${launched.z.toFixed(0)} u/s up, ${Math.hypot(v.x, v.y).toFixed(0)} u/s horizontal)`);
     return true;
 }

@@ -1,6 +1,7 @@
-// The user menu's developer camera page (dev/camera-tuning.js): the pure
-// scale rules, the layout's segments, and the clicks against the fake engine
-// — each setting only the clicking player's own chase camera.
+// The user menu's developer camera page (dev/camera-tuning.js): the layout's
+// segments and the clicks against the fake engine — each setting only the
+// clicking player's own chase camera. The scale's rules:
+// test/dev/tuning-scale.test.mjs.
 import "../helpers/register-cs-script.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -8,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
 import { FakeHud } from "../helpers/fake-hud.mjs";
 
-const logic = await import("../../src/melon_drive/dev/camera-tuning-logic.js");
+const { CAMERA_TUNING_SCALE: SCALE, ScaleSegmentCount } = await import("../../src/melon_drive/dev/tuning-scale-logic.js");
 const C = await import("../../src/melon_drive/constants/index.js");
 const { karts, SetModeratorSlot } = await import("../../src/melon_drive/core/kart-registry.js");
 const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
@@ -17,25 +18,9 @@ const { GetCameraOffsetFor } = await import("../../src/melon_drive/camera/index.
 const { SetUserMenuOpen } = await import("../../src/melon_drive/hud/user-menu.js");
 await import("../../src/melon_drive/index.js"); // registers OnCustomHudClicked
 
-test("values are kept on the scale", () => {
-    assert.equal(logic.ClampCameraTuning(C.CAMERA_TUNING_MIN - 1), C.CAMERA_TUNING_MIN);
-    assert.equal(logic.ClampCameraTuning(C.CAMERA_TUNING_MAX + 1), C.CAMERA_TUNING_MAX);
-    assert.equal(logic.ClampCameraTuning(C.CAMERA_DISTANCE), C.CAMERA_DISTANCE);
-});
-
-test("the scale runs from MIN to MAX and fills up to the value", () => {
-    const count = logic.CameraTuningSegmentCount();
-    assert.equal(logic.CameraTuningSegmentValue(0), C.CAMERA_TUNING_MIN);
-    assert.equal(logic.CameraTuningSegmentValue(count - 1), C.CAMERA_TUNING_MAX);
-    assert.ok(logic.IsCameraTuningSegmentLit(0, C.CAMERA_TUNING_MIN));
-    assert.ok(!logic.IsCameraTuningSegmentLit(1, C.CAMERA_TUNING_MIN));
-    assert.ok(logic.IsCameraTuningSegmentLit(1, C.CAMERA_TUNING_MIN + C.CAMERA_TUNING_SCALE_STEP));
-    assert.ok(logic.IsCameraTuningSegmentLit(count - 1, C.CAMERA_TUNING_MAX));
-});
-
 test("speedometer.xml has one segment per scale value for both axes", () => {
     const layout = readFileSync(new URL("../../panorama/layout/custom_game/speedometer.xml", import.meta.url), "utf8");
-    const count = logic.CameraTuningSegmentCount();
+    const count = ScaleSegmentCount(SCALE);
     for (const axis of ["distance", "height"]) {
         const indices = [...layout.matchAll(new RegExp(`id="camtune_${axis}_seg_(\\d+)"`, "g"))].map((m) => Number(m[1]));
         assert.deepEqual(indices, [...Array(count).keys()], axis);
@@ -101,7 +86,7 @@ test("− / + and the scale set only the clicking player's camera, within the sc
     assert.ok(hud.Has(0, "camtune_height_seg_0", "On"));
     assert.ok(!hud.Has(0, "camtune_height_seg_1", "On"));
 
-    const last = logic.CameraTuningSegmentCount() - 1;
+    const last = ScaleSegmentCount(SCALE) - 1;
     Click(0, `camtune_distance_seg_${last}`);
     Click(0, "camtune_distance_plus");
     assert.equal(GetCameraOffsetFor(a).x, -C.CAMERA_TUNING_MAX, "can't go above the scale");

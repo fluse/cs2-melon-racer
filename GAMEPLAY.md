@@ -508,13 +508,20 @@ run by `race/heat/`):
    `HUB`.
 
 For testing the countdown and the finish screen without a heat, the user
-menu's DEVELOPER group has **"Test Countdown"** (3…2…1…GO, the melon held
+menu's DEVELOPER group has a **"Test Triggers"** page (in place of the
+menu's columns, "Back" returns; `SetUserMenuPage` in
+`hud/user-menu.js`) with **"Test Countdown"** (3…2…1…GO, the melon held
 until GO) and **"Test Finish"** (FINISH, "1ST · +10 PTS" and the
 `BREAK_SECONDS` countdown, the melon held meanwhile) — for the clicking
 player only, the race phase and everyone else untouched — and **"Test
 Intro"** for the logo a player sees on joining (`INTRO_LOGO_SECONDS`, the
 melon held behind it). Ignored while that
-player races; the hub/tutorial buttons end a preview early. `TestCountdown`/
+player races; the hub/tutorial buttons end a preview early. The same page has
+three effect triggers on the clicking player's own melon (not while racing or
+broken): **"Test Break"** (breaks it where it is — effects, pieces, break
+camera, respawn at its respawn point), **"Test Perfect Bounce"** (a PERFECT
+bounce's spark, bounce panel and speedometer flash — no speed) and **"Test
+Heal"** (the heal zone's effect, health refilled); `dev/test-effects.js`. `TestCountdown`/
 `TestFinish` in `race/heat/race-flow.js` (`test/hud/hud-buttons.test.mjs`).
 
 ## Grand Prix — places & points (decided, implemented)
@@ -551,7 +558,7 @@ chase camera eases further back meanwhile (`camera/podium-zoom/`). Their respawn
 hub, so the respawn, hub and tutorial buttons (and any teleport, or the next
 Grand Prix) take them down early. A racer who left leaves their step empty;
 a cancelled Grand Prix puts nobody up. For testing, the user menu's
-DEVELOPER group has "Test Podium": everyone to the hub, the clicking player
+DEVELOPER group's "Test Triggers" page has "Test Podium": everyone to the hub, the clicking player
 onto place 1, the others in join order onto 2 and 3 — not while a heat
 runs (`TestGrandPrix` in `race/podium/podium.js`). Confetti: every
 `info_particle_system` named `particle_podium_confetti` (Start Active off)
@@ -839,7 +846,8 @@ chase camera was. Switching it on closes the menu. Their melon waits where
 it was, frozen (`UpdateKart` skips it, physics motion off) — no damage, but
 a running time trial's clock keeps going. Switching off (USE → the same
 button) puts the pawn back on its anchor and the chase camera on the melon.
-A heat starting or a new pawn switches it off. Not while the melon is
+A heat starting, a new pawn, the respawn button and "Restart Time Trial"
+(button or R) switch it off. Not while the melon is
 breaking. While it's on, a **ghost avatar** hangs on the flying pawn — a
 copy of the `template_spectator_hat` point_template, at eye height, flying
 along — so the others see who's flying around (the pawn itself is
@@ -860,8 +868,30 @@ columns. Lift, podium and camera-zone zooms still add on top. Meant for
 trying out values in-game: not saved (gone on reconnect or a map restart),
 every change logged to the console (`[camera tuning] …`) to copy into
 `camera/follow/constants.js`. Constants: `dev/constants.js`; rules:
-`dev/camera-tuning-logic.js`, applied by `dev/camera-tuning.js` and
-`GetCameraOffsetFor` (`test/dev/camera-tuning.test.mjs`).
+`dev/tuning-scale-logic.js` (the slider, shared with the physics page),
+applied by `dev/camera-tuning.js` and `GetCameraOffsetFor` (`test/dev/camera-tuning.test.mjs`).
+
+## Physics settings (implemented, dev aid)
+
+Next to "Camera Settings", the DEVELOPER column has **"Physics
+Settings"**: a page built the same way that scales the clicking player's
+own melon physics, each in percent of its default (`PHYSICS_TUNING_MIN`…
+`_MAX`, 0…300 %; −10/−1/+1/+10 and a scale every 10 %), shown with the
+resulting value:
+
+- **Max speed** — `MAX_SPEED`, momentum steps on top (`KartMaxSpeed`).
+- **Acceleration** — `FORWARD_ACCEL`, `REVERSE_ACCEL`, `STRAFE_ACCEL`.
+- **Jump** — the ground jump's `JUMP_SPEED` (wall jumps stay as they are).
+- **Boost** — the attack boost's `ATTACK_BOOST_ACCEL` and its headroom above
+  the top speed (`ATTACK_BOOST_MAX_SPEED − MAX_SPEED`).
+- **Gravity** — the engine always pulls with `GRAVITY`; the script adds the
+  difference to the commanded vertical velocity every tick (0 % floats).
+  Ground contact still reads right, since it's measured against that command.
+
+Not saved, every change logged (`[physics tuning] …`); the menu reopens on
+its columns. Constants: `dev/constants.js`; rules:
+`dev/physics-tuning-logic.js`, applied by `dev/physics-tuning.js` and
+`movement/` (`test/dev/physics-tuning.test.mjs`).
 
 ## Jump pads (implemented)
 

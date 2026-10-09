@@ -12,7 +12,7 @@ const { karts, SetModeratorSlot } = await import("../../src/melon_drive/core/kar
 const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
 const { GetHubSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
 const flow = await import("../../src/melon_drive/race/heat/race-flow.js");
-const { SetUserMenuOpen } = await import("../../src/melon_drive/hud/user-menu.js");
+const { SetUserMenuOpen, SetUserMenuPage, USER_MENU_TOGGLES, USER_MENU_PAGES } = await import("../../src/melon_drive/hud/user-menu.js");
 const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, SPEED_HUD_ENTITY_NAME, RacePhase, COLOR_PRESETS, MELON_MAX_HEALTH } = await import("../../src/melon_drive/constants/index.js");
 const C = await import("../../src/melon_drive/constants/index.js");
 await import("../../src/melon_drive/index.js"); // registers OnCustomHudClicked
@@ -227,10 +227,97 @@ test("free look: a ghost avatar from template_spectator_hat hangs on the flying 
     assert.equal(again.IsValid(), false, "removed when the player leaves");
 });
 
+test("free look: the respawn and restart buttons end it and put the chase camera back on the melon", async () => {
+    const { CustomCameraMode } = await import("../helpers/cs-script-mock.mjs");
+    Click(0, "usermenu_freelook_button");
+    assert.equal(a.freeLook, true);
+    SetUserMenuOpen(0, a, true);
+    Click(0, "usermenu_respawn_button");
+    assert.equal(a.freeLook, false, "respawn");
+    assert.equal(a.pawn.GetCustomCamera().GetMode(), CustomCameraMode.FOLLOW_POSITION);
+
+    a.trackId = 1; // on track 1, in a free-roaming time trial
+    a.racing = false;
+    world.add(new Entity({ name: "start_spawn_1", className: "info_target", origin: { x: 3000, y: 0, z: 0 } }));
+    Click(0, "usermenu_freelook_button");
+    Click(0, "usermenu_restart_button");
+    assert.equal(a.freeLook, false, "restart");
+    assert.equal(a.pawn.GetCustomCamera().GetMode(), CustomCameraMode.FOLLOW_POSITION);
+});
+
 test("free look without template_spectator_hat in the map: no avatar, free look still works", () => {
     Click(0, "usermenu_freelook_button");
     assert.equal(a.freeLook, true);
     assert.deepEqual(a.spectatorHat, []);
+});
+
+test("test triggers button: its page in place of the columns, Back and reopening swap them back", () => {
+    SetUserMenuOpen(0, a, true);
+    Click(0, "usermenu_triggers_button");
+    assert.ok(hud.Has(0, "usermenu_main_page", "Hidden"));
+    assert.ok(!hud.Has(0, "usermenu_triggers_page", "Hidden"));
+    assert.ok(!hud.Has(1, "usermenu_main_page", "Hidden"), "only for the clicking player");
+    Click(0, "triggers_back_button");
+    assert.ok(!hud.Has(0, "usermenu_main_page", "Hidden"));
+    assert.ok(hud.Has(0, "usermenu_triggers_page", "Hidden"));
+
+    Click(0, "usermenu_triggers_button");
+    Click(0, "usermenu_testcountdown_button"); // a trigger closes the menu…
+    assert.equal(a.userMenuOpen, false);
+    SetUserMenuOpen(0, a, true); // …and it reopens on its columns
+    assert.ok(!hud.Has(0, "usermenu_main_page", "Hidden"));
+    assert.ok(hud.Has(0, "usermenu_triggers_page", "Hidden"));
+});
+
+test("test break/bounce/heal: on the clicking player's own melon, menu closed — never while racing", async () => {
+    a.health = 10;
+    SetUserMenuOpen(0, a, true);
+    Click(0, "usermenu_testheal_button");
+    assert.equal(a.health, MELON_MAX_HEALTH, "health refilled");
+    assert.equal(a.userMenuOpen, false);
+
+    Click(0, "usermenu_testbounce_button");
+    assert.ok(a.lastBounceTime !== undefined && a.lastBounceInfo.angleFactor === 1, "a PERFECT bounce for the panel");
+    assert.equal(b.lastBounceInfo, undefined, "only the clicking player");
+
+    Click(0, "usermenu_testbreak_button");
+    assert.equal(a.breaking, true);
+    assert.ok(!b.breaking);
+    Click(0, "usermenu_testbreak_button"); // already broken: ignored, no throw
+
+    b.racing = true;
+    b.health = 10;
+    Click(1, "usermenu_testheal_button");
+    Click(1, "usermenu_testbreak_button");
+    assert.equal(b.health, 10, "not while racing");
+    assert.ok(!b.breaking);
+});
+
+test("every ON/OFF setting: a click flips it and its pill, a second click back", () => {
+    for (const [buttonId, { variable, isOn }] of Object.entries(USER_MENU_TOGGLES)) {
+        const before = isOn(a);
+        Click(0, buttonId);
+        assert.equal(isOn(a), !before, buttonId);
+        assert.equal(hud.Variable(0, buttonId, variable), before ? "OFF" : "ON", `${buttonId} pill`);
+        assert.equal(hud.Has(0, buttonId, "ToggleOn"), !before, `${buttonId} highlight`);
+        Click(0, buttonId);
+        assert.equal(isOn(a), before, `${buttonId} back`);
+    }
+});
+
+test("SetUserMenuPage: one developer page at a time, undefined shows the columns again", () => {
+    const pages = Object.keys(USER_MENU_PAGES);
+    for (const page of pages) {
+        SetUserMenuPage(0, a, page);
+        assert.equal(a.userMenuPage, page);
+        assert.ok(hud.Has(0, "usermenu_main_page", "Hidden"), page);
+        for (const other of pages) {
+            assert.equal(hud.Has(0, USER_MENU_PAGES[other].panel, "Hidden"), other !== page, `${page}: ${other}`);
+        }
+    }
+    SetUserMenuPage(0, a, undefined);
+    assert.ok(!hud.Has(0, "usermenu_main_page", "Hidden"));
+    assert.ok(pages.every((page) => hud.Has(0, USER_MENU_PAGES[page].panel, "Hidden")));
 });
 
 test("color buttons paint that player's melon in the preset; an unknown color does nothing", () => {

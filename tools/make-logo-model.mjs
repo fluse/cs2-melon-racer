@@ -1,22 +1,28 @@
 // Builds the logo lettering as a 3D model for Hammer — `node tools/make-logo-model.mjs`:
 // MELON RACER in Bungee (tools/fonts/, like the logo), slanted like the
-// logo's banner, extruded into holo letters (FACE_MATERIAL, the gates'
-// holo_dashes) standing in a lime green outline — the letters grown by
-// OUTLINE_WIDTH and merged, like the logo's text stroke. Writes
+// logo's banner, extruded into solid letters (FACE_COLOR) standing in a lime
+// green outline — the letters grown by OUTLINE_WIDTH and merged, like the
+// logo's text stroke. The letters' fronts get an opaque copy of a holo
+// material (HOLO_SOURCE, the gates' holo_dashes): same textures, scrolling and
+// glow, but FACE_COLOR where the gates show glass. Not the translucent
+// material itself: a see-through letter showed the sky, its own back and the
+// outline's walls, and as a layer just in front of the letters it z-fought
+// and sorted badly (grain, colored patches). Writes
 //   models/melon_racer/logo_text.obj   the mesh (render + collision)
 //   models/melon_racer/logo_text.vmdl  the ModelDoc model Hammer places
-//   materials/melon_racer/logo_text_outline.vmat + _color.png (and
-//   logo_text_face.vmat in FACE_COLOR when FACE_MATERIAL is "")
+//   materials/melon_racer/logo_text_{face,outline}.vmat + _color.png
+//   materials/melon_racer/logo_text_holo.vmat + _color.png (from HOLO_SOURCE —
+//   re-run after changing it or its textures)
 // Compile the model once with resourcecompiler (see the end of the output),
 // then place it in Hammer as a prop_static. Origin: bottom center of the
 // text, halfway through its depth; the letters read correctly looking at the
 // prop's front (+X, the way a prop with angles 0 0 0 faces).
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import opentype from "opentype.js";
-import earcut from "earcut";
 import ClipperLib from "clipper-lib";
-import { EncodePng } from "./png.mjs";
+import { Area, Mesh, ObjText, SolidPng, VmatText, VmdlText, WriteAddonFile } from "./model.mjs";
+import { DecodePng, EncodePng } from "./png.mjs";
 
 const TEXT = "MELON RACER";
 const CAP_HEIGHT = 64; // units, height of a capital letter
@@ -28,14 +34,22 @@ const SMOOTH_ANGLE = 35; // degrees: corners sharper than this stay hard on the 
 const OUTLINE_WIDTH = 4; // units the outline reaches past the letters (0 = no outline)
 const OUTLINE_ARC_TOLERANCE = 0.25; // units, how finely its round corners are cut
 const LETTER_RAISE = 3; // units the letters stand out in front of the outline
-const UV_TILE = 128; // units one texture repeat covers (the holo textures are 512 px)
-// The letters' material: an existing one (the gates' holo look), or "" for a
-// plain one in FACE_COLOR written next to the outline's.
-const FACE_MATERIAL = "materials/melon_racer/holo_dashes.vmat";
-const FACE_COLOR = [0xee, 0xf4, 0xe8];
+// Units one texture repeat covers (the holo textures are 512 px): much finer
+// and the thin dashes break up into sparkle from any distance.
+const UV_TILE = 256;
+// The holo material the letters' fronts copy ("" = plain FACE_COLOR fronts):
+// its textures are <name>_{color,trans,illum}.png next to it (tools/make-holo.mjs).
+const HOLO_SOURCE = "materials/melon_racer/holo_dashes.vmat";
+const FACE_COLOR = [0x1f, 0x24, 0x2b]; // the letters' body, and the holo's glass: dark, so the glowing dashes stand out
+// Swaps colors in the copied holo: every holo pixel is a mix of its gradient's
+// two colors (GRADIENT in tools/make-holo.mjs) and white (the dash cores), so
+// mapping those three (white stays) recolors it exactly. Only the logo's copy.
+const HOLO_RECOLOR = [
+    { from: [57, 255, 20], to: [57, 255, 20] }, // toxic green, kept
+    { from: [170, 40, 255], to: [0xff, 0x0e, 0xff] }, // ultraviolet -> magenta
+];
 const OUTLINE_COLOR = [0xaa, 0xff, 0x33];
 
-const ROOT = new URL("../", import.meta.url);
 const FONT = fileURLToPath(new URL("./fonts/Bungee-Regular.ttf", import.meta.url));
 const MODEL_DIR = "models/melon_racer";
 const MATERIAL_DIR = "materials/melon_racer";
@@ -102,11 +116,6 @@ function Clean(contour) {
     return out;
 }
 
-const Area = c => c.reduce((s, p, i) => {
-    const q = c[(i + 1) % c.length];
-    return s + p[0] * q[1] - q[0] * p[1];
-}, 0) / 2;
-
 function Inside(pt, c) {
     let inside = false;
     for (let i = 0, j = c.length - 1; i < c.length; j = i++) {
@@ -151,8 +160,7 @@ const letters = slanted.map(s => ({ outer: Center(s.outer), holes: s.holes.map(C
 
 /**
  * The outline: the letters grown by OUTLINE_WIDTH (round corners) and merged,
- * with the letters themselves cut out — a ring around them, so translucent
- * letters (the holo face material) show what's behind them, not the outline.
+ * with the letters themselves cut out — a ring around them.
  */
 function Outline(shapes) {
     const S = 1000; // Clipper works on integers
@@ -185,213 +193,79 @@ function Outline(shapes) {
 }
 const outline = OUTLINE_WIDTH > 0 ? Outline(letters) : [];
 
-// Mesh: 2D (x, y) -> model space (depth, x, y): front faces +X, text runs
-// along +Y (the viewer's right when looking at the front), y up is +Z.
-const allPts = [...letters, ...outline].flatMap(s => [s.outer, ...s.holes].flat());
-const minU = Math.min(...allPts.map(p => p[0])), maxU = Math.max(...allPts.map(p => p[0]));
-const v = [], vt = [], vn = [];
-const tris = { face: [], outline: [] };
-const Vec = (arr, val) => (arr.push(val), arr.length); // OBJ indices are 1-based
-const fmt = n => (Math.abs(n) < 1e-9 ? 0 : +n.toFixed(5));
-const N_FRONT = Vec(vn, [1, 0, 0]);
-const N_BACK = Vec(vn, [-1, 0, 0]);
-const UV = p => Vec(vt, [(p[0] - minU) / UV_TILE, p[1] / UV_TILE]);
-const cosSmooth = Math.cos((SMOOTH_ANGLE * Math.PI) / 180);
-
-/** Extrudes 2D shapes from depth x0 (back) to x1 (front) into tris[part]. */
-function Extrude(shapes, x0, x1, part) {
-    const out = tris[part];
-    // Front and back caps
-    for (const s of shapes) {
-        const flat = [s.outer, ...s.holes].flat();
-        const holeIdx = [];
-        let n = s.outer.length;
-        for (const h of s.holes) { holeIdx.push(n); n += h.length; }
-        const t = earcut(flat.flat(), holeIdx, 2);
-        const front = flat.map(([y, z]) => Vec(v, [x1, y, z]));
-        const back = flat.map(([y, z]) => Vec(v, [x0, y, z]));
-        const uvs = flat.map(UV);
-        for (let i = 0; i < t.length; i += 3) {
-            let [a, b, c] = [t[i], t[i + 1], t[i + 2]];
-            // Counter-clockwise seen from +X: in the (y, z) plane that's CCW in 2D.
-            if (Area([flat[a], flat[b], flat[c]]) < 0) [b, c] = [c, b];
-            out.push([[front[a], uvs[a], N_FRONT], [front[b], uvs[b], N_FRONT], [front[c], uvs[c], N_FRONT]]);
-            out.push([[back[a], uvs[a], N_BACK], [back[c], uvs[c], N_BACK], [back[b], uvs[b], N_BACK]]);
-        }
-    }
-    // Sides: a quad per contour edge, smooth along curves, hard at corners.
-    for (const pts of shapes.flatMap(s => [s.outer, ...s.holes])) {
-        const n = pts.length;
-        const edgeN = pts.map((p, i) => {
-            const q = pts[(i + 1) % n];
-            const dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy);
-            return [dy / len, -dx / len]; // outward: outers CCW, holes CW
-        });
-        const Corner = (i, e) => { // normal at point i for edge e (i's own edge or the one before)
-            const other = e === i ? edgeN[(i - 1 + n) % n] : edgeN[i];
-            const mine = edgeN[e];
-            if (mine[0] * other[0] + mine[1] * other[1] < cosSmooth) return mine;
-            const x = mine[0] + other[0], y = mine[1] + other[1], len = Math.hypot(x, y);
-            return [x / len, y / len];
-        };
-        let along = 0;
-        for (let i = 0; i < n; i++) {
-            const j = (i + 1) % n;
-            const p = pts[i], q = pts[j];
-            const len = Math.hypot(q[0] - p[0], q[1] - p[1]);
-            const nP = Corner(i, i), nQ = Corner(j, i);
-            const vertex = (pt, x) => Vec(v, [x, pt[0], pt[1]]);
-            const pf = vertex(p, x1), pb = vertex(p, x0);
-            const qf = vertex(q, x1), qb = vertex(q, x0);
-            const np = Vec(vn, [0, nP[0], nP[1]]), nq = Vec(vn, [0, nQ[0], nQ[1]]);
-            const u0 = along / UV_TILE, u1 = (along + len) / UV_TILE, v0 = x0 / UV_TILE, v1 = x1 / UV_TILE;
-            along += len;
-            const tf = Vec(vt, [u0, v1]), tb = Vec(vt, [u0, v0]), uf = Vec(vt, [u1, v1]), ub = Vec(vt, [u1, v0]);
-            // Outward normal (0, ny, nz) with edge p->q: CCW seen from outside is pb, qb, qf, pf.
-            out.push([[pb, tb, np], [qb, ub, nq], [qf, uf, nq]]);
-            out.push([[pb, tb, np], [qf, uf, nq], [pf, tf, np]]);
-        }
-    }
-}
-
-// The outline ring is the full depth; the letters fill its inside and stand
+// Model space: front faces +X, text runs along +Y (the viewer's right when
+// looking at the front), y up is +Z — the 2D shapes extruded along X. The
+// outline ring is the full depth; the letters fill its inside and stand
 // LETTER_RAISE out in front of it.
-Extrude(outline, -DEPTH / 2, DEPTH / 2, "outline");
-Extrude(letters, -DEPTH / 2, DEPTH / 2 + (outline.length ? LETTER_RAISE : 0), "face");
+const mesh = new Mesh(UV_TILE);
+mesh.smoothCos = Math.cos((SMOOTH_ANGLE * Math.PI) / 180);
+mesh.Extrude(outline, -DEPTH / 2, DEPTH / 2, "outline");
+const front = DEPTH / 2 + (outline.length ? LETTER_RAISE : 0);
+mesh.Extrude(letters, -DEPTH / 2, front, "face", "x", HOLO_SOURCE ? "holo" : "face");
 
-const face = tri => "f " + tri.map(c => c.join("/")).join(" ");
-const obj = [
-    "# AUTO-GENERATED by tools/make-logo-model.mjs — edit the script, not this file.",
-    "# Y up (OBJ convention): ModelDoc turns (x, y, z) into Source (z, x, y), so this is Source (y, z, x).",
-    `o letters`,
-    ...v.map(([x, y, z]) => `v ${[y, z, x].map(fmt).join(" ")}`),
-    ...vt.map(t => `vt ${t.map(fmt).join(" ")}`),
-    ...vn.map(([x, y, z]) => `vn ${[y, z, x].map(fmt).join(" ")}`),
-    `usemtl ${NAME}_face`,
-    ...tris.face.map(face),
-    `usemtl ${NAME}_outline`,
-    ...tris.outline.map(face),
-    "",
-].join("\n");
-
-const MATERIALS = { face: FACE_MATERIAL || `${MATERIAL_DIR}/${NAME}_face.vmat`, outline: `${MATERIAL_DIR}/${NAME}_outline.vmat` };
-const remap = part => [
-    `\t\t\t\t\t\t{ from = "${NAME}_${part}.vmat" to = "${MATERIALS[part]}" },`,
-    `\t\t\t\t\t\t{ from = "${NAME}_${part}" to = "${MATERIALS[part]}" },`,
-].join("\n");
-
-const vmdl = `<!-- kv3 encoding:text:version{e21c7f3c-8a33-41c5-9977-a76d3a32aa0d} format:modeldoc36:version{972dada4-b828-45a4-bb93-7795cf0585da} -->
-{
-	rootNode =
-	{
-		_class = "RootNode"
-		children =
-		[
-			{
-				_class = "MaterialGroupList"
-				children =
-				[
-					{
-						_class = "DefaultMaterialGroup"
-						remaps =
-						[
-${remap("face")}
-${remap("outline")}
-						]
-						use_global_default = false
-						global_default_material = ""
-					},
-				]
-			},
-			{
-				_class = "RenderMeshList"
-				children =
-				[
-					{
-						_class = "RenderMeshFile"
-						filename = "${MODEL_DIR}/${NAME}.obj"
-						import_translation = [ 0.0, 0.0, 0.0 ]
-						import_rotation = [ 0.0, 0.0, 0.0 ]
-						import_scale = 1.0
-						align_origin_x_type = "None"
-						align_origin_y_type = "None"
-						align_origin_z_type = "None"
-						parent_bone = ""
-						import_filter =
-						{
-							exclude_by_default = false
-							exception_list = [  ]
-						}
-					},
-				]
-			},
-			{
-				_class = "PhysicsShapeList"
-				children =
-				[
-					{
-						_class = "PhysicsMeshFile"
-						name = "${NAME}"
-						parent_bone = ""
-						surface_prop = "default"
-						collision_tags = "solid"
-						recenter_on_parent_bone = false
-						offset_origin = [ 0.0, 0.0, 0.0 ]
-						offset_angles = [ 0.0, 0.0, 0.0 ]
-						align_origin_x_type = "None"
-						align_origin_y_type = "None"
-						align_origin_z_type = "None"
-						filename = "${MODEL_DIR}/${NAME}.obj"
-						import_scale = 1.0
-						maxMeshVertices = 0
-						qemError = 0.0
-						import_filter =
-						{
-							exclude_by_default = false
-							exception_list = [  ]
-						}
-					},
-				]
-			},
-		]
-		model_archetype = ""
-		primary_associated_entity = ""
-		anim_graph_name = ""
-		base_model_name = ""
-	}
+const GENERATOR = "tools/make-logo-model.mjs";
+const OBJ = `${MODEL_DIR}/${NAME}.obj`;
+WriteAddonFile(OBJ, ObjText(mesh, NAME, GENERATOR));
+WriteAddonFile(`${MODEL_DIR}/${NAME}.vmdl`, VmdlText({
+    name: NAME,
+    obj: OBJ,
+    physicsObj: OBJ,
+    materials: {
+        face: `${MATERIAL_DIR}/${NAME}_face.vmat`,
+        outline: `${MATERIAL_DIR}/${NAME}_outline.vmat`,
+        ...(HOLO_SOURCE ? { holo: `${MATERIAL_DIR}/${NAME}_holo.vmat` } : {}),
+    },
+}));
+for (const [part, rgb] of [["face", FACE_COLOR], ["outline", OUTLINE_COLOR]]) {
+    WriteAddonFile(`${MATERIAL_DIR}/${NAME}_${part}_color.png`, SolidPng(rgb));
+    WriteAddonFile(`${MATERIAL_DIR}/${NAME}_${part}.vmat`, VmatText({ texture: `${MATERIAL_DIR}/${NAME}_${part}_color.png`, generator: GENERATOR }));
 }
-`;
+if (HOLO_SOURCE) WriteOpaqueHolo();
 
-const vmat = texture => `// AUTO-GENERATED by tools/make-logo-model.mjs
+/**
+ * logo_text_holo: HOLO_SOURCE without its translucency. The color texture is
+ * the holo's color over FACE_COLOR, as much as the holo is opaque there; the
+ * self-illum mask, scrolling and the rest of the material stay the source's.
+ */
+function WriteOpaqueHolo() {
+    // The linear map taking HOLO_RECOLOR's two `from` colors and white to their
+    // `to` colors and white: M = To · From⁻¹, the colors as columns.
+    const white = [255, 255, 255];
+    const From = [...HOLO_RECOLOR.map(r => r.from), white];
+    const To = [...HOLO_RECOLOR.map(r => r.to), white];
+    const Col = (cols, row, col) => cols[col][row];
+    const det = m => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+    const F = [0, 1, 2].map(r => [0, 1, 2].map(c => Col(From, r, c))); // rows
+    const d = det(F);
+    const inv = [0, 1, 2].map(r => [0, 1, 2].map(c => { // adjugate / det
+        const m = F.filter((_, i) => i !== c).map(row => row.filter((_, j) => j !== r));
+        return ((r + c) % 2 ? -1 : 1) * (m[0][0] * m[1][1] - m[0][1] * m[1][0]) / d;
+    }));
+    const M = [0, 1, 2].map(r => [0, 1, 2].map(c => [0, 1, 2].reduce((s, k) => s + Col(To, r, k) * inv[k][c], 0)));
+    const Recolor = rgb => M.map(row => row[0] * rgb[0] + row[1] * rgb[1] + row[2] * rgb[2]);
 
-Layer0
-{
-	shader "csgo_complex.vfx"
-
-	g_flModelTintAmount "1.000"
-	g_vColorTint "[1.000000 1.000000 1.000000 0.000000]"
-	TextureColor "${texture}"
-
-	g_flMetalness "0.000"
-	TextureRoughness "materials/default/default_rough.tga"
-	TextureNormal "materials/default/default_normal.tga"
+    const base = HOLO_SOURCE.replace(/\.vmat$/, "");
+    const Load = suffix => DecodePng(readFileSync(new URL(`../${base}_${suffix}.png`, import.meta.url)));
+    const color = Load("color"), trans = Load("trans");
+    const texture = `${MATERIAL_DIR}/${NAME}_holo_color.png`;
+    WriteAddonFile(texture, EncodePng(color.width, color.height, (x, y) => {
+        const i = y * color.width + x;
+        const a = trans.data[i * trans.channels] / 255;
+        const holo = Recolor([0, 1, 2].map(c => color.data[i * color.channels + c]));
+        return [0, 1, 2].map(c => Math.round(Math.min(255, Math.max(0, FACE_COLOR[c] + (holo[c] - FACE_COLOR[c]) * a)))).concat(255);
+    }));
+    const source = readFileSync(new URL(`../${HOLO_SOURCE}`, import.meta.url), "utf8");
+    // Line by line: the source has \r\n line endings (Hammer's), which trip up multiline regexes.
+    const lines = source.split(/\r?\n/)
+        .filter(l => !/^\s*(F_TRANSLUCENT|g_flOpacityScale|TextureTranslucency)\b|---- Translucent ----/.test(l))
+        .map(l => /AUTO-GENERATED/.test(l) ? `// AUTO-GENERATED by ${GENERATOR} from ${HOLO_SOURCE}, without its translucency` : l)
+        .map(l => l.replace(/^(\s*TextureColor\s+)".*"/, `$1"${texture}"`));
+    // The empty "Translucent" { } group under VariableState.
+    const group = lines.findIndex(l => l.trim() === '"Translucent"');
+    if (group >= 0 && lines[group + 1]?.trim() === "{" && lines[group + 2]?.trim() === "}") lines.splice(group, 3);
+    WriteAddonFile(`${MATERIAL_DIR}/${NAME}_holo.vmat`, lines.join("\n"));
 }
-`;
 
-const Write = (path, data) => {
-    const url = new URL(path, ROOT);
-    mkdirSync(new URL(".", url), { recursive: true });
-    writeFileSync(url, data);
-    console.log(`wrote ${path}`);
-};
-const solid = rgb => EncodePng(4, 4, () => [...rgb, 255]);
-
-Write(`${MODEL_DIR}/${NAME}.obj`, obj);
-Write(`${MODEL_DIR}/${NAME}.vmdl`, vmdl);
-for (const [part, rgb] of [["face", FACE_MATERIAL ? null : FACE_COLOR], ["outline", OUTLINE_COLOR]]) {
-    if (!rgb) continue;
-    Write(`${MATERIAL_DIR}/${NAME}_${part}_color.png`, solid(rgb));
-    Write(`${MATERIAL_DIR}/${NAME}_${part}.vmat`, vmat(`${MATERIAL_DIR}/${NAME}_${part}_color.png`));
-}
-console.log(`${tris.face.length + tris.outline.length} triangles, ${(maxU - minU).toFixed(1)} x ${DEPTH + (outline.length ? LETTER_RAISE : 0)} x ${CAP_HEIGHT + 2 * OUTLINE_WIDTH} units (width x depth x height)`);
+const xs = [...letters, ...outline].flatMap(s => [s.outer, ...s.holes].flat()).map(p => p[0]);
+console.log(`${mesh.triangleCount} triangles, ${(Math.max(...xs) - Math.min(...xs)).toFixed(1)} x ${DEPTH + (outline.length ? LETTER_RAISE : 0)} x ${CAP_HEIGHT + 2 * OUTLINE_WIDTH} units (width x depth x height)`);
 console.log(`compile: game/bin/win64/resourcecompiler.exe -game csgo -addon melon_racer -i "<content path>/${MODEL_DIR}/${NAME}.vmdl"`);
