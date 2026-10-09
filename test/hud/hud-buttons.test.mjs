@@ -169,6 +169,20 @@ test("toggle buttons switch that player's own setting and show ON/OFF", () => {
     }
 });
 
+test("start in tutorial button: saved per player name, ON by default, OFF sends their next join to the hub", async () => {
+    const { IsStartInTutorialOn } = await import("../../src/melon_drive/kart/join-spot.js");
+    assert.equal(IsStartInTutorialOn(a), true, "on by default");
+    Click(0, "usermenu_jointutorial_button");
+    assert.equal(IsStartInTutorialOn(a), false);
+    assert.equal(hud.Variable(0, "usermenu_jointutorial_button", "jointutorial_state"), "OFF");
+    assert.equal(hud.Has(0, "usermenu_jointutorial_button", "ToggleOn"), false);
+    assert.equal(IsStartInTutorialOn(b), true, "the other player's untouched");
+    assert.equal(JSON.parse(world.saveData)[C.SAVE_DATA_PLAYER_SETTINGS_KEY][a.pawn.GetPlayerController().GetPlayerName()].startInTutorial, false, "in the save data");
+    Click(0, "usermenu_jointutorial_button");
+    assert.equal(IsStartInTutorialOn(a), true);
+    assert.equal(hud.Variable(0, "usermenu_jointutorial_button", "jointutorial_state"), "ON");
+});
+
 test("free look button: switching it on closes the menu, switching it off doesn't open it", () => {
     SetUserMenuOpen(0, a, true);
     Click(0, "usermenu_freelook_button");
@@ -231,7 +245,7 @@ test("color buttons paint that player's melon in the preset; an unknown color do
 });
 
 test("clicks from a player without a kart are ignored", () => {
-    for (const button of ["hub_close_button", "usermenu_close_button", "usermenu_respawn_button", "usermenu_restart_button", "usermenu_hub_button", "usermenu_tutorial_button", "usermenu_glow_button", "usermenu_freelook_button", "usermenu_color_red"]) {
+    for (const button of ["hub_close_button", "usermenu_close_button", "usermenu_respawn_button", "usermenu_restart_button", "usermenu_hub_button", "usermenu_tutorial_button", "usermenu_glow_button", "usermenu_jointutorial_button", "usermenu_freelook_button", "usermenu_color_red"]) {
         assert.doesNotThrow(() => Click(7, button), button);
     }
 });

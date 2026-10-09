@@ -1113,6 +1113,13 @@ const HUB_SPAWN_NAME = "hub_spawn";
 const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
 const INTRO_SPAWN_NAME = "intro_spawn";
 
+// Where a joining player's melon appears is their own choice (the user
+// menu's "Start in Tutorial" toggle, kart/join-spot.js): intro_spawn (the
+// default) or straight at hub_spawn. Kept per player name in the addon's
+// save data under this key, next to the best times, so it survives
+// reconnects and map restarts: { [playerName]: { startInTutorial: false } }.
+const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
+
 // The frozen pawn (CSMoveType.NOCLIP: non-solid, but WASD still flies it)
 // stays where it spawned — see HoldPawn in kart/spawn.js. It's only put back
 // once it has drifted further than this, not every tick.
@@ -2771,6 +2778,167 @@ function GetPodiumSpawnPoint(place) {
     return FindSpawnPoint(PodiumSpawnName(place));
 }
 
+// Pure time-trial rules — no cs_script import, so they're unit-testable in
+// Node (see test/race/time-trial.test.mjs). race/time-trial/time-trial.js applies them: starts
+// and stops a kart's run clock, and reads/writes the best times through
+// Instance.GetSaveData/SetSaveData.
+
+/**
+ * Best time (seconds) per track id per player name.
+ * @typedef {Record<string, Record<string, number>>} BestTimes
+ */
+
+/**
+ * "m:ss.cc", e.g. 83.456 -> "1:23.45". Truncated, not rounded, like a
+ * stopwatch — a run is never shown faster than it was.
+ * @param {number} seconds
+ */
+function FormatRaceTime(seconds) {
+    const centis = Math.floor(Math.max(0, seconds) * 100 + 1e-6);
+    const minutes = Math.floor(centis / 6000);
+    const secs = Math.floor(centis / 100) % 60;
+    const rest = centis % 100;
+    return `${minutes}:${String(secs).padStart(2, "0")}.${String(rest).padStart(2, "0")}`;
+}
+
+/**
+ * The addon's whole save data as an object — anything unreadable (empty on
+ * first run, or written by something else) counts as empty rather than
+ * throwing, so a broken file can't stop the script.
+ * @param {string} raw
+ * @returns {Record<string, any>}
+ */
+function ParseSaveData(raw) {
+    if (!raw) {
+        return {};
+    }
+    try {
+        const data = JSON.parse(raw);
+        return data && typeof data === "object" && !Array.isArray(data) ? data : {};
+    } catch {
+        return {};
+    }
+}
+
+/**
+ * The best times inside parsed save data (a fresh object if there are none).
+ * Drops entries that aren't positive numbers.
+ * @param {Record<string, any>} saveData
+ * @returns {BestTimes}
+ */
+function GetBestTimes(saveData) {
+    const raw = saveData[SAVE_DATA_BEST_TIMES_KEY];
+    /** @type {BestTimes} */
+    const best = {};
+    if (!raw || typeof raw !== "object") {
+        return best;
+    }
+    for (const [trackId, players] of Object.entries(raw)) {
+        if (!players || typeof players !== "object") {
+            continue;
+        }
+        for (const [name, time] of Object.entries(players)) {
+            if (typeof time === "number" && time > 0 && Number.isFinite(time)) {
+                (best[trackId] ??= {})[name] = time;
+            }
+        }
+    }
+    return best;
+}
+
+/**
+ * Records a finished run. Only a faster time than the player's best on
+ * that track replaces it.
+ * @param {BestTimes} best @param {number} trackId @param {string} playerName @param {number} time
+ * @returns {boolean} whether it's a new best
+ */
+function RecordRunTime(best, trackId, playerName, time) {
+    const previous = best[trackId]?.[playerName];
+    if (previous !== undefined && previous <= time) {
+        return false;
+    }
+    (best[trackId] ??= {})[playerName] = time;
+    return true;
+}
+
+// Pure rules of where a joining player's melon appears (kart/join-spot.js):
+// the "Start in Tutorial" setting inside the addon's parsed save data.
+
+/**
+ * Whether `playerName` starts in the tutorial when joining — true unless
+ * they switched it off (also for an unreadable entry).
+ * @param {Record<string, any>} saveData parsed, see ParseSaveData
+ * @param {string} playerName
+ */
+function StartsInTutorial(saveData, playerName) {
+    return saveData[SAVE_DATA_PLAYER_SETTINGS_KEY]?.[playerName]?.startInTutorial !== false;
+}
+
+/**
+ * `saveData` with `playerName`'s "Start in Tutorial" set to `on` — the rest
+ * (best times, other players, other settings) kept. The default (on) isn't
+ * stored, so players who never touched it leave no entry.
+ * @param {Record<string, any>} saveData parsed, see ParseSaveData
+ * @param {string} playerName @param {boolean} on
+ * @returns {Record<string, any>}
+ */
+function WithStartsInTutorial(saveData, playerName, on) {
+    const raw = saveData[SAVE_DATA_PLAYER_SETTINGS_KEY];
+    const all = raw && typeof raw === "object" && !Array.isArray(raw) ? { ...raw } : {};
+    const mine = { ...(all[playerName] && typeof all[playerName] === "object" ? all[playerName] : {}) };
+    if (on) {
+        delete mine.startInTutorial;
+    } else {
+        mine.startInTutorial = false;
+    }
+    if (Object.keys(mine).length > 0) {
+        all[playerName] = mine;
+    } else {
+        delete all[playerName];
+    }
+    return { ...saveData, [SAVE_DATA_PLAYER_SETTINGS_KEY]: all };
+}
+
+// Where a joining player's melon appears: the tutorial (intro_spawn, the
+// default) or straight in the hub — each player's own choice in the user
+// menu ("Start in Tutorial"), kept per player name in the addon's save data
+// (like the best times: the API has no stable player id). The rules are in
+// kart/join-spot-logic.js.
+
+/** @param {import("../core/kart-registry.js").Kart | { pawn: any }} kart */
+function PlayerName$1(kart) {
+    return kart.pawn.GetPlayerController()?.GetPlayerName() ?? "";
+}
+
+/** Whether this kart's player starts in the tutorial when joining. @param {import("../core/kart-registry.js").Kart} kart */
+function IsStartInTutorialOn(kart) {
+    return StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$1(kart));
+}
+
+/**
+ * Sets whether this kart's player starts in the tutorial next time they
+ * join, and saves it. @param {import("../core/kart-registry.js").Kart} kart @param {boolean} on
+ */
+function SetStartInTutorial(kart, on) {
+    // Re-read so the best times and everyone else's settings survive.
+    const data = WithStartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$1(kart), on);
+    Instance.SetSaveData(JSON.stringify(data));
+    Debug(`SetStartInTutorial: "${PlayerName$1(kart)}" starts ${on ? "in the tutorial" : "in the hub"} on join`);
+}
+
+/**
+ * Where a joining player's very first melon appears: intro_spawn (or the hub
+ * without one) — or hub_spawn if they switched "Start in Tutorial" off (the
+ * intro if the map has no hub_spawn).
+ * @param {any} pawn
+ */
+function GetJoinSpawnPoint(pawn) {
+    if (StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$1({ pawn }))) {
+        return GetIntroSpawnPoint();
+    }
+    return GetHubSpawnPoint() ?? GetIntroSpawnPoint();
+}
+
 // The one custom_hud_layout entity every HUD panel lives in (speedometer.xml),
 // plus the per-player input capture the modals share.
 
@@ -3359,7 +3527,7 @@ function ShowIntroLogoThenSpawn(slot, pawn) {
     if (now < end) {
         return;
     }
-    if (SetUpPlayerKart(pawn, GetIntroSpawnPoint())) {
+    if (SetUpPlayerKart(pawn, GetJoinSpawnPoint(pawn))) { // the intro, or the hub (the player's "Start in Tutorial" setting)
         SetIntroLogoVisible(slot, false);
         introLogoEnd.delete(slot);
     } else {
@@ -5411,89 +5579,6 @@ function GetTrackConfig() {
 /** Track ids in race order (ascending), derived from whatever start triggers exist. */
 function GetTrackOrder() {
     return Object.keys(GetTrackConfig()).map(Number).sort((a, b) => a - b);
-}
-
-// Pure time-trial rules — no cs_script import, so they're unit-testable in
-// Node (see test/race/time-trial.test.mjs). race/time-trial/time-trial.js applies them: starts
-// and stops a kart's run clock, and reads/writes the best times through
-// Instance.GetSaveData/SetSaveData.
-
-/**
- * Best time (seconds) per track id per player name.
- * @typedef {Record<string, Record<string, number>>} BestTimes
- */
-
-/**
- * "m:ss.cc", e.g. 83.456 -> "1:23.45". Truncated, not rounded, like a
- * stopwatch — a run is never shown faster than it was.
- * @param {number} seconds
- */
-function FormatRaceTime(seconds) {
-    const centis = Math.floor(Math.max(0, seconds) * 100 + 1e-6);
-    const minutes = Math.floor(centis / 6000);
-    const secs = Math.floor(centis / 100) % 60;
-    const rest = centis % 100;
-    return `${minutes}:${String(secs).padStart(2, "0")}.${String(rest).padStart(2, "0")}`;
-}
-
-/**
- * The addon's whole save data as an object — anything unreadable (empty on
- * first run, or written by something else) counts as empty rather than
- * throwing, so a broken file can't stop the script.
- * @param {string} raw
- * @returns {Record<string, any>}
- */
-function ParseSaveData(raw) {
-    if (!raw) {
-        return {};
-    }
-    try {
-        const data = JSON.parse(raw);
-        return data && typeof data === "object" && !Array.isArray(data) ? data : {};
-    } catch {
-        return {};
-    }
-}
-
-/**
- * The best times inside parsed save data (a fresh object if there are none).
- * Drops entries that aren't positive numbers.
- * @param {Record<string, any>} saveData
- * @returns {BestTimes}
- */
-function GetBestTimes(saveData) {
-    const raw = saveData[SAVE_DATA_BEST_TIMES_KEY];
-    /** @type {BestTimes} */
-    const best = {};
-    if (!raw || typeof raw !== "object") {
-        return best;
-    }
-    for (const [trackId, players] of Object.entries(raw)) {
-        if (!players || typeof players !== "object") {
-            continue;
-        }
-        for (const [name, time] of Object.entries(players)) {
-            if (typeof time === "number" && time > 0 && Number.isFinite(time)) {
-                (best[trackId] ??= {})[name] = time;
-            }
-        }
-    }
-    return best;
-}
-
-/**
- * Records a finished run. Only a faster time than the player's best on
- * that track replaces it.
- * @param {BestTimes} best @param {number} trackId @param {string} playerName @param {number} time
- * @returns {boolean} whether it's a new best
- */
-function RecordRunTime(best, trackId, playerName, time) {
-    const previous = best[trackId]?.[playerName];
-    if (previous !== undefined && previous <= time) {
-        return false;
-    }
-    (best[trackId] ??= {})[playerName] = time;
-    return true;
 }
 
 // Time trial: every run over a track is timed, for every player on their
@@ -7861,6 +7946,7 @@ function SetUserMenuOpen(slot, kart, open) {
         // Refreshed on every open: a layout or script reload in tools mode
         // wipes what was set when the kart spawned.
         UpdateMelonGlowHud(slot, kart);
+        UpdateStartInTutorialHud(slot, kart);
         UpdatePredictionHud(slot, kart);
         UpdateCollisionDebugHud(slot, kart);
         UpdateFreeLookHud(slot, kart);
@@ -7891,6 +7977,22 @@ function UpdateMelonGlowHud(slot, kart) {
     const on = IsMelonGlowOn(kart);
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_glow_button", "glow_state", on ? "ON" : "OFF");
     hud.SetHasClassForPlayer(slot, "usermenu_glow_button", "ToggleOn", on);
+}
+
+/**
+ * The user menu's "Start in Tutorial" toggle button: its ON/OFF text and
+ * highlight (ON: the player's melon appears in the tutorial when they join,
+ * OFF: in the hub — kart/join-spot.js).
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+function UpdateStartInTutorialHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const on = IsStartInTutorialOn(kart);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_jointutorial_button", "jointutorial_state", on ? "ON" : "OFF");
+    hud.SetHasClassForPlayer(slot, "usermenu_jointutorial_button", "ToggleOn", on);
 }
 
 /**
@@ -8047,6 +8149,15 @@ function RegisterHudInputs() {
             if (kart) {
                 SetMelonGlow(kart, !IsMelonGlowOn(kart));
                 UpdateMelonGlowHud(slot, kart);
+            }
+        } else if (event.buttonId === "usermenu_jointutorial_button") {
+            // Where this player's melon appears next time they join: the
+            // tutorial or the hub. Saved per player name (kart/join-spot.js).
+            const slot = event.player.GetPlayerSlot();
+            const kart = karts.get(slot);
+            if (kart) {
+                SetStartInTutorial(kart, !IsStartInTutorialOn(kart));
+                UpdateStartInTutorialHud(slot, kart);
             }
         } else if (event.buttonId === "usermenu_prediction_button") {
             // Per player: only this player's melon gets the line (drawn with
@@ -9187,7 +9298,8 @@ function RegisterKartInputs() {
 }
 
 // A player's kart: spawning the melon and freezing the pawn (spawn.js), the
-// spawn entities (spawn-points.js), moving the melon on purpose
+// spawn entities (spawn-points.js) and where a joining player starts
+// (join-spot.js), moving the melon on purpose
 // (teleport.js), its look — paint and glow (look.js) — and the player
 // lifecycle / paint trigger inputs (inputs.js). The kart record itself and
 // the registry of all karts are in core/kart-registry.js.

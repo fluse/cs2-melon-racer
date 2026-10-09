@@ -1029,7 +1029,7 @@
 }
 
 .UserMenuFrame {
-    width: 940px;
+    width: 1240px; /* three columns: actions, settings, developer */
     horizontal-align: center;
     vertical-align: center;
 }
@@ -1130,8 +1130,17 @@
 }
 
 .UserMenuActions {
-    width: 380px;
+    width: 360px;
+    height: 100%; /* as tall as the longest column, so the tutorial button can sit at the bottom */
     flow-children: down;
+}
+
+/* Fills the actions column's free height, pushing the tutorial button below
+   it to the bottom edge; at least a clear gap when the column is full. */
+.UserMenuActionsSpacer {
+    width: 100%;
+    height: fill-parent-flow( 1.0 );
+    min-height: 28px;
 }
 
 .UserMenuDivider {

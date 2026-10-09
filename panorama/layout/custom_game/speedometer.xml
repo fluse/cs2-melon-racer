@@ -405,8 +405,9 @@
 
 			<Panel class="UserMenuFrame" hittest="false">
 				<Panel class="UserMenuCard">
-					<!-- Left: what to do now (big buttons); right, after a gap and a
-					     divider: settings, as toggle rows grouped by topic. -->
+					<!-- Left: what to do now (big buttons); then, each after a gap and
+					     a divider: settings, as toggle rows grouped by topic, and the
+					     developer aids. -->
 					<Panel class="UserMenuColumns">
 						<Panel class="UserMenuActions">
 							<Label class="UserMenuColumnTitle" text="ACTIONS" />
@@ -434,6 +435,9 @@
 									<Label class="UserMenuButtonLabel" text="{s:hub_label}" />
 								</Panel>
 							</Button>
+							<!-- Pushes the tutorial button down to the column's bottom edge,
+							     apart from the buttons above (.UserMenuActionsSpacer). -->
+							<Panel class="UserMenuActionsSpacer" hittest="false" />
 							<!-- Same as the hub button (also leaves a running heat), but to
 							     intro_spawn — see SendKartToTutorial. -->
 							<Button id="usermenu_tutorial_button" class="UserMenuActionButton UserMenuButtonPlain">
@@ -470,6 +474,16 @@
 							</Button>
 
 							<Panel class="UserMenuGroupHeader">
+								<Image class="UserMenuGroupIcon" src="file://{images}/custom_game/icons/tutorial.png" />
+								<Label class="UserMenuGroupLabel" text="ON JOIN" />
+							</Panel>
+							<!-- Where your melon appears when you join: ON the tutorial (intro_spawn, default), OFF straight in the hub. Saved per player name (kart/join-spot.js). -->
+							<Button id="usermenu_jointutorial_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Start in Tutorial" />
+								<Label class="UserMenuTogglePill" text="{s:jointutorial_state}" />
+							</Button>
+
+							<Panel class="UserMenuGroupHeader">
 								<Image class="UserMenuGroupIcon" src="file://{images}/custom_game/icons/guide-line.png" />
 								<Label class="UserMenuGroupLabel" text="DRIVING AIDS" />
 							</Panel>
@@ -478,11 +492,13 @@
 								<Label class="UserMenuToggleName" text="Guide Line" />
 								<Label class="UserMenuTogglePill" text="{s:prediction_state}" />
 							</Button>
+						</Panel>
 
-							<Panel class="UserMenuGroupHeader">
-								<Image class="UserMenuGroupIcon" src="file://{images}/custom_game/icons/debug.png" />
-								<Label class="UserMenuGroupLabel" text="DEVELOPER" />
-							</Panel>
+						<Panel class="UserMenuDivider" />
+
+						<!-- Third column: developer aids and test previews. -->
+						<Panel class="UserMenuSettings">
+							<Label class="UserMenuColumnTitle" text="DEVELOPER" />
 							<!-- How ground/wall contact and jump presses are judged (dev/collision-debug.js); its drawing only shows in tools mode. -->
 							<Button id="usermenu_collisiondebug_button" class="UserMenuToggle">
 								<Label class="UserMenuToggleName" text="Collision Debug" />

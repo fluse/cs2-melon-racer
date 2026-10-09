@@ -32,6 +32,13 @@ export const HUB_SPAWN_NAME = "hub_spawn";
 export const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
 export const INTRO_SPAWN_NAME = "intro_spawn";
 
+// Where a joining player's melon appears is their own choice (the user
+// menu's "Start in Tutorial" toggle, kart/join-spot.js): intro_spawn (the
+// default) or straight at hub_spawn. Kept per player name in the addon's
+// save data under this key, next to the best times, so it survives
+// reconnects and map restarts: { [playerName]: { startInTutorial: false } }.
+export const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
+
 // The frozen pawn (CSMoveType.NOCLIP: non-solid, but WASD still flies it)
 // stays where it spawned — see HoldPawn in kart/spawn.js. It's only put back
 // once it has drifted further than this, not every tick.

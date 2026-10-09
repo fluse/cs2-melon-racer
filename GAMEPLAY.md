@@ -914,6 +914,15 @@ long fall lands hard enough for the engine to destroy the melon on impact.
   until it reaches a checkpoint or is sent to the hub. Without an
   `intro_spawn`, the first spawn uses `hub_spawn`. Reconnecting counts as a
   first join again (the kart is dropped on disconnect).
+- **Start in Tutorial** (decided): each player chooses in the user menu
+  (SETTINGS → "ON JOIN") whether that first melon appears at `intro_spawn`
+  (ON, the default) or straight at `hub_spawn` (OFF) — for players who
+  know the tutorial already. Saved per player name in the addon's save
+  data (`SAVE_DATA_PLAYER_SETTINGS_KEY`, next to the best times), so it
+  holds for every later join; like the best times, renaming starts from
+  the default. The "Play Tutorial" button works either way. Rules:
+  `kart/join-spot-logic.js` (`test/kart/join-spot-logic.test.mjs`),
+  applied by `kart/join-spot.js`.
 - Returning to the hub uses `hub_spawn` (required — there's no fallback),
   facing `hub_spawn_facing` if placed, else `hub_spawn`'s own angles.
 - The user menu's "Play Tutorial" button sends that player back to

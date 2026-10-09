@@ -47,7 +47,7 @@ src/melon_drive/index.js                 # melon_drive entry — wiring only: ti
 src/melon_drive/<domain>/                # one folder per domain, each with an index.js (its public API); bigger
                                           #   domains have one subfolder per feature (see "Folder layout" below):
                                           #   core/      kart-registry.js (Kart type, karts map, moderator), think.js (per-tick driver), trace.js, debug.js
-                                          #   kart/      spawn.js (melon spawn, frozen pawn, intro logo), spawn-points.js (+ spawn-points-logic.js), teleport.js (checkpoint respawn,
+                                          #   kart/      spawn.js (melon spawn, frozen pawn, intro logo), spawn-points.js (+ spawn-points-logic.js), join-spot.js (+ -logic.js: tutorial or hub on join), teleport.js (checkpoint respawn,
                                           #              generic teleport), look.js (paint color + outline glow), inputs.js (player reset/disconnect, melon_paint)
                                           #   movement/  driving/ (drive.js = UpdateKart, the per-tick order; steering), contact/ (floor/wall probes),
                                           #              jump/, wall-bounce/, attack-boost/, momentum/

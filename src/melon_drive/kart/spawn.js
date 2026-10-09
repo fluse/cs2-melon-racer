@@ -2,7 +2,8 @@ import { Instance, PointTemplate, CSMoveType, CustomCameraMode } from "cs_script
 import { Debug } from "../core/debug.js";
 import { karts, moderatorSlot, SetModeratorSlot } from "../core/kart-registry.js";
 import { ApplyCameraFollow } from "../camera/index.js";
-import { FacePlayerView, GetIntroSpawnPoint } from "./spawn-points.js";
+import { FacePlayerView } from "./spawn-points.js";
+import { GetJoinSpawnPoint } from "./join-spot.js";
 import { GetSpeedHud } from "../hud/layout.js";
 import { ShowMelonPaint } from "./look.js";
 import { SetFreeLook } from "../dev/free-look.js";
@@ -247,7 +248,7 @@ function ShowIntroLogoThenSpawn(slot, pawn) {
     if (now < end) {
         return;
     }
-    if (SetUpPlayerKart(pawn, GetIntroSpawnPoint())) {
+    if (SetUpPlayerKart(pawn, GetJoinSpawnPoint(pawn))) { // the intro, or the hub (the player's "Start in Tutorial" setting)
         SetIntroLogoVisible(slot, false);
         introLogoEnd.delete(slot);
     } else {
