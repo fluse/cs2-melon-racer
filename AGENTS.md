@@ -55,7 +55,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #   health/    damage/ (impacts, flat landings), breaking/ (break, effects at the crash site, respawn, melon_break),
                                           #              heal/ (heal zones, full health on respawn)
                                           #   zones/     registry.js (which zones a melon is in, the WallRules that follow), inputs.js (every *_enter/*_leave),
-                                          #              lift/, jump-pad/ (launch + no-damage flight), camera-zone/, side-view/ (2D: screen-axis driving, plane lock),
+                                          #              lift/, jump-pad/ (launch + no-damage flight), camera-zone/, side-view/ (2D: A/D-only screen-axis driving, plane lock, W/S depth zones),
                                           #              water/ (stop on entry, no impacts inside), jump-recharge/ (wall-jump charges kept full inside),
                                           #              teleport/ (melon_teleport)
                                           #   race/      track-config.js (tracks from trigger names), checkpoints/ (progress, start_/checkpoint_/finish_ inputs),

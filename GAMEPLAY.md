@@ -1144,8 +1144,9 @@ camera looks, Hammer yaw; defaults `SIDE_VIEW_*`). Inside:
 - The camera is switched to `CONTROLLED` mode and placed by script every
   tick, aiming at the melon; it swings over from the chase camera and back
   over `SIDE_VIEW_EASE_SECONDS`. Walls don't pull it in.
-- The mouse doesn't steer: A/D drive left/right on screen (and turn the
-  melon that way), W the way it faces, S the other way; jumps, wall jumps,
+- The mouse doesn't steer, and **only A/D drive** (decided): left/right on
+  screen, turning the melon that way; W/S do nothing (but see depth zones
+  below). Jumps, wall jumps,
   bounces and the attack boost (along the facing) work as usual — except
   that a wall jump **isn't rated** (decided): no angle rating, boost or
   feedback, as in a lift zone — instead it always goes a bit higher and
@@ -1155,6 +1156,12 @@ camera looks, Hammer yaw; defaults `SIDE_VIEW_*`). Inside:
   chain.
   As in a lift zone they cost no charge (and need none, decided) and may
   follow a bounce at once.
+- **Depth zones:** a smaller `trigger_multiple` inside the side-view zone
+  (`side_view_depth_enter`/`side_view_depth_leave`, any name) lets the melon
+  move in depth there: W drives into the screen (away from the camera), S
+  out of it, and it isn't held on its plane. Leaving it, the plane is
+  wherever the melon is then (`SideViewDepthInput`, `SideViewDriving` in
+  `movement/driving/drive.js`).
 - The melon stays on the plane it entered on: speed towards/away from the
   camera is dropped every tick and a drift pulled back
   (`SIDE_VIEW_PLANE_PULL`).

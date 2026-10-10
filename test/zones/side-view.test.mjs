@@ -1,12 +1,12 @@
 // Side-view zones (zones/side-view/, camera/side-view/): the pure rules, then
-// the real UpdateKart and side camera against the fake engine — A/D drive
+// the real UpdateKart and side camera against the fake engine — only A/D drive
 // along the screen axis whatever the mouse does, the melon stays on its
 // plane, and the camera swings to the side and back.
 import "../helpers/register-cs-script.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
-import { SideViewFromName, SideViewAxes, InitialFacing, SideViewInput, KeepOnPlane } from "../../src/melon_drive/zones/side-view/logic.js";
+import { SideViewFromName, SideViewAxes, InitialFacing, SideViewInput, SideViewDepthInput, KeepOnPlane } from "../../src/melon_drive/zones/side-view/logic.js";
 import { StepSideViewBlend, SideViewPose, ChaseCameraPose, BlendPose, IsTeleportJump, CutsSideViewExit } from "../../src/melon_drive/camera/side-view/logic.js";
 import {
     SIDE_VIEW_DEFAULT_YAW,
@@ -43,11 +43,14 @@ test("looking north (yaw 90), screen right is east", () => {
     assert.ok(close(right.x, 1) && close(right.y, 0));
 });
 
-test("A/D drive and turn the melon on screen, W follows its facing, S drives back without turning", () => {
-    assert.deepEqual(SideViewInput(0, 1, -1), { axis: 1, facing: 1 });
-    assert.deepEqual(SideViewInput(0, -1, 1), { axis: -1, facing: -1 });
-    assert.deepEqual(SideViewInput(1, 0, -1), { axis: -1, facing: -1 });
-    assert.deepEqual(SideViewInput(-1, 0, 1), { axis: -1, facing: 1 });
+test("only A/D drive and turn the melon on screen; W/S only drive in a depth zone", () => {
+    assert.deepEqual(SideViewInput(1, -1), { axis: 1, facing: 1 });
+    assert.deepEqual(SideViewInput(-1, 1), { axis: -1, facing: -1 });
+    assert.deepEqual(SideViewInput(0, -1), { axis: 0, facing: -1 });
+    assert.equal(SideViewDepthInput(1, false), 0);
+    assert.equal(SideViewDepthInput(-1, false), 0);
+    assert.equal(SideViewDepthInput(1, true), 1);
+    assert.equal(SideViewDepthInput(-1, true), -1);
     assert.equal(InitialFacing({ x: -100, y: 0 }, { x: 1, y: 0 }), -1);
     assert.equal(InitialFacing({ x: 0, y: 0 }, { x: 1, y: 0 }), 1);
 });
@@ -133,6 +136,38 @@ test("in a side view, D drives screen right (east) whatever way the player looks
     const v = kart.melon.GetAbsVelocity();
     assert.ok(v.x > 0, `drives east, got ${JSON.stringify(v)}`);
     assert.ok(Math.abs(v.y) < 1e-6, `no speed towards the camera, got ${v.y}`);
+});
+
+test("in a side view, W and S do nothing", () => {
+    kart.melon.velocity = { x: 0, y: 0, z: 0 };
+    ScriptInput("side_view_enter")({ caller: trigger, activator: kart.melon });
+    for (const key of ["FORWARD", "BACK"]) {
+        for (let i = 0; i < 10; i++) {
+            Tick([key]);
+        }
+        const v = kart.melon.GetAbsVelocity();
+        assert.ok(Math.hypot(v.x, v.y) < 1e-6, `${key} doesn't move it, got ${JSON.stringify(v)}`);
+    }
+});
+
+test("in a depth zone, W drives into the screen and S out of it; leaving, the melon is held on its new plane", () => {
+    const depth = world.add(new Entity({ name: "side_view_depth_a", className: "trigger_multiple" }));
+    kart.melon.origin = { x: 0, y: 0, z: 10 };
+    kart.melon.velocity = { x: 0, y: 0, z: 0 };
+    ScriptInput("side_view_enter")({ caller: trigger, activator: kart.melon });
+    ScriptInput("side_view_depth_enter")({ caller: depth, activator: kart.melon });
+    Tick(["FORWARD"]);
+    assert.ok(kart.melon.GetAbsVelocity().y > 0, "W: north, away from the camera (looking north)");
+    kart.melon.velocity = { x: 0, y: 0, z: 0 };
+    Tick(["BACK"]);
+    assert.ok(kart.melon.GetAbsVelocity().y < 0, "S: south, towards the camera");
+
+    kart.melon.origin = { x: 0, y: 120, z: 10 }; // moved in depth
+    kart.melon.velocity = { x: 0, y: 0, z: 0 };
+    Tick([]);
+    ScriptInput("side_view_depth_leave")({ caller: depth, activator: kart.melon });
+    Tick(["FORWARD"]);
+    assert.ok(Math.abs(kart.melon.GetAbsVelocity().y) < 1e-6, `W does nothing again and no pull back to the old plane, got ${kart.melon.GetAbsVelocity().y}`);
 });
 
 test("the camera takes over in CONTROLLED mode at the side and hands back to the chase camera after leaving", () => {

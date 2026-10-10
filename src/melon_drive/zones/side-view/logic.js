@@ -53,17 +53,26 @@ export function InitialFacing(velocity, right) {
 }
 
 /**
- * Driving input in a side view. A/D drive left/right on screen and turn the
- * melon that way; W drives the way it faces, S the other way (without
- * turning it). The mouse does nothing.
- * @param {number} forwardInput W/S, -1..1 @param {number} strafeInput D/A, -1..1 @param {1 | -1} facing
+ * Driving input in a side view: only A/D, left/right on screen, turning the
+ * melon that way. W/S and the mouse do nothing here (see SideViewDepthInput).
+ * @param {number} strafeInput D/A, -1..1 @param {1 | -1} facing
  * @returns {{ axis: number, facing: 1 | -1 }} axis: -1..1 along screen right (0 = no input)
  */
-export function SideViewInput(forwardInput, strafeInput, facing) {
+export function SideViewInput(strafeInput, facing) {
     if (strafeInput !== 0) {
         return { axis: strafeInput, facing: strafeInput < 0 ? -1 : 1 };
     }
-    return { axis: forwardInput * facing, facing };
+    return { axis: 0, facing };
+}
+
+/**
+ * W/S in a side view: only inside a depth zone do they drive, W into the
+ * screen (along the view, away from the camera), S out of it.
+ * @param {number} forwardInput W/S, -1..1 @param {boolean} inDepthZone
+ * @returns {number} -1..1 along the view (0 = none)
+ */
+export function SideViewDepthInput(forwardInput, inDepthZone) {
+    return inDepthZone ? forwardInput : 0;
 }
 
 /** How far along `view` (towards the camera's far side) a point is. @param {{ x: number, y: number }} origin @param {Dir2} view */

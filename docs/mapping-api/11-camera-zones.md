@@ -83,8 +83,8 @@ floor keep pulling it back in, use `camera_zone_noclip_front_…`.
 ## Side-view zones
 
 A 2D jump & run section: the camera stops following the mouse and looks at
-the melon from one fixed side, at a set distance. A/D drive left/right on
-screen, W drives the way the melon faces, S the other way, Space jumps. Wall
+the melon from one fixed side, at a set distance. Only A/D drive, left/right on
+screen; W/S do nothing (except in a [depth zone](#depth-zones)), Space jumps. Wall
 jumps there aren't rated by angle (no boost, no PERFECT), as in a
 [lift zone](10-lift-zones.md), but always go a bit higher and further, and
 use a lift zone's longer contact window — and, as there, they use up no charges. The melon stays on the plane it entered on — nothing moves it towards or away
@@ -139,6 +139,24 @@ bit of room above for jumps.
 | `SIDE_VIEW_EASE_SECONDS` | 0.8 s | swing to the side and back | `camera/side-view/constants.js` |
 | `SIDE_VIEW_TELEPORT_DISTANCE` | 256 units | a move in one tick this far counts as a teleport | `camera/side-view/constants.js` |
 | `SIDE_VIEW_TELEPORT_CUT_SECONDS` | 0.25 s | leaving within this long after a teleport cuts back instead of swinging | `camera/side-view/constants.js` |
+
+## Depth zones
+
+A small area inside a side-view zone where the melon may also move in
+depth: W drives into the screen (away from the camera), S out of it (towards
+the camera), and the melon isn't held on its plane. Leaving it, the melon is
+held on the plane it's on right then. Outside a side view it does nothing.
+
+| Setting | Value |
+|---|---|
+| Class | `trigger_multiple` ([standard setup](01-conventions.md#3-every-melon-trigger-is-set-up-the-same-way)) |
+| Name | anything |
+| `OnStartTouch` | → `melon_drive_script` → `RunScriptInput` → `side_view_depth_enter` |
+| `OnEndTouch` | → `melon_drive_script` → `RunScriptInput` → `side_view_depth_leave` |
+
+Both outputs are required. The side camera follows the melon in depth on
+its own (it always sits at the zone's distance from the melon), so keep the
+space towards the camera clear here too.
 
 ---
 [← Lift zones](10-lift-zones.md) · [Mapping API](README.md) · [Jump pads →](12-jump-pads.md)

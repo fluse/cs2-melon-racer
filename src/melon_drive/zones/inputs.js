@@ -1,4 +1,4 @@
-// Script inputs of the zone triggers — heal, lift, camera, side-view, water and jump recharge zones, jump pads,
+// Script inputs of the zone triggers — heal, lift, camera, side-view (+ depth), water and jump recharge zones, jump pads,
 // plus the teleporters (teleport/inputs.js). The zones all work
 // the same way: OnStartTouch -> "<kind>_enter", OnEndTouch -> "<kind>_leave",
 // and the touched trigger's own name may carry its value (heal_zone_<rate>,
@@ -52,6 +52,8 @@ export function RegisterZoneInputs() {
     RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
     // Side-view zones — see side-view/constants.js. Read by UpdateKart (2D driving) and the side camera (camera/side-view/).
     RegisterZone("side_view_enter", "side_view_leave", "sideViews", SideViewFromName, "yaw/distance/height");
+    // Side-view depth zones — inside a side view, W/S move the melon towards/away from the camera. Read by UpdateKart.
+    RegisterZone("side_view_depth_enter", "side_view_depth_leave", "sideViewDepths", () => 1, "(side-view depth)");
     // Jump pads — see jump-pad/constants.js. Read by jump-pad/jump-pad.js (launch, no damage).
     RegisterZone("jump_pad_enter", "jump_pad_leave", "jumpPads", JumpPadFromName, "up/forward u/s");
     // Water zones (a trigger around a func_water) — see water/constants.js:

@@ -44,9 +44,9 @@ import { ApplyImpactDamage } from "../../health/damage/damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage, WallBounceBreaksAtImpact } from "../wall-bounce/wall-bounce.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
 import { ApplyHealing } from "../../health/heal/index.js";
-import { CurrentWallRules, CurrentSideView, InWater, InJumpRechargeZone } from "../../zones/registry.js";
+import { CurrentWallRules, CurrentSideView, InSideViewDepthZone, InWater, InJumpRechargeZone } from "../../zones/registry.js";
 import { ChargeInRechargeZone } from "../../zones/jump-recharge/logic.js";
-import { SideViewAxes, InitialFacing, SideViewInput, PlaneDepth, KeepOnPlane } from "../../zones/side-view/logic.js";
+import { SideViewAxes, InitialFacing, SideViewInput, SideViewDepthInput, PlaneDepth, KeepOnPlane } from "../../zones/side-view/logic.js";
 import { PodiumHoldActive, PodiumHoldVelocity } from "../../race/podium/logic.js";
 
 /** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt */
@@ -291,9 +291,10 @@ export function UpdateKart(slot, kart, dt) {
     const sideView = SideViewDriving(kart, origin, currentVelocity, forwardInput, strafeInput);
     const rad = (pawn.GetEyeAngles().yaw * Math.PI) / 180;
     const forwardDir = sideView ? sideView.forwardDir : { x: Math.cos(rad), y: Math.sin(rad) };
-    const rightDir = { x: Math.sin(rad), y: -Math.cos(rad) };
+    // In a side view the "strafe" axis is the depth (W/S in a depth zone).
+    const rightDir = sideView ? sideView.view : { x: Math.sin(rad), y: -Math.cos(rad) };
     const driveForward = sideView ? sideView.forwardInput : forwardInput;
-    const driveStrafe = sideView ? 0 : strafeInput;
+    const driveStrafe = sideView ? sideView.depthInput : strafeInput;
 
     // After a wall bounce, steering/friction apply on top of the reflected
     // velocity rather than whatever vphysics left behind — so the player can
@@ -381,8 +382,9 @@ export function UpdateKart(slot, kart, dt) {
         vx = hold.x;
         vy = hold.y;
     }
-    // Side view: nothing moves the melon towards or away from the camera.
-    if (sideView) {
+    // Side view: nothing moves the melon towards or away from the camera —
+    // except in a depth zone, where the plane follows the melon instead.
+    if (sideView && !sideView.free) {
         const kept = KeepOnPlane({ x: vx, y: vy }, sideView.view, sideView.depthError);
         vx = kept.x;
         vy = kept.y;
@@ -421,8 +423,10 @@ export function UpdateKart(slot, kart, dt) {
 
 /**
  * Driving in a side-view zone (zones/side-view/): the screen axis instead of
- * the look direction, A/D left/right on screen, W the way the melon faces
- * (see SideViewInput), and how far it's off the plane it entered on.
+ * the look direction, only A/D, left/right on screen (see SideViewInput), and
+ * how far it's off the plane it entered on. In a depth zone W/S drive along
+ * the view and the plane moves with the melon (`free`), so leaving the
+ * depth zone holds it on the plane it's on then.
  * undefined outside one. Entering a (new) zone starts on the plane the melon
  * is on, facing the way it moves.
  * @param {import("../../core/kart-registry.js").Kart} kart
@@ -438,12 +442,21 @@ function SideViewDriving(kart, origin, velocity, forwardInput, strafeInput) {
     if (kart.sideViewDrive?.zone !== zone) {
         kart.sideViewDrive = { zone, plane: PlaneDepth(origin, view), facing: InitialFacing(velocity, right) };
     }
-    const input = SideViewInput(forwardInput, strafeInput, kart.sideViewDrive.facing);
+    const input = SideViewInput(strafeInput, kart.sideViewDrive.facing);
     kart.sideViewDrive.facing = input.facing;
+    // In a depth zone, and on the first tick after it, the plane is where the
+    // melon is (it may have rested in the zone, skipping this).
+    const free = InSideViewDepthZone(kart);
+    if (free || kart.sideViewDrive.free) {
+        kart.sideViewDrive.plane = PlaneDepth(origin, view);
+    }
+    kart.sideViewDrive.free = free;
     const dir = input.axis !== 0 ? Math.sign(input.axis) : input.facing;
     return {
         forwardDir: { x: right.x * dir, y: right.y * dir },
         forwardInput: Math.abs(input.axis),
+        depthInput: SideViewDepthInput(forwardInput, free),
+        free,
         view,
         depthError: kart.sideViewDrive.plane - PlaneDepth(origin, view),
     };

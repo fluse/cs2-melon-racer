@@ -4,6 +4,7 @@
 // jump pads (jump_pad_enter/jump_pad_leave, zones/jump-pad/constants.js)
 // water zones (water_enter/water_leave, zones/water/constants.js)
 // side-view zones (side_view_enter/side_view_leave, zones/side-view/constants.js)
+// side-view depth zones (side_view_depth_enter/side_view_depth_leave, same file)
 // and jump recharge zones (jump_recharge_enter/jump_recharge_leave, zones/jump-recharge/logic.js):
 // entering/leaving them (registered in inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.
@@ -12,7 +13,7 @@
 // tracked separately.
 import { WallRules } from "./lift/logic.js";
 
-/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews" | "jumpRecharges"} ZoneKind */
+/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews" | "sideViewDepths" | "jumpRecharges"} ZoneKind */
 
 /**
  * The melon entered a zone trigger of this kind, worth `value`.
@@ -43,6 +44,7 @@ export function LeaveZones(kart) {
     kart.jumpPads?.clear();
     kart.waterZones?.clear();
     kart.sideViews?.clear();
+    kart.sideViewDepths?.clear();
     kart.jumpRecharges?.clear();
 }
 
@@ -86,6 +88,15 @@ export function InWater(kart) {
  */
 export function InJumpRechargeZone(kart) {
     return StrongestZone(kart, "jumpRecharges") !== undefined;
+}
+
+/**
+ * Whether the melon is inside a side-view depth zone — W/S move it towards
+ * and away from the camera there, see zones/side-view/constants.js.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+export function InSideViewDepthZone(kart) {
+    return StrongestZone(kart, "sideViewDepths") !== undefined;
 }
 
 /** The wall bounce / wall jump rules for where the melon is now (see WallRules). @param {import("../core/kart-registry.js").Kart} kart */

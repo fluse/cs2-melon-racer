@@ -121,7 +121,8 @@ function TraceSphere(config) {
  *   cameraZones?: Map<any, import("../zones/camera-zone/logic.js").CameraZone>, // camera triggers the melon is inside -> their zoom, see zones/registry.js
  *   zoneCamera?: import("../zones/camera-zone/logic.js").ZoneCameraState, // the camera-zone zoom being eased in/out — see UpdateZoneCamera
  *   sideViews?: Map<any, import("../zones/side-view/logic.js").SideView>, // side-view triggers the melon is inside -> their view, see zones/registry.js
- *   sideViewDrive?: { zone: import("../zones/side-view/logic.js").SideView, plane: number, facing: 1 | -1 }, // the side view being driven in: its plane and which way the melon faces on screen — see UpdateKart
+ *   sideViewDepths?: Map<any, number>, // side-view depth triggers the melon is inside (value unused), see zones/registry.js
+ *   sideViewDrive?: { zone: import("../zones/side-view/logic.js").SideView, plane: number, facing: 1 | -1, free?: boolean }, // the side view being driven in: its plane, which way the melon faces on screen, whether it was in a depth zone last tick — see UpdateKart
  *   sideViewBlend?: number, // 0..1, how far the camera has swung to the side — see UpdateSideViewCamera
  *   sideViewZone?: import("../zones/side-view/logic.js").SideView, sideViewLast?: import("../zones/side-view/logic.js").SideView, // the side view the camera is in / swinging out of — see UpdateSideViewCamera
  *   sideViewOrigin?: { x: number, y: number, z: number }, sideViewTeleportTime?: number, // the melon's origin last tick / when it last jumped there by teleport — see UpdateSideViewCamera
@@ -1286,6 +1287,13 @@ const CAMERA_CLOSEUP_EASE_SECONDS = 1.2;
 //                                         looking down at it (negative: from below)
 // Any other name: SIDE_VIEW_DEFAULT_YAW, SIDE_VIEW_DISTANCE, SIDE_VIEW_HEIGHT.
 // Overlapping zones: the one entered last counts.
+// Only A/D drive (decided) — W/S do nothing, except inside a side-view depth
+// zone: a trigger_multiple (filtered to prop_physics, any name) with
+// OnStartTouch -> RunScriptInput "side_view_depth_enter" and OnEndTouch ->
+// "side_view_depth_leave", placed inside a side-view zone. There W drives
+// into the screen (away from the camera), S out of it (towards the camera),
+// the melon isn't held on its plane, and leaving it the plane is wherever the
+// melon is then. Outside a side view it does nothing.
 const SIDE_VIEW_NAME_PATTERN = /^side_view_(-?\d+(?:\.\d+)?)(?:_(\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?)?$/;
 const SIDE_VIEW_DEFAULT_YAW = 90; // degrees, for a zone without values in its name
 // How far from the melon the camera sits, without a distance in the name.
@@ -2033,6 +2041,7 @@ function LiftZoneUpSpeed(triggerName) {
 // jump pads (jump_pad_enter/jump_pad_leave, zones/jump-pad/constants.js)
 // water zones (water_enter/water_leave, zones/water/constants.js)
 // side-view zones (side_view_enter/side_view_leave, zones/side-view/constants.js)
+// side-view depth zones (side_view_depth_enter/side_view_depth_leave, same file)
 // and jump recharge zones (jump_recharge_enter/jump_recharge_leave, zones/jump-recharge/logic.js):
 // entering/leaving them (registered in inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.
@@ -2040,7 +2049,7 @@ function LiftZoneUpSpeed(triggerName) {
 // health/s, lift kick in u/s, camera zoom), so overlapping zones and their leaves are
 // tracked separately.
 
-/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews" | "jumpRecharges"} ZoneKind */
+/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews" | "sideViewDepths" | "jumpRecharges"} ZoneKind */
 
 /**
  * The melon entered a zone trigger of this kind, worth `value`.
@@ -2071,6 +2080,7 @@ function LeaveZones(kart) {
     kart.jumpPads?.clear();
     kart.waterZones?.clear();
     kart.sideViews?.clear();
+    kart.sideViewDepths?.clear();
     kart.jumpRecharges?.clear();
 }
 
@@ -2114,6 +2124,15 @@ function InWater(kart) {
  */
 function InJumpRechargeZone(kart) {
     return StrongestZone(kart, "jumpRecharges") !== undefined;
+}
+
+/**
+ * Whether the melon is inside a side-view depth zone — W/S move it towards
+ * and away from the camera there, see zones/side-view/constants.js.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function InSideViewDepthZone(kart) {
+    return StrongestZone(kart, "sideViewDepths") !== undefined;
 }
 
 /** The wall bounce / wall jump rules for where the melon is now (see WallRules). @param {import("../core/kart-registry.js").Kart} kart */
@@ -2318,17 +2337,26 @@ function InitialFacing(velocity, right) {
 }
 
 /**
- * Driving input in a side view. A/D drive left/right on screen and turn the
- * melon that way; W drives the way it faces, S the other way (without
- * turning it). The mouse does nothing.
- * @param {number} forwardInput W/S, -1..1 @param {number} strafeInput D/A, -1..1 @param {1 | -1} facing
+ * Driving input in a side view: only A/D, left/right on screen, turning the
+ * melon that way. W/S and the mouse do nothing here (see SideViewDepthInput).
+ * @param {number} strafeInput D/A, -1..1 @param {1 | -1} facing
  * @returns {{ axis: number, facing: 1 | -1 }} axis: -1..1 along screen right (0 = no input)
  */
-function SideViewInput(forwardInput, strafeInput, facing) {
+function SideViewInput(strafeInput, facing) {
     if (strafeInput !== 0) {
         return { axis: strafeInput, facing: strafeInput < 0 ? -1 : 1 };
     }
-    return { axis: forwardInput * facing, facing };
+    return { axis: 0, facing };
+}
+
+/**
+ * W/S in a side view: only inside a depth zone do they drive, W into the
+ * screen (along the view, away from the camera), S out of it.
+ * @param {number} forwardInput W/S, -1..1 @param {boolean} inDepthZone
+ * @returns {number} -1..1 along the view (0 = none)
+ */
+function SideViewDepthInput(forwardInput, inDepthZone) {
+    return inDepthZone ? forwardInput : 0;
 }
 
 /** How far along `view` (towards the camera's far side) a point is. @param {{ x: number, y: number }} origin @param {Dir2} view */
@@ -9351,9 +9379,10 @@ function UpdateKart(slot, kart, dt) {
     const sideView = SideViewDriving(kart, origin, currentVelocity, forwardInput, strafeInput);
     const rad = (pawn.GetEyeAngles().yaw * Math.PI) / 180;
     const forwardDir = sideView ? sideView.forwardDir : { x: Math.cos(rad), y: Math.sin(rad) };
-    const rightDir = { x: Math.sin(rad), y: -Math.cos(rad) };
+    // In a side view the "strafe" axis is the depth (W/S in a depth zone).
+    const rightDir = sideView ? sideView.view : { x: Math.sin(rad), y: -Math.cos(rad) };
     const driveForward = sideView ? sideView.forwardInput : forwardInput;
-    const driveStrafe = sideView ? 0 : strafeInput;
+    const driveStrafe = sideView ? sideView.depthInput : strafeInput;
 
     // After a wall bounce, steering/friction apply on top of the reflected
     // velocity rather than whatever vphysics left behind — so the player can
@@ -9441,8 +9470,9 @@ function UpdateKart(slot, kart, dt) {
         vx = hold.x;
         vy = hold.y;
     }
-    // Side view: nothing moves the melon towards or away from the camera.
-    if (sideView) {
+    // Side view: nothing moves the melon towards or away from the camera —
+    // except in a depth zone, where the plane follows the melon instead.
+    if (sideView && !sideView.free) {
         const kept = KeepOnPlane({ x: vx, y: vy }, sideView.view, sideView.depthError);
         vx = kept.x;
         vy = kept.y;
@@ -9481,8 +9511,10 @@ function UpdateKart(slot, kart, dt) {
 
 /**
  * Driving in a side-view zone (zones/side-view/): the screen axis instead of
- * the look direction, A/D left/right on screen, W the way the melon faces
- * (see SideViewInput), and how far it's off the plane it entered on.
+ * the look direction, only A/D, left/right on screen (see SideViewInput), and
+ * how far it's off the plane it entered on. In a depth zone W/S drive along
+ * the view and the plane moves with the melon (`free`), so leaving the
+ * depth zone holds it on the plane it's on then.
  * undefined outside one. Entering a (new) zone starts on the plane the melon
  * is on, facing the way it moves.
  * @param {import("../../core/kart-registry.js").Kart} kart
@@ -9498,12 +9530,21 @@ function SideViewDriving(kart, origin, velocity, forwardInput, strafeInput) {
     if (kart.sideViewDrive?.zone !== zone) {
         kart.sideViewDrive = { zone, plane: PlaneDepth(origin, view), facing: InitialFacing(velocity, right) };
     }
-    const input = SideViewInput(forwardInput, strafeInput, kart.sideViewDrive.facing);
+    const input = SideViewInput(strafeInput, kart.sideViewDrive.facing);
     kart.sideViewDrive.facing = input.facing;
+    // In a depth zone, and on the first tick after it, the plane is where the
+    // melon is (it may have rested in the zone, skipping this).
+    const free = InSideViewDepthZone(kart);
+    if (free || kart.sideViewDrive.free) {
+        kart.sideViewDrive.plane = PlaneDepth(origin, view);
+    }
+    kart.sideViewDrive.free = free;
     const dir = input.axis !== 0 ? Math.sign(input.axis) : input.facing;
     return {
         forwardDir: { x: right.x * dir, y: right.y * dir },
         forwardInput: Math.abs(input.axis),
+        depthInput: SideViewDepthInput(forwardInput, free),
+        free,
         view,
         depthError: kart.sideViewDrive.plane - PlaneDepth(origin, view),
     };
@@ -9939,7 +9980,7 @@ function RegisterTeleportInput() {
     });
 }
 
-// Script inputs of the zone triggers — heal, lift, camera, side-view, water and jump recharge zones, jump pads,
+// Script inputs of the zone triggers — heal, lift, camera, side-view (+ depth), water and jump recharge zones, jump pads,
 // plus the teleporters (teleport/inputs.js). The zones all work
 // the same way: OnStartTouch -> "<kind>_enter", OnEndTouch -> "<kind>_leave",
 // and the touched trigger's own name may carry its value (heal_zone_<rate>,
@@ -9982,6 +10023,8 @@ function RegisterZoneInputs() {
     RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
     // Side-view zones — see side-view/constants.js. Read by UpdateKart (2D driving) and the side camera (camera/side-view/).
     RegisterZone("side_view_enter", "side_view_leave", "sideViews", SideViewFromName, "yaw/distance/height");
+    // Side-view depth zones — inside a side view, W/S move the melon towards/away from the camera. Read by UpdateKart.
+    RegisterZone("side_view_depth_enter", "side_view_depth_leave", "sideViewDepths", () => 1, "(side-view depth)");
     // Jump pads — see jump-pad/constants.js. Read by jump-pad/jump-pad.js (launch, no damage).
     RegisterZone("jump_pad_enter", "jump_pad_leave", "jumpPads", JumpPadFromName, "up/forward u/s");
     // Water zones (a trigger around a func_water) — see water/constants.js:

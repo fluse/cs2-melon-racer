@@ -64,6 +64,8 @@ script, and `npm test` fails on it.
 | `camera_leave` | **End** | the same camera trigger | — | [Camera zones](11-camera-zones.md) |
 | `side_view_enter` | Start | any side-view trigger | name (yaw, distance, height) | [Camera zones](11-camera-zones.md#side-view-zones) |
 | `side_view_leave` | **End** | the same side-view trigger | — | [Camera zones](11-camera-zones.md#side-view-zones) |
+| `side_view_depth_enter` | Start | any depth trigger inside a side-view zone | — | [Camera zones](11-camera-zones.md#depth-zones) |
+| `side_view_depth_leave` | **End** | the same depth trigger | — | [Camera zones](11-camera-zones.md#depth-zones) |
 | `jump_pad_enter` | Start | any jump pad trigger | name (launch) | [Jump pads](12-jump-pads.md) |
 | `jump_pad_leave` | **End** | the same jump pad trigger | — | [Jump pads](12-jump-pads.md) |
 | `water_enter` | Start | any trigger around a `func_water` | — | [Water zones](13-water-zones.md) |
