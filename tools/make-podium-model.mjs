@@ -8,7 +8,7 @@
 // 3rd start-gate magenta. Writes
 //   models/melon_racer/podium.dmx  for Hammer's File → Import: edit it like any
 //                                  mesh, collision from the mesh itself
-//   materials/melon_racer/podium_<part>.vmat (+ _color.png, except the body:
+//   materials/melon_racer/podium/podium_<part>.vmat (+ _color.png, except the body:
 //   it uses BODY_TEXTURES, ambientCG's Rubber004, CC0 — https://ambientcg.com/view?id=Rubber004,
 //   the 1K PNG's Color, NormalGL and Roughness maps, copied in as they are)
 // Origin: on the floor, under the middle of the winner's step; the front
@@ -35,9 +35,9 @@ const DIGIT_HEIGHT = 22; // units, the place number's height
 const DIGIT_TOP_GAP = 8; // units from the band down to the number's top, the same on every step
 const DIGIT_RAISE = 2; // how far it stands out in front of the step
 const BODY_TEXTURES = {
-    texture: "materials/melon_racer/rubber004_color.png",
-    normal: "materials/melon_racer/rubber004_normal.png",
-    roughness: "materials/melon_racer/rubber004_rough.png",
+    texture: "materials/melon_racer/surfaces/rubber004_color.png",
+    normal: "materials/melon_racer/surfaces/rubber004_normal.png",
+    roughness: "materials/melon_racer/surfaces/rubber004_rough.png",
 };
 const UV_TILE = 128; // units one texture repeat covers (the rubber; the other parts are one color)
 const GLOW_COLOR = [0x90, 0xff, 0x50]; // guide lines
@@ -46,7 +46,7 @@ const SPAWN_HEIGHT = 24; // podium_spawn_<place>: this far above the plate
 
 const NAME = "podium";
 const MODEL_DIR = "models/melon_racer";
-const MATERIAL_DIR = "materials/melon_racer";
+const MATERIAL_DIR = "materials/melon_racer/podium";
 const GENERATOR = "tools/make-podium-model.mjs";
 
 const font = LoadFont(BUNGEE);

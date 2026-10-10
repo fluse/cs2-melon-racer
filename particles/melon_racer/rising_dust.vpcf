@@ -6,7 +6,7 @@
 	// upward from a flat disc around the system's origin (not smoke puffs —
 	// a wispy smoke texture read as smoke). Self-lit + additive so they
 	// stay visible; steady brightness, no twinkle (decided).
-	// Square = the addon's own materials/melon_racer/particle_square.vtex
+	// Square = the addon's own materials/melon_racer/particles/particle_square.vtex
 	// (16x16 white PNG with a 1px transparent edge).
 	// Not script-driven — place an info_particle_system in Hammer with
 	// "Start Active" on, at floor level (e.g. the bottom of a lift shaft).
@@ -26,7 +26,7 @@
 			_class = "C_OP_RenderSprites"
 			m_flDiffuseAmount = 0.0
 			m_flSelfIllumAmount = 1.0
-			m_hTexture = resource:"materials/melon_racer/particle_square.vtex"
+			m_hTexture = resource:"materials/melon_racer/particles/particle_square.vtex"
 			m_bAdditive = true
 		},
 	]

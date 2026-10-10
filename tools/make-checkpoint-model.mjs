@@ -12,7 +12,7 @@
 //                          48 apart, the details scaled down with it
 // Each writes models/melon_racer/<name>.obj (render), <name>_physics.obj
 // (collision: feet, pillars, beam — no strips, no diamond) and <name>.vmdl;
-// both share materials/melon_racer/checkpoint_gate_{body,trim,glow}.vmat +
+// both share materials/melon_racer/checkpoint_gate/checkpoint_gate_{body,trim,glow}.vmat +
 // _color.png. Compile the .vmdl files with resourcecompiler (see the end of
 // the output). Origin on the floor in the middle of the gate, the pillars on
 // either side along Y, the melon driving through along X.
@@ -31,7 +31,7 @@ const GLOW_BRIGHTNESS = 2;
 
 const MATERIAL_NAME = "checkpoint_gate";
 const MODEL_DIR = "models/melon_racer";
-const MATERIAL_DIR = "materials/melon_racer";
+const MATERIAL_DIR = "materials/melon_racer/checkpoint_gate";
 const GENERATOR = "tools/make-checkpoint-model.mjs";
 
 const Shape = outer => [{ outer, holes: [] }];

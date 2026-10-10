@@ -1,5 +1,5 @@
 // Generates the tileable zigzag hologram texture used by
-// materials/melon_racer/holo_zigzag.vmat — `node tools/make-holo.mjs`.
+// materials/melon_racer/holo/holo_zigzag.vmat — `node tools/make-holo.mjs`.
 // The animation isn't in the texture: the material scrolls it
 // (g_vTexCoordScrollSpeed / g_vSelfIllumScrollSpeed), so the pattern only has
 // to tile seamlessly. No dependencies, like make-icons.mjs.
@@ -18,7 +18,8 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
-const OUT_DIR = new URL("../materials/melon_racer/", import.meta.url);
+const OUT_DIR = new URL("../materials/melon_racer/holo/", import.meta.url);
+const PARTICLE_DIR = new URL("../materials/melon_racer/particles/", import.meta.url); // the heal cross sprite
 const ONLY = process.argv[2];
 
 /** Writes <name>_{color,trans,illum}.png, unless another name was asked for. */
@@ -150,9 +151,10 @@ for (let y = 0; y < SIZE; y++) {
 }
 
 mkdirSync(OUT_DIR, { recursive: true });
+mkdirSync(PARTICLE_DIR, { recursive: true });
 WriteSet(NAME, SIZE, SIZE, color, trans, illum);
 
-// --- holo_dashes: staggered diagonal dashes (materials/melon_racer/holo_dashes.vmat) ---
+// --- holo_dashes: staggered diagonal dashes (materials/melon_racer/holo/holo_dashes.vmat) ---
 //
 // Short "\" dashes on dashed diagonal lines, each line's dashes shifted half
 // a period against its neighbors', so they sit in a staggered grid. Worked in
@@ -204,7 +206,7 @@ for (let y = 0; y < SIZE; y++) {
 }
 WriteSet(DASH_NAME, SIZE, SIZE, dashColor, dashTrans, dashIllum);
 
-// --- holo_portal: disc filling the ring's hole (materials/melon_racer/holo_portal.vmat) ---
+// --- holo_portal: disc filling the ring's hole (materials/melon_racer/holo/holo_portal.vmat) ---
 //
 // A color pulse over the whole disc at once: the texture is one pulse period
 // along U (dark → bright → dark, wraps). The material shrinks the UVs so the
@@ -238,7 +240,7 @@ for (let x = 0; x < PORTAL_WIDTH; x++) {
 }
 WriteSet(PORTAL_NAME, PORTAL_WIDTH, PORTAL_HEIGHT, portalColor, portalTrans, portalIllum);
 
-// --- holo_heal: rising plus crosses for heal gates (materials/melon_racer/holo_heal.vmat) ---
+// --- holo_heal: rising plus crosses for heal gates (materials/melon_racer/holo/holo_heal.vmat) ---
 //
 // Staggered grid of outlined "+" crosses (the heal sign) with a softly filled
 // inside, in the HUD health bar's green shading to mint. Color and opacity
@@ -379,11 +381,11 @@ if (!ONLY || ONLY === SPRITE_NAME) {
             sprite[i + 3] = Math.round(255 * Math.min(1, edge + inside * HEAL_FILL));
         }
     }
-    writeFileSync(new URL(`${SPRITE_NAME}.png`, OUT_DIR), WritePng(SPRITE_SIZE, SPRITE_SIZE, 4, sprite));
+    writeFileSync(new URL(`${SPRITE_NAME}.png`, PARTICLE_DIR), WritePng(SPRITE_SIZE, SPRITE_SIZE, 4, sprite));
     console.log(`wrote ${SPRITE_NAME}.png (${SPRITE_SIZE}x${SPRITE_SIZE})`);
 }
 
-// --- holo_checkpoint: respawn signs for checkpoint gates (materials/melon_racer/holo_checkpoint.vmat) ---
+// --- holo_checkpoint: respawn signs for checkpoint gates (materials/melon_racer/holo/holo_checkpoint.vmat) ---
 //
 // "You respawn from here": a staggered grid of the usual respawn/restart sign
 // — a circular arrow (ring with a gap and an arrowhead, turning

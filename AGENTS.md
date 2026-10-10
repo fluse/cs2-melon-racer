@@ -95,20 +95,20 @@ tools/make-route-icons.mjs               # generates the hub window's route card
                                           #   from route_<name>.vmap) — re-run after adding/renaming a route (test/map/route-icons.test.mjs)
 tools/make-logo-model.mjs                # extrudes MELON RACER (Bungee, slanted like the logo, lime green outline ring around them) into mesh geometry,
                                           #   models/melon_racer/logo_text.dmx for Hammer's File → Import (DmxText in model.mjs),
-                                          #   + materials/melon_racer/logo_text_{face,outline,holo}.vmat (holo = an opaque copy of holo_dashes for the letter fronts) (opentype.js + earcut + clipper-lib, devDependencies)
+                                          #   + materials/melon_racer/logo/logo_text_{face,outline,holo}.vmat (holo = an opaque copy of holo_dashes for the letter fronts) (opentype.js + earcut + clipper-lib, devDependencies)
 tools/make-checkpoint-model.mjs          # the checkpoint gate's frame (glowing pillars, beam, floating diamond) as models/melon_racer/checkpoint_gate.vmdl
-                                          #   (+ _physics.obj collision, materials/melon_racer/checkpoint_gate_{body,trim,glow}.vmat); same footprint as the prefab's old poles
+                                          #   (+ _physics.obj collision, materials/melon_racer/checkpoint_gate/checkpoint_gate_{body,trim,glow}.vmat); same footprint as the prefab's old poles
 tools/make-podium-model.mjs              # the hub podium (steps 2-1-3 in the docs/GAME_CI.md colors, glowing Bungee place numbers) as mesh geometry,
-                                          #   models/melon_racer/podium.dmx for Hammer's File → Import (DmxText in model.mjs), + materials/melon_racer/podium_*.vmat; prints where the podium_spawn_<place> info_targets go
+                                          #   models/melon_racer/podium.dmx for Hammer's File → Import (DmxText in model.mjs), + materials/melon_racer/podium/podium_*.vmat; prints where the podium_spawn_<place> info_targets go
 tools/font.mjs                           # shared by make-logo-model.mjs and make-podium-model.mjs: a line of text in a font (Bungee) as 2D shapes
 tools/model.mjs                          # shared by the model generators: mesh builder (extrude, triangles), .obj/.vmdl/.dmx/.vmat writers
-tools/make-decal.mjs                     # generates materials/melon_racer/<decal>_{color,trans}.png for every decal in its DECALS list
+tools/make-decal.mjs                     # generates materials/melon_racer/decals/<decal>_{color,trans}.png for every decal in its DECALS list
                                           #   (HUD logo, rawDecals/*.png|jpg — JPG via Windows System.Drawing; can key out a baked-in checkerboard, writes <name>_transparent.png)
 rawDecals/*.png                          # new source images for decals (make-decal.mjs input); once done, the tool moves
                                           #   them (+ their _transparent.png) to rawDecals/done/ and reads them from there
 particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3, hand-written): boost_trail + boost_trail_juice (two separate info_particle_systems in one template — a child system doesn't render);
                                           #   rising_dust (ambient, not script-driven — a map-placed info_particle_system, Start Active;
-                                          #   square specks from materials/melon_racer/particle_square.vtex + .png, a 16x16 white square);
+                                          #   square specks from materials/melon_racer/particles/particle_square.vtex + .png, a 16x16 white square);
                                           #   lift_updraft + lift_updraft_streaks (ambient, same way: two info_particle_systems at the bottom of a lift shaft —
                                           #   soft swaying glow motes + faint fast rising air streaks);
                                           #   jump_pad_rings + jump_pad_sparks (ambient, same way: two info_particle_systems on a jump pad —
@@ -118,7 +118,10 @@ particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3
                                           #   rising "+" crosses in holo_heal's green/mint, sprite particle_heal_cross.vtex from tools/make-holo.mjs)
                                           #   Write the editor source format, not resourceinfo's compiled dump — see the comments in boost_trail.vpcf;
                                           #   compile with resourcecompiler.exe (-f) like Panorama
-materials/melon_racer/*_decal.vmat       # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
+materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/,
+                                          #   logo/ (logo_text_*), podium/, surfaces/ (rubber004, ambientCG CC0), particles/ (particle sprites .vtex + .png),
+                                          #   checkpoint_gate/ — a new material goes into the fitting one, never loose in materials/melon_racer/
+materials/melon_racer/decals/*_decal.vmat # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
 ```
 
 `src/<entry>/` is where gameplay code goes — one directory per `point_script`

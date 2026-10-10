@@ -10,8 +10,8 @@
 // and sorted badly (grain, colored patches). Writes
 //   models/melon_racer/logo_text.dmx   for Hammer's File → Import: edit it like
 //                                      any mesh, collision from the mesh itself
-//   materials/melon_racer/logo_text_{face,outline}.vmat + _color.png
-//   materials/melon_racer/logo_text_holo.vmat + _color.png (from HOLO_SOURCE —
+//   materials/melon_racer/logo/logo_text_{face,outline}.vmat + _color.png
+//   materials/melon_racer/logo/logo_text_holo.vmat + _color.png (from HOLO_SOURCE —
 //   re-run after changing it or its textures)
 // Origin: bottom center of the text, halfway through its depth; the letters
 // read correctly looking at its front (+X as imported).
@@ -42,7 +42,7 @@ const LETTER_RAISE = 3; // units the letters stand out in front of the outline
 const UV_TILE = 256;
 // The holo material the letters' fronts copy ("" = plain FACE_COLOR fronts):
 // its textures are <name>_{color,trans,illum}.png next to it (tools/make-holo.mjs).
-const HOLO_SOURCE = "materials/melon_racer/holo_dashes.vmat";
+const HOLO_SOURCE = "materials/melon_racer/holo/holo_dashes.vmat";
 const FACE_COLOR = [0x1f, 0x24, 0x2b]; // the letters' body, and the holo's glass: dark, so the glowing dashes stand out
 // Swaps colors in the copied holo: every holo pixel is a mix of its gradient's
 // two colors (GRADIENT in tools/make-holo.mjs) and white (the dash cores), so
@@ -54,7 +54,7 @@ const HOLO_RECOLOR = [
 const OUTLINE_COLOR = [0xaa, 0xff, 0x33];
 
 const MODEL_DIR = "models/melon_racer";
-const MATERIAL_DIR = "materials/melon_racer";
+const MATERIAL_DIR = "materials/melon_racer/logo";
 const NAME = "logo_text";
 
 const font = LoadFont(BUNGEE);

@@ -6,7 +6,7 @@
 		"CDmeInputTexture"
 		{
 			"m_name" "string" "SheetTexture"
-			"m_fileName" "string" "materials/melon_racer/particle_heal_cross.png"
+			"m_fileName" "string" "materials/melon_racer/particles/particle_square.png"
 			"m_colorSpace" "string" "linear"
 			"m_typeString" "string" "2D"
 			"m_imageProcessorArray" "element_array"

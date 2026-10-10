@@ -1,5 +1,5 @@
 // Turns source PNGs into the textures of the in-game decals in
-// materials/melon_racer/ (one <name>.vmat each, see DECALS) —
+// materials/melon_racer/decals/ (one <name>.vmat each, see DECALS) —
 // `node tools/make-decal.mjs`. Re-run after changing a source image.
 // No dependencies, like make-icons.mjs.
 //
@@ -20,7 +20,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const OUT_DIR = new URL("../materials/melon_racer/", import.meta.url);
+const OUT_DIR = new URL("../materials/melon_racer/decals/", import.meta.url);
 // Raw decal images are dropped into rawDecals/; once their decal textures
 // are written they're moved to rawDecals/done/ (with their
 // _transparent.png), so rawDecals/ only holds what's still to do.
@@ -391,7 +391,7 @@ function MakeDecal(src, outName) {
     mkdirSync(OUT_DIR, { recursive: true });
     writeFileSync(new URL(`${outName}_color.png`, OUT_DIR), WritePng(W, H, 3, outRgb));
     writeFileSync(new URL(`${outName}_trans.png`, OUT_DIR), WritePng(W, H, 1, outAlpha));
-    console.log(`wrote materials/melon_racer/${outName}_color.png + _trans.png (${W}x${H}, from a ${w}x${h} crop of ${src.width}x${src.height})`);
+    console.log(`wrote materials/melon_racer/decals/${outName}_color.png + _trans.png (${W}x${H}, from a ${w}x${h} crop of ${src.width}x${src.height})`);
 }
 
 for (const decal of DECALS) {

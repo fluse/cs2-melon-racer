@@ -1,5 +1,5 @@
-// "PRESS USE" lettering as a decal/overlay. Textures come from
-// rawDecals/PressUse.png via `node tools/make-decal.mjs` — re-run that after
+// Arrow as a decal/overlay. Textures come from
+// rawDecals/Arrow.jpg via `node tools/make-decal.mjs` — re-run that after
 // changing the image.
 
 Layer0
@@ -11,11 +11,11 @@ Layer0
 
 	//---- Color ----
 	g_vColorTint "[1.000000 1.000000 1.000000 0.000000]"
-	TextureColor "materials/melon_racer/press_use_decal_color.png"
+	TextureColor "materials/melon_racer/decals/arrow_decal_color.png"
 
 	//---- Translucent ----
 	g_flOpacityScale "1.000"
-	TextureTranslucency "materials/melon_racer/press_use_decal_trans.png"
+	TextureTranslucency "materials/melon_racer/decals/arrow_decal_trans.png"
 
 	//---- Fog ----
 	g_bFogEnabled "1"
