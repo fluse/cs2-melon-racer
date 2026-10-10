@@ -1,6 +1,6 @@
 // The user menu's developer physics page (dev/physics-tuning.js): the pure
 // rules, the layout's segments, the clicks against the fake engine, and the
-// factors reaching the real UpdateKart — each only for the clicking player.
+// factors reaching the real UpdateKart — server-wide, the same for every melon.
 import "../helpers/register-cs-script.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
@@ -22,12 +22,17 @@ await import("../../src/melon_drive/index.js"); // registers OnCustomHudClicked
 const DT = 1 / 64;
 const ROW_IDS = { maxSpeed: "maxspeed", accel: "accel", jump: "jump", boost: "boost", gravity: "gravity" };
 
-test("a kart without tuning has every factor at 1; percent / 100 otherwise", () => {
+beforeEach(() => logic.ResetPhysicsTuning());
+
+test("without tuning every factor is 1; percent / 100 otherwise; Reset drops them", () => {
     for (const key of logic.PHYSICS_TUNING_KEYS) {
-        assert.equal(logic.PhysicsFactor({}, key), 1, key);
+        assert.equal(logic.PhysicsFactor(key), 1, key);
     }
-    assert.equal(logic.PhysicsFactor({ physicsTuning: { jump: 150 } }, "jump"), 1.5);
-    assert.equal(logic.PhysicsFactor({ physicsTuning: { jump: 150 } }, "gravity"), 1);
+    logic.SetPhysicsPercent("jump", 150);
+    assert.equal(logic.PhysicsFactor("jump"), 1.5);
+    assert.equal(logic.PhysicsFactor("gravity"), 1);
+    logic.ResetPhysicsTuning();
+    assert.equal(logic.PhysicsFactor("jump"), 1);
 });
 
 test("gravity: the script adds only the difference to the engine's pull", () => {
@@ -45,9 +50,10 @@ test("boost: a faster melon still boosts above its own top speed", () => {
 
 test("max speed scales the kart's top speed, momentum steps on top", () => {
     assert.equal(KartMaxSpeed({}), C.MAX_SPEED);
-    assert.equal(KartMaxSpeed({ physicsTuning: { maxSpeed: 200 } }), 2 * C.MAX_SPEED);
+    logic.SetPhysicsPercent("maxSpeed", 200);
+    assert.equal(KartMaxSpeed({}), 2 * C.MAX_SPEED);
     const momentum = { steps: 1, armed: false };
-    assert.equal(KartMaxSpeed({ momentum, physicsTuning: { maxSpeed: 200 } }), 2 * C.MAX_SPEED * (1 + C.MOMENTUM_STEP));
+    assert.equal(KartMaxSpeed({ momentum }), 2 * C.MAX_SPEED * (1 + C.MOMENTUM_STEP));
 });
 
 test("speedometer.xml has one segment per scale value for every row", () => {
@@ -103,25 +109,32 @@ test("the physics button swaps the menu's columns for the physics page; Back and
     assert.ok(hud.Has(0, "usermenu_physics_page", "Hidden"));
 });
 
-test("− / + and the scale set only the clicking player's values, within the scale; Reset drops them", () => {
+test("− / + and the scale set the values for every melon, within the scale; others with the page open see it; Reset drops them", () => {
+    for (const [slot, kart] of [[0, a], [1, b]]) {
+        SetUserMenuOpen(slot, kart, true);
+        Click(slot, "usermenu_physics_button");
+    }
     Click(0, "phytune_jump_plus");
     Click(0, "phytune_jump_plus_fine");
-    assert.equal(logic.PhysicsFactor(a, "jump"), (100 + SCALE.step + SCALE.fineStep) / 100);
-    assert.equal(logic.PhysicsFactor(b, "jump"), 1);
+    const jump = 100 + SCALE.step + SCALE.fineStep;
+    assert.equal(logic.PhysicsFactor("jump"), jump / 100);
+    assert.equal(hud.Variable(1, "usermenu_physics_page", "phytune_jump"), `${jump} % · ${Math.round(C.JUMP_SPEED * jump / 100)} u/s`, "the other player's open page follows");
 
     Click(0, "phytune_gravity_seg_0");
     Click(0, "phytune_gravity_minus");
-    assert.equal(logic.PhysicsFactor(a, "gravity"), SCALE.min / 100, "can't go below the scale");
+    assert.equal(logic.PhysicsFactor("gravity"), SCALE.min / 100, "can't go below the scale");
     assert.ok(hud.Has(0, "phytune_gravity_seg_0", "On"));
     assert.ok(!hud.Has(0, "phytune_gravity_seg_1", "On"));
 
     const last = ScaleSegmentCount(SCALE) - 1;
     Click(0, `phytune_maxspeed_seg_${last}`);
     Click(0, "phytune_maxspeed_plus");
-    assert.equal(logic.PhysicsFactor(a, "maxSpeed"), SCALE.max / 100, "can't go above the scale");
+    assert.equal(logic.PhysicsFactor("maxSpeed"), SCALE.max / 100, "can't go above the scale");
 
     Click(0, "phytune_reset_button");
-    assert.equal(a.physicsTuning, undefined);
+    for (const key of logic.PHYSICS_TUNING_KEYS) {
+        assert.equal(logic.PhysicsFactor(key), 1, key);
+    }
     assert.equal(hud.Variable(0, "usermenu_physics_page", "phytune_jump"), `100 % · ${C.JUMP_SPEED} u/s`);
 });
 
@@ -148,27 +161,27 @@ const rolling = { commanded: { x: 200, y: 0, z: 0 }, actual: { x: 200, y: 0, z: 
 
 test("UpdateKart: jump scales the ground jump", () => {
     Floor();
-    a.physicsTuning = { jump: 150 };
+    logic.SetPhysicsPercent("jump", 150);
     assert.equal(Tick(a, { ...rolling, justPressed: ["JUMP"] }).z, C.JUMP_SPEED * 1.5);
 });
 
 test("UpdateKart: gravity adds its difference every tick, in the air", () => {
     world.traceLine = (c) => ({ didHit: false, startedInSolid: false, fraction: 1, end: c.end, normal: { x: 0, y: 0, z: 1 } });
-    a.physicsTuning = { gravity: 200 };
+    logic.SetPhysicsPercent("gravity", 200);
     const falling = { commanded: { x: 200, y: 0, z: -100 }, actual: { x: 200, y: 0, z: -100 - C.GRAVITY * DT } };
     assert.equal(Tick(a, falling).z, -100 - 2 * C.GRAVITY * DT);
-    a.physicsTuning = { gravity: 0 };
+    logic.SetPhysicsPercent("gravity", 0);
     assert.equal(Tick(a, falling).z, -100, "0 %: the engine's pull is cancelled");
 });
 
 test("UpdateKart: acceleration and max speed scale driving", () => {
     Floor();
-    a.physicsTuning = { accel: 200 };
-    const v = Tick(a, { ...rolling, pressed: ["FORWARD"] });
     const plain = Tick(b, { ...rolling, pressed: ["FORWARD"] });
+    logic.SetPhysicsPercent("accel", 200);
+    const v = Tick(a, { ...rolling, pressed: ["FORWARD"] });
     assert.ok(Math.hypot(v.x, v.y) > Math.hypot(plain.x, plain.y), "accelerates harder");
 
-    a.physicsTuning = { maxSpeed: 50 };
+    logic.SetPhysicsPercent("maxSpeed", 50);
     const fast = { commanded: { x: C.MAX_SPEED, y: 0, z: 0 }, actual: { x: C.MAX_SPEED, y: 0, z: 0 } };
     a.speedCap = undefined;
     const capped = Tick(a, { ...fast, pressed: ["FORWARD"] });

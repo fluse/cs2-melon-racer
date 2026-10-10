@@ -518,7 +518,7 @@
 								<Label class="UserMenuToggleName" text="Camera Settings" />
 								<Label class="UserMenuTogglePill UserMenuRunPill" text="EDIT" />
 							</Button>
-							<!-- Opens the physics page in place of these columns: your own melon's
+							<!-- Opens the physics page in place of these columns: every melon's
 							     top speed, acceleration, jump, boost and gravity in percent (dev/physics-tuning.js). -->
 							<Button id="usermenu_physics_button" class="UserMenuToggle">
 								<Label class="UserMenuToggleName" text="Physics Settings" />
@@ -666,13 +666,13 @@
 						</Panel>
 					</Panel>
 
-					<!-- Developer physics page (dev/physics-tuning.js): your own melon's physics,
+					<!-- Developer physics page (dev/physics-tuning.js): every melon's physics, server-wide,
 					     each in percent of its default, PHYSICS_TUNING_MIN..MAX, with − / + (big
 					     and fine) and a clickable scale (one segment per PHYSICS_TUNING_SCALE_STEP,
 					     lit up to the value — "On"). Values are logged to the console. -->
 					<Panel id="usermenu_physics_page" class="TuningPage Hidden">
 						<Label class="UserMenuColumnTitle" text="DEVELOPER · PHYSICS SETTINGS" />
-						<Label class="TuningIntro" text="Your own melon only, in percent of the default, until you leave or the map restarts. Each change is logged to the console." />
+						<Label class="TuningIntro" text="All melons on the server, in percent of the default, until the map restarts. Anyone can change them. Each change is logged to the console." />
 						<Panel class="TuningRow TuningRowCompact">
 							<Panel class="TuningHeader">
 								<Label class="TuningName" text="MAX SPEED" />

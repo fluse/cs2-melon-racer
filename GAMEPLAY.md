@@ -879,8 +879,10 @@ applied by `dev/camera-tuning.js` and `GetCameraOffsetFor` (`test/dev/camera-tun
 ## Physics settings (implemented, dev aid)
 
 Next to "Camera Settings", the DEVELOPER column has **"Physics
-Settings"**: a page built the same way that scales the clicking player's
-own melon physics, each in percent of its default (`PHYSICS_TUNING_MIN`…
+Settings"**: a page built the same way that scales the melon physics
+**for every melon on the server** (decided: anyone can change them, and
+everyone with the page open sees the change), each in percent of its
+default (`PHYSICS_TUNING_MIN`…
 `_MAX`, 0…300 %; −10/−1/+1/+10 and a scale every 10 %), shown with the
 resulting value:
 
@@ -893,8 +895,8 @@ resulting value:
   difference to the commanded vertical velocity every tick (0 % floats).
   Ground contact still reads right, since it's measured against that command.
 
-Not saved, every change logged (`[physics tuning] …`); the menu reopens on
-its columns. Constants: `dev/constants.js`; rules:
+Not saved (gone on a map restart), every change logged with who made it
+(`[physics tuning] …`); the menu reopens on its columns. Constants: `dev/constants.js`; rules:
 `dev/physics-tuning-logic.js`, applied by `dev/physics-tuning.js` and
 `movement/` (`test/dev/physics-tuning.test.mjs`).
 
