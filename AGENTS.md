@@ -100,6 +100,10 @@ tools/make-checkpoint-model.mjs          # the checkpoint gate's frame (glowing 
                                           #   (+ _physics.obj collision, materials/melon_racer/checkpoint_gate/checkpoint_gate_{body,trim,glow}.vmat); same footprint as the prefab's old poles
 tools/make-podium-model.mjs              # the hub podium (steps 2-1-3 in the docs/GAME_CI.md colors, glowing Bungee place numbers) as mesh geometry,
                                           #   models/melon_racer/podium.dmx for Hammer's File → Import (DmxText in model.mjs), + materials/melon_racer/podium/podium_*.vmat; prints where the podium_spawn_<place> info_targets go
+tools/make-inflatable.mjs                # materials/melon_racer/surfaces/inflatable.vmat: the glossy vinyl of an inflatable pool mattress — no shapes, only
+                                          #   how it reflects (a roughness map); plain white, so it can be tinted (g_vColorTint or an entity render color)
+tools/make-ball-model.mjs                # a ball-pit ball as models/melon_racer/ball.vmdl (+ ball.obj): 320-triangle icosphere in inflatable.vmat,
+                                          #   a sphere primitive for collision, light (mass_override) — color each prop_physics by its render color
 tools/font.mjs                           # shared by make-logo-model.mjs and make-podium-model.mjs: a line of text in a font (Bungee) as 2D shapes
 tools/model.mjs                          # shared by the model generators: mesh builder (extrude, triangles), .obj/.vmdl/.dmx/.vmat writers
 tools/make-decal.mjs                     # generates materials/melon_racer/decals/<decal>_{color,trans}.png for every decal in its DECALS list
@@ -119,7 +123,7 @@ particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3
                                           #   Write the editor source format, not resourceinfo's compiled dump — see the comments in boost_trail.vpcf;
                                           #   compile with resourcecompiler.exe (-f) like Panorama
 materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/,
-                                          #   logo/ (logo_text_*), podium/, surfaces/ (rubber004, ambientCG CC0), particles/ (particle sprites .vtex + .png),
+                                          #   logo/ (logo_text_*), podium/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
                                           #   checkpoint_gate/ — a new material goes into the fitting one, never loose in materials/melon_racer/
 materials/melon_racer/decals/*_decal.vmat # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
 ```
