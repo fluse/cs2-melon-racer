@@ -12,10 +12,10 @@ export const FREE_LOOK_EYE_HEIGHT = 64;
 // it shows the others who's flying around. Optional: without it, no avatar.
 export const SPECTATOR_HAT_TEMPLATE_NAME = "template_spectator_hat";
 // Where it hangs: this far above the pawn's origin (its feet) — at its eyes.
-export const SPECTATOR_HAT_HEIGHT = FREE_LOOK_EYE_HEIGHT;
+export const SPECTATOR_HAT_HEIGHT = 80;
 // …and this far behind the eyes, against the view's yaw — so the player's
 // own camera (at the eyes) doesn't look out through it.
-export const SPECTATOR_HAT_BACK = 48;
+export const SPECTATOR_HAT_BACK = -20;
 
 // Camera tuning (dev/camera-tuning.js, its scale CAMERA_TUNING_SCALE in
 // dev/tuning-scale-logic.js): the user menu's "Camera Settings"

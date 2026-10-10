@@ -56,6 +56,12 @@ podium instead of `hub_spawn`. **No triggers** — one point entity per step:
 - A step without its `podium_spawn_<place>` leaves that place at
   `hub_spawn`; a racer who left leaves their step empty (nobody moves up).
   Nothing after a cancelled Grand Prix.
+- The podium itself is mesh geometry: `models/melon_racer/podium.dmx`, generated
+  by `tools/make-podium-model.mjs`, brought in with Hammer's File → Import — three
+  steps, 1st in the middle (100 high), 2nd on the left (72), 3rd on the right (48)
+  seen from the front, which faces +X as imported. Give the `podium_spawn_<place>`
+  info_targets the yaw the front faces; the tool prints their spots relative to the
+  podium's origin (1st: `0 0 124`, 2nd: `0 -112 96`, 3rd: `0 112 72`).
 - Keep the steps more than a melon apart and away from `hub_start_trigger`
   if standing on them shouldn't open the hub modal.
 - `npm test` fails on any other `podium*` name (a typo).

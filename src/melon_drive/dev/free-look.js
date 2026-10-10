@@ -95,22 +95,25 @@ export function UpdateSpectatorHat(kart) {
 }
 
 /**
- * Where the ghost avatar hangs: SPECTATOR_HAT_HEIGHT above the pawn's feet
- * and SPECTATOR_HAT_BACK behind its eyes along the view's yaw (so the
- * player's own camera doesn't look out through it), facing the view.
+ * Where the ghost avatar hangs: SPECTATOR_HAT_BACK behind the pawn's eyes
+ * (SPECTATOR_HAT_HEIGHT above its feet) against the view (so the player's
+ * own camera doesn't look out through it), turned and tilted with the view —
+ * looking down, it tips forward and rises behind the eyes, like a head nodding.
  * @param {import("../core/kart-registry.js").Kart} kart
  */
 function SpectatorHatPose(kart) {
     const feet = kart.pawn.GetAbsOrigin();
-    const yaw = kart.pawn.GetEyeAngles().yaw;
-    const rad = yaw * Math.PI / 180;
+    const { pitch, yaw } = kart.pawn.GetEyeAngles();
+    const p = pitch * Math.PI / 180, y = yaw * Math.PI / 180;
+    // The view's forward direction (Source pitch: positive looks down).
+    const forward = { x: Math.cos(p) * Math.cos(y), y: Math.cos(p) * Math.sin(y), z: -Math.sin(p) };
     return {
         position: {
-            x: feet.x - Math.cos(rad) * SPECTATOR_HAT_BACK,
-            y: feet.y - Math.sin(rad) * SPECTATOR_HAT_BACK,
-            z: feet.z + SPECTATOR_HAT_HEIGHT,
+            x: feet.x - forward.x * SPECTATOR_HAT_BACK,
+            y: feet.y - forward.y * SPECTATOR_HAT_BACK,
+            z: feet.z + SPECTATOR_HAT_HEIGHT - forward.z * SPECTATOR_HAT_BACK,
         },
-        angles: { pitch: 0, yaw, roll: 0 },
+        angles: { pitch, yaw, roll: 0 },
     };
 }
 

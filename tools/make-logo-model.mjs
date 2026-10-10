@@ -1,4 +1,4 @@
-// Builds the logo lettering as a 3D model for Hammer — `node tools/make-logo-model.mjs`:
+// Builds the logo lettering as mesh geometry for Hammer — `node tools/make-logo-model.mjs`:
 // MELON RACER in Bungee (tools/fonts/, like the logo), slanted like the
 // logo's banner, extruded into solid letters (FACE_COLOR) standing in a lime
 // green outline — the letters grown by OUTLINE_WIDTH and merged, like the
@@ -8,20 +8,17 @@
 // material itself: a see-through letter showed the sky, its own back and the
 // outline's walls, and as a layer just in front of the letters it z-fought
 // and sorted badly (grain, colored patches). Writes
-//   models/melon_racer/logo_text.obj   the mesh (render + collision)
-//   models/melon_racer/logo_text.vmdl  the ModelDoc model Hammer places
+//   models/melon_racer/logo_text.dmx   for Hammer's File → Import: edit it like
+//                                      any mesh, collision from the mesh itself
 //   materials/melon_racer/logo_text_{face,outline}.vmat + _color.png
 //   materials/melon_racer/logo_text_holo.vmat + _color.png (from HOLO_SOURCE —
 //   re-run after changing it or its textures)
-// Compile the model once with resourcecompiler (see the end of the output),
-// then place it in Hammer as a prop_static. Origin: bottom center of the
-// text, halfway through its depth; the letters read correctly looking at the
-// prop's front (+X, the way a prop with angles 0 0 0 faces).
+// Origin: bottom center of the text, halfway through its depth; the letters
+// read correctly looking at its front (+X as imported).
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import opentype from "opentype.js";
 import ClipperLib from "clipper-lib";
-import { Area, Mesh, ObjText, SolidPng, VmatText, VmdlText, WriteAddonFile } from "./model.mjs";
+import { BUNGEE, Clean, LoadFont, TextShapes } from "./font.mjs";
+import { Area, DmxText, Mesh, SolidPng, VmatText, WriteAddonFile } from "./model.mjs";
 import { DecodePng, EncodePng } from "./png.mjs";
 
 const TEXT = "MELON RACER";
@@ -29,10 +26,16 @@ const CAP_HEIGHT = 64; // units, height of a capital letter
 const DEPTH = 16; // units, front to back
 const SLANT_DEGREES = 10; // the logo banner's skewX(-10)
 const LETTER_SPACING = 2; // units added between letters
-const CURVE_STEP = 2; // units per straight segment along a curve
+const CURVE_STEP = 6; // units per straight segment along a curve
+const CURVE_MIN_SEGMENTS = 1; // at least this many per curve (1: Bungee's tiny rounded corners become one bevel)
+// Units a point may lie off the line between its neighbours and still be
+// dropped (0 = keep all) — on the letters and the outline. Every point left is
+// a face on the sides, so this is what keeps the mesh light in Hammer.
+const SIMPLIFY = 1;
 const SMOOTH_ANGLE = 35; // degrees: corners sharper than this stay hard on the sides
 const OUTLINE_WIDTH = 4; // units the outline reaches past the letters (0 = no outline)
-const OUTLINE_ARC_TOLERANCE = 0.25; // units, how finely its round corners are cut
+const OUTLINE_ARC_TOLERANCE = 1.5; // units, how finely its round corners are cut
+const OUTLINE_ROUND = true; // round outer corners (false: sharp, mitered — far fewer faces)
 const LETTER_RAISE = 3; // units the letters stand out in front of the outline
 // Units one texture repeat covers (the holo textures are 512 px): much finer
 // and the thin dashes break up into sparkle from any distance.
@@ -50,107 +53,38 @@ const HOLO_RECOLOR = [
 ];
 const OUTLINE_COLOR = [0xaa, 0xff, 0x33];
 
-const FONT = fileURLToPath(new URL("./fonts/Bungee-Regular.ttf", import.meta.url));
 const MODEL_DIR = "models/melon_racer";
 const MATERIAL_DIR = "materials/melon_racer";
 const NAME = "logo_text";
 
-const font = opentype.parse(readFileSync(FONT).buffer);
-const capUnits = font.tables.os2.sCapHeight || font.unitsPerEm * 0.7;
-const scale = CAP_HEIGHT / capUnits;
+const font = LoadFont(BUNGEE);
 const slant = Math.tan((SLANT_DEGREES * Math.PI) / 180);
 
-/** Closed contours of one glyph at pen x, in units, y up, curves flattened. */
-function GlyphContours(glyph, penX) {
-    const contours = [];
-    let cur = null;
-    let last = [0, 0];
-    const P = (x, y) => [penX + x * scale, y * scale];
-    const segments = (p0, p1) => Math.max(2, Math.ceil(Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) / CURVE_STEP));
-    for (const c of glyph.getPath(0, 0, font.unitsPerEm).commands) {
-        // getPath is y-down at font size = unitsPerEm, so coordinates are font units.
-        if (c.type === "M") {
-            cur = [P(c.x, -c.y)];
-            contours.push(cur);
-            last = cur[0];
-        } else if (c.type === "L") {
-            last = P(c.x, -c.y);
-            cur.push(last);
-        } else if (c.type === "Q") {
-            const p1 = P(c.x1, -c.y1);
-            const p2 = P(c.x, -c.y);
-            const n = segments(last, p2);
-            for (let i = 1; i <= n; i++) {
-                const t = i / n;
-                const a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, d = t * t;
-                cur.push([a * last[0] + b * p1[0] + d * p2[0], a * last[1] + b * p1[1] + d * p2[1]]);
-            }
-            last = p2;
-        } else if (c.type === "C") {
-            const p1 = P(c.x1, -c.y1);
-            const p2 = P(c.x2, -c.y2);
-            const p3 = P(c.x, -c.y);
-            const n = segments(last, p3);
-            for (let i = 1; i <= n; i++) {
-                const t = i / n, u = 1 - t;
-                const a = u * u * u, b = 3 * u * u * t, d = 3 * u * t * t, e = t * t * t;
-                cur.push([
-                    a * last[0] + b * p1[0] + d * p2[0] + e * p3[0],
-                    a * last[1] + b * p1[1] + d * p2[1] + e * p3[1],
-                ]);
-            }
-            last = p3;
+/** A closed contour without the points that lie within SIMPLIFY of the line between their neighbours. */
+function Simplify(contour) {
+    const c = [...contour];
+    const OffLine = i => {
+        const [ax, ay] = c[(i - 1 + c.length) % c.length], [px, py] = c[i], [bx, by] = c[(i + 1) % c.length];
+        const len = Math.hypot(bx - ax, by - ay);
+        return len < 1e-9 ? 0 : Math.abs((bx - ax) * (py - ay) - (by - ay) * (px - ax)) / len;
+    };
+    // Least visible first, re-measuring the neighbours after each drop.
+    while (c.length > 3) {
+        let best = -1, bestOff = SIMPLIFY;
+        for (let i = 0; i < c.length; i++) {
+            const off = OffLine(i);
+            if (off <= bestOff) { best = i; bestOff = off; }
         }
+        if (best < 0) break;
+        c.splice(best, 1);
     }
-    return contours.map(Clean).filter(c => c.length >= 3);
-}
-
-/** Drops the closing duplicate and points too close to the one before. */
-function Clean(contour) {
-    const out = [];
-    for (const p of contour) {
-        const q = out[out.length - 1];
-        if (!q || Math.hypot(p[0] - q[0], p[1] - q[1]) > 1e-4) out.push(p);
-    }
-    while (out.length > 1 && Math.hypot(out[0][0] - out.at(-1)[0], out[0][1] - out.at(-1)[1]) <= 1e-4) out.pop();
-    return out;
-}
-
-function Inside(pt, c) {
-    let inside = false;
-    for (let i = 0, j = c.length - 1; i < c.length; j = i++) {
-        const [xi, yi] = c[i], [xj, yj] = c[j];
-        if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi) + xi) inside = !inside;
-    }
-    return inside;
-}
-
-/** Groups a glyph's contours into shapes: outer CCW, its holes CW. */
-function Shapes(contours) {
-    // Nesting depth decides outer (even) vs hole (odd), whatever the font's winding.
-    const depth = contours.map((c, i) => contours.filter((o, j) => j !== i && Inside(c[0], o)).length);
-    const shapes = [];
-    contours.forEach((c, i) => {
-        if (depth[i] % 2) return;
-        shapes.push({ outer: Area(c) > 0 ? c : [...c].reverse(), holes: [], index: i });
-    });
-    contours.forEach((c, i) => {
-        if (!(depth[i] % 2)) return;
-        const parents = shapes.filter(s => depth[s.index] === depth[i] - 1 && Inside(c[0], s.outer));
-        const parent = parents.sort((a, b) => Math.abs(Area(a.outer)) - Math.abs(Area(b.outer)))[0];
-        if (parent) parent.holes.push(Area(c) < 0 ? c : [...c].reverse());
-    });
-    return shapes;
+    return c;
 }
 
 // Lay out the text: font 2D (x right, y up), slanted (tops lean right) and
 // centered on its bottom center, still as 2D shapes.
-const glyphShapes = [];
-let pen = 0;
-for (const glyph of font.stringToGlyphs(TEXT)) {
-    glyphShapes.push(...Shapes(GlyphContours(glyph, pen)));
-    pen += glyph.advanceWidth * scale + LETTER_SPACING;
-}
+const glyphShapes = TextShapes(font, TEXT, CAP_HEIGHT, { letterSpacing: LETTER_SPACING, curveStep: CURVE_STEP, minSegments: CURVE_MIN_SEGMENTS })
+    .map(s => ({ outer: Simplify(s.outer), holes: s.holes.map(Simplify) }));
 const Slant = c => c.map(([x, y]) => [x + slant * y, y]);
 const slanted = glyphShapes.map(s => ({ outer: Slant(s.outer), holes: s.holes.map(Slant) }));
 const allX = slanted.flatMap(s => [s.outer, ...s.holes].flat()).map(p => p[0]);
@@ -166,7 +100,7 @@ function Outline(shapes) {
     const S = 1000; // Clipper works on integers
     const paths = shapes.flatMap(s => [s.outer, ...s.holes]).map(c => c.map(([x, y]) => ({ X: Math.round(x * S), Y: Math.round(y * S) })));
     const offset = new ClipperLib.ClipperOffset(2, OUTLINE_ARC_TOLERANCE * S);
-    offset.AddPaths(paths, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    offset.AddPaths(paths, OUTLINE_ROUND ? ClipperLib.JoinType.jtRound : ClipperLib.JoinType.jtMiter, ClipperLib.EndType.etClosedPolygon);
     const grown = new ClipperLib.Paths();
     offset.Execute(grown, OUTLINE_WIDTH * S);
     const clipper = new ClipperLib.Clipper();
@@ -178,7 +112,8 @@ function Outline(shapes) {
     const ToPts = node => Clean(node.Contour().map(p => [p.X / S, p.Y / S]));
     const Walk = node => {
         for (const outer of node.Childs()) {
-            const c = ToPts(outer);
+            // Only its outside is simplified: the holes are the letters' own edges.
+            const c = Simplify(ToPts(outer));
             const shape = { outer: Area(c) > 0 ? c : [...c].reverse(), holes: [] };
             for (const hole of outer.Childs()) {
                 const h = ToPts(hole);
@@ -204,18 +139,12 @@ const front = DEPTH / 2 + (outline.length ? LETTER_RAISE : 0);
 mesh.Extrude(letters, -DEPTH / 2, front, "face", "x", HOLO_SOURCE ? "holo" : "face");
 
 const GENERATOR = "tools/make-logo-model.mjs";
-const OBJ = `${MODEL_DIR}/${NAME}.obj`;
-WriteAddonFile(OBJ, ObjText(mesh, NAME, GENERATOR));
-WriteAddonFile(`${MODEL_DIR}/${NAME}.vmdl`, VmdlText({
-    name: NAME,
-    obj: OBJ,
-    physicsObj: OBJ,
-    materials: {
-        face: `${MATERIAL_DIR}/${NAME}_face.vmat`,
-        outline: `${MATERIAL_DIR}/${NAME}_outline.vmat`,
-        ...(HOLO_SOURCE ? { holo: `${MATERIAL_DIR}/${NAME}_holo.vmat` } : {}),
-    },
-}));
+const materials = {
+    face: `${MATERIAL_DIR}/${NAME}_face.vmat`,
+    outline: `${MATERIAL_DIR}/${NAME}_outline.vmat`,
+    ...(HOLO_SOURCE ? { holo: `${MATERIAL_DIR}/${NAME}_holo.vmat` } : {}),
+};
+WriteAddonFile(`${MODEL_DIR}/${NAME}.dmx`, DmxText(mesh, NAME, materials));
 for (const [part, rgb] of [["face", FACE_COLOR], ["outline", OUTLINE_COLOR]]) {
     WriteAddonFile(`${MATERIAL_DIR}/${NAME}_${part}_color.png`, SolidPng(rgb));
     WriteAddonFile(`${MATERIAL_DIR}/${NAME}_${part}.vmat`, VmatText({ texture: `${MATERIAL_DIR}/${NAME}_${part}_color.png`, generator: GENERATOR }));
@@ -268,4 +197,3 @@ function WriteOpaqueHolo() {
 
 const xs = [...letters, ...outline].flatMap(s => [s.outer, ...s.holes].flat()).map(p => p[0]);
 console.log(`${mesh.triangleCount} triangles, ${(Math.max(...xs) - Math.min(...xs)).toFixed(1)} x ${DEPTH + (outline.length ? LETTER_RAISE : 0)} x ${CAP_HEIGHT + 2 * OUTLINE_WIDTH} units (width x depth x height)`);
-console.log(`compile: game/bin/win64/resourcecompiler.exe -game csgo -addon melon_racer -i "<content path>/${MODEL_DIR}/${NAME}.vmdl"`);

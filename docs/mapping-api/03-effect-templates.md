@@ -91,8 +91,9 @@ entity, e.g. a "Never Solid" `func_brush`.
 `template_spectator_hat`: the ghost avatar of a player in free look (user
 menu, DEVELOPER). Their pawn flies around invisible, so a fresh copy of
 this template hangs on it — at eye height (`SPECTATOR_HAT_HEIGHT`, 64 units
-above the feet) and a little behind the eyes (`SPECTATOR_HAT_BACK`, 48 units,
-so the player's own view isn't through it), facing the view, flying along —
+above the feet) and a little behind the eyes (`SPECTATOR_HAT_BACK`, 24 units,
+so the player's own view isn't through it), turned and tilted with the view (looking
+down, it tips forward and rises behind the eyes), flying along —
 and shows the others who
 it is. Removed when free look goes off or the player leaves. Where it sits in
 Hammer doesn't matter. Make the model **"Not solid"**: the script also sends

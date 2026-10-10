@@ -31,6 +31,7 @@ import {
 } from "../../constants/index.js";
 import { PhysicsFactor, ExtraGravityDelta, BoostMaxSpeed } from "../../dev/physics-tuning-logic.js";
 import { AttackBoost, WithoutEnginePush } from "../attack-boost/logic.js";
+import { KnifeGuardActive } from "../attack-boost/knife-guard.js";
 import { BaseMaxSpeed, KartMaxSpeed, UpdateMomentum } from "../momentum/logic.js";
 import { LogAttackHeld } from "../../dev/attack-debug.js";
 import { Debug } from "../../core/debug.js";
@@ -115,7 +116,14 @@ export function UpdateKart(slot, kart, dt) {
         }
     }
     const origin = melon.GetAbsOrigin();
-    const currentVelocity = melon.GetAbsVelocity();
+    // Someone's knife swing (movement/attack-boost/knife-guard.js) may have
+    // shoved this melon — not an impact, and no speed from it either.
+    const knifeGuard = KnifeGuardActive(now);
+    if (knifeGuard) {
+        kart.attackGuardUntil = Math.max(kart.attackGuardUntil ?? -Infinity, now + ATTACK_PUSH_GUARD_SECONDS);
+    }
+    const rawVelocity = melon.GetAbsVelocity();
+    const currentVelocity = knifeGuard && kart.lastVelocity ? WithoutEnginePush(rawVelocity, kart.lastVelocity) : rawVelocity;
     // Ground contact from physics (see IsSupported): the vertical velocity we
     // commanded last tick vs. what it is now. No command to compare against
     // (first tick after a teleport/respawn, or coming out of rest): a melon

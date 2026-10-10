@@ -35,6 +35,7 @@ import { RegisterBreakInputs } from "./health/index.js";
 import { RegisterZoneInputs } from "./zones/index.js";
 import { phase, activeTrackId, phaseEndTime, RestoreRaceFlowSnapshot, RegisterRaceInputs, grandPrix, RestoreGrandPrix } from "./race/index.js";
 import { RegisterHudInputs } from "./hud/index.js";
+import { RegisterMovementInputs } from "./movement/index.js";
 import { RegisterAttackDebug } from "./dev/index.js";
 import { movers, RestoreMovers, RegisterMoverInputs } from "./world/index.js";
 
@@ -70,5 +71,6 @@ RegisterRaceInputs(); // start_/checkpoint_/finish_<trackId>, hub_enter/hub_leav
 RegisterZoneInputs(); // heal/lift/camera/jump pad *_enter/*_leave, melon_teleport
 RegisterBreakInputs(); // melon_break
 RegisterHudInputs(); // OnCustomHudClicked
+RegisterMovementInputs(); // OnKnifeAttack (knife guard)
 RegisterAttackDebug();
 RegisterMoverInputs(); // OnActivate/OnRoundStart: start the func_movelinear movers

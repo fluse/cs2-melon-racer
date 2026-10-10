@@ -34,6 +34,13 @@ Instance.ServerCommand("mp_solid_teammates 0"); // don't block each other on the
 Instance.ServerCommand("mp_ignore_round_win_conditions 1");
 Instance.ServerCommand("mp_teamcashawards false");
 Instance.ServerCommand("mp_playercashawards false");
+// No default loadout: the engine handed every pawn a knife back after
+// DestroyWeapons, and a knife swing shoves melons — a free-looking pawn
+// could fly up to someone's melon and knife it to pieces.
+Instance.ServerCommand('mp_t_default_melee ""');
+Instance.ServerCommand('mp_ct_default_melee ""');
+Instance.ServerCommand('mp_t_default_secondary ""');
+Instance.ServerCommand('mp_ct_default_secondary ""');
 
 /** @param {import("cs_script/point_script").CSPlayerPawn} pawn */
 function PutPlayerInRaceMode(pawn) {

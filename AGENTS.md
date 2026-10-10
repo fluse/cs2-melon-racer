@@ -28,6 +28,7 @@ Current addon contents:
 ```
 CHANGELOG.md                             # player-facing changes per release (git tag v<version>), written by the /release skill
 docs/TRACK_CREATION.md                   # step-by-step Hammer guide for a new track
+docs/GAME_CI.md                          # the map's color palette (guide lines, heal, checkpoint, start gate) — use it for new materials/models/HUD
 docs/valve/scripting_api.html            # saved copy of Valve's cs_script API wiki page (the site blocks automated fetches)
 docs/mapping-api/*.md                    # Mapping API (map↔script contract): README.md = index of every input/name/pattern,
                                           #   01-…17-*.md one page per topic, each with setup / name-variant / "Values" tables
@@ -92,12 +93,15 @@ tools/make-logo.mjs                      # renders the logo (melon slice + slant
 tools/make-route-icons.mjs               # generates the hub window's route cards from the .vmap: an icon per track, picked by its name (ROUTE_ICONS)
                                           #   (panorama/images/custom_game/routes/route_<trackId>.png) + route names (src/melon_drive/hud/hub-modal/routes.js,
                                           #   from route_<name>.vmap) — re-run after adding/renaming a route (test/map/route-icons.test.mjs)
-tools/make-logo-model.mjs                # extrudes MELON RACER (Bungee, slanted like the logo, lime green outline ring around them) into models/melon_racer/logo_text.obj + .vmdl
-                                          #   + materials/melon_racer/logo_text_{face,outline,holo}.vmat (holo = an opaque copy of holo_dashes for the letter fronts) (opentype.js + earcut + clipper-lib, devDependencies);
-                                          #   OBJ is written Y-up (ModelDoc rotates OBJ axes) — re-run, then compile the .vmdl with resourcecompiler.exe
+tools/make-logo-model.mjs                # extrudes MELON RACER (Bungee, slanted like the logo, lime green outline ring around them) into mesh geometry,
+                                          #   models/melon_racer/logo_text.dmx for Hammer's File → Import (DmxText in model.mjs),
+                                          #   + materials/melon_racer/logo_text_{face,outline,holo}.vmat (holo = an opaque copy of holo_dashes for the letter fronts) (opentype.js + earcut + clipper-lib, devDependencies)
 tools/make-checkpoint-model.mjs          # the checkpoint gate's frame (glowing pillars, beam, floating diamond) as models/melon_racer/checkpoint_gate.vmdl
                                           #   (+ _physics.obj collision, materials/melon_racer/checkpoint_gate_{body,trim,glow}.vmat); same footprint as the prefab's old poles
-tools/model.mjs                          # shared by the model generators: mesh builder (extrude, triangles), .obj/.vmdl/.vmat writers
+tools/make-podium-model.mjs              # the hub podium (steps 2-1-3 in the docs/GAME_CI.md colors, glowing Bungee place numbers) as mesh geometry,
+                                          #   models/melon_racer/podium.dmx for Hammer's File → Import (DmxText in model.mjs), + materials/melon_racer/podium_*.vmat; prints where the podium_spawn_<place> info_targets go
+tools/font.mjs                           # shared by make-logo-model.mjs and make-podium-model.mjs: a line of text in a font (Bungee) as 2D shapes
+tools/model.mjs                          # shared by the model generators: mesh builder (extrude, triangles), .obj/.vmdl/.dmx/.vmat writers
 tools/make-decal.mjs                     # generates materials/melon_racer/<decal>_{color,trans}.png for every decal in its DECALS list
                                           #   (HUD logo, rawDecals/*.png|jpg — JPG via Windows System.Drawing; can key out a baked-in checkerboard, writes <name>_transparent.png)
 rawDecals/*.png                          # new source images for decals (make-decal.mjs input); once done, the tool moves

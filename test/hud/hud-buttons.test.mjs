@@ -217,6 +217,15 @@ test("free look: a ghost avatar from template_spectator_hat hangs on the flying 
     assert.ok(Math.abs(moved.x - 100) < 1e-6 && Math.abs(moved.y - (200 - C.SPECTATOR_HAT_BACK)) < 1e-6
         && moved.z === 300 + C.SPECTATOR_HAT_HEIGHT, "follows the flying pawn, behind its current view");
 
+    a.pawn.Teleport({ angles: { pitch: 30, yaw: 90, roll: 0 } });
+    UpdateSpectatorHat(a);
+    const tilted = hat.GetAbsOrigin();
+    const down = 30 * Math.PI / 180;
+    assert.ok(Math.abs(tilted.y - (200 - Math.cos(down) * C.SPECTATOR_HAT_BACK)) < 1e-6
+        && Math.abs(tilted.z - (300 + C.SPECTATOR_HAT_HEIGHT + Math.sin(down) * C.SPECTATOR_HAT_BACK)) < 1e-6,
+        "looking down it swings up behind the eyes, around them");
+    assert.equal(hat.GetAbsAngles().pitch, 30, "tilted with the view");
+
     Click(0, "usermenu_freelook_button");
     assert.equal(hat.IsValid(), false, "removed when free look goes off");
     assert.equal(a.spectatorHat, undefined);

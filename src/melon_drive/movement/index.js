@@ -4,3 +4,9 @@
 // momentum/. Other parts of melon_drive import from here.
 export { UpdateKart } from "./driving/drive.js";
 export { GetWallJumpCharges } from "./jump/jump.js";
+import { RegisterAttackBoostInputs } from "./attack-boost/inputs.js";
+
+/** Registers the movement mechanics' engine events. Called once from index.js. */
+export function RegisterMovementInputs() {
+    RegisterAttackBoostInputs(); // OnKnifeAttack: knife guard
+}

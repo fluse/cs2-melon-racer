@@ -684,7 +684,12 @@ Removing weapons alone doesn't stop the push in-game, so in addition: while atta
 and for `ATTACK_PUSH_GUARD_SECONDS` after, physics may not add horizontal
 speed beyond what the script commanded last tick (`WithoutEnginePush`) —
 speed then only comes from driving (W, up to `MAX_SPEED` as always) and the
-paid boost.
+paid boost. A swing shoves other melons too — from free look a pawn could
+fly up to someone's melon and knife it until it broke — so `gamemode`
+clears the default loadout (`mp_t/ct_default_melee ""`), and after any
+`OnKnifeAttack` every melon gets that guard for `ATTACK_PUSH_GUARD_SECONDS`,
+the shove counting as no impact either, and the swinger loses their weapons
+(`movement/attack-boost/knife-guard.js`).
 
 ## Momentum — top speed that grows (implemented)
 

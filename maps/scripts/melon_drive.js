@@ -99,7 +99,6 @@ function TraceSphere(config) {
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
- *   physicsTuning?: Partial<Record<import("../dev/physics-tuning-logic.js").PhysicsTuningKey, number>>, // this player's own melon physics in percent of the defaults, from the user menu's physics page — see dev/physics-tuning.js
  *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the developer page the user menu shows in place of its columns, if any — see SetUserMenuPage
  *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
@@ -1384,10 +1383,10 @@ const FREE_LOOK_EYE_HEIGHT = 64;
 // it shows the others who's flying around. Optional: without it, no avatar.
 const SPECTATOR_HAT_TEMPLATE_NAME = "template_spectator_hat";
 // Where it hangs: this far above the pawn's origin (its feet) — at its eyes.
-const SPECTATOR_HAT_HEIGHT = FREE_LOOK_EYE_HEIGHT;
+const SPECTATOR_HAT_HEIGHT = 80;
 // …and this far behind the eyes, against the view's yaw — so the player's
 // own camera (at the eyes) doesn't look out through it.
-const SPECTATOR_HAT_BACK = 48;
+const SPECTATOR_HAT_BACK = -20;
 
 // Camera tuning (dev/camera-tuning.js, its scale CAMERA_TUNING_SCALE in
 // dev/tuning-scale-logic.js): the user menu's "Camera Settings"
@@ -2946,13 +2945,13 @@ function WithStartsInTutorial(saveData, playerName, on) {
 // kart/join-spot-logic.js.
 
 /** @param {import("../core/kart-registry.js").Kart | { pawn: any }} kart */
-function PlayerName$1(kart) {
+function PlayerName$2(kart) {
     return kart.pawn.GetPlayerController()?.GetPlayerName() ?? "";
 }
 
 /** Whether this kart's player starts in the tutorial when joining. @param {import("../core/kart-registry.js").Kart} kart */
 function IsStartInTutorialOn(kart) {
-    return StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$1(kart));
+    return StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$2(kart));
 }
 
 /**
@@ -2961,9 +2960,9 @@ function IsStartInTutorialOn(kart) {
  */
 function SetStartInTutorial(kart, on) {
     // Re-read so the best times and everyone else's settings survive.
-    const data = WithStartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$1(kart), on);
+    const data = WithStartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$2(kart), on);
     Instance.SetSaveData(JSON.stringify(data));
-    Debug(`SetStartInTutorial: "${PlayerName$1(kart)}" starts ${on ? "in the tutorial" : "in the hub"} on join`);
+    Debug(`SetStartInTutorial: "${PlayerName$2(kart)}" starts ${on ? "in the tutorial" : "in the hub"} on join`);
 }
 
 /**
@@ -2973,7 +2972,7 @@ function SetStartInTutorial(kart, on) {
  * @param {any} pawn
  */
 function GetJoinSpawnPoint(pawn) {
-    if (StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$1({ pawn }))) {
+    if (StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$2({ pawn }))) {
         return GetIntroSpawnPoint();
     }
     return GetHubSpawnPoint() ?? GetIntroSpawnPoint();
@@ -3287,22 +3286,25 @@ function UpdateSpectatorHat(kart) {
 }
 
 /**
- * Where the ghost avatar hangs: SPECTATOR_HAT_HEIGHT above the pawn's feet
- * and SPECTATOR_HAT_BACK behind its eyes along the view's yaw (so the
- * player's own camera doesn't look out through it), facing the view.
+ * Where the ghost avatar hangs: SPECTATOR_HAT_BACK behind the pawn's eyes
+ * (SPECTATOR_HAT_HEIGHT above its feet) against the view (so the player's
+ * own camera doesn't look out through it), turned and tilted with the view —
+ * looking down, it tips forward and rises behind the eyes, like a head nodding.
  * @param {import("../core/kart-registry.js").Kart} kart
  */
 function SpectatorHatPose(kart) {
     const feet = kart.pawn.GetAbsOrigin();
-    const yaw = kart.pawn.GetEyeAngles().yaw;
-    const rad = yaw * Math.PI / 180;
+    const { pitch, yaw } = kart.pawn.GetEyeAngles();
+    const p = pitch * Math.PI / 180, y = yaw * Math.PI / 180;
+    // The view's forward direction (Source pitch: positive looks down).
+    const forward = { x: Math.cos(p) * Math.cos(y), y: Math.cos(p) * Math.sin(y), z: -Math.sin(p) };
     return {
         position: {
-            x: feet.x - Math.cos(rad) * SPECTATOR_HAT_BACK,
-            y: feet.y - Math.sin(rad) * SPECTATOR_HAT_BACK,
-            z: feet.z + SPECTATOR_HAT_HEIGHT,
+            x: feet.x - forward.x * SPECTATOR_HAT_BACK,
+            y: feet.y - forward.y * SPECTATOR_HAT_BACK,
+            z: feet.z + SPECTATOR_HAT_HEIGHT - forward.z * SPECTATOR_HAT_BACK,
         },
-        angles: { pitch: 0, yaw, roll: 0 },
+        angles: { pitch, yaw, roll: 0 },
     };
 }
 
@@ -4031,23 +4033,38 @@ function FreshApproach(contact, now) {
     return contact.approachTime !== undefined && now - contact.approachTime <= WALL_JUMP_APPROACH_MEMORY ? contact.approach : undefined;
 }
 
-// Pure rules for the user menu's physics tuning page — no cs_script import,
-// so the driving rules can read a kart's factors and Node can test them
-// (test/dev/physics-tuning.test.mjs). physics-tuning.js next to it keeps the
-// values on the kart and drives the HUD; the scale itself is
-// tuning-scale-logic.js.
+// The user menu's physics tuning: the values themselves — server-wide, the
+// same for every melon — and the rules applying them. No cs_script import,
+// so the driving rules (movement/) can read the factors and Node can test
+// them (test/dev/physics-tuning.test.mjs). physics-tuning.js next to it
+// drives the page; the scale itself is tuning-scale-logic.js. The values are
+// module state: they survive a tools-mode script reload, not a map restart.
 
 /** @typedef {"maxSpeed" | "accel" | "jump" | "boost" | "gravity"} PhysicsTuningKey */
 /** The page's rows, top to bottom. @type {PhysicsTuningKey[]} */
 const PHYSICS_TUNING_KEYS = ["maxSpeed", "accel", "jump", "boost", "gravity"];
 
-/**
- * A kart's factor for one value: its percent on the physics page / 100,
- * 1 (the default) when it never changed it.
- * @param {{ physicsTuning?: Partial<Record<PhysicsTuningKey, number>> }} kart @param {PhysicsTuningKey} key
- */
-function PhysicsFactor(kart, key) {
-    return (kart.physicsTuning?.[key] ?? 100) / 100;
+/** Each value in percent of its default; a missing one is 100. @type {Partial<Record<PhysicsTuningKey, number>>} */
+let tuning = {};
+
+/** One value in percent of its default (100 = unchanged). @param {PhysicsTuningKey} key */
+function PhysicsPercent(key) {
+    return tuning[key] ?? 100;
+}
+
+/** Sets one value, for every melon. @param {PhysicsTuningKey} key @param {number} percent */
+function SetPhysicsPercent(key, percent) {
+    tuning = { ...tuning, [key]: percent };
+}
+
+/** Every value back to 100 %. */
+function ResetPhysicsTuning() {
+    tuning = {};
+}
+
+/** The factor a value scales its default with: its percent / 100. @param {PhysicsTuningKey} key */
+function PhysicsFactor(key) {
+    return PhysicsPercent(key) / 100;
 }
 
 /**
@@ -4093,28 +4110,27 @@ function NewMomentum() {
 /**
  * The top speed with `momentum`'s steps (plain `baseMax` without any).
  * @param {MomentumState | undefined} momentum
- * @param {number} [baseMax] the top speed without steps — MAX_SPEED, or a kart's own (KartMaxSpeed)
+ * @param {number} [baseMax] the top speed without steps — MAX_SPEED, or the tuned one (BaseMaxSpeed)
  */
 function MomentumMaxSpeed(momentum, baseMax = MAX_SPEED) {
     return baseMax * (1 + MOMENTUM_STEP * (momentum?.steps ?? 0));
 }
 
 /**
- * A kart's top speed without momentum: MAX_SPEED, scaled by its physics
- * page's "Max Speed" (dev/physics-tuning.js).
- * @param {{ physicsTuning?: any }} kart
+ * The top speed without momentum: MAX_SPEED, scaled by the physics page's
+ * "Max Speed" (dev/physics-tuning.js, the same for every melon).
  */
-function KartBaseMaxSpeed(kart) {
-    return MAX_SPEED * PhysicsFactor(kart, "maxSpeed");
+function BaseMaxSpeed() {
+    return MAX_SPEED * PhysicsFactor("maxSpeed");
 }
 
 /**
- * A kart's current top speed: its own base (KartBaseMaxSpeed) with its
- * momentum steps.
- * @param {{ momentum?: MomentumState, physicsTuning?: any }} kart
+ * A kart's current top speed: the base (BaseMaxSpeed) with its momentum
+ * steps.
+ * @param {{ momentum?: MomentumState }} kart
  */
 function KartMaxSpeed(kart) {
-    return MomentumMaxSpeed(kart.momentum, KartBaseMaxSpeed(kart));
+    return MomentumMaxSpeed(kart.momentum, BaseMaxSpeed());
 }
 
 /**
@@ -5260,7 +5276,7 @@ function ApplyJump(slot, kart, now, grounded, jumpPressed, v, rules) {
     const timingPress = RegisterWallTimingPress(kart, now);
     LogJumpPress(slot, kart, now, grounded, groundJump, timingPress);
     if (groundJump) {
-        v.z = JUMP_SPEED * PhysicsFactor(kart, "jump"); // scaled by the physics page (dev/physics-tuning.js)
+        v.z = JUMP_SPEED * PhysicsFactor("jump"); // scaled by the physics page (dev/physics-tuning.js)
         kart.lastJumpTime = now;
     }
     // Wall timing — independent of the normal jump above (works in the air
@@ -5336,7 +5352,7 @@ function FireBufferedGroundJump(slot, kart, now, grounded, v) {
     }
     kart.bufferedGroundJumpTime = undefined;
     kart.bufferedWallJumpTime = undefined; // the press is used up
-    v.z = JUMP_SPEED * PhysicsFactor(kart, "jump"); // scaled by the physics page (dev/physics-tuning.js)
+    v.z = JUMP_SPEED * PhysicsFactor("jump"); // scaled by the physics page (dev/physics-tuning.js)
     kart.lastJumpTime = now;
     if (kart.lastIdleJumpPressTime === pressed) {
         kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
@@ -5715,7 +5731,7 @@ function SaveBestTimes() {
 }
 
 /** @param {import("../../core/kart-registry.js").Kart} kart */
-function PlayerName(kart) {
+function PlayerName$1(kart) {
     return kart.pawn.GetPlayerController()?.GetPlayerName() ?? "";
 }
 
@@ -5742,7 +5758,7 @@ function FinishRun(kart, trackId) {
     const now = Instance.GetGameTime();
     const time = now - kart.runStartTime;
     kart.runStartTime = undefined;
-    const name = PlayerName(kart);
+    const name = PlayerName$1(kart);
     // RecordRunTime updates the cached object in place; SaveBestTimes then
     // writes exactly that object back.
     const newBest = name !== "" && RecordRunTime(BestTimes(), trackId, name, time);
@@ -5776,7 +5792,7 @@ function GetTrackBestTimes(trackId) {
 
 /** This player's best time on `trackId`, if any. @param {import("../../core/kart-registry.js").Kart} kart @param {number} trackId */
 function GetBestTime(kart, trackId) {
-    return BestTimes()[trackId]?.[PlayerName(kart)];
+    return BestTimes()[trackId]?.[PlayerName$1(kart)];
 }
 
 // What the HUD's checkpoint strip shows (start flag -> numbered checkpoints
@@ -7528,11 +7544,12 @@ function HandleCameraTuningClick(slot, kart, buttonId) {
 }
 
 // Physics tuning: the user menu's "Physics Settings" page (DEVELOPER column)
-// scales the clicking player's own melon physics — top speed, acceleration,
-// jump, attack boost, gravity — each in percent of its default
-// (kart.physicsTuning, read through PhysicsFactor in physics-tuning-logic.js
-// by movement/). To try out values in-game: not saved (gone on reconnect or
-// a map restart), every change logged to the console with the resulting
+// scales the melon physics — top speed, acceleration, jump, attack boost,
+// gravity — each in percent of its default, for every melon on the server
+// (the values live in physics-tuning-logic.js, read through PhysicsFactor by
+// movement/). Anyone can change them; everyone with the page open sees the
+// change. To try out values in-game: not saved (gone on a map restart),
+// every change logged to the console with who made it and the resulting
 // value, ready to copy into the constants. The scale is the shared one
 // (tuning-scale-logic.js); opening/closing the page is SetUserMenuPage in
 // hud/user-menu.js.
@@ -7552,30 +7569,26 @@ const ROWS = {
     gravity: { id: "gravity", constant: "GRAVITY", base: GRAVITY, unit: "u/s²" },
 };
 
-/** @param {import("../core/kart-registry.js").Kart} kart @param {PhysicsTuningKey} key */
-function Percent(kart, key) {
-    return Math.round(PhysicsFactor(kart, key) * 100);
+/** Who changed it, for the log. @param {number} slot */
+function PlayerName(slot) {
+    return karts.get(slot)?.pawn.GetPlayerController()?.GetPlayerName() ?? `slot ${slot}`;
 }
 
-/**
- * Sets one value and shows it. Back on 100 % for every value, the kart
- * drops its tuning again.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {PhysicsTuningKey} key @param {number} percent
- */
-function SetPhysicsTuning(slot, kart, key, percent) {
-    const tuning = { ...kart.physicsTuning, [key]: percent };
-    kart.physicsTuning = PHYSICS_TUNING_KEYS.every((k) => (tuning[k] ?? 100) === 100) ? undefined : tuning;
-    const row = ROWS[key];
-    Instance.Msg(`[physics tuning] slot ${slot}: ${key} ${Percent(kart, key)} % = ${row.constant} ${Math.round(row.base * PhysicsFactor(kart, key))}`);
-    UpdatePhysicsTuningHud(slot, kart);
+/** Everyone who has the physics page open sees the new values. */
+function RefreshOpenPages() {
+    for (const [slot, kart] of karts) {
+        if (kart.userMenuOpen && kart.userMenuPage === "physics") {
+            UpdatePhysicsTuningHud(slot);
+        }
+    }
 }
 
 /**
  * The physics page's numbers ("130 % · 845 u/s") and its scales, filled up
- * to the values.
- * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ * to the values, for the player in `slot`.
+ * @param {number} slot
  */
-function UpdatePhysicsTuningHud(slot, kart) {
+function UpdatePhysicsTuningHud(slot) {
     const hud = GetSpeedHud();
     if (!hud) {
         return;
@@ -7584,8 +7597,8 @@ function UpdatePhysicsTuningHud(slot, kart) {
     hud.SetDialogVariableStringForPlayer(slot, "usermenu_physics_page", "phytune_fine_step", `${PHYSICS_TUNING_SCALE.fineStep}`);
     for (const key of PHYSICS_TUNING_KEYS) {
         const row = ROWS[key];
-        const percent = Percent(kart, key);
-        const value = Math.round(row.base * PhysicsFactor(kart, key));
+        const percent = PhysicsPercent(key);
+        const value = Math.round(row.base * PhysicsFactor(key));
         hud.SetDialogVariableStringForPlayer(slot, "usermenu_physics_page", `phytune_${row.id}`, `${percent} % · ${value} ${row.unit}`);
         hud.SetDialogVariableStringForPlayer(slot, "usermenu_physics_page", `phytune_${row.id}_default`, `${row.base} ${row.unit}`);
         UpdateTuningScaleHud(hud, slot, `phytune_${row.id}_`, PHYSICS_TUNING_SCALE, percent);
@@ -7594,15 +7607,15 @@ function UpdatePhysicsTuningHud(slot, kart) {
 
 /**
  * A click on the physics page's controls (button ids "phytune_…"): reset,
- * or − / + (big or fine step) or a segment on a row.
+ * or − / + (big or fine step) or a segment on a row — for every melon.
  * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {string} buttonId
  * @returns {boolean} whether it was one of them
  */
 function HandlePhysicsTuningClick(slot, kart, buttonId) {
     if (buttonId === "phytune_reset_button") {
-        kart.physicsTuning = undefined;
-        Instance.Msg(`[physics tuning] slot ${slot}: everything back to 100 %`);
-        UpdatePhysicsTuningHud(slot, kart);
+        ResetPhysicsTuning();
+        Instance.Msg(`[physics tuning] ${PlayerName(slot)}: everything back to 100 % (all melons)`);
+        RefreshOpenPages();
         return true;
     }
     const button = ParseTuningButton("phytune_", buttonId);
@@ -7610,7 +7623,10 @@ function HandlePhysicsTuningClick(slot, kart, buttonId) {
     if (!button || !key) {
         return false;
     }
-    SetPhysicsTuning(slot, kart, key, TunedValue(PHYSICS_TUNING_SCALE, Percent(kart, key), button));
+    SetPhysicsPercent(key, TunedValue(PHYSICS_TUNING_SCALE, PhysicsPercent(key), button));
+    const row = ROWS[key];
+    Instance.Msg(`[physics tuning] ${PlayerName(slot)}: ${key} ${PhysicsPercent(key)} % = ${row.constant} ${Math.round(row.base * PhysicsFactor(key))} (all melons)`);
+    RefreshOpenPages();
     return true;
 }
 
@@ -8864,13 +8880,43 @@ function AttackBoost(health, attackHeld, dt) {
     };
 }
 
+// Knife swings near other melons. The engine keeps handing pawns a knife
+// back (see HoldPawn), and a swing shoves whatever melon it reaches — not
+// just the swinger's own (that one is covered by the attack guard in
+// UpdateKart). A free-looking pawn (dev/free-look.js) can fly right up to
+// someone else's melon and knife it: the shove read as an impact and broke
+// it. So after any knife attack anywhere, every melon gets the same guard
+// for ATTACK_PUSH_GUARD_SECONDS: no speed from engine pushes, no impact
+// from them. The swinger loses their weapons at once, too.
+
+let lastKnifeAttackTime = -Infinity;
+
+/** Whether a knife attack happened within ATTACK_PUSH_GUARD_SECONDS. @param {number} now */
+function KnifeGuardActive(now) {
+    return now - lastKnifeAttackTime <= ATTACK_PUSH_GUARD_SECONDS;
+}
+
+/**
+ * OnKnifeAttack: starts the guard and takes the swinger's weapons away.
+ * @param {{ weapon: any, attackType: number }} event
+ */
+function OnKnifeAttack({ weapon, attackType }) {
+    lastKnifeAttackTime = Instance.GetGameTime();
+    const owner = weapon?.GetOwner();
+    Debug(`[attack debug] knife attack: ${weapon?.GetClassName?.() ?? "?"} (type ${attackType}), every melon guarded`);
+    if (owner?.IsValid()) {
+        owner.DestroyWeapons();
+    }
+}
+
 // Diagnostics for the attack button (DEBUG only, console). Found with it: the
 // engine gave the pawn a knife back after spawn, and each knife swing shoved
 // the melon ~140 u/s even with the attack boost off — HoldPawn now takes
 // weapons away every tick. Kept in case anything else reacts to attack. These logs show
 // what's going on: per kart while attack is held, how much speed physics
 // added on top of what the script commanded last tick, and which weapon the
-// pawn holds; plus every gun shot, bullet impact and knife attack.
+// pawn holds; plus every gun shot and bullet impact (knife attacks are
+// logged by movement/attack-boost/knife-guard.js, which owns OnKnifeAttack).
 
 const ATTACK_DEBUG_INTERVAL = 0.25; // seconds between two per-kart lines while attack is held
 
@@ -8918,9 +8964,6 @@ function RegisterAttackDebug() {
             `[attack debug] bullet from ${Describe(weapon)} hit ${Describe(hitEntity)}` +
             `${melonKart ? " — A MELON" : ""} at (${position.x.toFixed(0)}, ${position.y.toFixed(0)}, ${position.z.toFixed(0)})`
         );
-    });
-    Instance.OnKnifeAttack(({ weapon, attackType }) => {
-        Debug(`[attack debug] knife attack: ${Describe(weapon)} (type ${attackType})`);
     });
 }
 
@@ -9083,7 +9126,7 @@ function UpdateKart(slot, kart, dt) {
         melon.Move({ velocity: { x: 0, y: 0, z: vel.z } });
         kart.lastVelocity = undefined;
         kart.settled = false;
-        kart.speedCap = KartBaseMaxSpeed(kart);
+        kart.speedCap = BaseMaxSpeed();
         kart.momentum = undefined; // standing still — the momentum run is over
         kart.attackBoosting = false;
         kart.pendingBounce = undefined; // parked/finished — a bounce's leftover damage no longer matters
@@ -9133,7 +9176,14 @@ function UpdateKart(slot, kart, dt) {
         }
     }
     const origin = melon.GetAbsOrigin();
-    const currentVelocity = melon.GetAbsVelocity();
+    // Someone's knife swing (movement/attack-boost/knife-guard.js) may have
+    // shoved this melon — not an impact, and no speed from it either.
+    const knifeGuard = KnifeGuardActive(now);
+    if (knifeGuard) {
+        kart.attackGuardUntil = Math.max(kart.attackGuardUntil ?? -Infinity, now + ATTACK_PUSH_GUARD_SECONDS);
+    }
+    const rawVelocity = melon.GetAbsVelocity();
+    const currentVelocity = knifeGuard && kart.lastVelocity ? WithoutEnginePush(rawVelocity, kart.lastVelocity) : rawVelocity;
     // Ground contact from physics (see IsSupported): the vertical velocity we
     // commanded last tick vs. what it is now. No command to compare against
     // (first tick after a teleport/respawn, or coming out of rest): a melon
@@ -9337,7 +9387,7 @@ function UpdateKart(slot, kart, dt) {
 
     if (driveForward !== 0 || driveStrafe !== 0) {
         // All three scaled by the physics page's "Acceleration" (dev/physics-tuning.js).
-        const accelFactor = PhysicsFactor(kart, "accel");
+        const accelFactor = PhysicsFactor("accel");
         const forwardAccel = (driveForward > 0 ? FORWARD_ACCEL : REVERSE_ACCEL) * accelFactor;
         const strafeAccel = STRAFE_ACCEL * accelFactor;
         let ax = forwardDir.x * driveForward * forwardAccel + rightDir.x * driveStrafe * strafeAccel;
@@ -9356,10 +9406,10 @@ function UpdateKart(slot, kart, dt) {
     if (boost.boosting) {
         // Push and headroom above the top speed scaled by the physics page's
         // "Boost" (dev/physics-tuning.js).
-        const boostFactor = PhysicsFactor(kart, "boost");
+        const boostFactor = PhysicsFactor("boost");
         vx += forwardDir.x * ATTACK_BOOST_ACCEL * boostFactor * dt;
         vy += forwardDir.y * ATTACK_BOOST_ACCEL * boostFactor * dt;
-        const boostMax = BoostMaxSpeed(KartBaseMaxSpeed(kart), ATTACK_BOOST_MAX_SPEED - MAX_SPEED, boostFactor);
+        const boostMax = BoostMaxSpeed(BaseMaxSpeed(), ATTACK_BOOST_MAX_SPEED - MAX_SPEED, boostFactor);
         kart.speedCap = Math.max(kart.speedCap ?? KartMaxSpeed(kart), boostMax);
     }
 
@@ -9383,7 +9433,7 @@ function UpdateKart(slot, kart, dt) {
     // The physics page's "Gravity" (dev/physics-tuning.js): the engine pulls
     // with GRAVITY regardless, the script adds the difference. Ground
     // contact still reads right — it compares against this command.
-    const vz = v.z + ExtraGravityDelta(PhysicsFactor(kart, "gravity"), GRAVITY, dt);
+    const vz = v.z + ExtraGravityDelta(PhysicsFactor("gravity"), GRAVITY, dt);
     // On the podium: whatever else happened, horizontally it only goes back
     // over its spot (a jump goes straight up and comes down there).
     if (podium) {
@@ -9415,7 +9465,7 @@ function UpdateKart(slot, kart, dt) {
     // Boosts don't count towards momentum (neither the attack boost nor a
     // cap a bounce/boost has lifted above the momentum top speed).
     const boosted = boost.boosting || speedCap > momentumMax + 1e-6;
-    kart.momentum = UpdateMomentum(kart.momentum, horizSpeed, now, boosted, KartBaseMaxSpeed(kart));
+    kart.momentum = UpdateMomentum(kart.momentum, horizSpeed, now, boosted, BaseMaxSpeed());
     kart.speedCap = Math.max(KartMaxSpeed(kart), Math.min(speedCap - BOOST_DECAY * dt, horizSpeed));
 
     melon.Move({ velocity: { x: vx, y: vy, z: vz } });
@@ -9459,10 +9509,22 @@ function SideViewDriving(kart, origin, velocity, forwardInput, strafeInput) {
     };
 }
 
+// Engine events for the attack boost's knife guard (knife-guard.js).
+
+/** Registers OnKnifeAttack. Called once from movement/index.js's RegisterMovementInputs. */
+function RegisterAttackBoostInputs() {
+    Instance.OnKnifeAttack(OnKnifeAttack);
+}
+
 // Everything that moves a kart's melon each tick, one folder per mechanic:
 // driving/ (UpdateKart — the per-tick order — and steering), contact/ (floor
 // and wall probes), jump/ (ground + wall jump), wall-bounce/, attack-boost/,
 // momentum/. Other parts of melon_drive import from here.
+
+/** Registers the movement mechanics' engine events. Called once from index.js. */
+function RegisterMovementInputs() {
+    RegisterAttackBoostInputs(); // OnKnifeAttack: knife guard
+}
 
 // Kill triggers: the melon_break input.
 
@@ -10140,5 +10202,6 @@ RegisterRaceInputs(); // start_/checkpoint_/finish_<trackId>, hub_enter/hub_leav
 RegisterZoneInputs(); // heal/lift/camera/jump pad *_enter/*_leave, melon_teleport
 RegisterBreakInputs(); // melon_break
 RegisterHudInputs(); // OnCustomHudClicked
+RegisterMovementInputs(); // OnKnifeAttack (knife guard)
 RegisterAttackDebug();
 RegisterMoverInputs(); // OnActivate/OnRoundStart: start the func_movelinear movers

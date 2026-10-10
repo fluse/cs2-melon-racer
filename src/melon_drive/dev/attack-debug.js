@@ -4,7 +4,8 @@
 // weapons away every tick. Kept in case anything else reacts to attack. These logs show
 // what's going on: per kart while attack is held, how much speed physics
 // added on top of what the script commanded last tick, and which weapon the
-// pawn holds; plus every gun shot, bullet impact and knife attack.
+// pawn holds; plus every gun shot and bullet impact (knife attacks are
+// logged by movement/attack-boost/knife-guard.js, which owns OnKnifeAttack).
 import { Instance } from "cs_script/point_script";
 import { DEBUG, Debug } from "../core/debug.js";
 import { FindKartByMelon } from "../core/kart-registry.js";
@@ -55,8 +56,5 @@ export function RegisterAttackDebug() {
             `[attack debug] bullet from ${Describe(weapon)} hit ${Describe(hitEntity)}` +
             `${melonKart ? " — A MELON" : ""} at (${position.x.toFixed(0)}, ${position.y.toFixed(0)}, ${position.z.toFixed(0)})`
         );
-    });
-    Instance.OnKnifeAttack(({ weapon, attackType }) => {
-        Debug(`[attack debug] knife attack: ${Describe(weapon)} (type ${attackType})`);
     });
 }
