@@ -138,6 +138,8 @@ bit of room above for jumps.
 | `SIDE_VIEW_WALL_JUMP_PUSH_SPEED` | 220 u/s | a wall jump's push off the wall in the zone (outside: 160) | `zones/side-view/constants.js` |
 | `SIDE_VIEW_EASE_SECONDS` | 0.8 s | swing to the side and back | `camera/side-view/constants.js` |
 | `SIDE_VIEW_TELEPORT_DISTANCE` | 256 units | a move in one tick this far counts as a teleport | `camera/side-view/constants.js` |
+| `SIDE_VIEW_CAMERA_SMOOTH_SECONDS` | 0.12 s | the camera follows on a damped spring, aiming ahead by speed × this — soft at walls and wall jumps | `camera/side-view/constants.js` |
+| `SIDE_VIEW_CAMERA_HEIGHT_SMOOTH_SECONDS` | 0.15 s | the same for its height, without aiming ahead | `camera/side-view/constants.js` |
 | `SIDE_VIEW_TELEPORT_CUT_SECONDS` | 0.25 s | leaving within this long after a teleport cuts back instead of swinging | `camera/side-view/constants.js` |
 
 ## Depth zones

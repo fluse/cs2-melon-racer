@@ -2,11 +2,13 @@
 // (zones/side-view/), the camera stops chasing it along the mouse and looks
 // at it from one side, like a 2D jump & run. The camera is switched to
 // CONTROLLED mode and placed by script every tick; it swings over from the
-// chase camera and back (SIDE_VIEW_EASE_SECONDS, the math in logic.js).
+// chase camera and back (SIDE_VIEW_EASE_SECONDS, the math in logic.js). It
+// follows the melon on a damped spring (SIDE_VIEW_CAMERA_SMOOTH_SECONDS):
+// stuck to it, it stopped dead at walls and jerked at wall jumps.
 import { Instance, CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { ApplyCameraFollow, ZonedFollowOffset } from "../follow/follow.js";
-import { StepSideViewBlend, SideViewPose, ChaseCameraPose, BlendPose, IsTeleportJump, CutsSideViewExit } from "./logic.js";
+import { StepSideViewBlend, SideViewPose, StepSideViewFocus, ChaseCameraPose, BlendPose, IsTeleportJump, CutsSideViewExit } from "./logic.js";
 import { SideViewAxes } from "../../zones/side-view/logic.js";
 import { ViewAnglesFacing } from "../../zones/teleport/logic.js";
 // Straight from zones/registry.js, not zones/index.js: that one also loads
@@ -61,6 +63,7 @@ export function UpdateSideViewCamera(kart, dt) {
         kart.sideViewZone = undefined;
     }
     if (blend === 0) {
+        kart.sideViewFocus = undefined;
         if (before > 0) {
             kart.sideViewLast = undefined;
             ApplyCameraFollow(kart); // back to the chase camera
@@ -77,7 +80,10 @@ export function UpdateSideViewCamera(kart, dt) {
         camera.SetMode(CustomCameraMode.CONTROLLED);
         Debug(`side view: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} camera to the side (yaw ${sideView.yaw})`);
     }
-    const side = SideViewPose(origin, sideView);
+    // Aimed on a damped spring (logic.js StepSideViewFocus) — straight at
+    // the melon again after a teleport.
+    kart.sideViewFocus = StepSideViewFocus(jumped ? undefined : kart.sideViewFocus, origin, kart.melon.GetAbsVelocity(), dt);
+    const side = SideViewPose(kart.sideViewFocus.point, sideView);
     const pose =
         blend >= 1
             ? side

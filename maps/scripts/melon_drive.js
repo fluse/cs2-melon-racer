@@ -123,6 +123,7 @@ function TraceSphere(config) {
  *   sideViews?: Map<any, import("../zones/side-view/logic.js").SideView>, // side-view triggers the melon is inside -> their view, see zones/registry.js
  *   sideViewDepths?: Map<any, number>, // side-view depth triggers the melon is inside (value unused), see zones/registry.js
  *   sideViewDrive?: { zone: import("../zones/side-view/logic.js").SideView, plane: number, facing: 1 | -1, free?: boolean }, // the side view being driven in: its plane, which way the melon faces on screen, whether it was in a depth zone last tick — see UpdateKart
+ *   sideViewFocus?: import("../camera/side-view/logic.js").SideViewFocus, // where the side camera aims, on its damped spring — see UpdateSideViewCamera
  *   sideViewBlend?: number, // 0..1, how far the camera has swung to the side — see UpdateSideViewCamera
  *   sideViewZone?: import("../zones/side-view/logic.js").SideView, sideViewLast?: import("../zones/side-view/logic.js").SideView, // the side view the camera is in / swinging out of — see UpdateSideViewCamera
  *   sideViewOrigin?: { x: number, y: number, z: number }, sideViewTeleportTime?: number, // the melon's origin last tick / when it last jumped there by teleport — see UpdateSideViewCamera
@@ -1328,6 +1329,17 @@ const SIDE_VIEW_TELEPORT_DISTANCE = 256;
 // to the chase camera instead of swinging (the zone's OnEndTouch can arrive a
 // tick or two after the teleport).
 const SIDE_VIEW_TELEPORT_CUT_SECONDS = 0.25;
+// The side camera follows the melon on a damped spring instead of sticking
+// to it: followed 1:1 it stopped dead when the melon hit a wall and jerked
+// round at every wall jump. Roughly the seconds it takes to catch up along
+// the screen; it aims ahead by the melon's speed times this, so at a steady
+// speed the melon still stays centered. Lower: tighter, harsher; higher:
+// softer, swings further past a sudden stop.
+const SIDE_VIEW_CAMERA_SMOOTH_SECONDS = 0.12;
+// The same for its height, without aiming ahead: jumps and the small hops
+// of a rolling melon move it up and down on screen instead of shaking the
+// camera.
+const SIDE_VIEW_CAMERA_HEIGHT_SMOOTH_SECONDS = 0.15;
 
 // The HUD entity, and what every panel shares. Each panel with its own
 // rules keeps its tunables in its folder (speedometer/, track/, scoreboard/).
@@ -2424,6 +2436,48 @@ function CutsSideViewExit(teleportTime, now) {
 }
 
 /**
+ * One axis of a critically damped spring (like Unity's SmoothDamp): moves
+ * `current` towards `target` over about `smoothTime` seconds without
+ * overshooting a still target, keeping its own speed — so a target that
+ * stops dead or turns round is followed smoothly, not with a jerk.
+ * @param {number} current @param {number} target @param {number} speed the axis's speed so far
+ * @param {number} smoothTime @param {number} dt @returns {{ value: number, speed: number }}
+ */
+function SmoothDamp(current, target, speed, smoothTime, dt) {
+    const omega = 2 / Math.max(1e-4, smoothTime);
+    const x = omega * Math.max(0, dt);
+    const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    const change = current - target;
+    const temp = (speed + omega * change) * dt;
+    return { value: target + (change + temp) * decay, speed: (speed - omega * temp) * decay };
+}
+
+/** @typedef {{ point: { x: number, y: number, z: number }, speed: { x: number, y: number, z: number } }} SideViewFocus where the side camera aims, and how fast that moves */
+
+/**
+ * Where the side camera aims after `dt` more seconds: on a damped spring
+ * towards the melon (SIDE_VIEW_CAMERA_SMOOTH_SECONDS), ahead of it by its
+ * horizontal speed times that (a damped follow trails by about that much,
+ * so a steady melon stays centered), and its height on a softer spring
+ * without aiming ahead (SIDE_VIEW_CAMERA_HEIGHT_SMOOTH_SECONDS). No previous
+ * focus (just entered, teleported): right at the melon, moving with it.
+ * @param {SideViewFocus | undefined} previous
+ * @param {{ x: number, y: number, z: number }} origin the melon's center @param {{ x: number, y: number, z: number }} velocity its velocity
+ * @param {number} dt @returns {SideViewFocus}
+ */
+function StepSideViewFocus(previous, origin, velocity, dt) {
+    const lead = SIDE_VIEW_CAMERA_SMOOTH_SECONDS;
+    const target = { x: origin.x + velocity.x * lead, y: origin.y + velocity.y * lead, z: origin.z };
+    if (!previous) {
+        return { point: { ...origin }, speed: { x: velocity.x, y: velocity.y, z: 0 } };
+    }
+    const x = SmoothDamp(previous.point.x, target.x, previous.speed.x, lead, dt);
+    const y = SmoothDamp(previous.point.y, target.y, previous.speed.y, lead, dt);
+    const z = SmoothDamp(previous.point.z, target.z, previous.speed.z, SIDE_VIEW_CAMERA_HEIGHT_SMOOTH_SECONDS, dt);
+    return { point: { x: x.value, y: y.value, z: z.value }, speed: { x: x.speed, y: y.speed, z: z.speed } };
+}
+
+/**
  * The side camera: `distance` back from `target` against the view direction
  * and `height` above it, looking at it.
  * @param {{ x: number, y: number, z: number }} target the melon's center
@@ -2543,7 +2597,9 @@ function TeleportExitVelocity(velocity, destinationYaw, keepSpeed = TELEPORT_KEE
 // (zones/side-view/), the camera stops chasing it along the mouse and looks
 // at it from one side, like a 2D jump & run. The camera is switched to
 // CONTROLLED mode and placed by script every tick; it swings over from the
-// chase camera and back (SIDE_VIEW_EASE_SECONDS, the math in logic.js).
+// chase camera and back (SIDE_VIEW_EASE_SECONDS, the math in logic.js). It
+// follows the melon on a damped spring (SIDE_VIEW_CAMERA_SMOOTH_SECONDS):
+// stuck to it, it stopped dead at walls and jerked at wall jumps.
 
 /** Whether the side-view camera has the camera (also while swinging in or out). @param {import("../../core/kart-registry.js").Kart} kart */
 function SideViewCameraOn(kart) {
@@ -2592,6 +2648,7 @@ function UpdateSideViewCamera(kart, dt) {
         kart.sideViewZone = undefined;
     }
     if (blend === 0) {
+        kart.sideViewFocus = undefined;
         if (before > 0) {
             kart.sideViewLast = undefined;
             ApplyCameraFollow(kart); // back to the chase camera
@@ -2608,7 +2665,10 @@ function UpdateSideViewCamera(kart, dt) {
         camera.SetMode(CustomCameraMode.CONTROLLED);
         Debug(`side view: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} camera to the side (yaw ${sideView.yaw})`);
     }
-    const side = SideViewPose(origin, sideView);
+    // Aimed on a damped spring (logic.js StepSideViewFocus) — straight at
+    // the melon again after a teleport.
+    kart.sideViewFocus = StepSideViewFocus(jumped ? undefined : kart.sideViewFocus, origin, kart.melon.GetAbsVelocity(), dt);
+    const side = SideViewPose(kart.sideViewFocus.point, sideView);
     const pose =
         blend >= 1
             ? side

@@ -1,7 +1,13 @@
 // Pure rules for the side-view camera — no cs_script import, so it's
 // unit-testable in Node (see test/camera/side-view.test.mjs). side-view.js
 // next to it places the camera.
-import { SIDE_VIEW_EASE_SECONDS, SIDE_VIEW_TELEPORT_DISTANCE, SIDE_VIEW_TELEPORT_CUT_SECONDS } from "../../constants/index.js";
+import {
+    SIDE_VIEW_EASE_SECONDS,
+    SIDE_VIEW_TELEPORT_DISTANCE,
+    SIDE_VIEW_TELEPORT_CUT_SECONDS,
+    SIDE_VIEW_CAMERA_SMOOTH_SECONDS,
+    SIDE_VIEW_CAMERA_HEIGHT_SMOOTH_SECONDS,
+} from "../../constants/index.js";
 import { SideViewAxes } from "../../zones/side-view/logic.js";
 import { RotateCameraOffset } from "../wall-clip/logic.js";
 
@@ -44,6 +50,48 @@ export function IsTeleportJump(previous, origin) {
  */
 export function CutsSideViewExit(teleportTime, now) {
     return teleportTime !== undefined && now - teleportTime <= SIDE_VIEW_TELEPORT_CUT_SECONDS;
+}
+
+/**
+ * One axis of a critically damped spring (like Unity's SmoothDamp): moves
+ * `current` towards `target` over about `smoothTime` seconds without
+ * overshooting a still target, keeping its own speed — so a target that
+ * stops dead or turns round is followed smoothly, not with a jerk.
+ * @param {number} current @param {number} target @param {number} speed the axis's speed so far
+ * @param {number} smoothTime @param {number} dt @returns {{ value: number, speed: number }}
+ */
+export function SmoothDamp(current, target, speed, smoothTime, dt) {
+    const omega = 2 / Math.max(1e-4, smoothTime);
+    const x = omega * Math.max(0, dt);
+    const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    const change = current - target;
+    const temp = (speed + omega * change) * dt;
+    return { value: target + (change + temp) * decay, speed: (speed - omega * temp) * decay };
+}
+
+/** @typedef {{ point: { x: number, y: number, z: number }, speed: { x: number, y: number, z: number } }} SideViewFocus where the side camera aims, and how fast that moves */
+
+/**
+ * Where the side camera aims after `dt` more seconds: on a damped spring
+ * towards the melon (SIDE_VIEW_CAMERA_SMOOTH_SECONDS), ahead of it by its
+ * horizontal speed times that (a damped follow trails by about that much,
+ * so a steady melon stays centered), and its height on a softer spring
+ * without aiming ahead (SIDE_VIEW_CAMERA_HEIGHT_SMOOTH_SECONDS). No previous
+ * focus (just entered, teleported): right at the melon, moving with it.
+ * @param {SideViewFocus | undefined} previous
+ * @param {{ x: number, y: number, z: number }} origin the melon's center @param {{ x: number, y: number, z: number }} velocity its velocity
+ * @param {number} dt @returns {SideViewFocus}
+ */
+export function StepSideViewFocus(previous, origin, velocity, dt) {
+    const lead = SIDE_VIEW_CAMERA_SMOOTH_SECONDS;
+    const target = { x: origin.x + velocity.x * lead, y: origin.y + velocity.y * lead, z: origin.z };
+    if (!previous) {
+        return { point: { ...origin }, speed: { x: velocity.x, y: velocity.y, z: 0 } };
+    }
+    const x = SmoothDamp(previous.point.x, target.x, previous.speed.x, lead, dt);
+    const y = SmoothDamp(previous.point.y, target.y, previous.speed.y, lead, dt);
+    const z = SmoothDamp(previous.point.z, target.z, previous.speed.z, SIDE_VIEW_CAMERA_HEIGHT_SMOOTH_SECONDS, dt);
+    return { point: { x: x.value, y: y.value, z: z.value }, speed: { x: x.speed, y: y.speed, z: z.speed } };
 }
 
 /**

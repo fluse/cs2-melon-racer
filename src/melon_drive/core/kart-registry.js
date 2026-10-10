@@ -70,6 +70,7 @@ import { predictionDotSet } from "./trace.js";
  *   sideViews?: Map<any, import("../zones/side-view/logic.js").SideView>, // side-view triggers the melon is inside -> their view, see zones/registry.js
  *   sideViewDepths?: Map<any, number>, // side-view depth triggers the melon is inside (value unused), see zones/registry.js
  *   sideViewDrive?: { zone: import("../zones/side-view/logic.js").SideView, plane: number, facing: 1 | -1, free?: boolean }, // the side view being driven in: its plane, which way the melon faces on screen, whether it was in a depth zone last tick — see UpdateKart
+ *   sideViewFocus?: import("../camera/side-view/logic.js").SideViewFocus, // where the side camera aims, on its damped spring — see UpdateSideViewCamera
  *   sideViewBlend?: number, // 0..1, how far the camera has swung to the side — see UpdateSideViewCamera
  *   sideViewZone?: import("../zones/side-view/logic.js").SideView, sideViewLast?: import("../zones/side-view/logic.js").SideView, // the side view the camera is in / swinging out of — see UpdateSideViewCamera
  *   sideViewOrigin?: { x: number, y: number, z: number }, sideViewTeleportTime?: number, // the melon's origin last tick / when it last jumped there by teleport — see UpdateSideViewCamera

@@ -7,7 +7,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
 import { SideViewFromName, SideViewAxes, InitialFacing, SideViewInput, SideViewDepthInput, KeepOnPlane } from "../../src/melon_drive/zones/side-view/logic.js";
-import { StepSideViewBlend, SideViewPose, ChaseCameraPose, BlendPose, IsTeleportJump, CutsSideViewExit } from "../../src/melon_drive/camera/side-view/logic.js";
+import { StepSideViewBlend, SideViewPose, StepSideViewFocus, ChaseCameraPose, BlendPose, IsTeleportJump, CutsSideViewExit } from "../../src/melon_drive/camera/side-view/logic.js";
 import {
     SIDE_VIEW_DEFAULT_YAW,
     SIDE_VIEW_DISTANCE,
@@ -17,6 +17,7 @@ import {
     SIDE_VIEW_EASE_SECONDS,
     SIDE_VIEW_TELEPORT_DISTANCE,
     SIDE_VIEW_TELEPORT_CUT_SECONDS,
+    SIDE_VIEW_CAMERA_SMOOTH_SECONDS,
     MELON_TEMPLATE_NAME,
     HUB_SPAWN_NAME,
 } from "../../src/melon_drive/constants/index.js";
@@ -67,6 +68,28 @@ test("side camera: distance back against the view, height up, looking down at th
     assert.ok(close(pose.position.x, 0) && close(pose.position.y, -300) && pose.position.z === 300);
     assert.ok(close(pose.angles.pitch, 45));
     assert.equal(pose.angles.yaw, 90);
+});
+
+test("the side camera follows on a damped spring: centered at a steady speed, no dead stop at a wall", () => {
+    const dt = 1 / 64;
+    const v = { x: 600, y: 0, z: 0 };
+    let origin = { x: 0, y: 0, z: 0 };
+    let focus = StepSideViewFocus(undefined, origin, v, dt);
+    assert.deepEqual(focus.point, origin, "starts right at the melon");
+    for (let i = 0; i < 128; i++) {
+        origin = { x: origin.x + v.x * dt, y: 0, z: 0 };
+        focus = StepSideViewFocus(focus, origin, v, dt);
+    }
+    assert.ok(Math.abs(focus.point.x - origin.x) < 0.1 * v.x * SIDE_VIEW_CAMERA_SMOOTH_SECONDS, `steady speed: about centered, ${focus.point.x - origin.x} off`);
+    // The melon hits a wall and stops dead: the camera glides on and settles back.
+    const before = focus.point.x;
+    focus = StepSideViewFocus(focus, origin, { x: 0, y: 0, z: 0 }, dt);
+    assert.ok(focus.point.x > before, "still moving the tick the melon stopped");
+    assert.ok(focus.speed.x < v.x, "but slowing down");
+    for (let i = 0; i < 64 * 10 * SIDE_VIEW_CAMERA_SMOOTH_SECONDS; i++) {
+        focus = StepSideViewFocus(focus, origin, { x: 0, y: 0, z: 0 }, dt);
+    }
+    assert.ok(Math.abs(focus.point.x - origin.x) < 1, `settles back on the melon, ${focus.point.x - origin.x} off`);
 });
 
 test("the swing to the side eases over SIDE_VIEW_EASE_SECONDS, the yaw the short way round", () => {
