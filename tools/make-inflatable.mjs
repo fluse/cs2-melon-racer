@@ -12,8 +12,10 @@ import { EncodePng } from "./png.mjs";
 import { VmatText, WriteAddonFile } from "./model.mjs";
 
 const SIZE = 512;
-// Glossy but not a mirror: lower showed the map's low-res cubemaps as dark,
-// blocky reflections all over a surface; vinyl has broad, soft highlights.
+// Glossy: the vinyl visibly reflects its surroundings (the area's baked
+// cubemap). A cubemap captured from inside geometry shows up as dark, blocky
+// stains on it — then fix the env_combined_light_probe_volume (its origin
+// in open air), not this; at 0.8 the reflections are gone.
 const ROUGHNESS = 0.42;
 const ROUGHNESS_VARIATION = 0.04; // ± around it — faint, like a slightly uneven, handled surface
 // Broad blotches of that variation: waves per repeat (whole numbers, so it
