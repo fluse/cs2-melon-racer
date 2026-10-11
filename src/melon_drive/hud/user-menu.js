@@ -1,6 +1,6 @@
 import { CSInputs } from "cs_script/point_script";
 import { IsCollisionDebugOn } from "../dev/collision-debug.js";
-import { IsFreeLookOn } from "../dev/free-look.js";
+import { IsFreeLookOn, SetFreeLook } from "../dev/free-look.js";
 import { UpdateCameraTuningHud } from "../dev/camera-tuning.js";
 import { UpdatePhysicsTuningHud } from "../dev/physics-tuning.js";
 import { IsPredictionOn } from "../fx/prediction/prediction.js";
@@ -194,8 +194,11 @@ export function UpdateUserMenu(slot, kart) {
     // open or not, so a bad start costs one key instead of USE + a click.
     // Pressed outside a time trial it does nothing — and while the call to
     // join a starting Grand Prix is up, R joins it instead (UpdateGathering).
-    // Spectating, R leaves that instead (race/spectate/).
-    if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && !kart.grandPrixCall && !kart.watching && kart.spectateSlot === undefined && CanRestartTimeTrial(kart) && RestartTimeTrial(kart)) {
+    // Spectating, R leaves that instead (race/spectate/); in drone mode it
+    // leaves that (the hint bottom left says so).
+    if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && kart.freeLook && !kart.grandPrixCall) {
+        SetFreeLook(kart, false);
+    } else if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && !kart.grandPrixCall && !kart.watching && kart.spectateSlot === undefined && CanRestartTimeTrial(kart) && RestartTimeTrial(kart)) {
         if (kart.userMenuOpen) {
             SetUserMenuOpen(slot, kart, false);
         }

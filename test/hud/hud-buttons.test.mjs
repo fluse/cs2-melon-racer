@@ -348,6 +348,19 @@ test("free look: the respawn and restart buttons end it and put the chase camera
     assert.equal(a.pawn.GetCustomCamera().GetMode(), CustomCameraMode.FOLLOW_POSITION);
 });
 
+test("drone mode: the hint under the drone shows while flying, R leaves it", async () => {
+    const { UpdateDrone } = await import("../../src/melon_drive/dev/free-look.js");
+    Click(0, "usermenu_drone_button");
+    UpdateDrone(a, 0.1);
+    assert.equal(hud.Has(0, "drone_hint", "Hidden"), false, "R → EXIT DRONE MODE");
+    a.pawn.justPressed.add("RELOAD");
+    UpdateUserMenu(0, a);
+    a.pawn.justPressed.clear();
+    assert.equal(a.freeLook, false, "R left drone mode");
+    assert.equal(a.drone, undefined);
+    assert.equal(hud.Has(0, "drone_hint", "Hidden"), true, "hint gone at once");
+});
+
 test("drone mode: not while the player is in a Grand Prix — the button hidden, a click does nothing", () => {
     a.racing = true;
     SetUserMenuOpen(0, a, true);

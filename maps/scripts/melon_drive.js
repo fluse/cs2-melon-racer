@@ -123,6 +123,7 @@ function TraceBox(config) {
  *   xpGainShown?: string, xpGainResendAt?: number, // what the XP notifier last showed, and its next full resend — see UpdateXpGainHud
  *   skinHudLevel?: number, // the level the skin grid's locks were last drawn for — see UpdateSkinHud
  *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud
+ *   droneHintShown?: boolean, droneHintResendAt?: number, // drone mode: the "R → EXIT DRONE MODE" hint as last sent — see dev/free-look.js
  *   drone?: { entities: any[], parts: any[], body: any, laser: any[], position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number }, tilt: { pitch: number, roll: number }, yaw: number, landed: boolean, takeoffUntil?: number }, // free look: the drone this player flies, where, how fast, how far it leans, which way it faces, whether it sits on the floor (rotors still) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
@@ -4693,6 +4694,7 @@ function SetFreeLook(kart, on) {
     kart.prevLastVelocity = undefined;
     kart.settled = false;
     if (!on) {
+        SetDroneHintHud(kart, false);
         RemoveDrone(kart);
         if (kart.pawn.IsValid()) {
             ApplyCameraFollow(kart);
@@ -4745,6 +4747,25 @@ function SpawnDrone(kart) {
     });
     kart.appliedFollowKey = undefined; // the melon's chase camera is written anew when it's back
     return true;
+}
+
+/**
+ * The hint in the bottom left corner, "R → EXIT DRONE MODE" (#drone_hint): shown
+ * while flying — sent on change and again every HUD_RESEND_SECONDS —,
+ * hidden at once when drone mode ends.
+ * @param {Kart} kart @param {boolean} on
+ */
+function SetDroneHintHud(kart, on) {
+    const now = Instance.GetGameTime();
+    if (on === kart.droneHintShown && now < (kart.droneHintResendAt ?? 0)) {
+        return;
+    }
+    kart.droneHintShown = on;
+    kart.droneHintResendAt = now + HUD_RESEND_SECONDS;
+    const slot = kart.pawn.IsValid() ? kart.pawn.GetPlayerController()?.GetPlayerSlot() : undefined;
+    if (slot !== undefined) {
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "drone_hint", "Hidden", !on);
+    }
 }
 
 /**
@@ -4830,6 +4851,7 @@ function UpdateDrone(kart, dt) {
     }
     UpdateDroneRotors(kart, takingOff);
     UpdateDroneLaser(kart, angles, view);
+    SetDroneHintHud(kart, true);
 }
 
 /**
@@ -8661,6 +8683,7 @@ function SetSpectateHud(slot, kart, value, now) {
     }
     hud.SetHasClassForPlayer(slot, "spectate_panel", "Watching", mode === "watcher");
     hud.SetHasClassForPlayer(slot, "spectate_panel", "Hidden", value === undefined);
+    hud.SetHasClassForPlayer(slot, "spectate_hints", "Hidden", value === undefined); // the keys, bottom left
 }
 
 /**
@@ -11187,8 +11210,11 @@ function UpdateUserMenu(slot, kart) {
     // open or not, so a bad start costs one key instead of USE + a click.
     // Pressed outside a time trial it does nothing — and while the call to
     // join a starting Grand Prix is up, R joins it instead (UpdateGathering).
-    // Spectating, R leaves that instead (race/spectate/).
-    if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && !kart.grandPrixCall && !kart.watching && kart.spectateSlot === undefined && CanRestartTimeTrial(kart) && RestartTimeTrial(kart)) {
+    // Spectating, R leaves that instead (race/spectate/); in drone mode it
+    // leaves that (the hint bottom left says so).
+    if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && kart.freeLook && !kart.grandPrixCall) {
+        SetFreeLook(kart, false);
+    } else if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && !kart.grandPrixCall && !kart.watching && kart.spectateSlot === undefined && CanRestartTimeTrial(kart) && RestartTimeTrial(kart)) {
         if (kart.userMenuOpen) {
             SetUserMenuOpen(slot, kart, false);
         }

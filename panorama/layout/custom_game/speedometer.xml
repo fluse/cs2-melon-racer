@@ -246,13 +246,39 @@
 		     race/heat/race-flow.js) — for everyone in the heat or watching it. -->
 		<Label id="finish_grace" class="FinishGrace Hidden" text="FINISH CLOSES IN {s:seconds}" />
 
-		<!-- Spectating (race/spectate/): whose melon the camera follows, how to
-		     switch, and that R goes back to the own melon. -->
+		<!-- Spectating (race/spectate/): whose melon the camera follows — the
+		     keys (switch, R back to the own melon) are in .KeyHints, bottom left. -->
 		<Panel id="spectate_panel" class="SpectatePanel Hidden">
 			<Label class="SpectateTitle" text="SPECTATING" />
 			<Label class="SpectateName" text="{s:name}" />
-			<Label class="SpectateHint" text="◀ MOUSE2 / A        D / MOUSE1 ▶" />
-			<Label class="SpectateStopHint" text="R → BACK TO YOUR MELON" />
+		</Panel>
+
+		<!-- Key hints, bottom left: a keycap with the letter (.KeyCap) or a mouse
+		     with the button marked (icons/mouse-*.png, tools/images/make-icons.mjs),
+		     and what it does. One group per mode, the script toggles Hidden. -->
+		<Panel class="KeyHints" hittest="false">
+			<!-- Spectating (race/spectate/, SetSpectateHud). A/D switch too. -->
+			<Panel id="spectate_hints" class="KeyHintGroup Hidden">
+				<Panel class="KeyHint">
+					<Image class="KeyHintMouse" src="file://{images}/custom_game/icons/mouse-left.png" />
+					<Label class="KeyHintText" text="NEXT PLAYER" />
+				</Panel>
+				<Panel class="KeyHint">
+					<Image class="KeyHintMouse" src="file://{images}/custom_game/icons/mouse-right.png" />
+					<Label class="KeyHintText" text="PREVIOUS PLAYER" />
+				</Panel>
+				<Panel class="KeyHint">
+					<Panel class="KeyCap"><Label class="KeyCapLetter" text="R" /></Panel>
+					<Label class="KeyHintText" text="BACK TO YOUR MELON" />
+				</Panel>
+			</Panel>
+			<!-- Drone mode (dev/free-look.js, SetDroneHintHud). -->
+			<Panel id="drone_hint" class="KeyHintGroup Hidden">
+				<Panel class="KeyHint">
+					<Panel class="KeyCap"><Label class="KeyCapLetter" text="R" /></Panel>
+					<Label class="KeyHintText" text="EXIT DRONE MODE" />
+				</Panel>
+			</Panel>
 		</Panel>
 
 		<!-- A racer who's gone DNF_WARNING_SECONDS without a new checkpoint:

@@ -17,6 +17,7 @@
 // most DRONE_LASER_LENGTH long, laid from glowing rod segments.
 import { Instance, CSInputs, CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "../core/debug.js";
+import { GetSpeedHud } from "../hud/layout.js";
 import { karts } from "../core/kart-registry.js";
 import { ApplyCameraFollow } from "../camera/index.js";
 import { SpawnFromTemplate } from "../fx/particles.js";
@@ -25,7 +26,7 @@ import { DroneWishVelocity, StepDroneVelocity, IsDroneLanded, DroneRotorInputs, 
 import {
     DRONE_TEMPLATE_NAME, DRONE_START_HEIGHT, DRONE_SPEED, DRONE_FAST_SPEED, DRONE_RADIUS, DRONE_BOTTOM, DRONE_TOP, DRONE_GROUND_DISTANCE, DRONE_TAKEOFF_SPEED, DRONE_TAKEOFF_SECONDS,
     DRONE_CAMERA_DISTANCE, DRONE_CAMERA_HEIGHT, DRONE_CAMERA_PIVOT, CAMERA_OFFSET_RETURN_STRENGTH,
-    DRONE_LASER_TEMPLATE_NAME,
+    DRONE_LASER_TEMPLATE_NAME, HUD_RESEND_SECONDS,
 } from "../constants/index.js";
 
 /** @typedef {import("../core/kart-registry.js").Kart} Kart */
@@ -77,6 +78,7 @@ export function SetFreeLook(kart, on) {
     kart.prevLastVelocity = undefined;
     kart.settled = false;
     if (!on) {
+        SetDroneHintHud(kart, false);
         RemoveDrone(kart);
         if (kart.pawn.IsValid()) {
             ApplyCameraFollow(kart);
@@ -129,6 +131,25 @@ function SpawnDrone(kart) {
     });
     kart.appliedFollowKey = undefined; // the melon's chase camera is written anew when it's back
     return true;
+}
+
+/**
+ * The hint in the bottom left corner, "R → EXIT DRONE MODE" (#drone_hint): shown
+ * while flying — sent on change and again every HUD_RESEND_SECONDS —,
+ * hidden at once when drone mode ends.
+ * @param {Kart} kart @param {boolean} on
+ */
+function SetDroneHintHud(kart, on) {
+    const now = Instance.GetGameTime();
+    if (on === kart.droneHintShown && now < (kart.droneHintResendAt ?? 0)) {
+        return;
+    }
+    kart.droneHintShown = on;
+    kart.droneHintResendAt = now + HUD_RESEND_SECONDS;
+    const slot = kart.pawn.IsValid() ? kart.pawn.GetPlayerController()?.GetPlayerSlot() : undefined;
+    if (slot !== undefined) {
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "drone_hint", "Hidden", !on);
+    }
 }
 
 /**
@@ -214,6 +235,7 @@ export function UpdateDrone(kart, dt) {
     }
     UpdateDroneRotors(kart, takingOff);
     UpdateDroneLaser(kart, angles, view);
+    SetDroneHintHud(kart, true);
 }
 
 /**

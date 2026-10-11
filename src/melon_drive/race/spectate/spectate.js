@@ -207,6 +207,7 @@ function SetSpectateHud(slot, kart, value, now) {
     }
     hud.SetHasClassForPlayer(slot, "spectate_panel", "Watching", mode === "watcher");
     hud.SetHasClassForPlayer(slot, "spectate_panel", "Hidden", value === undefined);
+    hud.SetHasClassForPlayer(slot, "spectate_hints", "Hidden", value === undefined); // the keys, bottom left
 }
 
 /**

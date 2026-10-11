@@ -629,7 +629,11 @@ melon:
   watched melon as around one's own; that melon's lift/podium/camera-zone
   zooms apply, the viewer's own camera distance from the camera page.
 - HUD: "SPECTATING" and the name bottom center above the speed panel
-  (`spectate_panel`), with the keys and "R → BACK TO YOUR MELON".
+  (`spectate_panel`); the keys in the bottom left corner (`spectate_hints`,
+  decided): a mouse with the left button marked "NEXT PLAYER", the right
+  one "PREVIOUS PLAYER", a keycap R "BACK TO YOUR MELON" — each in a white
+  border, no background (`.KeyHint`; mouse icons from
+  `tools/images/make-icons.mjs`, keycaps in CSS with the letter inside).
 
 Constants: `race/spectate/constants.js`; rules: `race/spectate/logic.js`
 (`test/race/spectate.test.mjs`), applied by `race/spectate/spectate.js`
@@ -1074,7 +1078,8 @@ Switching it on or off closes the menu.
 
 Their melon waits where it was, frozen (`UpdateKart` skips it, physics
 motion off) — no damage, but a running time trial's clock keeps going.
-Switching off (USE → "Exit Drone Mode") removes the drone and puts the chase
+While flying, the bottom left corner shows a keycap R **EXIT DRONE MODE**
+(`drone_hint`, the same key hints as spectating); R does it, like USE → "Exit Drone Mode". Switching off removes the drone and puts the chase
 camera back on the melon. A heat starting, a new pawn, the respawn button
 and "Restart Time Trial" (button or R) switch it off. Not while the melon
 is breaking, and not without `template_drone` in the map (it stays
