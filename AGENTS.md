@@ -49,7 +49,8 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #   domains have one subfolder per feature (see "Folder layout" below):
                                           #   core/      kart-registry.js (Kart type, karts map, moderator), think.js (per-tick driver), trace.js, debug.js
                                           #   kart/      spawn.js (melon spawn, frozen pawn, intro logo), spawn-points.js (+ spawn-points-logic.js), join-spot.js (+ -logic.js: tutorial or hub on join), teleport.js (checkpoint respawn,
-                                          #              generic teleport), look.js (paint color + outline glow), inputs.js (player reset/disconnect, melon_paint)
+                                          #              generic teleport), look.js (paint color + outline glow), skin.js (+ skin-logic.js: the user menu's melon skins, SetModel),
+                                          #              player-settings-logic.js (per-player settings in the save data, for join-spot + skin), inputs.js (player reset/disconnect, melon_paint)
                                           #   movement/  driving/ (drive.js = UpdateKart, the per-tick order; steering), contact/ (floor/wall probes),
                                           #              jump/, wall-bounce/, attack-boost/, momentum/
                                           #   health/    damage/ (impacts, flat landings), breaking/ (break, effects at the crash site, respawn, melon_break),
@@ -122,7 +123,16 @@ particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3
                                           #   rising "+" crosses in holo_heal's green/mint, sprite particle_heal_cross.vtex from tools/make-holo.mjs)
                                           #   Write the editor source format, not resourceinfo's compiled dump — see the comments in boost_trail.vpcf;
                                           #   compile with resourcecompiler.exe (-f) like Panorama
-materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/,
+models/melon_racer/melon/melon.vmdl      # the melon as our own copy: CS2's italy_food_melon decompiled (melon.dmx mesh, same sphere collision,
+                                          #   prop_data and break pieces; its fixed mass 2.0 added by hand — the decompiler drops mass_override), material remapped to materials/melon_racer/melon/melon_default.vmat —
+                                          #   the base for melon skins (no SetMaterialGroup in cs_script: one .vmdl per skin, swapped by SetModel)
+tools/make-melon-skins.mjs               # the melon skins (gold, football, golf — dimples as a tangent-space normal map —, honey (the yellow honey melon's net), camo, strawberry (seeds in pits, calyx), pumpkin (ribs, a carved face glowing through a self-illum mask), pineapple (fruitlets on the Fibonacci spiral, bracts), zebra (warped stripes, fur); SKINS list): recolors melon_default_color.png (same UVs, same stripes) or paints
+                                          #   by place on the melon (`surface`: melon.dmx's triangles drawn into texture space, via test/helpers/vmap.mjs) into
+                                          #   materials/melon_racer/melon/melon_<skin>.vmat (+ textures; tint 0, paint doesn't change them) and
+                                          #   models/melon_racer/melon/melon_<skin>.vmdl (melon.vmdl, material remapped) — add a skin there, re-run, compile
+tools/bin/                               # downloaded tools, gitignored: source2viewer/Source2Viewer-CLI.exe (ValveResourceFormat 20.0) decompiles game assets
+                                          #   (-i game/csgo/pak01_dir.vpk -f <path> -d -o <out> --game game/csgo/gameinfo.gi; .vmat fails on new shaders — read -b DATA instead)
+materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/, melon/ (melon skins),
                                           #   logo/ (logo_text_*), podium/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
                                           #   checkpoint_gate/ — a new material goes into the fitting one, never loose in materials/melon_racer/
 materials/melon_racer/decals/*_decal.vmat # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs

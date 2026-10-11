@@ -7,8 +7,9 @@ import { Instance } from "cs_script/point_script";
 import { Debug } from "../core/debug.js";
 import { karts, IsModerator } from "../core/kart-registry.js";
 import { RespawnKartAtCheckpoint } from "../kart/teleport.js";
-import { IsMelonGlowOn, SetMelonGlow, SetKartPaintColor } from "../kart/look.js";
+import { IsMelonGlowOn, SetMelonGlow, SetKartPaintColor, ShowMelonPaint } from "../kart/look.js";
 import { IsStartInTutorialOn, SetStartInTutorial } from "../kart/join-spot.js";
+import { SetMelonSkin } from "../kart/skin.js";
 import { IsPredictionOn, SetPrediction } from "../fx/prediction/prediction.js";
 import { IsCollisionDebugOn, SetCollisionDebug } from "../dev/collision-debug.js";
 import { IsFreeLookOn, SetFreeLook } from "../dev/free-look.js";
@@ -20,7 +21,7 @@ import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { PlaceOnPodium, TestGrandPrix } from "../race/podium/podium.js";
 import { GetSpeedHud } from "./layout.js";
 import { HideHubModal } from "./hub-modal/hub-modal.js";
-import { SetUserMenuOpen, SetUserMenuPage, UpdateToggleHud } from "./user-menu.js";
+import { SetUserMenuOpen, SetUserMenuPage, UpdateSkinHud, UpdateToggleHud } from "./user-menu.js";
 import { COLOR_PRESETS, RacePhase } from "../constants/index.js";
 
 /** @typedef {import("../core/kart-registry.js").Kart} Kart */
@@ -163,7 +164,7 @@ const TEST_TRIGGER_BUTTONS = {
 };
 
 /**
- * Buttons handled by id prefix: the color swatches and the tuning pages'
+ * Buttons handled by id prefix: the color swatches, the skins and the tuning pages'
  * controls. Each returns whether the id was one of its buttons.
  * @type {[string, (slot: number, kart: Kart, buttonId: string) => boolean][]}
  */
@@ -176,6 +177,19 @@ const PREFIX_BUTTONS = [
                 SetKartPaintColor(kart, preset);
             }
             return Boolean(preset);
+        },
+    ],
+    [
+        "usermenu_skin_",
+        (slot, kart, buttonId) => {
+            if (!SetMelonSkin(kart, buttonId.slice("usermenu_skin_".length))) {
+                return false;
+            }
+            if (!kart.breaking) {
+                ShowMelonPaint(kart); // a broken melon gets it on respawn
+            }
+            UpdateSkinHud(slot, kart);
+            return true;
         },
     ],
     ["camtune_", HandleCameraTuningClick], // dev/camera-tuning.js

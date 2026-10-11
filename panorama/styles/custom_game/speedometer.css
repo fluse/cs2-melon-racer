@@ -1289,6 +1289,61 @@
 .ColorSwatchWhite { background-color: #ffffff; }
 .ColorSwatchBlack { background-color: #282828; }
 
+/* Skins: a preview and a name per skin; the current one is outlined
+   (SkinSelected, set by UpdateSkinHud — no transition on it, see the HUD
+   notes in AGENTS.md). */
+.UserMenuSkinRow {
+    width: 100%;
+    flow-children: right;
+    margin-top: 6px;
+    margin-bottom: 4px;
+}
+
+.SkinButton {
+    width: fill-parent-flow(1.0);
+    height: 76px;
+    margin-left: 6px;
+    border-radius: 0px;
+    border: 2px solid #ffffff14;
+    background-color: #ffffff0a;
+    flow-children: down;
+
+    &:first-child {
+        margin-left: 0px;
+    }
+
+    &:hover {
+        background-color: #ffffff17;
+    }
+
+    &.SkinSelected {
+        border: 2px solid #7fd13b;
+        background-color: #7fd13b1f;
+    }
+}
+
+/* A placeholder in a row with fewer than three skins: takes the space, shows nothing. */
+.SkinSlotEmpty {
+    border: 0px solid transparent;
+    background-color: transparent;
+}
+
+.SkinPreview {
+    width: 44px;
+    height: 44px;
+    horizontal-align: center;
+    margin-top: 5px;
+}
+
+.SkinName {
+    horizontal-align: center;
+    margin-top: 3px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: white;
+}
+
 /* One setting per row: its name left, an ON/OFF pill right (the script
    sets the pill's text and ToggleOn on the button, see hud/user-menu.js).
    No transitions on the toggled parts (see the HUD notes in AGENTS.md). */

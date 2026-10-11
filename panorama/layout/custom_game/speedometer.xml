@@ -470,6 +470,58 @@
 								<Button id="usermenu_color_white" class="ColorSwatch ColorSwatchWhite" />
 								<Button id="usermenu_color_black" class="ColorSwatch ColorSwatchBlack" />
 							</Panel>
+							<!-- Skins: one button per MELON_SKINS key (kart/constants.js), three per row (fill a short last row with
+							     <Panel class="SkinButton SkinSlotEmpty" hittest="false" /> so its buttons keep their width), the current one SkinSelected (UpdateSkinHud). Previews from tools/make-melon-skins.mjs. Saved per player name (kart/skin.js). -->
+							<Panel class="UserMenuSkinRow">
+								<Button id="usermenu_skin_default" class="SkinButton">
+									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_default.png" />
+									<Label class="SkinName" text="Melon" />
+								</Button>
+								<Button id="usermenu_skin_gold" class="SkinButton">
+									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_gold.png" />
+									<Label class="SkinName" text="Gold" />
+								</Button>
+								<Button id="usermenu_skin_football" class="SkinButton">
+									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_football.png" />
+									<Label class="SkinName" text="Football" />
+								</Button>
+							</Panel>
+							<Panel class="UserMenuSkinRow">
+								<Button id="usermenu_skin_golf" class="SkinButton">
+									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_golf.png" />
+									<Label class="SkinName" text="Golf" />
+								</Button>
+								<Button id="usermenu_skin_honey" class="SkinButton">
+									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_honey.png" />
+									<Label class="SkinName" text="Honey Melon" />
+								</Button>
+								<Button id="usermenu_skin_camo" class="SkinButton">
+									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_camo.png" />
+									<Label class="SkinName" text="Camo" />
+								</Button>
+							</Panel>
+							<Panel class="UserMenuSkinRow">
+								<Button id="usermenu_skin_strawberry" class="SkinButton">
+									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_strawberry.png" />
+									<Label class="SkinName" text="Strawberry" />
+								</Button>
+								<Button id="usermenu_skin_pumpkin" class="SkinButton">
+									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_pumpkin.png" />
+									<Label class="SkinName" text="Pumpkin" />
+								</Button>
+								<Button id="usermenu_skin_pineapple" class="SkinButton">
+									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_pineapple.png" />
+									<Label class="SkinName" text="Pineapple" />
+								</Button>
+							</Panel>
+							<Panel class="UserMenuSkinRow">
+								<Button id="usermenu_skin_zebra" class="SkinButton">
+									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_zebra.png" />
+									<Label class="SkinName" text="Zebra" />
+								</Button>
+								<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
+								<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
+							</Panel>
 							<!-- Outline glow around the player's own melon, in its paint color, green until painted (kart/look.js). On by default. -->
 							<Button id="usermenu_glow_button" class="UserMenuToggle">
 								<Label class="UserMenuToggleName" text="Glow" />

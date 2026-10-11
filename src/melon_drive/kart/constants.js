@@ -32,12 +32,37 @@ export const HUB_SPAWN_NAME = "hub_spawn";
 export const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
 export const INTRO_SPAWN_NAME = "intro_spawn";
 
-// Where a joining player's melon appears is their own choice (the user
-// menu's "Start in Tutorial" toggle, kart/join-spot.js): intro_spawn (the
-// default) or straight at hub_spawn. Kept per player name in the addon's
-// save data under this key, next to the best times, so it survives
-// reconnects and map restarts: { [playerName]: { startInTutorial: false } }.
+// Per-player settings — where a joining player's melon appears (the user
+// menu's "Start in Tutorial" toggle, kart/join-spot.js: intro_spawn, the
+// default, or straight at hub_spawn) and their melon skin (kart/skin.js).
+// Kept per player name in the addon's save data under this key, next to the
+// best times, so they survive reconnects and map restarts:
+// { [playerName]: { startInTutorial: false, skin: "gold" } } — a setting at
+// its default isn't stored.
 export const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
+
+// --- Skins: the melon's model, picked in the user menu (kart/skin.js). ---
+
+// Every skin is its own .vmdl — the same mesh, collision and break pieces
+// with another material (tools/make-melon-skins.mjs) — since cs_script can't
+// switch material groups, only SetModel. Each one has to be used somewhere
+// in the .vmap too (the default by melon_template, the others e.g. by a
+// prop in the hub), or the map doesn't ship it (test/map/map-skins.test.mjs).
+// The key is the button's: usermenu_skin_<key> in speedometer.xml.
+/** @type {Record<string, string>} */
+export const MELON_SKINS = {
+    default: "models/melon_racer/melon/melon.vmdl",
+    gold: "models/melon_racer/melon/melon_gold.vmdl",
+    football: "models/melon_racer/melon/melon_football.vmdl",
+    golf: "models/melon_racer/melon/melon_golf.vmdl",
+    honey: "models/melon_racer/melon/melon_honey.vmdl",
+    strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
+    pumpkin: "models/melon_racer/melon/melon_pumpkin.vmdl",
+    pineapple: "models/melon_racer/melon/melon_pineapple.vmdl",
+    zebra: "models/melon_racer/melon/melon_zebra.vmdl",
+    camo: "models/melon_racer/melon/melon_camo.vmdl",
+};
+export const MELON_SKIN_DEFAULT = "default";
 
 // The frozen pawn (CSMoveType.NOCLIP: non-solid, but WASD still flies it)
 // stays where it spawned — see HoldPawn in kart/spawn.js. It's only put back

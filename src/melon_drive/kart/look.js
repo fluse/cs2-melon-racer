@@ -1,14 +1,17 @@
-// How a kart's melon looks while it's whole: its paint color plus an outline
-// glow in that same color — green (MELON_GLOW_UNPAINTED_COLOR) until it's
-// first painted (kart.painted) — which each player can switch
-// off for their own melon in the user menu ("GLOW", kart.melonGlow). Every path that shows the
-// melon (spawn, respawn after a break, repaint) goes through ShowMelonPaint;
+// How a kart's melon looks while it's whole: its skin (kart/skin.js), its
+// paint color plus an outline glow in that same color — green
+// (MELON_GLOW_UNPAINTED_COLOR) until it's first painted (kart.painted) —
+// which each player can switch off for their own melon in the user menu
+// ("GLOW", kart.melonGlow). Every path that shows the melon (spawn, respawn
+// after a break, repaint, a new skin) goes through ShowMelonPaint;
 // a break turns the glow off with HideMelonGlow — the melon is hidden then,
 // and an outline of it floating at the crash site would give that away.
 import { MELON_GLOW_ENABLED, MELON_GLOW_UNPAINTED_COLOR } from "../constants/index.js";
+import { ApplyMelonSkin } from "./skin.js";
 
 /** @param {import("../core/kart-registry.js").Kart} kart */
 export function ShowMelonPaint(kart) {
+    ApplyMelonSkin(kart); // first: a new model could drop the color and glow set before
     kart.melon.SetColor(kart.paintColor);
     if (IsMelonGlowOn(kart)) {
         kart.melon.Glow(kart.painted ? kart.paintColor : MELON_GLOW_UNPAINTED_COLOR);

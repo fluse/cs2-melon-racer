@@ -1033,6 +1033,30 @@ stay out of it (decided).
 `MELON_GLOW_ENABLED` (`kart/constants.js`) turns it off map-wide; applied
 by `kart/look.js`.
 
+## Melon skins (implemented)
+
+Each player picks a **skin** for their melon in the user menu (SETTINGS →
+MELON, the row under the colors, decided): Melon (the default), Gold,
+Football, Golf (dimples only in the normal map, so they show in the light
+and reflections), Honey Melon, Camo, Strawberry, Pumpkin (a carved face that glows from
+inside), Pineapple, Zebra — three per row, a preview and a name per button, the current one
+outlined. Saved per player name in the addon's save data like "Start in
+Tutorial" (`SAVE_DATA_PLAYER_SETTINGS_KEY`), so every later join gets it.
+A skin is a whole model (`MELON_SKINS`, `kart/constants.js`): the same
+mesh, collision and break pieces with another material, swapped by
+`SetModel` — cs_script can't switch material groups. It's put on in
+`ShowMelonPaint`, so every spawn and respawn carries it; a melon that's
+broken while the player picks one gets it on the respawn. **Paint and
+skins:** a paint trigger or swatch still sets the paint color, but the
+skins' materials don't take it (a red gold melon wouldn't be gold) — only
+the plain melon is tinted; the outline glow shows the paint color on every
+skin. The materials and models come from `tools/make-melon-skins.mjs`;
+each skin model has to be used somewhere in the map, or the map doesn't
+ship it ([Mapping API: melon skins](docs/mapping-api/02-core-entities.md#melon-skins)).
+Rules: `kart/skin-logic.js` (`test/kart/skin-logic.test.mjs`), applied by
+`kart/skin.js` (`test/hud/hud-buttons.test.mjs`); the map side in
+`test/map/map-skins.test.mjs`.
+
 ## Teleporters (implemented)
 
 Generic, same name-carries-the-config convention as paint triggers — adding

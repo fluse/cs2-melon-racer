@@ -19,6 +19,9 @@ reuse a color for something with a different meaning.
 - **Podium** (`tools/make-podium-model.mjs`): 1st place in checkpoint gold,
   2nd in heal cyan, 3rd in start magenta (top plate and glowing number);
   the band under each plate in guide green.
+- **Melon skins** (`tools/make-melon-skins.mjs`): gold is one plain,
+  faintly glowing metal gold (`#FFC456`), not checkpoint gold; camo is off-palette on
+  purpose.
 
 ## Not on the palette yet
 

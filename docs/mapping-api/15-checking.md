@@ -26,6 +26,7 @@ Reads `maps/melon_racer.vmap` and every [prefab](14-prefabs.md) placed in it (sa
 | Templates | a missing or duplicated `perfect_hit_particle_template` / `particle_health_template`, or one without a `.vpcf` | [Effect templates](03-effect-templates.md) |
 | Templates | `particle_boost_trail_template` (once placed) without exactly `boost_trail.vpcf` + `boost_trail_juice.vpcf` | [Effect templates](03-effect-templates.md#boost-trail) |
 | Templates | two particle templates pointing at the same `info_particle_system` | [Effect templates](03-effect-templates.md) |
+| Skins | a skin model (`MELON_SKINS`) no entity in the map uses, a missing model or menu preview, or a skin without its `usermenu_skin_<key>` button | [Core entities](02-core-entities.md#melon-skins) |
 
 `npm test` also checks this Mapping API against the script
 (`mapping-api-doc.test.mjs`) and the source folder layout
@@ -55,7 +56,7 @@ broken or race-locked melon, and every `*_leave`.
 
 - [ ] `point_script` `gamemode` + `point_script` `melon_drive_script` ([core](02-core-entities.md))
 - [ ] `custom_hud_layout` `speed_hud` (one)
-- [ ] `point_template` `melon_template` with the melon `prop_physics`
+- [ ] `point_template` `melon_template` with the melon `prop_physics`, and every [skin model](02-core-entities.md#melon-skins) used somewhere in the map
 - [ ] `hub_spawn` near the hub floor, `hub_start_trigger` with `hub_enter` + `hub_leave` ([hub](05-hub.md))
 - [ ] per track ([tracks](04-tracks.md)): `start_<id>[_laps<M>]` firing `start_line` (or `start_<id>`) + `start_spawn_<id>` or a `start_spawn` next to it (the [start gate prefab](04-tracks.md#start-gate-prefab) does both); `checkpoint_<id>_1` … `_<N>` firing `checkpoint`, each with `checkpoint_spawn_<id>_<n>` or a `checkpoint_spawn` next to it (the [checkpoint gate prefab](04-tracks.md#checkpoint-gate-prefab) does both); a `finish_<id>` or `finish_line` output (the [finish gate prefab](14-prefabs.md#finish-gate))
 - [ ] optional: `intro_spawn`, `hub_spawn_facing`, [effect templates](03-effect-templates.md), [paint triggers](06-paint-triggers.md), [teleporters](07-teleporters.md), [kill triggers](08-kill-triggers.md), [zones](09-heal-zones.md), [jump pads](12-jump-pads.md)

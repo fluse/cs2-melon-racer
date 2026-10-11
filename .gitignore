@@ -7,3 +7,6 @@ _bakeresourcecache/
 
 # GitHub Page build output (node site/build.mjs)
 site/dist/
+
+# Downloaded tools (Source2Viewer-CLI etc.), not part of the repo
+tools/bin/

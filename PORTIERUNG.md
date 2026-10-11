@@ -101,8 +101,8 @@ Typen in der Haupt-Map, zur Orientierung: 89 `CMapEntity`, 122 `CMapMesh`,
 Texturen, Materialien und Modelle stehen nur in der kompilierten Map
 sinnvoll zur Verfügung. **Source 2 Viewer (ValveResourceFormat)** exportiert
 sie per Kommandozeile (`Source2Viewer-CLI`, Open Source, GitHub-Release) als
-glTF/GLB. .NET ist auf dem Entwicklungsrechner installiert. Das Werkzeug
-selbst ist noch **nicht** heruntergeladen.
+glTF/GLB. Das Werkzeug liegt unter `tools/bin/source2viewer/` (Version 20.0,
+per `.gitignore` nicht im Repo).
 
 ### Geplantes Exportskript `tools/export-web-map.mjs`
 
@@ -170,8 +170,5 @@ Einzelspieler-Zeitfahren, Multiplayer deutlich mehr.
 
 ## Offene Entscheidungen
 
-- Darf `Source2Viewer-CLI` heruntergeladen werden (Vorschlag: nach
-  `tools/bin/`, in `.gitignore`)? Ohne ihn entstehen zunächst nur `map.json`
-  und die Collision aus der `.vmap`, ohne Texturen.
 - Wo liegt das three.js-Projekt? Vorschlag: `web/` in diesem Repo, damit es
   dieselben `src/`-Dateien nutzt. Alternative: ein eigenes Repo.

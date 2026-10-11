@@ -45,6 +45,8 @@ export class Entity {
     Remove() { this.valid = false; }
     Kill() { this.valid = false; }
     SetColor(color) { this.color = clone(color); }
+    SetModel(model) { this.model = model; }
+    GetModelName() { return this.model ?? ""; }
     Glow(color) { this.glow = clone(color); }
     Unglow() { this.glow = undefined; }
     IsGlowing() { return this.glow !== undefined; }

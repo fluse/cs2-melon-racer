@@ -1,0 +1,26 @@
+// The melon's own skin: a copy of CS2's models/food/fruits/watermelon01a.vmat
+// (rebuilt from its compiled parameters, color texture decompiled with
+// Source2Viewer-CLI). The normal map is our own, 1024x1024: the rind's
+// stripes and grain (WriteRindNormal in tools/make-melon-skins.mjs); the
+// decompiled 256x256 one barely showed. New skins: tools/make-melon-skins.mjs.
+// Keep this file plain ASCII: a non-ASCII character in a comment here made
+// the material show the error checkerboard in Hammer and in-game, although
+// resourcecompiler reported no error.
+
+Layer0
+{
+	shader "csgo_simple.vfx"
+
+	g_flModelTintAmount "1.000"
+	g_vColorTint "[1.000000 1.000000 1.000000 0.000000]"
+	TextureColor "materials/melon_racer/melon/melon_default_color.png"
+
+	g_flMetalness "0.000"
+	TextureNormal "materials/melon_racer/melon/melon_rind_normal.png"
+	TextureAmbientOcclusion "materials/default/default_ao.tga"
+
+	SystemAttributes
+	{
+		PhysicsSurfaceProperties "fruit"
+	}
+}

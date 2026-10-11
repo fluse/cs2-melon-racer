@@ -11,7 +11,7 @@ The map doesn't work without these. Exactly one of each.
 | `gamemode` | `point_script` | `cs_script` = `maps/scripts/gamemode.vjs` | cvars, teams, no combat. The name isn't looked up — just the convention. |
 | `melon_drive_script` | `point_script` | `cs_script` = `maps/scripts/melon_drive.vjs` | **Target of every output** in the Mapping API. |
 | `speed_hud` | `custom_hud_layout` | `layout` = `panorama/layout/custom_game/speedometer.vxml` | The whole HUD (speedometer, countdown, hub modal, user menu, …). |
-| `melon_template` | `point_template` | Template01 = a `prop_physics` with the melon model | Spawned once per player. Where it sits doesn't matter — the melon is moved into place. |
+| `melon_template` | `point_template` | Template01 = a `prop_physics` with the melon model (`models/melon_racer/melon/melon.vmdl`) | Spawned once per player. Where it sits doesn't matter — the melon is moved into place. |
 | `hub_spawn` | `info_player_start` (any named point entity) | — | See [spawn points](#spawn-points). |
 | `hub_start_trigger` | `trigger_multiple` | `hub_enter` + `hub_leave` | The hub's start area — see [Hub](05-hub.md). |
 
@@ -28,6 +28,31 @@ from the entity, facing its yaw ([conventions §5](01-conventions.md#5-transform
 
 Track spawns (`start_spawn_*`, `checkpoint_spawn_*`) are on the
 [Tracks](04-tracks.md) page.
+
+## Melon skins
+
+The user menu's skins swap the melon's model (`MELON_SKINS` in
+`src/melon_drive/kart/constants.js`). The script reaches those models only
+by `SetModel`, and a map ships only the models its own entities use — so
+**each skin model has to be on some entity in the map**, no name needed
+(the melon prefab holds one `prop_physics` per skin).
+
+| Skin | Model |
+|---|---|
+| Melon (default) | `models/melon_racer/melon/melon.vmdl` — the `melon_template`'s own |
+| Gold | `models/melon_racer/melon/melon_gold.vmdl` |
+| Football | `models/melon_racer/melon/melon_football.vmdl` |
+| Golf | `models/melon_racer/melon/melon_golf.vmdl` |
+| Honey Melon | `models/melon_racer/melon/melon_honey.vmdl` |
+| Strawberry | `models/melon_racer/melon/melon_strawberry.vmdl` |
+| Pumpkin | `models/melon_racer/melon/melon_pumpkin.vmdl` |
+| Pineapple | `models/melon_racer/melon/melon_pineapple.vmdl` |
+| Zebra | `models/melon_racer/melon/melon_zebra.vmdl` |
+| Camo | `models/melon_racer/melon/melon_camo.vmdl` |
+
+A new skin: add it to `SKINS` in `tools/make-melon-skins.mjs` (run it,
+compile), to `MELON_SKINS`, as a `usermenu_skin_<key>` button in
+`speedometer.xml`, and put its model in the map.
 
 ---
 [← Conventions](01-conventions.md) · [Mapping API](README.md) · [Effect templates →](03-effect-templates.md)

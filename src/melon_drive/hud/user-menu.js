@@ -6,6 +6,8 @@ import { UpdatePhysicsTuningHud } from "../dev/physics-tuning.js";
 import { IsPredictionOn } from "../fx/prediction/prediction.js";
 import { IsMelonGlowOn } from "../kart/look.js";
 import { IsStartInTutorialOn } from "../kart/join-spot.js";
+import { GetMelonSkin } from "../kart/skin.js";
+import { MELON_SKINS } from "../constants/index.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { CanRestartTimeTrial } from "../race/time-trial/time-trial.js";
 import { GetSpeedHud, SyncInputCapture } from "./layout.js";
@@ -63,6 +65,7 @@ export function SetUserMenuOpen(slot, kart, open) {
         for (const buttonId of Object.keys(USER_MENU_TOGGLES)) {
             UpdateToggleHud(slot, kart, buttonId);
         }
+        UpdateSkinHud(slot, kart);
         UpdateHubButtonHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
@@ -112,6 +115,22 @@ export function UpdateToggleHud(slot, kart, buttonId) {
     const on = toggle.isOn(kart);
     hud.SetDialogVariableStringForPlayer(slot, buttonId, toggle.variable, on ? "ON" : "OFF");
     hud.SetHasClassForPlayer(slot, buttonId, "ToggleOn", on);
+}
+
+/**
+ * The skin row (usermenu_skin_<key>, one per MELON_SKINS): the player's
+ * current skin gets SkinSelected.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+export function UpdateSkinHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const skin = GetMelonSkin(kart);
+    for (const key of Object.keys(MELON_SKINS)) {
+        hud.SetHasClassForPlayer(slot, `usermenu_skin_${key}`, "SkinSelected", key === skin);
+    }
 }
 
 /** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart */

@@ -10,9 +10,9 @@ import { GetHubSpawnPoint, GetIntroSpawnPoint } from "./spawn-points.js";
 // (like the best times: the API has no stable player id). The rules are in
 // kart/join-spot-logic.js.
 
-/** @param {import("../core/kart-registry.js").Kart | { pawn: any }} kart */
-function PlayerName(kart) {
-    return kart.pawn.GetPlayerController()?.GetPlayerName() ?? "";
+/** The name per-player settings are saved under. @param {import("../core/kart-registry.js").Kart | { pawn: any }} kart */
+export function PlayerName(kart) {
+    return kart.pawn?.GetPlayerController()?.GetPlayerName() ?? "";
 }
 
 /** Whether this kart's player starts in the tutorial when joining. @param {import("../core/kart-registry.js").Kart} kart */

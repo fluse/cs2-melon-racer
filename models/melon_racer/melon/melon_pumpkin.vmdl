@@ -1,0 +1,259 @@
+<!-- kv3 encoding:text:version{e21c7f3c-8a33-41c5-9977-a76d3a32aa0d} format:modeldoc28:version{fb63b6ca-f435-4aa0-a2c7-c66ddc651dca} -->
+{
+	rootNode = 
+	{
+		_class = "RootNode"
+		children = 
+		[
+			{
+				_class = "BoneMarkupList"
+				children = [  ]
+				bone_cull_type = "None"
+			},
+			{
+				_class = "MaterialGroupList"
+				children =
+				[
+					{
+						_class = "DefaultMaterialGroup"
+						remaps =
+						[
+							{ from = "models/food/fruits/watermelon01a.vmat" to = "materials/melon_racer/melon/melon_pumpkin.vmat" },
+							{ from = "watermelon01a.vmat" to = "materials/melon_racer/melon/melon_pumpkin.vmat" },
+						]
+						use_global_default = false
+						global_default_material = ""
+					},
+				]
+			},
+			{
+				_class = "RenderMeshList"
+				children =
+				[
+					{
+						_class = "RenderMeshFile"
+						name = "melon"
+						filename = "models/melon_racer/melon/melon.dmx"
+					},
+				]
+			},
+			{
+				_class = "GameDataList"
+				children = 
+				[
+					{
+						_class = "GenericGameData"
+						name = ""
+						game_class = "prop_data"
+						game_keys = 
+						{
+							base = "Item.Medium"
+							allowstatic = false
+							bakelighting = true
+							damage_table = ""
+							dmg.bullets = -1.0
+							dmg.club = -1.0
+							dmg.explosive = -1.0
+							dmg.fire = -1.0
+							health = 5.0
+							spawn_motion_disabled = false
+						}
+					},
+					{
+						_class = "GenericGameData"
+						name = ""
+						game_class = "ao_proxy_capsule"
+						game_keys = 
+						{
+							bonename = null
+							radius = 6.15365
+							point0 = [ -0.008662, -0.970652, -0.021492 ]
+							point1 = [ 0.034288, 0.712318, 0.086381 ]
+						}
+					},
+				]
+			},
+			{
+				_class = "BreakPieceList"
+				children = 
+				[
+					{
+						_class = "BreakPieceExternal"
+						piece_name = ""
+						model = resource:"models/cs_italy/italy_food_melon/italy_food_melon/piece.vmdl"
+						collision_group_override = "debris"
+						offset = [ 0.0, 0.0, 0.0 ]
+						offset_rotation = [ 0.0, 0.0, 0.0 ]
+						fadetime = 20.0
+						fademindist = 0.0
+						fademaxdist = 0.0
+						random_spawn_chance = 1.0
+						suppress_creation_on_death = false
+						is_essential_piece = false
+						can_player_pickup_piece = false
+						inherit_owner_joints = false
+					},
+					{
+						_class = "BreakPieceExternal"
+						piece_name = ""
+						model = resource:"models/cs_italy/italy_food_melon/italy_food_melon/piece1.vmdl"
+						collision_group_override = "debris"
+						offset = [ 0.0, 0.0, 0.0 ]
+						offset_rotation = [ 0.0, 0.0, 0.0 ]
+						fadetime = 20.0
+						fademindist = 0.0
+						fademaxdist = 0.0
+						random_spawn_chance = 1.0
+						suppress_creation_on_death = false
+						is_essential_piece = false
+						can_player_pickup_piece = false
+						inherit_owner_joints = false
+					},
+					{
+						_class = "BreakPieceExternal"
+						piece_name = ""
+						model = resource:"models/cs_italy/italy_food_melon/italy_food_melon/piece2.vmdl"
+						collision_group_override = "debris"
+						offset = [ 0.0, 0.0, 0.0 ]
+						offset_rotation = [ 0.0, 0.0, 0.0 ]
+						fadetime = 20.0
+						fademindist = 0.0
+						fademaxdist = 0.0
+						random_spawn_chance = 1.0
+						suppress_creation_on_death = false
+						is_essential_piece = false
+						can_player_pickup_piece = false
+						inherit_owner_joints = false
+					},
+					{
+						_class = "BreakPieceExternal"
+						piece_name = ""
+						model = resource:"models/cs_italy/italy_food_melon/italy_food_melon/piece3.vmdl"
+						collision_group_override = "debris"
+						offset = [ 0.0, 0.0, 0.0 ]
+						offset_rotation = [ 0.0, 0.0, 0.0 ]
+						fadetime = 20.0
+						fademindist = 0.0
+						fademaxdist = 0.0
+						random_spawn_chance = 1.0
+						suppress_creation_on_death = false
+						is_essential_piece = false
+						can_player_pickup_piece = false
+						inherit_owner_joints = false
+					},
+					{
+						_class = "BreakPieceExternal"
+						piece_name = ""
+						model = resource:"models/cs_italy/italy_food_melon/italy_food_melon/piece4.vmdl"
+						collision_group_override = "debris"
+						offset = [ 0.0, 0.0, 0.0 ]
+						offset_rotation = [ 0.0, 0.0, 0.0 ]
+						fadetime = 20.0
+						fademindist = 0.0
+						fademaxdist = 0.0
+						random_spawn_chance = 1.0
+						suppress_creation_on_death = false
+						is_essential_piece = false
+						can_player_pickup_piece = false
+						inherit_owner_joints = false
+					},
+					{
+						_class = "BreakPieceExternal"
+						piece_name = ""
+						model = resource:"models/cs_italy/italy_food_melon/italy_food_melon/piece5.vmdl"
+						collision_group_override = "debris"
+						offset = [ 0.0, 0.0, 0.0 ]
+						offset_rotation = [ 0.0, 0.0, 0.0 ]
+						fadetime = 20.0
+						fademindist = 0.0
+						fademaxdist = 0.0
+						random_spawn_chance = 1.0
+						suppress_creation_on_death = false
+						is_essential_piece = false
+						can_player_pickup_piece = false
+						inherit_owner_joints = false
+					},
+					{
+						_class = "BreakPieceExternal"
+						piece_name = ""
+						model = resource:"models/cs_italy/italy_food_melon/italy_food_melon/piece6.vmdl"
+						collision_group_override = "debris"
+						offset = [ 0.0, 0.0, 0.0 ]
+						offset_rotation = [ 0.0, 0.0, 0.0 ]
+						fadetime = 20.0
+						fademindist = 0.0
+						fademaxdist = 0.0
+						random_spawn_chance = 1.0
+						suppress_creation_on_death = false
+						is_essential_piece = false
+						can_player_pickup_piece = false
+						inherit_owner_joints = false
+					},
+					{
+						_class = "BreakPieceExternal"
+						piece_name = ""
+						model = resource:"models/cs_italy/italy_food_melon/italy_food_melon/piece7.vmdl"
+						collision_group_override = "debris"
+						offset = [ 0.0, 0.0, 0.0 ]
+						offset_rotation = [ 0.0, 0.0, 0.0 ]
+						fadetime = 20.0
+						fademindist = 0.0
+						fademaxdist = 0.0
+						random_spawn_chance = 1.0
+						suppress_creation_on_death = false
+						is_essential_piece = false
+						can_player_pickup_piece = false
+						inherit_owner_joints = false
+					},
+					{
+						_class = "BreakPieceExternal"
+						piece_name = ""
+						model = resource:"models/cs_italy/italy_food_melon/italy_food_melon/piece8.vmdl"
+						collision_group_override = "debris"
+						offset = [ 0.0, 0.0, 0.0 ]
+						offset_rotation = [ 0.0, 0.0, 0.0 ]
+						fadetime = 20.0
+						fademindist = 0.0
+						fademaxdist = 0.0
+						random_spawn_chance = 1.0
+						suppress_creation_on_death = false
+						is_essential_piece = false
+						can_player_pickup_piece = false
+						inherit_owner_joints = false
+					},
+				]
+			},
+			{
+				_class = "PhysicsShapeList"
+				children = 
+				[
+					{
+						_class = "PhysicsShapeSphere"
+						parent_bone = ""
+						surface_prop = "fruit"
+						collision_tags = ""
+						radius = 6.809788
+						center = [ -0.055733, -0.150801, -0.040127 ]
+						name = ""
+					},
+				]
+			},
+			{
+				_class = "PhysicsBodyMarkupList"
+				children =
+				[
+					{
+						_class = "PhysicsBodyMarkup"
+						target_body = ""
+						mass_override = 2.0
+						inertia_scale = 1.0
+						linear_damping = 0.0
+						angular_damping = 0.0
+						use_mass_center_override = false
+						mass_center_override = [ 0.0, 0.0, 0.0 ]
+					},
+				]
+			},
+		]
+	}
+}

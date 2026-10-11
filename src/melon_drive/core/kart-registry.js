@@ -52,6 +52,7 @@ import { predictionDotSet } from "./trace.js";
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
  *   melonGlow?: boolean, // this player's melon has its outline glow (user menu toggle, on by default) — see kart/look.js
+ *   skin?: string, // this player's melon skin (a MELON_SKINS key), read from the save data on first use — see kart/skin.js
  *   predictionLine?: boolean, // this player's prediction line is on (user menu toggle, off by default) — see fx/prediction/prediction.js
  *   predictionDots?: any[], // this kart's prediction-line dot entities, see fx/prediction/prediction.js
  *   pendingBounce?: { time: number, impactSpeed: number, impactDir: { x: number, y: number, z: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number }, // damage not yet charged — waits out the jump window, see SettleWallBounceDamage

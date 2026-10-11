@@ -105,6 +105,7 @@ function TraceSphere(config) {
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
  *   melonGlow?: boolean, // this player's melon has its outline glow (user menu toggle, on by default) — see kart/look.js
+ *   skin?: string, // this player's melon skin (a MELON_SKINS key), read from the save data on first use — see kart/skin.js
  *   predictionLine?: boolean, // this player's prediction line is on (user menu toggle, off by default) — see fx/prediction/prediction.js
  *   predictionDots?: any[], // this kart's prediction-line dot entities, see fx/prediction/prediction.js
  *   pendingBounce?: { time: number, impactSpeed: number, impactDir: { x: number, y: number, z: number }, angle: number, angleFactor: number, jumpFactor: number, speedGain: number }, // damage not yet charged — waits out the jump window, see SettleWallBounceDamage
@@ -1117,12 +1118,37 @@ const HUB_SPAWN_NAME = "hub_spawn";
 const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
 const INTRO_SPAWN_NAME = "intro_spawn";
 
-// Where a joining player's melon appears is their own choice (the user
-// menu's "Start in Tutorial" toggle, kart/join-spot.js): intro_spawn (the
-// default) or straight at hub_spawn. Kept per player name in the addon's
-// save data under this key, next to the best times, so it survives
-// reconnects and map restarts: { [playerName]: { startInTutorial: false } }.
+// Per-player settings — where a joining player's melon appears (the user
+// menu's "Start in Tutorial" toggle, kart/join-spot.js: intro_spawn, the
+// default, or straight at hub_spawn) and their melon skin (kart/skin.js).
+// Kept per player name in the addon's save data under this key, next to the
+// best times, so they survive reconnects and map restarts:
+// { [playerName]: { startInTutorial: false, skin: "gold" } } — a setting at
+// its default isn't stored.
 const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
+
+// --- Skins: the melon's model, picked in the user menu (kart/skin.js). ---
+
+// Every skin is its own .vmdl — the same mesh, collision and break pieces
+// with another material (tools/make-melon-skins.mjs) — since cs_script can't
+// switch material groups, only SetModel. Each one has to be used somewhere
+// in the .vmap too (the default by melon_template, the others e.g. by a
+// prop in the hub), or the map doesn't ship it (test/map/map-skins.test.mjs).
+// The key is the button's: usermenu_skin_<key> in speedometer.xml.
+/** @type {Record<string, string>} */
+const MELON_SKINS = {
+    default: "models/melon_racer/melon/melon.vmdl",
+    gold: "models/melon_racer/melon/melon_gold.vmdl",
+    football: "models/melon_racer/melon/melon_football.vmdl",
+    golf: "models/melon_racer/melon/melon_golf.vmdl",
+    honey: "models/melon_racer/melon/melon_honey.vmdl",
+    strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
+    pumpkin: "models/melon_racer/melon/melon_pumpkin.vmdl",
+    pineapple: "models/melon_racer/melon/melon_pineapple.vmdl",
+    zebra: "models/melon_racer/melon/melon_zebra.vmdl",
+    camo: "models/melon_racer/melon/melon_camo.vmdl",
+};
+const MELON_SKIN_DEFAULT = "default";
 
 // The frozen pawn (CSMoveType.NOCLIP: non-solid, but WASD still flies it)
 // stays where it spawned — see HoldPawn in kart/spawn.js. It's only put back
@@ -2988,6 +3014,45 @@ function RecordRunTime(best, trackId, playerName, time) {
     return true;
 }
 
+// Pure rules of the per-player settings in the addon's parsed save data
+// (SAVE_DATA_PLAYER_SETTINGS_KEY): one object per player name, holding only
+// what isn't at its default. Used by kart/join-spot-logic.js and
+// kart/skin-logic.js.
+
+/**
+ * `playerName`'s stored value of `key` (undefined if not stored).
+ * @param {Record<string, any>} saveData parsed, see ParseSaveData
+ * @param {string} playerName @param {string} key
+ */
+function PlayerSetting(saveData, playerName, key) {
+    return saveData[SAVE_DATA_PLAYER_SETTINGS_KEY]?.[playerName]?.[key];
+}
+
+/**
+ * `saveData` with `playerName`'s `key` set to `value` — or removed, for
+ * undefined (the default). The rest (best times, other players, other
+ * settings) kept; a player left with no settings leaves no entry.
+ * @param {Record<string, any>} saveData parsed, see ParseSaveData
+ * @param {string} playerName @param {string} key @param {any} value
+ * @returns {Record<string, any>}
+ */
+function WithPlayerSetting(saveData, playerName, key, value) {
+    const raw = saveData[SAVE_DATA_PLAYER_SETTINGS_KEY];
+    const all = raw && typeof raw === "object" && !Array.isArray(raw) ? { ...raw } : {};
+    const mine = { ...(all[playerName] && typeof all[playerName] === "object" ? all[playerName] : {}) };
+    if (value === undefined) {
+        delete mine[key];
+    } else {
+        mine[key] = value;
+    }
+    if (Object.keys(mine).length > 0) {
+        all[playerName] = mine;
+    } else {
+        delete all[playerName];
+    }
+    return { ...saveData, [SAVE_DATA_PLAYER_SETTINGS_KEY]: all };
+}
+
 // Pure rules of where a joining player's melon appears (kart/join-spot.js):
 // the "Start in Tutorial" setting inside the addon's parsed save data.
 
@@ -2998,7 +3063,7 @@ function RecordRunTime(best, trackId, playerName, time) {
  * @param {string} playerName
  */
 function StartsInTutorial(saveData, playerName) {
-    return saveData[SAVE_DATA_PLAYER_SETTINGS_KEY]?.[playerName]?.startInTutorial !== false;
+    return PlayerSetting(saveData, playerName, "startInTutorial") !== false;
 }
 
 /**
@@ -3010,20 +3075,7 @@ function StartsInTutorial(saveData, playerName) {
  * @returns {Record<string, any>}
  */
 function WithStartsInTutorial(saveData, playerName, on) {
-    const raw = saveData[SAVE_DATA_PLAYER_SETTINGS_KEY];
-    const all = raw && typeof raw === "object" && !Array.isArray(raw) ? { ...raw } : {};
-    const mine = { ...(all[playerName] && typeof all[playerName] === "object" ? all[playerName] : {}) };
-    if (on) {
-        delete mine.startInTutorial;
-    } else {
-        mine.startInTutorial = false;
-    }
-    if (Object.keys(mine).length > 0) {
-        all[playerName] = mine;
-    } else {
-        delete all[playerName];
-    }
-    return { ...saveData, [SAVE_DATA_PLAYER_SETTINGS_KEY]: all };
+    return WithPlayerSetting(saveData, playerName, "startInTutorial", on ? undefined : false);
 }
 
 // Where a joining player's melon appears: the tutorial (intro_spawn, the
@@ -3032,9 +3084,9 @@ function WithStartsInTutorial(saveData, playerName, on) {
 // (like the best times: the API has no stable player id). The rules are in
 // kart/join-spot-logic.js.
 
-/** @param {import("../core/kart-registry.js").Kart | { pawn: any }} kart */
+/** The name per-player settings are saved under. @param {import("../core/kart-registry.js").Kart | { pawn: any }} kart */
 function PlayerName$2(kart) {
-    return kart.pawn.GetPlayerController()?.GetPlayerName() ?? "";
+    return kart.pawn?.GetPlayerController()?.GetPlayerName() ?? "";
 }
 
 /** Whether this kart's player starts in the tutorial when joining. @param {import("../core/kart-registry.js").Kart} kart */
@@ -3111,16 +3163,89 @@ function ResetHudForPlayer(slot) {
     hud.ResetForPlayer(slot);
 }
 
-// How a kart's melon looks while it's whole: its paint color plus an outline
-// glow in that same color — green (MELON_GLOW_UNPAINTED_COLOR) until it's
-// first painted (kart.painted) — which each player can switch
-// off for their own melon in the user menu ("GLOW", kart.melonGlow). Every path that shows the
-// melon (spawn, respawn after a break, repaint) goes through ShowMelonPaint;
+// Pure rules of the melon skins (kart/skin.js): which skin a player has,
+// inside the addon's parsed save data.
+
+/** Whether `skin` is one of MELON_SKINS. @param {unknown} skin */
+function IsSkin(skin) {
+    return typeof skin === "string" && Object.prototype.hasOwnProperty.call(MELON_SKINS, skin);
+}
+
+/**
+ * `playerName`'s skin — the default unless they picked another, and also for
+ * a stored skin that no longer exists.
+ * @param {Record<string, any>} saveData parsed, see ParseSaveData
+ * @param {string} playerName
+ */
+function SavedSkin(saveData, playerName) {
+    const skin = PlayerSetting(saveData, playerName, "skin");
+    return IsSkin(skin) ? skin : MELON_SKIN_DEFAULT;
+}
+
+/**
+ * `saveData` with `playerName`'s skin set — the default isn't stored.
+ * @param {Record<string, any>} saveData parsed, see ParseSaveData
+ * @param {string} playerName @param {string} skin
+ * @returns {Record<string, any>}
+ */
+function WithSkin(saveData, playerName, skin) {
+    return WithPlayerSetting(saveData, playerName, "skin", skin === MELON_SKIN_DEFAULT ? undefined : skin);
+}
+
+// The melon's skin: each player picks one in the user menu (the MELON
+// group's skin row), kept per player name in the addon's save data like
+// "Start in Tutorial" (kart/join-spot.js). A skin is a whole model
+// (MELON_SKINS), put on the melon by ApplyMelonSkin — called from
+// ShowMelonPaint (kart/look.js), so every spawn and respawn gets it. Paint
+// still sets the melon's color, but the skins don't take it (their material
+// ignores the tint); the outline glow shows it either way.
+
+/** @typedef {import("../core/kart-registry.js").Kart} Kart */
+
+/** This kart's skin: picked this session, else saved for its player. @param {Kart} kart */
+function GetMelonSkin(kart) {
+    if (kart.skin === undefined) {
+        kart.skin = SavedSkin(ParseSaveData(Instance.GetSaveData()), PlayerName$2(kart));
+    }
+    return kart.skin;
+}
+
+/** Puts this kart's skin model on its melon, if it doesn't have it already. @param {Kart} kart */
+function ApplyMelonSkin(kart) {
+    const model = MELON_SKINS[GetMelonSkin(kart)];
+    if (kart.melon.IsValid() && kart.melon.GetModelName() !== model) {
+        kart.melon.SetModel(model);
+    }
+}
+
+/**
+ * Picks this kart's skin and saves it for its player. Returns whether it's
+ * a skin (MELON_SKINS) — the caller shows the melon again (ShowMelonPaint).
+ * @param {Kart} kart @param {string} skin
+ */
+function SetMelonSkin(kart, skin) {
+    if (!IsSkin(skin)) {
+        return false;
+    }
+    kart.skin = skin;
+    // Re-read so the best times and everyone else's settings survive.
+    Instance.SetSaveData(JSON.stringify(WithSkin(ParseSaveData(Instance.GetSaveData()), PlayerName$2(kart), skin)));
+    Debug(`SetMelonSkin: "${PlayerName$2(kart)}" drives the ${skin} skin`);
+    return true;
+}
+
+// How a kart's melon looks while it's whole: its skin (kart/skin.js), its
+// paint color plus an outline glow in that same color — green
+// (MELON_GLOW_UNPAINTED_COLOR) until it's first painted (kart.painted) —
+// which each player can switch off for their own melon in the user menu
+// ("GLOW", kart.melonGlow). Every path that shows the melon (spawn, respawn
+// after a break, repaint, a new skin) goes through ShowMelonPaint;
 // a break turns the glow off with HideMelonGlow — the melon is hidden then,
 // and an outline of it floating at the crash site would give that away.
 
 /** @param {import("../core/kart-registry.js").Kart} kart */
 function ShowMelonPaint(kart) {
+    ApplyMelonSkin(kart); // first: a new model could drop the color and glow set before
     kart.melon.SetColor(kart.paintColor);
     if (IsMelonGlowOn(kart)) {
         kart.melon.Glow(kart.painted ? kart.paintColor : MELON_GLOW_UNPAINTED_COLOR);
@@ -8461,6 +8586,7 @@ function SetUserMenuOpen(slot, kart, open) {
         for (const buttonId of Object.keys(USER_MENU_TOGGLES)) {
             UpdateToggleHud(slot, kart, buttonId);
         }
+        UpdateSkinHud(slot, kart);
         UpdateHubButtonHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
@@ -8510,6 +8636,22 @@ function UpdateToggleHud(slot, kart, buttonId) {
     const on = toggle.isOn(kart);
     hud.SetDialogVariableStringForPlayer(slot, buttonId, toggle.variable, on ? "ON" : "OFF");
     hud.SetHasClassForPlayer(slot, buttonId, "ToggleOn", on);
+}
+
+/**
+ * The skin row (usermenu_skin_<key>, one per MELON_SKINS): the player's
+ * current skin gets SkinSelected.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+function UpdateSkinHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const skin = GetMelonSkin(kart);
+    for (const key of Object.keys(MELON_SKINS)) {
+        hud.SetHasClassForPlayer(slot, `usermenu_skin_${key}`, "SkinSelected", key === skin);
+    }
 }
 
 /** @param {number} slot @param {import("../core/kart-registry.js").Kart} kart */
@@ -8746,7 +8888,7 @@ const TEST_TRIGGER_BUTTONS = {
 };
 
 /**
- * Buttons handled by id prefix: the color swatches and the tuning pages'
+ * Buttons handled by id prefix: the color swatches, the skins and the tuning pages'
  * controls. Each returns whether the id was one of its buttons.
  * @type {[string, (slot: number, kart: Kart, buttonId: string) => boolean][]}
  */
@@ -8759,6 +8901,19 @@ const PREFIX_BUTTONS = [
                 SetKartPaintColor(kart, preset);
             }
             return Boolean(preset);
+        },
+    ],
+    [
+        "usermenu_skin_",
+        (slot, kart, buttonId) => {
+            if (!SetMelonSkin(kart, buttonId.slice("usermenu_skin_".length))) {
+                return false;
+            }
+            if (!kart.breaking) {
+                ShowMelonPaint(kart); // a broken melon gets it on respawn
+            }
+            UpdateSkinHud(slot, kart);
+            return true;
         },
     ],
     ["camtune_", HandleCameraTuningClick], // dev/camera-tuning.js
@@ -9950,9 +10105,9 @@ function RegisterKartInputs() {
 // A player's kart: spawning the melon and freezing the pawn (spawn.js), the
 // spawn entities (spawn-points.js) and where a joining player starts
 // (join-spot.js), moving the melon on purpose
-// (teleport.js), its look — paint and glow (look.js) — and the player
-// lifecycle / paint trigger inputs (inputs.js). The kart record itself and
-// the registry of all karts are in core/kart-registry.js.
+// (teleport.js), its look — paint and glow (look.js), skin (skin.js) — and
+// the player lifecycle / paint trigger inputs (inputs.js). The kart record
+// itself and the registry of all karts are in core/kart-registry.js.
 
 // Water zones (WATER_* in zones/water/constants.js). Pure rules, no cs_script
 // import; zones/water/water.js applies them (test/zones/water.test.mjs).

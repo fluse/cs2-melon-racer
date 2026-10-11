@@ -340,8 +340,36 @@ test("color buttons paint that player's melon in the preset; an unknown color do
     assert.deepEqual(a.paintColor, preset);
 });
 
+test("skin buttons: put that skin's model on the clicker's melon, mark it, keep its paint — saved for the next join", () => {
+    const skin = Object.keys(C.MELON_SKINS).find((key) => key !== C.MELON_SKIN_DEFAULT);
+    assert.equal(a.melon.GetModelName(), C.MELON_SKINS[C.MELON_SKIN_DEFAULT], "a new melon gets its player's (default) skin");
+    Click(0, `usermenu_color_${Object.keys(COLOR_PRESETS)[0]}`);
+    Click(0, `usermenu_skin_${skin}`);
+    assert.equal(a.melon.GetModelName(), C.MELON_SKINS[skin]);
+    assert.deepEqual(a.melon.color, Object.values(COLOR_PRESETS)[0], "paint and glow set again after the new model");
+    assert.equal(b.melon.GetModelName(), C.MELON_SKINS[C.MELON_SKIN_DEFAULT], "only the clicker's melon");
+    assert.ok(hud.Has(0, `usermenu_skin_${skin}`, "SkinSelected"));
+    assert.ok(!hud.Has(0, `usermenu_skin_${C.MELON_SKIN_DEFAULT}`, "SkinSelected"));
+
+    // Joining again: the same player name gets the skin back.
+    karts.delete(0);
+    const again = SetUpPlayerKart(world.add(new CSPlayerPawn({ slot: 0 })), GetHubSpawnPoint());
+    assert.equal(again.melon.GetModelName(), C.MELON_SKINS[skin]);
+
+    Click(0, "usermenu_skin_no_such_skin");
+    assert.equal(again.melon.GetModelName(), C.MELON_SKINS[skin]);
+});
+
+test("skin buttons: a broken melon gets its new skin on the respawn, not while it's hidden", () => {
+    const skin = Object.keys(C.MELON_SKINS).find((key) => key !== C.MELON_SKIN_DEFAULT);
+    a.breaking = true;
+    Click(0, `usermenu_skin_${skin}`);
+    assert.equal(a.skin, skin);
+    assert.equal(a.melon.GetModelName(), C.MELON_SKINS[C.MELON_SKIN_DEFAULT]);
+});
+
 test("clicks from a player without a kart are ignored", () => {
-    for (const button of ["hub_close_button", "usermenu_close_button", "usermenu_respawn_button", "usermenu_restart_button", "usermenu_hub_button", "usermenu_tutorial_button", "usermenu_glow_button", "usermenu_jointutorial_button", "usermenu_freelook_button", "usermenu_color_red"]) {
+    for (const button of ["hub_close_button", "usermenu_close_button", "usermenu_respawn_button", "usermenu_restart_button", "usermenu_hub_button", "usermenu_tutorial_button", "usermenu_glow_button", "usermenu_jointutorial_button", "usermenu_freelook_button", "usermenu_color_red", "usermenu_skin_gold"]) {
         assert.doesNotThrow(() => Click(7, button), button);
     }
 });
