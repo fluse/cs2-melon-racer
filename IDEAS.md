@@ -13,7 +13,6 @@
 - Flipper Tisch, auf dem man als erstes ins ziel gebounced werden muss.
 
 # Obstacles
-- Bahnstopper
 - Flipper Ball Bounce
 
 # Scoreboard
