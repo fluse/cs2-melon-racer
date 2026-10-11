@@ -44,8 +44,9 @@ import { ApplyImpactDamage } from "../../health/damage/damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage, WallBounceBreaksAtImpact } from "../wall-bounce/wall-bounce.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
 import { ApplyHealing } from "../../health/heal/index.js";
-import { CurrentWallRules, CurrentSideView, InSideViewDepthZone, InWater, InJumpRechargeZone } from "../../zones/registry.js";
+import { CurrentWallRules, CurrentSideView, InSideViewDepthZone, InWater, InJumpRechargeZone, CurrentGravityZone } from "../../zones/registry.js";
 import { ChargeInRechargeZone } from "../../zones/jump-recharge/logic.js";
+import { KeepRollingSpeed } from "../../zones/gravity/logic.js";
 import { SideViewAxes, InitialFacing, SideViewInput, SideViewDepthInput, PlaneDepth, KeepOnPlane } from "../../zones/side-view/logic.js";
 import { PodiumHoldActive, PodiumHoldVelocity } from "../../race/podium/logic.js";
 
@@ -129,7 +130,12 @@ export function UpdateKart(slot, kart, dt) {
     // (first tick after a teleport/respawn, or coming out of rest): a melon
     // that was lying still is on something, anything else counts as not.
     const verticalAccel = kart.lastVelocity ? VerticalAccel(kart.lastVelocity.z, currentVelocity.z, dt) : undefined;
-    const supported = verticalAccel !== undefined ? IsSupported(verticalAccel) : kart.settled;
+    // Gravity zone (gravity_enter/gravity_leave): its pull on top of the
+    // physics page's "Gravity", and how much of the rolling loss stays.
+    const gravityZone = CurrentGravityZone(kart);
+    const gravityFactor = PhysicsFactor("gravity") * (gravityZone?.gravity ?? 1);
+    const rollFactor = gravityZone?.roll ?? 1;
+    const supported = verticalAccel !== undefined ? IsSupported(verticalAccel, gravityFactor) : kart.settled;
     const grounded = UpdateGrounded(kart, origin, now, supported, verticalAccel);
     const wallNormalNow = UpdateWallContact(kart, origin, now, currentVelocity, dt, grounded);
     // Wall bounce / wall jump tuning for where the melon is (lift zone or not).
@@ -314,6 +320,13 @@ export function UpdateKart(slot, kart, dt) {
         vx = guarded.x;
         vy = guarded.y;
     }
+    // Gravity zone: part of the speed physics' rolling friction took since
+    // last tick is given back (KeepRollingSpeed — hits stay hits).
+    if (gravityZone && !bounceVelocity && kart.lastVelocity && !InWater(kart)) {
+        const kept = KeepRollingSpeed({ x: vx, y: vy }, kart.lastVelocity, rollFactor, dt);
+        vx = kept.x;
+        vy = kept.y;
+    }
 
     // Steering grip (STEER_GRIP_*): holding forward turns the velocity itself
     // towards the look direction — on the ground and (at STEER_AIR_GRIP_RATE)
@@ -338,7 +351,7 @@ export function UpdateKart(slot, kart, dt) {
     } else if (!boost.boosting) {
         const speed = Math.hypot(vx, vy);
         if (speed > 0) {
-            const scale = Math.max(0, speed - COAST_FRICTION * dt) / speed;
+            const scale = Math.max(0, speed - COAST_FRICTION * rollFactor * dt) / speed;
             vx *= scale;
             vy *= scale;
         }
@@ -371,10 +384,11 @@ export function UpdateKart(slot, kart, dt) {
     }
     vx = v.x;
     vy = v.y;
-    // The physics page's "Gravity" (dev/physics-tuning.js): the engine pulls
-    // with GRAVITY regardless, the script adds the difference. Ground
-    // contact still reads right — it compares against this command.
-    const vz = v.z + ExtraGravityDelta(PhysicsFactor("gravity"), GRAVITY, dt);
+    // The physics page's "Gravity" (dev/physics-tuning.js) and a gravity
+    // zone's: the engine pulls with GRAVITY regardless, the script adds the
+    // difference. Ground contact still reads right — it compares against
+    // this command (IsSupported is told the factor).
+    const vz = v.z + ExtraGravityDelta(gravityFactor, GRAVITY, dt);
     // On the podium: whatever else happened, horizontally it only goes back
     // over its spot (a jump goes straight up and comes down there).
     if (podium) {

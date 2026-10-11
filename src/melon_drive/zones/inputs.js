@@ -1,4 +1,4 @@
-// Script inputs of the zone triggers — heal, lift, camera, side-view (+ depth), water and jump recharge zones, jump pads,
+// Script inputs of the zone triggers — heal, lift, camera, side-view (+ depth), water, jump recharge and gravity zones, jump pads,
 // plus the teleporters (teleport/inputs.js). The zones all work
 // the same way: OnStartTouch -> "<kind>_enter", OnEndTouch -> "<kind>_leave",
 // and the touched trigger's own name may carry its value (heal_zone_<rate>,
@@ -12,6 +12,7 @@ import { LiftZoneUpSpeed } from "./lift/logic.js";
 import { CameraZoneFromName } from "./camera-zone/logic.js";
 import { SideViewFromName } from "./side-view/logic.js";
 import { JumpPadFromName } from "./jump-pad/logic.js";
+import { GravityZoneFromName } from "./gravity/logic.js";
 import { StopInWater } from "./water/water.js";
 import { EnterZone, LeaveZone } from "./registry.js";
 import { RegisterTeleportInput } from "./teleport/inputs.js";
@@ -62,5 +63,8 @@ export function RegisterZoneInputs() {
     // Jump recharge zones — see jump-recharge/logic.js. Read by UpdateKart:
     // the wall-jump charges are kept full inside.
     RegisterZone("jump_recharge_enter", "jump_recharge_leave", "jumpRecharges", () => 1, "(jump recharge)");
+    // Gravity zones — see gravity/constants.js. Read by UpdateKart: less (or
+    // more) pull and rolling loss inside.
+    RegisterZone("gravity_enter", "gravity_leave", "gravityZones", GravityZoneFromName, "gravity/roll factor");
     RegisterTeleportInput();
 }

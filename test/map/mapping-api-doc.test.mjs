@@ -43,6 +43,8 @@ const SCRIPT_INPUTS = [
     "jump_pad_leave",
     "water_enter",
     "water_leave",
+    "gravity_enter",
+    "gravity_leave",
     "ball_pit_enter",
     "ball_pit_leave",
 ];

@@ -933,6 +933,27 @@ sparks in health blue). Rule: `zones/jump-recharge/logic.js`, applied in
 `movement/driving/drive.js` (`test/zones/jump-recharge.test.mjs`). Details
 for mappers: [Mapping API: jump recharge zones](docs/mapping-api/17-jump-recharge-zones.md).
 
+## Gravity zones (implemented)
+
+A `trigger_multiple` (filtered to `prop_physics`) with `OnStartTouch` →
+`RunScriptInput` `gravity_enter` and `OnEndTouch` → `gravity_leave`. Inside,
+the melon is pulled with a share of `GRAVITY` (jumps go higher and further)
+and loses only a share of what rolling normally costs: `COAST_FRICTION` and
+the engine's own rolling friction (the part of last tick's commanded speed
+physics took away, given back by `KeepRollingSpeed`). A loss faster than
+`GRAVITY_ZONE_MAX_ROLL_DECEL` is a hit and stays one, so impacts and bounces
+are unchanged. The name sets both, in percent:
+`gravity_zone_<gravity>[_roll<roll>]`. Without `_roll` the roll follows the
+gravity (a lighter melon rubs less), and any other name uses
+`GRAVITY_ZONE_PERCENT` (50). So `gravity_zone_100_roll0` is a stretch where
+the melon rolls on at full speed. Overlapping zones: the last one entered
+counts. Applied on top of the physics page's "Gravity". Ground contact is
+measured with the zone's factor (`IsSupported`), so jumping off the floor
+still works there, down to about 10 %. Constants:
+`zones/gravity/constants.js`; rules: `zones/gravity/logic.js`, applied by
+`movement/driving/drive.js` (`test/zones/gravity-zone.test.mjs`). Details for
+mappers: [Mapping API: gravity zones](docs/mapping-api/21-gravity-zones.md).
+
 ## Water zones (implemented)
 
 `func_water` has no outputs, so the script learns about water from a

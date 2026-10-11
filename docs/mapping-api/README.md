@@ -37,6 +37,7 @@ this folder, the script doesn't know about it.
 | 18 | [Spike springs](18-spike-springs.md) | Spike traps popping out of the floor on the script's clock |
 | 19 | [Ball pits](19-ball-pits.md) | Physics balls kept in their pit, melons drive in and out |
 | 20 | [Ball spawner](20-ball-spawner.md) | Balls dropping in at irregular intervals, removed after a while |
+| 21 | [Gravity zones](21-gravity-zones.md) | Lower (or higher) gravity, less speed lost while rolling |
 
 ## All script inputs
 
@@ -75,6 +76,8 @@ script, and `npm test` fails on it.
 | `water_leave` | **End** | the same water trigger | — | [Water zones](13-water-zones.md) |
 | `jump_recharge_enter` | Start | any jump recharge trigger | — | [Jump recharge zones](17-jump-recharge-zones.md) |
 | `jump_recharge_leave` | **End** | the same jump recharge trigger | — | [Jump recharge zones](17-jump-recharge-zones.md) |
+| `gravity_enter` | Start | any gravity trigger | name (gravity, roll) | [Gravity zones](21-gravity-zones.md) |
+| `gravity_leave` | **End** | the same gravity trigger | — | [Gravity zones](21-gravity-zones.md) |
 | `ball_pit_enter` | Start | the trigger around a ball pit | origin (the pit's middle) | [Ball pits](19-ball-pits.md) |
 | `ball_pit_leave` | **End** | the same ball pit trigger | — | [Ball pits](19-ball-pits.md) |
 
@@ -128,5 +131,6 @@ Names the script parses — the name carries the config.
 | `camera_zone_[noclip_]close[_<b>[_<h>]]` | `camera_zone_close_12_2` | `trigger_multiple` | [Camera zones](11-camera-zones.md#close-up-zones) |
 | `side_view_<yaw>[_<distance>[_<height>]]` | `side_view_90_300_40` | `trigger_multiple` | [Camera zones](11-camera-zones.md#side-view-zones) |
 | `jump_pad_<up>[_<forward>]` | `jump_pad_1000_400` | `trigger_multiple` | [Jump pads](12-jump-pads.md) |
+| `gravity_zone_<gravity>[_roll<roll>]` | `gravity_zone_100_roll20` | `trigger_multiple` | [Gravity zones](21-gravity-zones.md) |
 | `mover[_wait<seconds>][_<anything>]` | `mover_wait1.5_left` | `func_movelinear` | [Movers](16-movers.md) |
 | `spike_spring[_<words>][_<down>_<up>][_offset<seconds>]` | `spike_spring_downtime_uptime_2_0.5` | `prop_dynamic` | [Spike springs](18-spike-springs.md) |

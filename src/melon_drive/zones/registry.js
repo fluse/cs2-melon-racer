@@ -5,7 +5,8 @@
 // water zones (water_enter/water_leave, zones/water/constants.js)
 // side-view zones (side_view_enter/side_view_leave, zones/side-view/constants.js)
 // side-view depth zones (side_view_depth_enter/side_view_depth_leave, same file)
-// and jump recharge zones (jump_recharge_enter/jump_recharge_leave, zones/jump-recharge/logic.js):
+// jump recharge zones (jump_recharge_enter/jump_recharge_leave, zones/jump-recharge/logic.js)
+// and gravity zones (gravity_enter/gravity_leave, zones/gravity/constants.js):
 // entering/leaving them (registered in inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.
 // Each kind is a Map on the kart: trigger entity -> its value (heal rate in
@@ -13,7 +14,7 @@
 // tracked separately.
 import { WallRules } from "./lift/logic.js";
 
-/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews" | "sideViewDepths" | "jumpRecharges"} ZoneKind */
+/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews" | "sideViewDepths" | "jumpRecharges" | "gravityZones"} ZoneKind */
 
 /**
  * The melon entered a zone trigger of this kind, worth `value`.
@@ -46,6 +47,7 @@ export function LeaveZones(kart) {
     kart.sideViews?.clear();
     kart.sideViewDepths?.clear();
     kart.jumpRecharges?.clear();
+    kart.gravityZones?.clear();
 }
 
 /**
@@ -132,6 +134,17 @@ export function CurrentCameraZone(kart) {
  */
 export function CurrentSideView(kart) {
     return LatestZone(kart, "sideViews");
+}
+
+/**
+ * The gravity and rolling loss of the gravity zone the melon entered last
+ * (of those it's still inside), or undefined if none — overlapping gravity
+ * zones don't add up.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ * @returns {import("./gravity/logic.js").GravityZone | undefined}
+ */
+export function CurrentGravityZone(kart) {
+    return LatestZone(kart, "gravityZones");
 }
 
 /**

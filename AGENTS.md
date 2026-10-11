@@ -31,7 +31,7 @@ docs/TRACK_CREATION.md                   # step-by-step Hammer guide for a new t
 docs/GAME_CI.md                          # the map's color palette (guide lines, heal, checkpoint, start gate) — use it for new materials/models/HUD
 docs/valve/scripting_api.html            # saved copy of Valve's cs_script API wiki page (the site blocks automated fetches)
 docs/mapping-api/*.md                    # Mapping API (map↔script contract): README.md = index of every input/name/pattern,
-                                          #   01-…20-*.md one page per topic, each with setup / name-variant / "Values" tables
+                                          #   01-…21-*.md one page per topic, each with setup / name-variant / "Values" tables
 maps/melon_racer.vmap                    # main map (binary DMX, Hammer-authoritative)
 maps/prefabs/*.vmap                      # prefabs placed in melon_racer.vmap (hub, routes, gates, jump pads); the start/checkpoint/finish gates and jump_pad are set up by a
                                           #   map variable per copy (docs/mapping-api/14-prefabs.md) — test/helpers/vmap.mjs reads prefabs, overrides resolved
@@ -58,7 +58,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #   zones/     registry.js (which zones a melon is in, the WallRules that follow), inputs.js (every *_enter/*_leave),
                                           #              lift/, jump-pad/ (launch + no-damage flight), camera-zone/, side-view/ (2D: A/D-only screen-axis driving, plane lock, W/S depth zones),
                                           #              water/ (stop on entry, no impacts inside), jump-recharge/ (wall-jump charges kept full inside),
-                                          #              teleport/ (melon_teleport)
+                                          #              gravity/ (lower/higher gravity, less rolling loss: gravity_zone_<gravity>[_roll<roll>]), teleport/ (melon_teleport)
                                           #   race/      track-config.js (tracks from trigger names), checkpoints/ (progress, start_/checkpoint_/finish_ inputs),
                                           #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs),
                                           #              grand-prix/ (places + points per heat, standings over the heats), podium/ (top 3 held on the hub podium)

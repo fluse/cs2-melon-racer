@@ -23,11 +23,15 @@ export function VerticalAccel(commandedVz, actualVz, dt) {
 /**
  * Whether something held the melon up last tick: in free fall gravity
  * takes the full GRAVITY off its vertical velocity every second, anything
- * it rests or rolls on cancels a clear part of that.
+ * it rests or rolls on cancels a clear part of that. With less gravity
+ * (`gravityFactor` below 1: a gravity zone, the physics page) the script
+ * cancels part of the pull itself, so the floor's share is smaller and the
+ * bar is lowered with it; below ~0.1 a floor can hardly be told from a fall.
  * @param {number} verticalAccel units/sec^2, see VerticalAccel
+ * @param {number} [gravityFactor] the share of GRAVITY the melon is pulled with
  */
-export function IsSupported(verticalAccel) {
-    return verticalAccel > -FREE_FALL_FRACTION * GRAVITY;
+export function IsSupported(verticalAccel, gravityFactor = 1) {
+    return verticalAccel > -GRAVITY + (1 - FREE_FALL_FRACTION) * GRAVITY * Math.min(1, gravityFactor);
 }
 
 /**

@@ -65,6 +65,7 @@ import { predictionDotSet } from "./trace.js";
  *   lastPadLaunchTime?: number, // last jump pad launch — see ShouldPadLaunch
  *   waterZones?: Map<any, number>, // water triggers the melon is inside (value unused), see zones/water/
  *   jumpRecharges?: Map<any, number>, // jump recharge triggers the melon is inside (value unused), see zones/jump-recharge/
+ *   gravityZones?: Map<any, import("../zones/gravity/logic.js").GravityZone>, // gravity triggers the melon is inside -> their gravity/roll factors, see zones/registry.js
  *   padFlight?: import("../zones/jump-pad/logic.js").PadFlight, // a jump pad launch's damage protection, still on — see zones/jump-pad/jump-pad.js
  *   cameraZones?: Map<any, import("../zones/camera-zone/logic.js").CameraZone>, // camera triggers the melon is inside -> their zoom, see zones/registry.js
  *   zoneCamera?: import("../zones/camera-zone/logic.js").ZoneCameraState, // the camera-zone zoom being eased in/out — see UpdateZoneCamera

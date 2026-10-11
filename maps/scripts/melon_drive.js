@@ -118,6 +118,7 @@ function TraceSphere(config) {
  *   lastPadLaunchTime?: number, // last jump pad launch — see ShouldPadLaunch
  *   waterZones?: Map<any, number>, // water triggers the melon is inside (value unused), see zones/water/
  *   jumpRecharges?: Map<any, number>, // jump recharge triggers the melon is inside (value unused), see zones/jump-recharge/
+ *   gravityZones?: Map<any, import("../zones/gravity/logic.js").GravityZone>, // gravity triggers the melon is inside -> their gravity/roll factors, see zones/registry.js
  *   padFlight?: import("../zones/jump-pad/logic.js").PadFlight, // a jump pad launch's damage protection, still on — see zones/jump-pad/jump-pad.js
  *   cameraZones?: Map<any, import("../zones/camera-zone/logic.js").CameraZone>, // camera triggers the melon is inside -> their zoom, see zones/registry.js
  *   zoneCamera?: import("../zones/camera-zone/logic.js").ZoneCameraState, // the camera-zone zoom being eased in/out — see UpdateZoneCamera
@@ -417,6 +418,30 @@ const JUMP_PAD_MAX_PROTECTED_SECONDS = 6;
 // How much of its speed (and spin) the melon keeps on entering the water.
 // 0: stops dead. 0.2: keeps a fifth of it.
 const WATER_ENTRY_SPEED_KEEP = 0;
+
+// Gravity zones: a trigger_multiple (filtered to prop_physics like the other
+// triggers) with OnStartTouch -> RunScriptInput "gravity_enter" and
+// OnEndTouch -> "gravity_leave". Inside, the melon is pulled down with a
+// share of GRAVITY and loses a share of the speed it normally loses while
+// rolling — so it floats further on a jump and keeps its momentum longer.
+// Rule: zones/gravity/logic.js, applied by movement/driving/drive.js
+// (test/zones/gravity-zone.test.mjs).
+
+// Pull of a gravity zone without a value in its name, in percent of GRAVITY.
+// 100 = normal, 50 = half (jumps twice as high), 0 = floating.
+const GRAVITY_ZONE_PERCENT = 50;
+// Per zone, the name sets both: "gravity_zone_<gravity>[_roll<roll>]", in
+// percent — gravity of GRAVITY, roll of the speed lost while rolling
+// (COAST_FRICTION and the engine's own rolling friction). Without _roll the
+// roll is the gravity (a lighter melon presses less on the floor, so it
+// rubs less): gravity_zone_50 = half the pull and half the loss,
+// gravity_zone_100_roll20 = normal pull, only a fifth of the loss,
+// gravity_zone_100_roll0 = rolls on without losing speed on the flat.
+const GRAVITY_ZONE_NAME_PATTERN = /^gravity_zone_(\d+(?:\.\d+)?)(?:_roll(\d+(?:\.\d+)?))?$/;
+// Speed lost between two ticks faster than this is a hit (a wall, a bump),
+// not rolling — the zone leaves it alone, so impacts and bounces stay as
+// they are. Rolling friction stays far below it.
+const GRAVITY_ZONE_MAX_ROLL_DECEL = 1500; // units/sec^2
 
 // Melon health and impact damage from landings/crashes (wall hits have their own rules in wall-bounce.js).
 
@@ -2157,14 +2182,15 @@ function LiftZoneUpSpeed(triggerName) {
 // water zones (water_enter/water_leave, zones/water/constants.js)
 // side-view zones (side_view_enter/side_view_leave, zones/side-view/constants.js)
 // side-view depth zones (side_view_depth_enter/side_view_depth_leave, same file)
-// and jump recharge zones (jump_recharge_enter/jump_recharge_leave, zones/jump-recharge/logic.js):
+// jump recharge zones (jump_recharge_enter/jump_recharge_leave, zones/jump-recharge/logic.js)
+// and gravity zones (gravity_enter/gravity_leave, zones/gravity/constants.js):
 // entering/leaving them (registered in inputs.js), what they add up
 // to right now, and leaving them all at once when a new melon replaces the old.
 // Each kind is a Map on the kart: trigger entity -> its value (heal rate in
 // health/s, lift kick in u/s, camera zoom), so overlapping zones and their leaves are
 // tracked separately.
 
-/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews" | "sideViewDepths" | "jumpRecharges"} ZoneKind */
+/** @typedef {"healZones" | "liftZones" | "cameraZones" | "jumpPads" | "waterZones" | "sideViews" | "sideViewDepths" | "jumpRecharges" | "gravityZones"} ZoneKind */
 
 /**
  * The melon entered a zone trigger of this kind, worth `value`.
@@ -2197,6 +2223,7 @@ function LeaveZones(kart) {
     kart.sideViews?.clear();
     kart.sideViewDepths?.clear();
     kart.jumpRecharges?.clear();
+    kart.gravityZones?.clear();
 }
 
 /**
@@ -2283,6 +2310,17 @@ function CurrentCameraZone(kart) {
  */
 function CurrentSideView(kart) {
     return LatestZone(kart, "sideViews");
+}
+
+/**
+ * The gravity and rolling loss of the gravity zone the melon entered last
+ * (of those it's still inside), or undefined if none — overlapping gravity
+ * zones don't add up.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ * @returns {import("./gravity/logic.js").GravityZone | undefined}
+ */
+function CurrentGravityZone(kart) {
+    return LatestZone(kart, "gravityZones");
 }
 
 /**
@@ -9107,11 +9145,15 @@ function VerticalAccel(commandedVz, actualVz, dt) {
 /**
  * Whether something held the melon up last tick: in free fall gravity
  * takes the full GRAVITY off its vertical velocity every second, anything
- * it rests or rolls on cancels a clear part of that.
+ * it rests or rolls on cancels a clear part of that. With less gravity
+ * (`gravityFactor` below 1: a gravity zone, the physics page) the script
+ * cancels part of the pull itself, so the floor's share is smaller and the
+ * bar is lowered with it; below ~0.1 a floor can hardly be told from a fall.
  * @param {number} verticalAccel units/sec^2, see VerticalAccel
+ * @param {number} [gravityFactor] the share of GRAVITY the melon is pulled with
  */
-function IsSupported(verticalAccel) {
-    return verticalAccel > -FREE_FALL_FRACTION * GRAVITY;
+function IsSupported(verticalAccel, gravityFactor = 1) {
+    return verticalAccel > -GRAVITY + (1 - FREE_FALL_FRACTION) * GRAVITY * Math.min(1, gravityFactor);
 }
 
 /**
@@ -9447,6 +9489,43 @@ function ChargeInRechargeZone(charge, inZone) {
     return inZone ? WALL_JUMP_CHARGES : charge;
 }
 
+// Gravity zones (GRAVITY_ZONE_* in zones/gravity/constants.js). Pure rules,
+// no cs_script import; movement/driving/drive.js applies them
+// (test/zones/gravity-zone.test.mjs).
+
+/** @typedef {{ gravity: number, roll: number }} GravityZone factors of GRAVITY and of the speed lost while rolling (1 = normal) */
+
+/**
+ * A zone's factors, from its trigger name (see GRAVITY_ZONE_NAME_PATTERN),
+ * else GRAVITY_ZONE_PERCENT for both.
+ * @param {string} triggerName @returns {GravityZone}
+ */
+function GravityZoneFromName(triggerName) {
+    const match = GRAVITY_ZONE_NAME_PATTERN.exec(triggerName.trim());
+    const gravity = (match ? Number(match[1]) : GRAVITY_ZONE_PERCENT) / 100;
+    const roll = match?.[2] !== undefined ? Number(match[2]) / 100 : gravity;
+    return { gravity, roll };
+}
+
+/**
+ * The horizontal velocity after this tick's rolling loss is scaled by `roll`:
+ * physics took the melon from `last` (what we commanded) down to `current`;
+ * of that loss only `roll` stays (0: none, 1: all of it, 2: twice as much),
+ * in the direction physics left it moving. A loss faster than
+ * GRAVITY_ZONE_MAX_ROLL_DECEL is a hit, not rolling — left as it is.
+ * @param {{ x: number, y: number }} current @param {{ x: number, y: number }} last
+ * @param {number} roll @param {number} dt
+ */
+function KeepRollingSpeed(current, last, roll, dt) {
+    const speed = Math.hypot(current.x, current.y);
+    const loss = Math.hypot(last.x, last.y) - speed;
+    if (roll === 1 || speed <= 0 || loss <= 0 || loss > GRAVITY_ZONE_MAX_ROLL_DECEL * dt) {
+        return current;
+    }
+    const scale = Math.max(0, speed + loss - loss * roll) / speed;
+    return { x: current.x * scale, y: current.y * scale };
+}
+
 // Per-tick melon driving (UpdateKart): the order everything happens in each
 // tick — break/lock handling, contact measurement, impact and wall-bounce
 // detection, steering, friction, jump, speed cap. The individual parts live
@@ -9532,7 +9611,12 @@ function UpdateKart(slot, kart, dt) {
     // (first tick after a teleport/respawn, or coming out of rest): a melon
     // that was lying still is on something, anything else counts as not.
     const verticalAccel = kart.lastVelocity ? VerticalAccel(kart.lastVelocity.z, currentVelocity.z, dt) : undefined;
-    const supported = verticalAccel !== undefined ? IsSupported(verticalAccel) : kart.settled;
+    // Gravity zone (gravity_enter/gravity_leave): its pull on top of the
+    // physics page's "Gravity", and how much of the rolling loss stays.
+    const gravityZone = CurrentGravityZone(kart);
+    const gravityFactor = PhysicsFactor("gravity") * (gravityZone?.gravity ?? 1);
+    const rollFactor = gravityZone?.roll ?? 1;
+    const supported = verticalAccel !== undefined ? IsSupported(verticalAccel, gravityFactor) : kart.settled;
     const grounded = UpdateGrounded(kart, origin, now, supported, verticalAccel);
     const wallNormalNow = UpdateWallContact(kart, origin, now, currentVelocity, dt, grounded);
     // Wall bounce / wall jump tuning for where the melon is (lift zone or not).
@@ -9717,6 +9801,13 @@ function UpdateKart(slot, kart, dt) {
         vx = guarded.x;
         vy = guarded.y;
     }
+    // Gravity zone: part of the speed physics' rolling friction took since
+    // last tick is given back (KeepRollingSpeed — hits stay hits).
+    if (gravityZone && !bounceVelocity && kart.lastVelocity && !InWater(kart)) {
+        const kept = KeepRollingSpeed({ x: vx, y: vy }, kart.lastVelocity, rollFactor, dt);
+        vx = kept.x;
+        vy = kept.y;
+    }
 
     // Steering grip (STEER_GRIP_*): holding forward turns the velocity itself
     // towards the look direction — on the ground and (at STEER_AIR_GRIP_RATE)
@@ -9741,7 +9832,7 @@ function UpdateKart(slot, kart, dt) {
     } else if (!boost.boosting) {
         const speed = Math.hypot(vx, vy);
         if (speed > 0) {
-            const scale = Math.max(0, speed - COAST_FRICTION * dt) / speed;
+            const scale = Math.max(0, speed - COAST_FRICTION * rollFactor * dt) / speed;
             vx *= scale;
             vy *= scale;
         }
@@ -9774,10 +9865,11 @@ function UpdateKart(slot, kart, dt) {
     }
     vx = v.x;
     vy = v.y;
-    // The physics page's "Gravity" (dev/physics-tuning.js): the engine pulls
-    // with GRAVITY regardless, the script adds the difference. Ground
-    // contact still reads right — it compares against this command.
-    const vz = v.z + ExtraGravityDelta(PhysicsFactor("gravity"), GRAVITY, dt);
+    // The physics page's "Gravity" (dev/physics-tuning.js) and a gravity
+    // zone's: the engine pulls with GRAVITY regardless, the script adds the
+    // difference. Ground contact still reads right — it compares against
+    // this command (IsSupported is told the factor).
+    const vz = v.z + ExtraGravityDelta(gravityFactor, GRAVITY, dt);
     // On the podium: whatever else happened, horizontally it only goes back
     // over its spot (a jump goes straight up and comes down there).
     if (podium) {
@@ -10807,7 +10899,7 @@ function RegisterTeleportInput() {
     });
 }
 
-// Script inputs of the zone triggers — heal, lift, camera, side-view (+ depth), water and jump recharge zones, jump pads,
+// Script inputs of the zone triggers — heal, lift, camera, side-view (+ depth), water, jump recharge and gravity zones, jump pads,
 // plus the teleporters (teleport/inputs.js). The zones all work
 // the same way: OnStartTouch -> "<kind>_enter", OnEndTouch -> "<kind>_leave",
 // and the touched trigger's own name may carry its value (heal_zone_<rate>,
@@ -10860,11 +10952,14 @@ function RegisterZoneInputs() {
     // Jump recharge zones — see jump-recharge/logic.js. Read by UpdateKart:
     // the wall-jump charges are kept full inside.
     RegisterZone("jump_recharge_enter", "jump_recharge_leave", "jumpRecharges", () => 1, "(jump recharge)");
+    // Gravity zones — see gravity/constants.js. Read by UpdateKart: less (or
+    // more) pull and rolling loss inside.
+    RegisterZone("gravity_enter", "gravity_leave", "gravityZones", GravityZoneFromName, "gravity/roll factor");
     RegisterTeleportInput();
 }
 
 // Map triggers that change what a melon does while it's inside: lift/,
-// jump-pad/, camera-zone/, side-view/, water/, jump-recharge/ (heal zones are in health/heal/), plus the
+// jump-pad/, camera-zone/, side-view/, water/, jump-recharge/, gravity/ (heal zones are in health/heal/), plus the
 // teleporters (teleport/). registry.js tracks which zones a melon is in;
 // inputs.js registers every *_enter/*_leave and melon_teleport input.
 

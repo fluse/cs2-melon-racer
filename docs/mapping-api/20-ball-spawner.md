@@ -1,4 +1,4 @@
-[Mapping API](README.md) › **20. Ball spawner** · [← Ball pits](19-ball-pits.md)
+[Mapping API](README.md) › **20. Ball spawner** · [← Ball pits](19-ball-pits.md) · [Gravity zones →](21-gravity-zones.md)
 
 # 20. Ball spawner
 
@@ -34,4 +34,4 @@ is said once in the console: `[melon_drive] SpawnFromTemplate: …`.
   a fresh random delay; a round restart removes the balls and starts over.
 
 ---
-[← Ball pits](19-ball-pits.md) · [Mapping API](README.md)
+[← Ball pits](19-ball-pits.md) · [Mapping API](README.md) · [Gravity zones →](21-gravity-zones.md)
