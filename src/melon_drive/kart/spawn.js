@@ -69,13 +69,16 @@ function MakeUnbreakableByEngine(melon) {
 
 /**
  * Takes the player's own body out of the game: non-solid (NOCLIP — NONE
- * would leave its hitbox solid for the melon to crash into), invisible, and
- * standing still wherever it spawned — the map's player spawns sit away from
- * the tracks, so it's out of the way there. Safe to call repeatedly.
+ * would leave its hitbox solid for the melon to crash into — and no
+ * collision at all: a NOCLIP pawn still shoved physics props, balls and
+ * melons, flying through them in free look), invisible, and standing still
+ * wherever it spawned — the map's player spawns sit away from the tracks,
+ * so it's out of the way there. Safe to call repeatedly.
  * @param {any} pawn
  */
 function FreezePawn(pawn) {
     pawn.SetMoveType(CSMoveType.NOCLIP);
+    Instance.EntFireAtTarget({ target: pawn, input: "DisableCollision" });
     pawn.SetColor({ r: 255, g: 255, b: 255, a: 0 });
     pawn.Teleport({ velocity: { x: 0, y: 0, z: 0 } });
 }
