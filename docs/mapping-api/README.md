@@ -98,6 +98,7 @@ names once, when the script first needs the track list.
 | `hub_start_trigger` | `trigger_multiple` | yes | [Hub](05-hub.md) |
 | `intro_spawn` | `info_player_start` | — | [Core entities](02-core-entities.md#spawn-points) |
 | `hub_spawn_facing` | `info_target` | — | [Core entities](02-core-entities.md#spawn-points) |
+| `spawn_join_grandprix` | any named point entity (e.g. `info_target`) | — | [Hub](05-hub.md#joining-a-starting-grand-prix) |
 | `heal_zone_full` | `trigger_multiple` | — | [Heal zones](09-heal-zones.md#full-heal-zone) |
 | `start_spawn` | `info_target` | — | [Tracks](04-tracks.md#start-gate-prefab) |
 | `checkpoint_spawn` | `info_target` | — | [Tracks](04-tracks.md#checkpoint-gate-prefab) |

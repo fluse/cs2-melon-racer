@@ -10,6 +10,7 @@ import {
     XP_GRAND_PRIX_FINISH,
     XP_GRAND_PRIX_PLACE_BONUS,
     MELON_SKIN_NAMES,
+    XP_GAIN_REASONS_SHOWN,
 } from "../../constants/index.js";
 
 /** @typedef {Record<string, number>} XpTotals every player's XP by name */
@@ -96,19 +97,39 @@ export function XpBarFill(progress, segments) {
  * into it ("340 / 525 XP"), and the bar — the segments filled before the
  * gain (oldFill; none if the gain reached a new level) and after it
  * (newFill), so the part just gained can be lit apart.
+ * Also why ("TIME TRIAL FINISH · NEW BEST TIME", see XpGainReasonText).
  * @param {number} fromXp the player's XP before @param {number} toXp …and now
  * @param {number} amount XP gained @param {number} segments
+ * @param {string[]} [reasons] each gain's reason, in order
  */
-export function XpGainView(fromXp, toXp, amount, segments) {
+export function XpGainView(fromXp, toXp, amount, segments, reasons = []) {
     const from = LevelProgress(fromXp);
     const to = LevelProgress(toXp);
     return {
         amount: `+${Math.max(1, Math.round(amount))} XP`,
+        reason: XpGainReasonText(reasons),
         level: `LV ${to.level}`,
         xp: `${Math.floor(to.into)} / ${to.needed} XP`,
         oldFill: from.level === to.level ? XpBarFill(from, segments) : 0,
         newFill: XpBarFill(to, segments),
     };
+}
+
+/**
+ * Why XP were earned, for the notifier: every reason once, in the order they
+ * came, a repeated one with how often ("PERFECT WALL BOUNCE ×3"), joined by
+ * " · "; after XP_GAIN_REASONS_SHOWN "+ MORE".
+ * @param {string[]} reasons
+ */
+export function XpGainReasonText(reasons) {
+    /** @type {Map<string, number>} */
+    const counts = new Map();
+    for (const reason of reasons) {
+        counts.set(reason, (counts.get(reason) ?? 0) + 1);
+    }
+    const parts = [...counts].map(([reason, count]) => (count > 1 ? `${reason} ×${count}` : reason));
+    const shown = parts.slice(0, XP_GAIN_REASONS_SHOWN);
+    return parts.length > shown.length ? `${shown.join(" · ")} + MORE` : shown.join(" · ");
 }
 
 /**

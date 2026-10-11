@@ -2,7 +2,7 @@ import { Instance } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { karts } from "../../core/kart-registry.js";
 import { GrantXp } from "./level.js";
-import { XP_CHEAT_COMMAND } from "../../constants/index.js";
+import { XP_CHEAT_COMMAND, XP_REASON_CHEAT } from "../../constants/index.js";
 
 // For testing the leveling: `melon_give_xp <amount>` in the console (only
 // with sv_cheats 1) gives every player on the map that many XP. Not a menu
@@ -16,7 +16,7 @@ export function RegisterLevelInputs() {
             return;
         }
         for (const kart of karts.values()) {
-            GrantXp(kart, amount, XP_CHEAT_COMMAND);
+            GrantXp(kart, amount, XP_REASON_CHEAT);
         }
     });
 }

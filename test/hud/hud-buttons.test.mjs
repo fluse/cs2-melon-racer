@@ -3,6 +3,7 @@
 // and moderator-only cancel buttons, and the user menu's rows — each acting
 // only for the player who clicked, and refusing what it mustn't do.
 import "../helpers/register-cs-script.mjs";
+import { StartGrandPrixNow } from "../helpers/grand-prix.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
@@ -12,7 +13,7 @@ const { karts, SetModeratorSlot } = await import("../../src/melon_drive/core/kar
 const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
 const { GetHubSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
 const flow = await import("../../src/melon_drive/race/heat/race-flow.js");
-const { SetUserMenuOpen, SetUserMenuPage, USER_MENU_TOGGLES, USER_MENU_PAGES } = await import("../../src/melon_drive/hud/user-menu.js");
+const { SetUserMenuOpen, SetUserMenuPage, UpdateUserMenu, USER_MENU_TOGGLES, USER_MENU_PAGES } = await import("../../src/melon_drive/hud/user-menu.js");
 const { SetKartPaintColor } = await import("../../src/melon_drive/kart/look.js");
 const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, SPEED_HUD_ENTITY_NAME, RacePhase, COLOR_PRESETS, MELON_MAX_HEALTH } = await import("../../src/melon_drive/constants/index.js");
 const C = await import("../../src/melon_drive/constants/index.js");
@@ -20,6 +21,7 @@ await import("../../src/melon_drive/index.js"); // registers OnCustomHudClicked
 
 const HUB = { x: 250, y: -520, z: 16 };
 const INTRO = { x: -2000, y: -900, z: 24 };
+const JOIN = { x: 600, y: -300, z: 16 };
 
 /** @type {FakeHud} */
 let hud;
@@ -50,6 +52,7 @@ beforeEach(() => {
     world.add(new PointTemplate({ name: MELON_TEMPLATE_NAME, spawn: () => [new Entity({ className: "prop_physics_multiplayer" })] }));
     world.add(new Entity({ name: HUB_SPAWN_NAME, className: "info_player_start", origin: HUB }));
     world.add(new Entity({ name: INTRO_SPAWN_NAME, className: "info_player_start", origin: INTRO }));
+    world.add(new Entity({ name: C.JOIN_GRAND_PRIX_SPAWN_NAME, className: "info_target", origin: JOIN }));
     world.add(new Entity({ name: "start_1", className: "trigger_multiple", origin: { x: 3000, y: 0, z: 0 } }));
     a = SetUpPlayerKart(world.add(new CSPlayerPawn({ slot: 0 })), GetHubSpawnPoint()); // the moderator: first in
     b = SetUpPlayerKart(world.add(new CSPlayerPawn({ slot: 1 })), GetHubSpawnPoint());
@@ -61,12 +64,115 @@ test("clicks from another layout are ignored", () => {
     assert.equal(flow.phase, RacePhase.HUB);
 });
 
-test("start button: starts a heat with whoever stands in the hub", () => {
-    a.inHub = true;
+test("start button: waits GRAND_PRIX_GATHER_SECONDS even with everyone in the hub", () => {
+    a.inHub = b.inHub = true;
+    world.time = 100;
     Click(1, "hub_start_button"); // anyone may click it
+    assert.equal(flow.phase, RacePhase.GATHERING);
+    FlowAt(100.1);
+    assert.equal(hud.Variable(0, "hub_starting", "seconds"), String(C.GRAND_PRIX_GATHER_SECONDS));
+    assert.equal(hud.Has(0, "grand_prix_call", "Hidden"), true, "nobody to call");
+    FlowAt(100 + C.GRAND_PRIX_GATHER_SECONDS);
     assert.equal(flow.phase, RacePhase.COUNTDOWN);
     assert.equal(a.racing, true);
-    assert.equal(b.racing, false);
+    assert.equal(b.racing, true);
+});
+
+test("start button: with someone outside, they're called for GRAND_PRIX_GATHER_SECONDS, then whoever is in the hub races", () => {
+    a.inHub = true;
+    world.time = 100;
+    Click(1, "hub_start_button");
+    assert.equal(flow.phase, RacePhase.GATHERING);
+    assert.equal(a.racing, false, "nobody races yet");
+
+    FlowAt(100.2);
+    assert.equal(hud.Has(1, "grand_prix_call", "Hidden"), false, "b, outside, is called");
+    assert.equal(hud.Variable(1, "grand_prix_call", "seconds"), String(C.GRAND_PRIX_GATHER_SECONDS));
+    assert.equal(hud.Has(0, "grand_prix_call", "Hidden"), true, "a is in the hub already");
+    assert.equal(hud.Variable(0, "hub_starting", "seconds"), String(C.GRAND_PRIX_GATHER_SECONDS));
+
+    Click(1, "hub_start_button");
+    assert.equal(flow.phase, RacePhase.GATHERING, "clicking again changes nothing");
+
+    FlowAt(100 + C.GRAND_PRIX_GATHER_SECONDS);
+    assert.equal(flow.phase, RacePhase.COUNTDOWN);
+    assert.equal(a.racing, true);
+    assert.equal(b.racing, false, "stayed outside");
+    assert.equal(hud.Has(1, "grand_prix_call", "Hidden"), true, "the call is gone");
+});
+
+test("while called, R teleports to the hub and joins the Grand Prix — not a time trial restart", () => {
+    a.inHub = true;
+    b.melon.Teleport({ position: { x: 5000, y: 5000, z: 0 } });
+    b.trackId = 1;
+    b.runStartTime = 0; // in a free-roaming time trial
+    world.time = 100;
+    flow.TryStartRace();
+    FlowAt(100.1);
+    assert.equal(b.grandPrixCall, true);
+
+    b.pawn.justPressed.add("RELOAD");
+    UpdateUserMenu(1, b); // the time trial's R shortcut steps aside
+    FlowAt(100.2);
+    b.pawn.justPressed.clear();
+    assert.equal(b.trackId, undefined, "left the track for the hub");
+    assert.deepEqual(HorizontalSpot(b).map(Math.round), [JOIN.x, JOIN.y], "teleported to spawn_join_grandprix");
+    assert.deepEqual([b.checkpointPosition.x, b.checkpointPosition.y], [JOIN.x, JOIN.y], "its respawn point now");
+    assert.equal(hud.Has(1, "grand_prix_call", "Hidden"), true);
+
+    FlowAt(100 + C.GRAND_PRIX_GATHER_SECONDS); // its hub_enter hasn't arrived yet — it counts anyway
+    assert.equal(b.racing, true);
+    assert.equal(a.racing, true);
+});
+
+test("several pressing R are lined up side by side at spawn_join_grandprix", () => {
+    const c = SetUpPlayerKart(world.add(new CSPlayerPawn({ slot: 2 })), GetHubSpawnPoint());
+    world.time = 100;
+    a.inHub = true; // b and c outside
+    flow.TryStartRace();
+    FlowAt(100.1);
+    for (const kart of [b, c]) {
+        kart.pawn.justPressed.add("RELOAD");
+    }
+    FlowAt(100.2);
+    const spots = [b, c].map((kart) => HorizontalSpot(kart).map(Math.round));
+    assert.deepEqual(spots[0], [JOIN.x, JOIN.y], "the first right on it");
+    assert.equal(Math.round(Math.hypot(spots[1][0] - JOIN.x, spots[1][1] - JOIN.y)), C.RACE_SPAWN_LATERAL_SPACING, "the next one beside it");
+});
+
+test("without spawn_join_grandprix, R goes to hub_spawn", () => {
+    world.entities.find((e) => e.name === C.JOIN_GRAND_PRIX_SPAWN_NAME).Remove();
+    a.inHub = true;
+    world.time = 100;
+    flow.TryStartRace();
+    FlowAt(100.1);
+    b.pawn.justPressed.add("RELOAD");
+    FlowAt(100.2);
+    assert.deepEqual(HorizontalSpot(b).map(Math.round), [HUB.x, HUB.y].map(Math.round));
+});
+
+test("the moderator can call the Grand Prix off while the others are called", () => {
+    a.inHub = true;
+    world.time = 100;
+    flow.TryStartRace();
+    FlowAt(100.1);
+    Click(1, "hub_abort_button");
+    assert.equal(flow.phase, RacePhase.GATHERING, "not the moderator");
+    Click(0, "hub_abort_button");
+    assert.equal(flow.phase, RacePhase.HUB);
+    assert.equal(hud.Has(1, "grand_prix_call", "Hidden"), true);
+    FlowAt(100 + C.GRAND_PRIX_GATHER_SECONDS);
+    assert.equal(a.racing, false);
+});
+
+test("nobody left in the hub when the call runs out: no Grand Prix", () => {
+    a.inHub = true;
+    world.time = 100;
+    flow.TryStartRace();
+    a.inHub = false;
+    FlowAt(100 + C.GRAND_PRIX_GATHER_SECONDS);
+    assert.equal(flow.phase, RacePhase.HUB);
+    assert.equal(a.racing, false);
 });
 
 test("close button: hides the modal for that player only, who still stands in the hub", () => {
@@ -81,7 +187,7 @@ test("close button: hides the modal for that player only, who still stands in th
 
 test("cancel button: only the moderator can abort a running heat", () => {
     a.inHub = b.inHub = true;
-    flow.TryStartRace();
+    StartGrandPrixNow(flow);
 
     Click(1, "hub_abort_button");
     assert.equal(flow.phase, RacePhase.COUNTDOWN, "not the moderator");
@@ -128,7 +234,7 @@ test("hub button: just this racer leaves the heat, the others keep racing", () =
     assert.equal(hud.Variable(0, "usermenu_hub_button", "hub_label"), "Return to Hub", "not in a race");
     SetUserMenuOpen(0, a, false);
     a.inHub = b.inHub = true;
-    flow.TryStartRace();
+    StartGrandPrixNow(flow);
     SetUserMenuOpen(0, a, true);
     assert.equal(hud.Variable(0, "usermenu_hub_button", "hub_label"), "Exit Race", "signed up for the heat");
 
@@ -144,7 +250,7 @@ test("hub button: just this racer leaves the heat, the others keep racing", () =
 
 test("tutorial button: leaves the heat and goes to intro_spawn, which becomes the respawn point", () => {
     a.inHub = true;
-    flow.TryStartRace();
+    StartGrandPrixNow(flow);
     Click(0, "usermenu_tutorial_button");
     assert.equal(a.racing, false);
     assert.equal(a.trackId, undefined);
@@ -402,7 +508,7 @@ test("test podium button: the clicker on place 1, the others after — never dur
         world.add(new Entity({ name: PodiumSpawnName(place), className: "info_target", origin: steps[place] }));
     }
     a.inHub = b.inHub = true;
-    flow.TryStartRace();
+    StartGrandPrixNow(flow);
     Click(1, "usermenu_podium_button");
     assert.equal(b.podium, undefined, "ignored while a heat runs");
     assert.equal(a.racing, true, "and nobody was pulled out of it");
@@ -462,7 +568,7 @@ test("test finish button: FINISH, the place and the break countdown for the clic
 
 test("test countdown/finish buttons: ignored while racing; the hub button ends a preview", () => {
     a.inHub = b.inHub = true;
-    flow.TryStartRace();
+    StartGrandPrixNow(flow);
     Click(1, "usermenu_testcountdown_button");
     Click(1, "usermenu_testfinish_button");
     assert.equal(b.testPreview, undefined, "ignored in a heat");
@@ -490,6 +596,30 @@ test("test intro button: the join logo for the clicker alone, held behind it", (
     assert.equal(b.testPreview, undefined);
 });
 
+test("test grand prix call button: the call for the clicker alone, counting down; R takes them to the hub", () => {
+    b.melon.Teleport({ position: { x: 5000, y: 5000, z: 0 } });
+    world.time = 50;
+    Click(1, "usermenu_testgpcall_button");
+    FlowAt(50.1);
+    assert.equal(hud.Has(1, "grand_prix_call", "Hidden"), false, "the call shows");
+    assert.equal(hud.Variable(1, "grand_prix_call", "seconds"), String(C.GRAND_PRIX_GATHER_SECONDS));
+    assert.equal(hud.Has(0, "grand_prix_call", "Hidden"), undefined, "the other player sees nothing");
+    assert.equal(b.locked, false, "drives on");
+    assert.equal(flow.phase, RacePhase.HUB, "no Grand Prix");
+
+    b.pawn.justPressed.add("RELOAD");
+    FlowAt(52);
+    b.pawn.justPressed.clear();
+    assert.deepEqual(HorizontalSpot(b).map(Math.round), [JOIN.x, JOIN.y], "R: to spawn_join_grandprix");
+    assert.equal(hud.Has(1, "grand_prix_call", "Hidden"), true);
+    assert.equal(b.testPreview, undefined);
+
+    Click(1, "usermenu_testgpcall_button");
+    FlowAt(52 + C.GRAND_PRIX_GATHER_SECONDS);
+    assert.equal(hud.Has(1, "grand_prix_call", "Hidden"), true, "gone when it runs out");
+    assert.equal(b.testPreview, undefined);
+});
+
 // Regression: a heat starting while Test Finish ran left its break
 // countdown on screen through the heat.
 test("a heat starting ends a running preview and hides all of it", () => {
@@ -498,7 +628,7 @@ test("a heat starting ends a running preview and hides all of it", () => {
     FlowAt(50 + 0.5);
     assert.equal(hud.Has(1, "break_countdown", "Hidden"), false, "setup: the break countdown runs");
     b.inHub = true;
-    flow.TryStartRace();
+    StartGrandPrixNow(flow);
     assert.equal(b.testPreview, undefined);
     assert.equal(hud.Has(1, "break_countdown", "Hidden"), true, "no leftover break countdown");
     assert.equal(hud.Has(1, "finish_image", "Hidden"), true);

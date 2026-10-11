@@ -64,6 +64,9 @@ function TraceSphere(config) {
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
  *   progressWatch?: { checkpoint: number, laps: number, since: number }, // racing: when this racer last made progress, for the DNF rule — see WatchProgress in race/heat/logic.js
  *   dnfShown?: number, dnfResendAt?: number, // what the dnf_warning shows (undefined: hidden) and when it's sent again — see UpdateDnf in race/heat/race-flow.js
+ *   gatherShown?: string, gatherResendAt?: number, // GATHERING: what the call to join (or the hub window's countdown) last showed and when it's sent again — see UpdateGathering in race/heat/race-flow.js
+ *   grandPrixCall?: boolean, // GATHERING: the call to join is up for it, so R joins instead of restarting a time trial
+ *   joinedGrandPrix?: boolean, // pressed R to join — counts as in the start area until its hub_enter arrives
  *   runStartTime?: number, // game time this kart's timed run started (unset: no run) — see race/time-trial/time-trial.js
  *   lastRun?: { trackId: number, time: number, newBest: boolean, at: number }, // last finished run, for the HUD
  *   finishRestartAt?: number, // game time a free-roaming finish sent the melon back to the start — see FINISH_RESTART_START_GUARD
@@ -95,7 +98,7 @@ function TraceSphere(config) {
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
  *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
  *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
- *   testPreview?: { kind: "countdown" | "finish" | "intro", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro playing — see TestCountdown in race/heat/race-flow.js
+ *   testPreview?: { kind: "countdown" | "finish" | "intro" | "call", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro/Grand Prix Call playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
@@ -105,7 +108,7 @@ function TraceSphere(config) {
  *   leaderboardNextUpdate?: number, leaderboardResendAt?: number, leaderboardShown?: Record<string, string>, // the leaderboards page's next rebuild, next full resend, and what it last sent — see UpdateLeaderboardsHud
  *   levelUp?: { level: number, skins: string[], until: number | undefined }, // a level-up waiting for (or on) the HUD: the new level, the skins it unlocked, until when it shows (undefined: not yet, e.g. mid-heat) — see GrantXp, UpdateLevelUpHud
  *   levelUpShown?: string, levelUpResendAt?: number, // what the level-up panel last showed, and its next full resend — see UpdateLevelUpHud
- *   xpGain?: { fromXp: number, toXp: number | undefined, amount: number, until: number }, // XP gained, on the XP notifier until `until`: the XP before, after (undefined: as they are now — set only by a preview), the amount — see ShowXpGain, UpdateXpGainHud
+ *   xpGain?: { fromXp: number, toXp: number | undefined, amount: number, reasons: string[], until: number }, // XP gained, on the XP notifier until `until`: the XP before, after (undefined: as they are now — set only by a preview), the amount, each gain's reason — see ShowXpGain, UpdateXpGainHud
  *   xpGainShown?: string, xpGainResendAt?: number, // what the XP notifier last showed, and its next full resend — see UpdateXpGainHud
  *   skinHudLevel?: number, // the level the skin grid's locks were last drawn for — see UpdateSkinHud
  *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud
@@ -936,18 +939,27 @@ const BREAK_PIECE_SPIN = 600;
 const MAX_TRACKS = 8;
 const MAX_CHECKPOINTS_PER_TRACK = 32;
 
-// Race flow: HUB (default/gather) -> COUNTDOWN (locked, pre-race) -> RACING
+// Race flow: HUB (default/gather) -> GATHERING (the call to join, see
+// GRAND_PRIX_GATHER_SECONDS) -> COUNTDOWN (locked, pre-race) -> RACING
 // -> BREAK (finished, waiting for the next heat) -> back to COUNTDOWN on the
 // next track, or back to HUB after the last one. See GAMEPLAY.md's "Hub ->
 // race -> next-track flow" for the full design.
 const RacePhase = /** @type {const} */ ({
     HUB: "HUB",
+    GATHERING: "GATHERING",
     COUNTDOWN: "COUNTDOWN",
     RACING: "RACING",
     BREAK: "BREAK",
 });
 
 const HUB_TRIGGER_NAME = "hub_start_trigger";
+
+// "Start Grand Prix" doesn't start at once: for this long everyone outside
+// the hub's start area sees "GRAND PRIX STARTS IN 10 · PRESS R TO JOIN"
+// (grand_prix_call), R teleports them to the hub, everyone in it sees the
+// seconds in the hub window, and whoever stands in the start area when it
+// runs out races.
+const GRAND_PRIX_GATHER_SECONDS = 10;
 
 const COUNTDOWN_SECONDS = 3;
 const GO_DISPLAY_SECONDS = 0.7; // how long "GO" stays on screen once the countdown ends — its grow-and-fade (speedometer.css) is done by .62s
@@ -1159,6 +1171,17 @@ const XP_GAIN_HUD_SECONDS = 3.5;
 // XP the user menu's "Test XP Gain" pretends to give (a new best's) — only
 // shown, not given.
 const XP_GAIN_TEST_AMOUNT = 25;
+// Why XP were earned, as the XP notifier says it under the "+40 XP" (GrantXp's
+// reason). A heat's and a Grand Prix's add the place ("HEAT 1ST").
+const XP_REASON_TIME_TRIAL_FINISH = "TIME TRIAL FINISH";
+const XP_REASON_NEW_BEST = "NEW BEST TIME";
+const XP_REASON_HEAT = "HEAT";
+const XP_REASON_GRAND_PRIX = "GRAND PRIX";
+const XP_REASON_PERFECT_BOUNCE = "PERFECT WALL BOUNCE";
+const XP_REASON_PERFECT_WALL_JUMP = "PERFECT WALL JUMP";
+const XP_REASON_CHEAT = "CHEAT";
+// Reasons listed on the notifier at most; more add "+ MORE".
+const XP_GAIN_REASONS_SHOWN = 3;
 // Segments of the profile's XP bar (usermenu_profile_xp_<i> in speedometer.xml)
 // and of the XP notifier's (xpgain_old_<i>/xpgain_new_<i>).
 const XP_BAR_SEGMENTS = 20;
@@ -1233,6 +1256,11 @@ const FLOOR_TRACE_DOWN = 512;
 // (the tutorial), facing its own angle; without it, hub_spawn.
 const HUB_SPAWN_NAME = "hub_spawn";
 const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
+// Where R puts a melon while a starting Grand Prix calls the others
+// (race/heat/race-flow.js, JoinGrandPrix): a point entity in the hub's
+// start area, facing its own yaw — several lined up side by side. Without
+// one, hub_spawn.
+const JOIN_GRAND_PRIX_SPAWN_NAME = "spawn_join_grandprix";
 const INTRO_SPAWN_NAME = "intro_spawn";
 
 // Per-player settings — where a joining player's melon appears (the user
@@ -1258,8 +1286,8 @@ const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
 const MELON_SKINS = {
     default: "models/melon_racer/melon/melon.vmdl",
     honey: "models/melon_racer/melon/melon_honey.vmdl",
-    strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
     camo: "models/melon_racer/melon/melon_camo.vmdl",
+    strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
     football: "models/melon_racer/melon/melon_football.vmdl",
     golf: "models/melon_racer/melon/melon_golf.vmdl",
     pineapple: "models/melon_racer/melon/melon_pineapple.vmdl",
@@ -1275,8 +1303,8 @@ const MELON_SKIN_DEFAULT = "default";
 const MELON_SKIN_NAMES = {
     default: "Melon",
     honey: "Honey Melon",
-    strawberry: "Strawberry",
     camo: "Camo",
+    strawberry: "Strawberry",
     football: "Football",
     golf: "Golf",
     pineapple: "Pineapple",
@@ -1291,8 +1319,8 @@ const MELON_SKIN_NAMES = {
 const MELON_SKIN_LEVELS = {
     default: 1,
     honey: 1,
-    strawberry: 1,
-    camo: 3,
+    camo: 1,
+    strawberry: 2,
     football: 5,
     golf: 7,
     pineapple: 10,
@@ -1739,8 +1767,8 @@ const BALL_SPAWNER_MAX_INTERVAL = 4;
 const BALL_SPAWNER_SPREAD = 8;
 
 // Bouncers: every prop_dynamic with the foam bouncer model swings on its own
-// — the script starts its "swing" loop once, after a random delay of up to
-// one swing, so the bouncers of a map don't all swing in step. Found by
+// — the script starts its "swing" loop once, at a random time up to one
+// swing later (on its own clock), so the bouncers don't all swing in step. Found by
 // model, not by name: no name, logic_auto or outputs in Hammer needed.
 // Rule: world/bouncer/logic.js, applied by world/bouncer/bouncer.js.
 // The swing's length is shared with the model's generator,
@@ -3171,6 +3199,16 @@ function GetHubSpawnPoint() {
     return spawn;
 }
 
+/** Where R takes a melon to join a starting Grand Prix: spawn_join_grandprix, or the hub spawn if there's none. */
+function GetJoinGrandPrixSpawnPoint() {
+    const spawn = FindSpawnPoint(JOIN_GRAND_PRIX_SPAWN_NAME);
+    if (!spawn) {
+        Debug(`GetJoinGrandPrixSpawnPoint: no "${JOIN_GRAND_PRIX_SPAWN_NAME}" in the map, using the hub spawn`);
+        return GetHubSpawnPoint();
+    }
+    return spawn;
+}
+
 /** Where a player's very first melon appears: the intro_spawn tutorial spot, or the hub if there's none. */
 function GetIntroSpawnPoint() {
     const spawn = FindSpawnPoint(INTRO_SPAWN_NAME);
@@ -3779,19 +3817,39 @@ function XpBarFill(progress, segments) {
  * into it ("340 / 525 XP"), and the bar — the segments filled before the
  * gain (oldFill; none if the gain reached a new level) and after it
  * (newFill), so the part just gained can be lit apart.
+ * Also why ("TIME TRIAL FINISH · NEW BEST TIME", see XpGainReasonText).
  * @param {number} fromXp the player's XP before @param {number} toXp …and now
  * @param {number} amount XP gained @param {number} segments
+ * @param {string[]} [reasons] each gain's reason, in order
  */
-function XpGainView(fromXp, toXp, amount, segments) {
+function XpGainView(fromXp, toXp, amount, segments, reasons = []) {
     const from = LevelProgress(fromXp);
     const to = LevelProgress(toXp);
     return {
         amount: `+${Math.max(1, Math.round(amount))} XP`,
+        reason: XpGainReasonText(reasons),
         level: `LV ${to.level}`,
         xp: `${Math.floor(to.into)} / ${to.needed} XP`,
         oldFill: from.level === to.level ? XpBarFill(from, segments) : 0,
         newFill: XpBarFill(to, segments),
     };
+}
+
+/**
+ * Why XP were earned, for the notifier: every reason once, in the order they
+ * came, a repeated one with how often ("PERFECT WALL BOUNCE ×3"), joined by
+ * " · "; after XP_GAIN_REASONS_SHOWN "+ MORE".
+ * @param {string[]} reasons
+ */
+function XpGainReasonText(reasons) {
+    /** @type {Map<string, number>} */
+    const counts = new Map();
+    for (const reason of reasons) {
+        counts.set(reason, (counts.get(reason) ?? 0) + 1);
+    }
+    const parts = [...counts].map(([reason, count]) => (count > 1 ? `${reason} ×${count}` : reason));
+    const shown = parts.slice(0, XP_GAIN_REASONS_SHOWN);
+    return parts.length > shown.length ? `${shown.join(" · ")} + MORE` : shown.join(" · ");
 }
 
 /**
@@ -3848,9 +3906,10 @@ function GetKartLevel(kart) {
 /**
  * Gives a player XP. A level-up (with the skins it unlocks) is left in
  * kart.levelUp for the HUD — added to one that's still waiting. With a
- * reason the XP notifier shows it, added to a gain still showing.
+ * reason the XP notifier shows it (and why), added to a gain still showing.
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} amount
- * @param {string} [reason] for the console; without one (the time on the server) no notifier
+ * @param {string} [reason] what the notifier says (an XP_REASON_*), also in the console;
+ *   without one (the time on the server) no notifier
  */
 function GrantXp(kart, amount, reason) {
     const name = PlayerName$3(kart);
@@ -3863,7 +3922,7 @@ function GrantXp(kart, amount, reason) {
     const after = LevelOf(Totals()[name]);
     if (reason !== undefined) {
         Debug(`GrantXp: "${name}" +${Math.round(amount)} XP (${reason})`);
-        ShowXpGain(kart, xpBefore, amount);
+        ShowXpGain(kart, xpBefore, amount, reason);
     }
     if (after > before) {
         const skins = SkinsUnlockedBetween(before, after);
@@ -3875,17 +3934,19 @@ function GrantXp(kart, amount, reason) {
 /**
  * Puts an XP gain on the XP notifier (hud/xp-gain-panel.js): added to the one
  * still showing (its bar keeps the fill from before the first), shown
- * XP_GAIN_HUD_SECONDS from now. `toXp` only for a preview (nothing given):
- * otherwise the notifier shows the player's XP as they are.
- * @param {import("../../core/kart-registry.js").Kart} kart @param {number} fromXp @param {number} amount @param {number} [toXp]
+ * XP_GAIN_HUD_SECONDS from now, with its reason. `toXp` only for a preview
+ * (nothing given): otherwise the notifier shows the player's XP as they are.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} fromXp @param {number} amount
+ * @param {string} reason @param {number} [toXp]
  */
-function ShowXpGain(kart, fromXp, amount, toXp) {
+function ShowXpGain(kart, fromXp, amount, reason, toXp) {
     const now = Instance.GetGameTime();
     const showing = kart.xpGain && now < kart.xpGain.until && kart.xpGain.toXp === undefined && toXp === undefined ? kart.xpGain : undefined;
     kart.xpGain = {
         fromXp: showing?.fromXp ?? fromXp,
         toXp,
         amount: (showing?.amount ?? 0) + amount,
+        reasons: [...(showing?.reasons ?? []), reason],
         until: now + XP_GAIN_HUD_SECONDS,
     };
 }
@@ -3904,7 +3965,7 @@ function GrantGrandPrixXp(gp, racers) {
     for (const kart of racers) {
         const place = order.indexOf(PlayerKey(kart)) + 1;
         if (place > 0) {
-            GrantXp(kart, GrandPrixXp(place), `Grand Prix, place ${place}`);
+            GrantXp(kart, GrandPrixXp(place), `${XP_REASON_GRAND_PRIX} ${OrdinalPlace(place)}`);
         }
     }
 }
@@ -6175,7 +6236,7 @@ function ComputeWallBounce(kart, n, now) {
     if (kart.perfectBounceBoost) {
         PlayPerfectSpark(kart);
         CountStat(kart, "perfectHits");
-        GrantXp(kart, XP_PERFECT_HIT, "PERFECT wall bounce");
+        GrantXp(kart, XP_PERFECT_HIT, XP_REASON_PERFECT_BOUNCE);
     }
     return { ...bounce, jumpFactor };
 }
@@ -6710,7 +6771,7 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
         if (kart.perfectBounceBoost) {
             PlayPerfectSpark(kart);
             CountStat(kart, "perfectHits");
-            GrantXp(kart, XP_PERFECT_HIT, "PERFECT wall jump");
+            GrantXp(kart, XP_PERFECT_HIT, XP_REASON_PERFECT_WALL_JUMP);
         }
     }
     kart.lastWallJump = { time: now, normal: wallContact.normal };
@@ -6910,9 +6971,9 @@ function UpdateLevelUpHud(slot, kart, now) {
 /**
  * The XP notifier (xpgain_panel in speedometer.xml, top right): for
  * XP_GAIN_HUD_SECONDS after XP were earned (kart.xpGain, see ShowXpGain) the
- * XP gained ("+40 XP"), the level and the XP into it, and the bar — the
- * fill from before green (xpgain_old_<i>), the part just gained gold
- * (xpgain_new_<i>). Also mid-heat. Sent on change, and again every
+ * XP gained ("+40 XP") and why ("TIME TRIAL FINISH · NEW BEST TIME"), the
+ * level and the XP into it, and the bar — the fill from before green
+ * (xpgain_old_<i>), the part just gained gold (xpgain_new_<i>). Also mid-heat. Sent on change, and again every
  * HUD_RESEND_SECONDS.
  * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {number} now
  */
@@ -6921,8 +6982,8 @@ function UpdateXpGainHud(slot, kart, now) {
         kart.xpGain = undefined;
     }
     const gain = kart.xpGain;
-    const view = gain ? XpGainView(gain.fromXp, gain.toXp ?? GetKartXp(kart), gain.amount, XP_BAR_SEGMENTS) : undefined;
-    const key = view ? `${view.amount}|${view.level}|${view.xp}|${view.oldFill}|${view.newFill}` : "";
+    const view = gain ? XpGainView(gain.fromXp, gain.toXp ?? GetKartXp(kart), gain.amount, XP_BAR_SEGMENTS, gain.reasons) : undefined;
+    const key = view ? `${view.amount}|${view.reason}|${view.level}|${view.xp}|${view.oldFill}|${view.newFill}` : "";
     if (key === kart.xpGainShown && now < (kart.xpGainResendAt ?? 0)) {
         return;
     }
@@ -6934,6 +6995,7 @@ function UpdateXpGainHud(slot, kart, now) {
     }
     if (view) {
         hud.SetDialogVariableStringForPlayer(slot, "xpgain_panel", "xpgain_amount", view.amount);
+        hud.SetDialogVariableStringForPlayer(slot, "xpgain_panel", "xpgain_reason", view.reason);
         hud.SetDialogVariableStringForPlayer(slot, "xpgain_panel", "xpgain_level", view.level);
         hud.SetDialogVariableStringForPlayer(slot, "xpgain_panel", "xpgain_xp", view.xp);
         for (let i = 0; i < XP_BAR_SEGMENTS; i++) {
@@ -7098,10 +7160,10 @@ function FinishRun(kart, trackId) {
     CountStat(kart, "finishes");
     // A heat's finish earns its XP by place (FinishKart in race/heat/race-flow.js).
     if (!kart.racing) {
-        GrantXp(kart, XP_TIME_TRIAL_FINISH, `time trial finish, track ${trackId}`);
+        GrantXp(kart, XP_TIME_TRIAL_FINISH, XP_REASON_TIME_TRIAL_FINISH);
     }
     if (newBest) {
-        GrantXp(kart, XP_NEW_BEST, `new best, track ${trackId}`);
+        GrantXp(kart, XP_NEW_BEST, XP_REASON_NEW_BEST);
     }
     Debug(`FinishRun: "${name}" ran track ${trackId} in ${FormatRaceTime(time)}${newBest ? " — new best" : ""}`);
 }
@@ -7566,7 +7628,8 @@ function ApplyHubModalState(slot, currentPhase) {
     if (!hud) {
         return;
     }
-    hud.SetHasClassForPlayer(slot, "hub_modal", "WaitingForOthers", currentPhase !== RacePhase.HUB);
+    hud.SetHasClassForPlayer(slot, "hub_modal", "WaitingForOthers", currentPhase !== RacePhase.HUB && currentPhase !== RacePhase.GATHERING);
+    hud.SetHasClassForPlayer(slot, "hub_modal", "Starting", currentPhase === RacePhase.GATHERING);
     hud.SetHasClassForPlayer(slot, "hub_modal", "IsModerator", IsModerator(slot));
     UpdateHubLists(hud, slot);
 }
@@ -7763,6 +7826,15 @@ function DnfWarningValue(left, warning) {
     return left > 0 && left <= warning ? Math.ceil(left) : undefined;
 }
 
+/**
+ * The seconds the call to join shows `remaining` seconds before the Grand
+ * Prix starts: rounded up, so it never shows 0 while there's still time.
+ * @param {number} remaining
+ */
+function GatherSecondsValue(remaining) {
+    return Math.max(0, Math.ceil(remaining));
+}
+
 // The podium in the hub: once a Grand Prix has run to its last track and the
 // group is back in the hub (race/heat/race-flow.js), the top three are moved
 // on from hub_spawn onto their podium_spawn_<place> and held there for
@@ -7863,7 +7935,7 @@ let phase = RacePhase.HUB;
 /** Which track the current/last heat was run on — undefined while in HUB.
  * @type {number | undefined} */
 let activeTrackId = undefined;
-/** GetGameTime() at which the current COUNTDOWN/BREAK phase should end. */
+/** GetGameTime() at which the current GATHERING/COUNTDOWN/BREAK phase should end. */
 let phaseEndTime = 0;
 
 /** The countdown's numbers in countdown_panel (speedometer.xml), in order —
@@ -7937,21 +8009,40 @@ function NextTrackId() {
     return order[index + 1];
 }
 
+/** Karts in the hub's start area right now — the ones a Grand Prix takes along. */
+function KartsInStartArea() {
+    return [...karts.values()].filter((kart) => (kart.inHub || kart.joinedGrandPrix) && kart.melon.IsValid());
+}
+
+/**
+ * The hub's "Start Grand Prix" button: always GRAND_PRIX_GATHER_SECONDS
+ * first (GATHERING, see UpdateGathering) — everyone outside the start area
+ * is called to join, everyone in it sees the seconds — then the Grand Prix
+ * starts with whoever stands in the start area.
+ */
 function TryStartRace() {
     if (phase !== RacePhase.HUB) {
-        Debug("TryStartRace: ignored, a heat is already running");
+        Debug("TryStartRace: ignored, a Grand Prix is already starting or running");
         return;
     }
-    const order = GetTrackOrder();
-    if (order.length === 0) {
+    if (GetTrackOrder().length === 0) {
         Debug("TryStartRace: no start_<id> triggers found, ignoring");
         return;
     }
-    const racers = [...karts.values()].filter((kart) => kart.inHub && kart.melon.IsValid());
-    if (racers.length === 0) {
+    const inStartArea = KartsInStartArea();
+    if (inStartArea.length === 0) {
         Debug("TryStartRace: no karts currently in the hub trigger, ignoring");
         return;
     }
+    phase = RacePhase.GATHERING;
+    gatherJoins = 0;
+    phaseEndTime = Instance.GetGameTime() + GRAND_PRIX_GATHER_SECONDS;
+    Debug(`TryStartRace: ${inStartArea.length} player(s) in the start area — the Grand Prix starts in ${GRAND_PRIX_GATHER_SECONDS}s`);
+}
+
+/** @param {import("../../core/kart-registry.js").Kart[]} racers */
+function StartGrandPrixWith(racers) {
+    const order = GetTrackOrder();
     for (const kart of racers) {
         kart.racing = true;
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
@@ -7959,9 +8050,93 @@ function TryStartRace() {
             HideHubModal(slot, kart);
         }
     }
-    Debug(`TryStartRace: starting heat on track ${order[0]} with ${racers.length} racer(s)`);
+    Debug(`StartGrandPrixWith: starting heat on track ${order[0]} with ${racers.length} racer(s)`);
     StartGrandPrix(racers, order.length);
     BeginHeat(order[0]);
+}
+
+/** How many melons R has sent to spawn_join_grandprix in this call — the next one's spot in the line. */
+let gatherJoins = 0;
+
+/**
+ * R while the call to join is up (or its test preview): takes the melon out
+ * of whatever it was doing, like the user menu's hub button, onto
+ * spawn_join_grandprix (else hub_spawn), which becomes its respawn point —
+ * each one there in this call a spot further along a line, alternating
+ * sides, so they don't land on each other.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function SendKartToJoinGrandPrix(kart) {
+    SetFreeLook(kart, false);
+    const spawn = GetJoinGrandPrixSpawnPoint();
+    const k = gatherJoins++;
+    const spot = k % 2 === 1 ? (k + 1) / 2 : -k / 2;
+    SendKartsOutOfRace([kart], spawn && { position: LineUpPosition(spawn.position, spawn.angles, spot, 1), angles: spawn.angles }, "Grand Prix join spot");
+}
+
+/**
+ * R while the call to join is up: to the start area (SendKartToJoinGrandPrix).
+ * It counts as in the start area from now on, in case the time runs out
+ * before its hub_enter arrives.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function JoinGrandPrix(kart) {
+    Debug(`JoinGrandPrix: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} joins the Grand Prix`);
+    SendKartToJoinGrandPrix(kart);
+    kart.joinedGrandPrix = true;
+}
+
+/**
+ * GATHERING, every tick: everyone outside the start area sees the call to
+ * join with the seconds left (grand_prix_call), and R takes them to the
+ * hub; everyone in it sees the seconds in the hub window (hub_starting).
+ * Each sent on change and again every HUD_RESEND_SECONDS.
+ * @param {number} now
+ */
+function UpdateGathering(now) {
+    const seconds = GatherSecondsValue(phaseEndTime - now);
+    for (const kart of karts.values()) {
+        const inStartArea = kart.inHub || Boolean(kart.joinedGrandPrix);
+        if (!inStartArea && kart.grandPrixCall && kart.pawn.WasInputJustPressed(CSInputs.RELOAD)) {
+            JoinGrandPrix(kart);
+        }
+        SetGatherHud(kart, kart.inHub || kart.joinedGrandPrix ? `hub:${seconds}` : `call:${seconds}`, now);
+    }
+}
+
+/**
+ * Shows one player's part of GATHERING — "call:<s>" the call to join,
+ * "hub:<s>" the hub window's countdown, undefined neither.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {string | undefined} value @param {number} now
+ */
+function SetGatherHud(kart, value, now) {
+    kart.grandPrixCall = value?.startsWith("call:") ?? false;
+    if (value === kart.gatherShown && now < (kart.gatherResendAt ?? 0)) {
+        return;
+    }
+    kart.gatherShown = value;
+    kart.gatherResendAt = now + HUD_RESEND_SECONDS;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    const hud = GetSpeedHud();
+    if (slot === undefined || !hud) {
+        return;
+    }
+    const [where, seconds] = value?.split(":") ?? [];
+    if (seconds !== undefined) {
+        hud.SetDialogVariableStringForPlayer(slot, where === "call" ? "grand_prix_call" : "hub_starting", "seconds", seconds);
+    }
+    hud.SetHasClassForPlayer(slot, "grand_prix_call", "Hidden", where !== "call");
+}
+
+/** Ends GATHERING's HUD for everyone and forgets who pressed R. */
+function EndGathering() {
+    gatherJoins = 0;
+    const now = Instance.GetGameTime();
+    for (const kart of karts.values()) {
+        kart.gatherResendAt = undefined;
+        SetGatherHud(kart, undefined, now);
+        kart.joinedGrandPrix = undefined;
+    }
 }
 
 // Moderator-only: cuts a heat short from wherever it's at (COUNTDOWN,
@@ -7970,6 +8145,12 @@ function TryStartRace() {
 function TryAbortRace() {
     if (phase === RacePhase.HUB) {
         Debug("TryAbortRace: ignored, no heat is running");
+        return;
+    }
+    if (phase === RacePhase.GATHERING) {
+        Debug("TryAbortRace: moderator cancelled the Grand Prix before it started");
+        EndGathering();
+        phase = RacePhase.HUB;
         return;
     }
     Debug(`TryAbortRace: moderator aborted the heat on track ${activeTrackId}`);
@@ -8092,7 +8273,7 @@ function FinishKart(kart) {
         GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "finish_place", "place", result ? `${OrdinalPlace(result.place)}  ·  +${result.points} PTS` : "");
     }
     if (result) {
-        GrantXp(kart, HeatFinishXp(result.place), `heat on track ${activeTrackId}, ${OrdinalPlace(result.place)}`);
+        GrantXp(kart, HeatFinishXp(result.place), `${XP_REASON_HEAT} ${OrdinalPlace(result.place)}`);
     }
     // Shown the moment this racer crosses the line, not only once the whole
     // heat is over — stays up through BREAK until the next heat/the hub.
@@ -8241,6 +8422,25 @@ function TestFinish(kart) {
 }
 
 /**
+ * Developer (user menu "Test Grand Prix Call"): the call to join a starting
+ * Grand Prix that everyone outside the start area gets (UpdateGathering),
+ * for this one player, without a Grand Prix — counting down
+ * GRAND_PRIX_GATHER_SECONDS, R teleports to the hub like the real one. The
+ * melon drives on meanwhile. Same limits as TestCountdown, and not while a
+ * Grand Prix is starting or running.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @returns {boolean} whether it started
+ */
+function TestGrandPrixCall(kart) {
+    if (phase !== RacePhase.HUB || kart.racing || kart.breaking || kart.testPreview) {
+        return false;
+    }
+    kart.testPreview = { kind: "call", endTime: Instance.GetGameTime() + GRAND_PRIX_GATHER_SECONDS };
+    kart.gatherResendAt = undefined;
+    return true;
+}
+
+/**
  * Developer (user menu "Test Intro"): the Melon Racer logo a player sees on
  * joining, for INTRO_LOGO_SECONDS, without rejoining — the melon held where
  * it is behind it. Same limits as TestCountdown.
@@ -8278,6 +8478,8 @@ function EndTestPreview(kart) {
     SetBreakCountdown(slot, undefined);
     SetFinishImageVisible(slot, false);
     SetIntroLogoVisible(slot, false);
+    kart.gatherResendAt = undefined;
+    SetGatherHud(kart, undefined, Instance.GetGameTime());
 }
 
 /**
@@ -8302,6 +8504,18 @@ function UpdateTestPreviews(now) {
                 if (slot !== undefined) {
                     ShowCountdown(slot, remaining);
                 }
+                continue;
+            }
+        } else if (preview.kind === "call") {
+            // A real Grand Prix starting takes the HUD over (UpdateGathering).
+            if (remaining > 0 && phase === RacePhase.HUB) {
+                if (kart.grandPrixCall && kart.pawn.WasInputJustPressed(CSInputs.RELOAD)) {
+                    Debug(`TestGrandPrixCall: slot ${slot} pressed R, to the Grand Prix join spot`);
+                    SendKartToJoinGrandPrix(kart); // ends the preview
+                    gatherJoins = 0; // only a preview — the next starts the line again
+                    continue;
+                }
+                SetGatherHud(kart, `call:${GatherSecondsValue(remaining)}`, now);
                 continue;
             }
         } else if (preview.kind === "finish") {
@@ -8379,6 +8593,22 @@ function HideDnfWarning(kart) {
 function UpdateRaceFlow(now) {
     const hud = GetSpeedHud();
     UpdateTestPreviews(now);
+
+    if (phase === RacePhase.GATHERING) {
+        if (now < phaseEndTime) {
+            UpdateGathering(now);
+            return;
+        }
+        const racers = KartsInStartArea();
+        EndGathering();
+        phase = RacePhase.HUB;
+        if (racers.length === 0) {
+            Debug("UpdateRaceFlow: nobody in the start area when the call ran out, no Grand Prix");
+            return;
+        }
+        StartGrandPrixWith(racers);
+        return;
+    }
 
     if (phase === RacePhase.COUNTDOWN) {
         const racers = CurrentRacers();
@@ -10083,8 +10313,9 @@ function UpdateUserMenu(slot, kart) {
     }
     // Shortcut for the menu's "Restart Time Trial" button: reload (R), menu
     // open or not, so a bad start costs one key instead of USE + a click.
-    // Pressed outside a time trial it does nothing.
-    if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && CanRestartTimeTrial(kart) && RestartTimeTrial(kart)) {
+    // Pressed outside a time trial it does nothing — and while the call to
+    // join a starting Grand Prix is up, R joins it instead (UpdateGathering).
+    if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && !kart.grandPrixCall && CanRestartTimeTrial(kart) && RestartTimeTrial(kart)) {
         if (kart.userMenuOpen) {
             SetUserMenuOpen(slot, kart, false);
         }
@@ -10181,7 +10412,7 @@ function TestHeal(kart) {
  */
 function TestXpGain(kart) {
     const xp = GetKartXp(kart);
-    ShowXpGain(kart, xp, XP_GAIN_TEST_AMOUNT, xp + XP_GAIN_TEST_AMOUNT);
+    ShowXpGain(kart, xp, XP_GAIN_TEST_AMOUNT, XP_REASON_NEW_BEST, xp + XP_GAIN_TEST_AMOUNT);
     return true;
 }
 
@@ -10337,6 +10568,8 @@ const TEST_TRIGGER_BUTTONS = {
     usermenu_testcountdown_button: (slot, kart) => TestCountdown(kart),
     usermenu_testfinish_button: (slot, kart) => TestFinish(kart),
     usermenu_testintro_button: (slot, kart) => TestIntro(kart),
+    // The call to join a starting Grand Prix (race/heat/race-flow.js).
+    usermenu_testgpcall_button: (slot, kart) => TestGrandPrixCall(kart),
     // A break, a PERFECT bounce's feedback or the heal effect on the melon,
     // the XP notifier (dev/test-effects.js).
     usermenu_testbreak_button: (slot, kart) => TestBreak(slot, kart),
@@ -11943,29 +12176,37 @@ function BouncerStartDelay(random) {
 }
 
 /**
- * The inputs that start a bouncer: held upright at once (a swing Hammer
- * started already is stopped), then the swing loop after `delay` — the
- * swing starts from upright, so there's no jump.
- * @param {number} delay
- * @returns {{ input: string, value: string, delay: number }[]}
+ * The inputs that hold a bouncer upright (a swing Hammer started already is
+ * stopped) until its start: sent when it's found.
+ * @returns {[string, string][]} [input, value]
  */
-function BouncerStartInputs(delay) {
-    return [
-        { input: "SetIdleAnimationLooping", value: BOUNCER_IDLE_ANIMATION, delay: 0 },
-        { input: "SetAnimationLooping", value: BOUNCER_IDLE_ANIMATION, delay: 0 },
-        { input: "SetIdleAnimationLooping", value: BOUNCER_SWING_ANIMATION, delay },
-        { input: "SetAnimationLooping", value: BOUNCER_SWING_ANIMATION, delay },
-    ];
+function BouncerHoldInputs() {
+    return [["SetIdleAnimationLooping", BOUNCER_IDLE_ANIMATION], ["SetAnimationLooping", BOUNCER_IDLE_ANIMATION]];
 }
 
-// Starting the map's bouncers (see world/bouncer/constants.js): each one's
-// swing is started once, after its own random delay. The map is searched for
-// bouncers every BOUNCER_SCAN_SECONDS, so one that spawned after the
-// script's first look (or was respawned by a round restart) still starts.
+/**
+ * The inputs that start its swing loop, sent once its start time has come —
+ * by the script's own clock, not as delayed inputs (those all came at once
+ * in-game: every bouncer swung in step). The swing starts from upright, so
+ * there's no jump.
+ * @returns {[string, string][]} [input, value]
+ */
+function BouncerSwingInputs() {
+    return [["SetIdleAnimationLooping", BOUNCER_SWING_ANIMATION], ["SetAnimationLooping", BOUNCER_SWING_ANIMATION]];
+}
+
+// Starting the map's bouncers (see world/bouncer/constants.js): each one is
+// held upright when it's found and its swing started at its own random time,
+// counted on the script's clock. The map is searched for bouncers every
+// BOUNCER_SCAN_SECONDS, so one that spawned after the script's first look
+// (or was respawned by a round restart) still starts.
 
 /** @typedef {import("cs_script/point_script").Entity} Entity */
 
-/** bouncer entity -> the delay its swing was started with. @type {Map<Entity, number>} */
+/**
+ * bouncer entity -> when its swing starts (game time), and whether it has.
+ * @type {Map<Entity, { startAt: number, started: boolean }>}
+ */
 const bouncers = new Map();
 let nextScanTime = -Infinity;
 
@@ -11975,38 +12216,56 @@ function ResetBouncers() {
     nextScanTime = -Infinity;
 }
 
-/** After a hot reload: the bouncers already swinging are left alone. @param {Map<Entity, number> | undefined} previous */
+/** After a hot reload: the bouncers already swinging (or waiting) are kept. @param {Map<Entity, { startAt: number, started: boolean }> | undefined} previous */
 function RestoreBouncers(previous) {
-    for (const [bouncer, delay] of [...(previous ?? [])]) {
-        bouncers.set(bouncer, delay);
+    for (const [bouncer, state] of [...(previous ?? [])]) {
+        if (typeof state === "object") {
+            bouncers.set(bouncer, state);
+        }
     }
 }
 
-/** Every tick: now and then, starts bouncers not started yet. @param {number} now */
-function UpdateBouncers(now) {
-    if (now < nextScanTime) {
-        return;
+/** @param {Entity} target @param {[string, string][]} inputs */
+function Fire(target, inputs) {
+    for (const [input, value] of inputs) {
+        Instance.EntFireAtTarget({ target, input, value });
     }
-    nextScanTime = now + BOUNCER_SCAN_SECONDS;
-    for (const bouncer of [...bouncers.keys()]) {
-        if (!bouncer.IsValid()) {
-            bouncers.delete(bouncer);
-        }
-    }
+}
+
+/** Holds bouncers not known yet upright, each with its own random start. @param {number} now */
+function ScanBouncers(now) {
     let added = 0;
     for (const entity of Instance.FindEntitiesByClass(BOUNCER_CLASS)) {
-        if (bouncers.has(entity) || !("GetModelName" in entity) || !IsBouncerModel(/** @type {any} */ (entity).GetModelName())) {
+        const model = /** @type {any} */ (entity).GetModelName?.() ?? "";
+        if (bouncers.has(entity) || !IsBouncerModel(model)) {
             continue;
         }
-        const delay = BouncerStartDelay(Math.random());
-        for (const { input, value, delay: after } of BouncerStartInputs(delay)) {
-            Instance.EntFireAtTarget({ target: entity, input, value, delay: after });
-        }
-        bouncers.set(entity, delay);
+        Fire(entity, BouncerHoldInputs());
+        bouncers.set(entity, { startAt: now + BouncerStartDelay(Math.random()), started: false });
         added++;
     }
     if (added) {
-        Instance.Msg(`[melon_drive] bouncers: ${bouncers.size} swinging, ${added} new`);
+        const waits = [...bouncers.values()].filter((b) => !b.started).map((b) => `${(b.startAt - now).toFixed(2)}s`);
+        Instance.Msg(`[melon_drive] bouncers: ${bouncers.size} found, ${added} new, swinging in ${waits.join(", ")}`);
+    }
+}
+
+/** Every tick: now and then a look for new bouncers; every bouncer whose time has come starts swinging. @param {number} now */
+function UpdateBouncers(now) {
+    if (now >= nextScanTime) {
+        nextScanTime = now + BOUNCER_SCAN_SECONDS;
+        for (const bouncer of [...bouncers.keys()]) {
+            if (!bouncer.IsValid()) {
+                bouncers.delete(bouncer);
+            }
+        }
+        ScanBouncers(now);
+    }
+    for (const [bouncer, state] of bouncers) {
+        if (!state.started && now >= state.startAt) {
+            state.started = true;
+            Fire(bouncer, BouncerSwingInputs());
+        }
     }
 }
 
@@ -12439,6 +12698,7 @@ function RegisterHeatInputs() {
             return;
         }
         kart.inHub = true;
+        kart.joinedGrandPrix = undefined; // R's teleport arrived — inHub counts from here
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot !== undefined) {
             ShowHubModal(slot, kart, phase);
@@ -12451,6 +12711,7 @@ function RegisterHeatInputs() {
             return;
         }
         kart.inHub = false;
+        kart.joinedGrandPrix = undefined; // drove out again
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot !== undefined) {
             HideHubModal(slot, kart);
@@ -12484,7 +12745,7 @@ function RegisterLevelInputs() {
             return;
         }
         for (const kart of karts.values()) {
-            GrantXp(kart, amount, XP_CHEAT_COMMAND);
+            GrantXp(kart, amount, XP_REASON_CHEAT);
         }
     });
 }

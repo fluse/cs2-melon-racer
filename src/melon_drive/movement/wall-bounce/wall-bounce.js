@@ -23,6 +23,7 @@ import {
     PERFECT_SPARK_TEMPLATE_NAME,
     PERFECT_SPARK_LIFETIME,
     XP_PERFECT_HIT,
+    XP_REASON_PERFECT_BOUNCE,
 } from "../../constants/index.js";
 import { DamageKart } from "../../health/damage/damage.js";
 import { IsPadProtected } from "../../zones/jump-pad/jump-pad.js";
@@ -167,7 +168,7 @@ export function ComputeWallBounce(kart, n, now) {
     if (kart.perfectBounceBoost) {
         PlayPerfectSpark(kart);
         CountStat(kart, "perfectHits");
-        GrantXp(kart, XP_PERFECT_HIT, "PERFECT wall bounce");
+        GrantXp(kart, XP_PERFECT_HIT, XP_REASON_PERFECT_BOUNCE);
     }
     return { ...bounce, jumpFactor };
 }

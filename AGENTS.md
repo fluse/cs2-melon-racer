@@ -82,7 +82,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              spike-spring/ (prop_dynamic "spike_spring…": rise/sink on the script's clock, breaks melons on its spikes),
                                           #              ball-pit/ (ball_pit_enter/leave: balls that leave the trigger steered back or dropped back in),
                                           #              ball-spawner/ (template_ball copied at spawn_ball at random intervals, removed after a lifetime, capped)
-                                          #              bouncer/ (prop_dynamic with the bouncer model: "swing" loop started once, after a random delay within one swing)
+                                          #              bouncer/ (prop_dynamic with the bouncer model: "swing" loop started once, at a random time within one swing, on the script's clock — delayed inputs arrived all at once)
 src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
 test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one folder per src/melon_drive/ domain (movement/, race/, …): unit tests
                                           #   for the pure files, engine-side tests against the fake engine (filed under the domain they're mainly about)

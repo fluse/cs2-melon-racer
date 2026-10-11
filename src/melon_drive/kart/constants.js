@@ -30,6 +30,11 @@ export const FLOOR_TRACE_DOWN = 512;
 // (the tutorial), facing its own angle; without it, hub_spawn.
 export const HUB_SPAWN_NAME = "hub_spawn";
 export const HUB_SPAWN_FACING_NAME = "hub_spawn_facing";
+// Where R puts a melon while a starting Grand Prix calls the others
+// (race/heat/race-flow.js, JoinGrandPrix): a point entity in the hub's
+// start area, facing its own yaw — several lined up side by side. Without
+// one, hub_spawn.
+export const JOIN_GRAND_PRIX_SPAWN_NAME = "spawn_join_grandprix";
 export const INTRO_SPAWN_NAME = "intro_spawn";
 
 // Per-player settings — where a joining player's melon appears (the user
@@ -55,8 +60,8 @@ export const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
 export const MELON_SKINS = {
     default: "models/melon_racer/melon/melon.vmdl",
     honey: "models/melon_racer/melon/melon_honey.vmdl",
-    strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
     camo: "models/melon_racer/melon/melon_camo.vmdl",
+    strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
     football: "models/melon_racer/melon/melon_football.vmdl",
     golf: "models/melon_racer/melon/melon_golf.vmdl",
     pineapple: "models/melon_racer/melon/melon_pineapple.vmdl",
@@ -72,8 +77,8 @@ export const MELON_SKIN_DEFAULT = "default";
 export const MELON_SKIN_NAMES = {
     default: "Melon",
     honey: "Honey Melon",
-    strawberry: "Strawberry",
     camo: "Camo",
+    strawberry: "Strawberry",
     football: "Football",
     golf: "Golf",
     pineapple: "Pineapple",
@@ -88,8 +93,8 @@ export const MELON_SKIN_NAMES = {
 export const MELON_SKIN_LEVELS = {
     default: 1,
     honey: 1,
-    strawberry: 1,
-    camo: 3,
+    camo: 1,
+    strawberry: 2,
     football: 5,
     golf: 7,
     pineapple: 10,

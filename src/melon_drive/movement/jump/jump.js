@@ -12,7 +12,7 @@ import { PhysicsFactor } from "../../dev/physics-tuning-logic.js";
 import { PlayPerfectSpark } from "../wall-bounce/wall-bounce.js";
 import { CountStat } from "../../race/stats/stats.js";
 import { GrantXp } from "../../race/level/level.js";
-import { JUMP_SPEED, GROUND_JUMP_BUFFER, WALL_JUMP_BUFFER, BOUNCE_RATINGS, WALL_JUMP_CHARGES, XP_PERFECT_HIT } from "../../constants/index.js";
+import { JUMP_SPEED, GROUND_JUMP_BUFFER, WALL_JUMP_BUFFER, BOUNCE_RATINGS, WALL_JUMP_CHARGES, XP_PERFECT_HIT, XP_REASON_PERFECT_WALL_JUMP } from "../../constants/index.js";
 import { LogJumpPress, LogWallJumpVerdict } from "../../dev/collision-debug.js";
 
 /**
@@ -263,7 +263,7 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
         if (kart.perfectBounceBoost) {
             PlayPerfectSpark(kart);
             CountStat(kart, "perfectHits");
-            GrantXp(kart, XP_PERFECT_HIT, "PERFECT wall jump");
+            GrantXp(kart, XP_PERFECT_HIT, XP_REASON_PERFECT_WALL_JUMP);
         }
     }
     kart.lastWallJump = { time: now, normal: wallContact.normal };

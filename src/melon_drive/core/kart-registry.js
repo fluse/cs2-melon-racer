@@ -11,6 +11,9 @@ import { predictionDotSet } from "./trace.js";
  *   lapsCompleted: number, inHub: boolean, racing: boolean, finished: boolean, locked: boolean,
  *   progressWatch?: { checkpoint: number, laps: number, since: number }, // racing: when this racer last made progress, for the DNF rule — see WatchProgress in race/heat/logic.js
  *   dnfShown?: number, dnfResendAt?: number, // what the dnf_warning shows (undefined: hidden) and when it's sent again — see UpdateDnf in race/heat/race-flow.js
+ *   gatherShown?: string, gatherResendAt?: number, // GATHERING: what the call to join (or the hub window's countdown) last showed and when it's sent again — see UpdateGathering in race/heat/race-flow.js
+ *   grandPrixCall?: boolean, // GATHERING: the call to join is up for it, so R joins instead of restarting a time trial
+ *   joinedGrandPrix?: boolean, // pressed R to join — counts as in the start area until its hub_enter arrives
  *   runStartTime?: number, // game time this kart's timed run started (unset: no run) — see race/time-trial/time-trial.js
  *   lastRun?: { trackId: number, time: number, newBest: boolean, at: number }, // last finished run, for the HUD
  *   finishRestartAt?: number, // game time a free-roaming finish sent the melon back to the start — see FINISH_RESTART_START_GUARD
@@ -42,7 +45,7 @@ import { predictionDotSet } from "./trace.js";
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
  *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
  *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
- *   testPreview?: { kind: "countdown" | "finish" | "intro", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro playing — see TestCountdown in race/heat/race-flow.js
+ *   testPreview?: { kind: "countdown" | "finish" | "intro" | "call", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro/Grand Prix Call playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
@@ -52,7 +55,7 @@ import { predictionDotSet } from "./trace.js";
  *   leaderboardNextUpdate?: number, leaderboardResendAt?: number, leaderboardShown?: Record<string, string>, // the leaderboards page's next rebuild, next full resend, and what it last sent — see UpdateLeaderboardsHud
  *   levelUp?: { level: number, skins: string[], until: number | undefined }, // a level-up waiting for (or on) the HUD: the new level, the skins it unlocked, until when it shows (undefined: not yet, e.g. mid-heat) — see GrantXp, UpdateLevelUpHud
  *   levelUpShown?: string, levelUpResendAt?: number, // what the level-up panel last showed, and its next full resend — see UpdateLevelUpHud
- *   xpGain?: { fromXp: number, toXp: number | undefined, amount: number, until: number }, // XP gained, on the XP notifier until `until`: the XP before, after (undefined: as they are now — set only by a preview), the amount — see ShowXpGain, UpdateXpGainHud
+ *   xpGain?: { fromXp: number, toXp: number | undefined, amount: number, reasons: string[], until: number }, // XP gained, on the XP notifier until `until`: the XP before, after (undefined: as they are now — set only by a preview), the amount, each gain's reason — see ShowXpGain, UpdateXpGainHud
  *   xpGainShown?: string, xpGainResendAt?: number, // what the XP notifier last showed, and its next full resend — see UpdateXpGainHud
  *   skinHudLevel?: number, // the level the skin grid's locks were last drawn for — see UpdateSkinHud
  *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud

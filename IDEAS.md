@@ -1,19 +1,22 @@
-# Side Slice
+# Mechanics
 - man kann an gewissen stellen nach vorne fahren, auf einen hebel, der eine Action auslöst z.b. Tür oder Todeslaserbeam
-- die strecke lebendig machen, indem müll, oder andere kleine dinge auf dem boden im weg stehen
-- Durch ein Bällebad fahren?
 - Actionen können visuell auf der Fläche der Spielwelt unterstützt z.b. ablauf eines Timers z.b. eine Zündschnurr
-- Blöcke fahren aus der Wand und schubsen einen runter
-  - Wenn die melone aus der strecke gestoßen wird, bleibt die kamera dabei stehen wodurch die melone dann ins gesicht des betrachters fliegt.
+- Blöcke fahren aus der Wand und schubsen einen runter.
 - Aussichtspunkt der auf SideSlice zeigt.
 - Friction Areas
 - Magnete
 
+# Sequenzen
+- Startfeld Area
+- Zwischen den Rennen werden die ersten 3 angezeigt
+- Siegerehrung
+
+# XP Gaining
+- Zufällig verteilt auf den strecken, in den hubs spawnen XP Coins, die man einsammeln kann
 
 # Route Ideen
 - Flipper Tisch, auf dem man als erstes ins ziel gebounced werden muss.
 - takeshi’s castle Türen.
-
 
 # Obstacles
 - Flipper Ball Bounce
@@ -21,8 +24,6 @@
 # Scoreboard
 - In Game 3D
     - auf jeder Strecke ein eigenes Scoreboard mit den temporären Zeiten, die aller spieler, die die strecke gefahren sind und jeweils auch nur die beste zeit. Sortiert schnellste oben, langsamste unten.
-- Im Hub 
-    - Am Route Gate ist eine Tafel die die All Time Best Times zeigt für diese Route.
 
 # Melon Skins
 - Coconut

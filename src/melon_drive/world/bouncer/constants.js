@@ -1,6 +1,6 @@
 // Bouncers: every prop_dynamic with the foam bouncer model swings on its own
-// — the script starts its "swing" loop once, after a random delay of up to
-// one swing, so the bouncers of a map don't all swing in step. Found by
+// — the script starts its "swing" loop once, at a random time up to one
+// swing later (on its own clock), so the bouncers don't all swing in step. Found by
 // model, not by name: no name, logic_auto or outputs in Hammer needed.
 // Rule: world/bouncer/logic.js, applied by world/bouncer/bouncer.js.
 // The swing's length is shared with the model's generator,

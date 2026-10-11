@@ -474,6 +474,18 @@
     color: #ffffff;
 }
 
+/* The seconds until the Grand Prix starts, in place of the start button
+   while the others are called (.Starting below). */
+.HubStartingLabel {
+    horizontal-align: center;
+    margin-top: 14px;
+    font-size: 24px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: #ffd84d;
+    visibility: collapse;
+}
+
 .HubWaitingLabel {
     horizontal-align: center;
     font-size: 18px;
@@ -515,6 +527,23 @@
         visibility: collapse;
     }
     .HubWaitingLabel {
+        visibility: visible;
+    }
+}
+
+/* Calling the others to join: the lists stay, the countdown replaces the
+   start button — the moderator can still call it off. */
+.HubModal.Starting {
+    .HubStartButton {
+        visibility: collapse;
+    }
+    .HubStartingLabel {
+        visibility: visible;
+    }
+}
+
+.HubModal.Starting.IsModerator {
+    .HubAbortButton {
         visibility: visible;
     }
 }
@@ -742,6 +771,41 @@
     }
 }
 
+/* #grand_prix_call: a Grand Prix about to start, for everyone outside the
+   hub's start area (UpdateGathering) — top center, below where the DNF
+   warning and the level-up sit. */
+.GrandPrixCall {
+    horizontal-align: center;
+    vertical-align: top;
+    margin-top: 270px;
+    padding: 10px 34px 12px 34px;
+    flow-children: down;
+    background-color: #152012e6;
+    border: 2px solid #ffd84d;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.GrandPrixCallTitle {
+    horizontal-align: center;
+    font-size: 30px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #ffffff;
+    text-shadow: 2px 2px 3px #000000cc;
+}
+
+.GrandPrixCallHint {
+    horizontal-align: center;
+    margin-top: 2px;
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: #ffd84d;
+}
+
 /* #levelup_panel: a level-up (UpdateLevelUpHud), top center where the DNF
    warning would be (that one only shows mid-heat, this one never does). */
 .LevelUpPanel {
@@ -828,6 +892,15 @@
     font-size: 16px;
     font-weight: bold;
     letter-spacing: 3px;
+    color: #ffffff;
+}
+
+.XpGainReason {
+    width: 100%;
+    margin-top: 1px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 1px;
     color: #ffffff;
 }
 

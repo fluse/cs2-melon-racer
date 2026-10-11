@@ -21,7 +21,8 @@ respawns at its last checkpoint.
    melon on that track and starts a time trial ("Time trial", "Multiple
    tracks & checkpoints").
 3. **Hub** — players gather in `hub_start_trigger` and start a race
-   together ("Hub → race → next-track flow").
+   together; everyone elsewhere gets 10 seconds to join, R takes them to
+   the hub ("Hub → race → next-track flow").
 4. **Heats** — one per track in `trackId` order: countdown, race, break,
    next track; after the last one everyone returns to the hub. Together
    they're a **Grand Prix**: each heat's finishers score points by place,
@@ -440,10 +441,25 @@ run by `race/heat/`):
    the .vmap by `test/map/map-io.test.mjs`): any other trigger that should just
    get melons to the hub — e.g. the intro's exit — fires `hub_teleport`
    instead, which sends the touching melon to `hub_spawn` without the modal.
-2. Clicking start: **every kart currently standing in the hub trigger**
-   (not every connected player) is pulled into the heat — the ones outside
-   it stay in the hub (decided: whoever wants to race stands in the
-   trigger). Their laps/checkpoint progress resets and they're teleported
+2. Clicking start doesn't start at once (decided, also with everyone in
+   the hub trigger): the phase is first **GATHERING** for
+   `GRAND_PRIX_GATHER_SECONDS` (10, `race/constants.js`): everyone outside
+   the trigger sees "GRAND PRIX STARTS IN 10 · PRESS R TO JOIN" top center
+   (`grand_prix_call`), and **R** teleports their melon to
+   `spawn_join_grandprix` in the start area (else `hub_spawn`; several lined
+   up side by side), out of whatever it was doing like the user menu's hub
+   button (meanwhile R doesn't restart a time trial). Those
+   in the trigger see the seconds in place of the start button
+   (`hub_starting`, the `Starting` class); the moderator can call it off
+   with "Cancel Grand Prix". Leaving the trigger brings the call back.
+   When it runs out, **every kart then
+   standing in the hub trigger** (not every connected player; a melon R
+   just sent there counts even before its `hub_enter` arrives) is pulled
+   into the heat; the ones outside it stay out (decided: whoever wants to
+   race stands in the trigger). Nobody there: no Grand Prix. Rules:
+   `GatherSecondsValue` in `race/heat/logic.js`, applied by
+   `UpdateGathering` in `race/heat/race-flow.js`
+   (`test/hud/hud-buttons.test.mjs`). Their laps/checkpoint progress resets and they're teleported
    to the lowest-`trackId` track's `start_spawn_<trackId>`, lined up side by
    side `RACE_SPAWN_LATERAL_SPACING` apart. `trackId` is set to that track
    right there, not on the physical `start_<trackId>` touch, so the
@@ -515,7 +531,9 @@ until GO) and **"Test Finish"** (FINISH, "1ST · +10 PTS" and the
 `BREAK_SECONDS` countdown, the melon held meanwhile) — for the clicking
 player only, the race phase and everyone else untouched — and **"Test
 Intro"** for the logo a player sees on joining (`INTRO_LOGO_SECONDS`, the
-melon held behind it). Ignored while that
+melon held behind it), and **"Test Grand Prix Call"** for the call to join
+a starting Grand Prix (counting down, R to the hub, the melon driving on
+meanwhile; not while one starts or runs). Ignored while that
 player races; the hub/tutorial buttons end a preview early. The same page has
 three effect triggers on the clicking player's own melon (not while racing or
 broken): **"Test Break"** (breaks it where it is — effects, pieces, break
@@ -676,7 +694,7 @@ for anything before leveling existed** (decided): everyone starts at level 1.
   `LEVEL_XP_STEP` × (L − 1) XP (150, 225, 300, …) — level 3 in about half an
   hour, level 25 (the last skin) after some 20–30 hours of racing.
 - **Skins by level** (`MELON_SKIN_LEVELS`, `kart/constants.js`): **three free
-  from the start** (decided) — Melon, Honey Melon, Strawberry —, then Camo 3,
+  from the start** (decided) — Melon, Honey Melon, Camo —, then Strawberry 2,
   Football 5, Golf 7, Pineapple 10, Zebra 14, Pumpkin 18, Gold 25. A locked
   skin shows in the grid dimmed under a padlock with "LV 12" in place of its
   name; clicking it does nothing. A saved skin that's locked (the levels
@@ -685,7 +703,9 @@ for anything before leveling existed** (decided): everyone starts at level 1.
   any, top center for `LEVEL_UP_HUD_SECONDS` (`levelup_panel`) — **not in the
   middle of a heat** (decided): a racer sees it once they've finished.
 - **XP notifier** (decided): every XP reward shows at once, top right, for
-  `XP_GAIN_HUD_SECONDS` (`xpgain_panel`): "+40 XP", the level ("LV 7"), the
+  `XP_GAIN_HUD_SECONDS` (`xpgain_panel`): "+40 XP", **why** ("TIME TRIAL
+  FINISH · NEW BEST TIME", "HEAT 1ST", "PERFECT WALL BOUNCE ×2" — the
+  `XP_REASON_*` each reward passes to `GrantXp`), the level ("LV 7"), the
   XP bar — the fill from before green, the part just gained gold (all of it
   after a level-up) — and "340 / 525 XP". Rewards within that time add up
   into one. Also mid-heat; not for the XP per minute on the server.
@@ -1183,7 +1203,7 @@ by `kart/look.js`.
 ## Melon skins (implemented)
 
 Each player picks a **skin** for their melon in the user menu (SETTINGS →
-MELON, decided): Melon (the default), Honey Melon, Strawberry, Camo,
+MELON, decided): Melon (the default), Honey Melon, Camo, Strawberry,
 Football, Golf (dimples only in the normal map, so they show in the light
 and reflections), Pineapple, Zebra, Pumpkin (a carved face that glows from
 inside), Gold — **sorted by the level that unlocks them** (decided, the free
@@ -1427,8 +1447,10 @@ Foam paddles on a spring (`tools/models/make-bouncer-model.mjs`) swinging
 from side to side across the track. **Each one starts at a random point of
 its swing** (decided), so a row of them doesn't swing in step: the script
 finds every `prop_dynamic` with the bouncer model, holds it upright and
-starts its looping `swing` once, after a random delay of up to one swing
-(`BOUNCER_SWING_SECONDS`, shared with the generator). The map is searched
+starts its looping `swing` once, at a random time up to one swing later
+(`BOUNCER_SWING_SECONDS`, shared with the generator) — counted on the
+script's clock: delayed inputs (`EntFireAtTarget`'s `delay`) all arrived at
+once in-game, every bouncer swinging in step. The map is searched
 again every `BOUNCER_SCAN_SECONDS`; a round restart starts them all anew. No
 name or Hammer logic. Constants: `world/bouncer/constants.js`; rules:
 `world/bouncer/logic.js`, applied by `world/bouncer/bouncer.js`

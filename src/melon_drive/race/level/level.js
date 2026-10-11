@@ -2,11 +2,11 @@ import { Instance } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { karts } from "../../core/kart-registry.js";
 import { ParseSaveData } from "../time-trial/logic.js";
-import { SortedStandings } from "../grand-prix/logic.js";
+import { SortedStandings, OrdinalPlace } from "../grand-prix/logic.js";
 import { PlayerKey } from "../grand-prix/grand-prix.js";
 import { SkinsUnlockedBetween } from "../../kart/skin-logic.js";
 import { AddXp, GetXpTotals, GrandPrixXp, LevelOf } from "./logic.js";
-import { SAVE_DATA_XP_KEY, XP_SAVE_SECONDS, XP_PER_MINUTE_PLAYED, XP_GAIN_HUD_SECONDS } from "../../constants/index.js";
+import { SAVE_DATA_XP_KEY, XP_SAVE_SECONDS, XP_PER_MINUTE_PLAYED, XP_GAIN_HUD_SECONDS, XP_REASON_GRAND_PRIX } from "../../constants/index.js";
 
 // Leveling: every player's XP, kept per player name in the addon's save data
 // like the stats (renaming starts from scratch). Earned where it happens —
@@ -49,9 +49,10 @@ export function GetKartLevel(kart) {
 /**
  * Gives a player XP. A level-up (with the skins it unlocks) is left in
  * kart.levelUp for the HUD — added to one that's still waiting. With a
- * reason the XP notifier shows it, added to a gain still showing.
+ * reason the XP notifier shows it (and why), added to a gain still showing.
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} amount
- * @param {string} [reason] for the console; without one (the time on the server) no notifier
+ * @param {string} [reason] what the notifier says (an XP_REASON_*), also in the console;
+ *   without one (the time on the server) no notifier
  */
 export function GrantXp(kart, amount, reason) {
     const name = PlayerName(kart);
@@ -64,7 +65,7 @@ export function GrantXp(kart, amount, reason) {
     const after = LevelOf(Totals()[name]);
     if (reason !== undefined) {
         Debug(`GrantXp: "${name}" +${Math.round(amount)} XP (${reason})`);
-        ShowXpGain(kart, xpBefore, amount);
+        ShowXpGain(kart, xpBefore, amount, reason);
     }
     if (after > before) {
         const skins = SkinsUnlockedBetween(before, after);
@@ -76,17 +77,19 @@ export function GrantXp(kart, amount, reason) {
 /**
  * Puts an XP gain on the XP notifier (hud/xp-gain-panel.js): added to the one
  * still showing (its bar keeps the fill from before the first), shown
- * XP_GAIN_HUD_SECONDS from now. `toXp` only for a preview (nothing given):
- * otherwise the notifier shows the player's XP as they are.
- * @param {import("../../core/kart-registry.js").Kart} kart @param {number} fromXp @param {number} amount @param {number} [toXp]
+ * XP_GAIN_HUD_SECONDS from now, with its reason. `toXp` only for a preview
+ * (nothing given): otherwise the notifier shows the player's XP as they are.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} fromXp @param {number} amount
+ * @param {string} reason @param {number} [toXp]
  */
-export function ShowXpGain(kart, fromXp, amount, toXp) {
+export function ShowXpGain(kart, fromXp, amount, reason, toXp) {
     const now = Instance.GetGameTime();
     const showing = kart.xpGain && now < kart.xpGain.until && kart.xpGain.toXp === undefined && toXp === undefined ? kart.xpGain : undefined;
     kart.xpGain = {
         fromXp: showing?.fromXp ?? fromXp,
         toXp,
         amount: (showing?.amount ?? 0) + amount,
+        reasons: [...(showing?.reasons ?? []), reason],
         until: now + XP_GAIN_HUD_SECONDS,
     };
 }
@@ -105,7 +108,7 @@ export function GrantGrandPrixXp(gp, racers) {
     for (const kart of racers) {
         const place = order.indexOf(PlayerKey(kart)) + 1;
         if (place > 0) {
-            GrantXp(kart, GrandPrixXp(place), `Grand Prix, place ${place}`);
+            GrantXp(kart, GrandPrixXp(place), `${XP_REASON_GRAND_PRIX} ${OrdinalPlace(place)}`);
         }
     }
 }

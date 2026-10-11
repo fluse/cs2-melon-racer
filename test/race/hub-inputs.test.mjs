@@ -3,6 +3,7 @@
 // modal — only from hub_start_trigger itself — and hub_teleport sends a melon
 // to the hub, out of any heat. See GAMEPLAY.md, "Hub → race → next-track flow".
 import "../helpers/register-cs-script.mjs";
+import { StartGrandPrixNow } from "../helpers/grand-prix.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
@@ -11,7 +12,8 @@ import { FakeHud } from "../helpers/fake-hud.mjs";
 const { karts, SetModeratorSlot } = await import("../../src/melon_drive/core/kart-registry.js");
 const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
 const { GetHubSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
-const { TryStartRace, RestoreRaceFlowSnapshot, CurrentRacers } = await import("../../src/melon_drive/race/heat/race-flow.js");
+const flow = await import("../../src/melon_drive/race/heat/race-flow.js");
+const { RestoreRaceFlowSnapshot, CurrentRacers } = flow;
 const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, HUB_TRIGGER_NAME, SPEED_HUD_ENTITY_NAME, RacePhase, MELON_MAX_HEALTH } = await import("../../src/melon_drive/constants/index.js");
 await import("../../src/melon_drive/index.js"); // registers the script inputs
 
@@ -91,7 +93,7 @@ test("hub inputs from something that isn't a tracked melon are ignored", () => {
 test("entering the hub while a heat runs: 'race in progress' — the moderator gets the cancel button", () => {
     const other = SetUpPlayerKart(world.add(new CSPlayerPawn({ slot: 1 })), GetHubSpawnPoint());
     other.inHub = true;
-    TryStartRace();
+    StartGrandPrixNow(flow);
 
     ScriptInput("hub_enter")({ caller: hubTrigger, activator: kart.melon });
     assert.equal(hud.Has(0, "hub_modal", "WaitingForOthers"), true);
@@ -105,7 +107,7 @@ test("entering the hub while a heat runs: 'race in progress' — the moderator g
 
 test("hub_teleport takes a racer out of the heat and puts it at hub_spawn, whole and standing still", () => {
     kart.inHub = true;
-    TryStartRace();
+    StartGrandPrixNow(flow);
     kart.health = 3;
     kart.melon.Teleport({ position: { x: 5000, y: 5000, z: 0 }, velocity: { x: 400, y: 0, z: 0 } });
 

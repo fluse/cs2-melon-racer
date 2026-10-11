@@ -23,17 +23,21 @@ export function BouncerStartDelay(random) {
 }
 
 /**
- * The inputs that start a bouncer: held upright at once (a swing Hammer
- * started already is stopped), then the swing loop after `delay` — the
- * swing starts from upright, so there's no jump.
- * @param {number} delay
- * @returns {{ input: string, value: string, delay: number }[]}
+ * The inputs that hold a bouncer upright (a swing Hammer started already is
+ * stopped) until its start: sent when it's found.
+ * @returns {[string, string][]} [input, value]
  */
-export function BouncerStartInputs(delay) {
-    return [
-        { input: "SetIdleAnimationLooping", value: BOUNCER_IDLE_ANIMATION, delay: 0 },
-        { input: "SetAnimationLooping", value: BOUNCER_IDLE_ANIMATION, delay: 0 },
-        { input: "SetIdleAnimationLooping", value: BOUNCER_SWING_ANIMATION, delay },
-        { input: "SetAnimationLooping", value: BOUNCER_SWING_ANIMATION, delay },
-    ];
+export function BouncerHoldInputs() {
+    return [["SetIdleAnimationLooping", BOUNCER_IDLE_ANIMATION], ["SetAnimationLooping", BOUNCER_IDLE_ANIMATION]];
+}
+
+/**
+ * The inputs that start its swing loop, sent once its start time has come —
+ * by the script's own clock, not as delayed inputs (those all came at once
+ * in-game: every bouncer swung in step). The swing starts from upright, so
+ * there's no jump.
+ * @returns {[string, string][]} [input, value]
+ */
+export function BouncerSwingInputs() {
+    return [["SetIdleAnimationLooping", BOUNCER_SWING_ANIMATION], ["SetAnimationLooping", BOUNCER_SWING_ANIMATION]];
 }

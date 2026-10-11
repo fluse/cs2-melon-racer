@@ -33,6 +33,7 @@ export function RegisterHeatInputs() {
             return;
         }
         kart.inHub = true;
+        kart.joinedGrandPrix = undefined; // R's teleport arrived — inHub counts from here
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot !== undefined) {
             ShowHubModal(slot, kart, phase);
@@ -45,6 +46,7 @@ export function RegisterHeatInputs() {
             return;
         }
         kart.inHub = false;
+        kart.joinedGrandPrix = undefined; // drove out again
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
         if (slot !== undefined) {
             HideHubModal(slot, kart);

@@ -20,7 +20,8 @@ export function ApplyHubModalState(slot, currentPhase) {
     if (!hud) {
         return;
     }
-    hud.SetHasClassForPlayer(slot, "hub_modal", "WaitingForOthers", currentPhase !== RacePhase.HUB);
+    hud.SetHasClassForPlayer(slot, "hub_modal", "WaitingForOthers", currentPhase !== RacePhase.HUB && currentPhase !== RacePhase.GATHERING);
+    hud.SetHasClassForPlayer(slot, "hub_modal", "Starting", currentPhase === RacePhase.GATHERING);
     hud.SetHasClassForPlayer(slot, "hub_modal", "IsModerator", IsModerator(slot));
     UpdateHubLists(hud, slot);
 }

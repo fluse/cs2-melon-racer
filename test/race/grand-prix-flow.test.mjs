@@ -3,6 +3,7 @@
 // places and points per heat, the place under FINISH, standings kept after
 // the last track, a cancelled one, and the rows each player sees.
 import "../helpers/register-cs-script.mjs";
+import { StartGrandPrixNow } from "../helpers/grand-prix.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
@@ -12,7 +13,7 @@ const { karts } = await import("../../src/melon_drive/core/kart-registry.js");
 const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
 const { GetHubSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
 const flow = await import("../../src/melon_drive/race/heat/race-flow.js");
-const { TryStartRace, TryAbortRace, FinishKart, UpdateRaceFlow, RestoreRaceFlowSnapshot } = flow;
+const { TryAbortRace, FinishKart, UpdateRaceFlow, RestoreRaceFlowSnapshot } = flow;
 const gpModule = await import("../../src/melon_drive/race/grand-prix/grand-prix.js");
 const { PlayerKey } = gpModule;
 const { HeatPoints } = await import("../../src/melon_drive/race/grand-prix/logic.js");
@@ -51,7 +52,7 @@ function StartGrandPrixWith(racers, time = 0) {
         kart.inHub = true;
     }
     world.time = time;
-    TryStartRace();
+    StartGrandPrixNow(flow);
     Tick(time + COUNTDOWN_SECONDS);
     assert.equal(flow.phase, RacePhase.RACING, "setup: GO");
 }

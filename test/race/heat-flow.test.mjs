@@ -4,6 +4,7 @@
 // back to the hub after the last one, the moderator's abort, and a heat
 // nobody is left in. See GAMEPLAY.md, "Hub → race → next-track flow".
 import "../helpers/register-cs-script.mjs";
+import { StartGrandPrixNow } from "../helpers/grand-prix.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
@@ -13,7 +14,7 @@ const { karts } = await import("../../src/melon_drive/core/kart-registry.js");
 const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
 const { GetHubSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
 const flow = await import("../../src/melon_drive/race/heat/race-flow.js");
-const { TryStartRace, TryAbortRace, BeginHeat, FinishKart, UpdateRaceFlow, NextTrackId, CurrentRacers, RestoreRaceFlowSnapshot } = flow;
+const { TryAbortRace, BeginHeat, FinishKart, UpdateRaceFlow, NextTrackId, CurrentRacers, RestoreRaceFlowSnapshot } = flow;
 const {
     MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, SPEED_HUD_ENTITY_NAME, StartSpawnName,
     RacePhase, COUNTDOWN_SECONDS, GO_DISPLAY_SECONDS, BREAK_SECONDS, RACE_SPAWN_LATERAL_SPACING, MELON_MAX_HEALTH,
@@ -52,7 +53,7 @@ function StartHeatWith(inHub, time = 0) {
         kart.inHub = true;
     }
     world.time = time;
-    TryStartRace();
+    StartGrandPrixNow(flow);
 }
 
 /** Runs the countdown out: GO at `goTime`. */
@@ -100,13 +101,13 @@ test("starting a race pulls in only the karts standing in the hub trigger, onto 
 });
 
 test("starting a race is ignored with nobody in the hub trigger, or while a heat is running", () => {
-    TryStartRace();
+    StartGrandPrixNow(flow);
     assert.equal(flow.phase, RacePhase.HUB, "nobody in the hub");
 
     const [a, b] = kartList;
     StartHeatWith([a]);
     b.inHub = true;
-    TryStartRace();
+    StartGrandPrixNow(flow);
     assert.equal(b.racing, false, "no late joining a running heat");
     assert.deepEqual(CurrentRacers(), [a]);
 });
@@ -291,7 +292,7 @@ test("a heat everyone left goes back to HUB — during the countdown or mid-race
         assert.equal(flow.activeTrackId, undefined);
 
         a.inHub = true;
-        TryStartRace();
+        StartGrandPrixNow(flow);
         assert.equal(flow.phase, RacePhase.COUNTDOWN, "a new heat can start again");
         TryAbortRace();
     }

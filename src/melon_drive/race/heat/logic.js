@@ -94,3 +94,12 @@ export function DnfSecondsLeft(watch, now, limit) {
 export function DnfWarningValue(left, warning) {
     return left > 0 && left <= warning ? Math.ceil(left) : undefined;
 }
+
+/**
+ * The seconds the call to join shows `remaining` seconds before the Grand
+ * Prix starts: rounded up, so it never shows 0 while there's still time.
+ * @param {number} remaining
+ */
+export function GatherSecondsValue(remaining) {
+    return Math.max(0, Math.ceil(remaining));
+}

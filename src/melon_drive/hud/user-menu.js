@@ -180,8 +180,9 @@ export function UpdateUserMenu(slot, kart) {
     }
     // Shortcut for the menu's "Restart Time Trial" button: reload (R), menu
     // open or not, so a bad start costs one key instead of USE + a click.
-    // Pressed outside a time trial it does nothing.
-    if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && CanRestartTimeTrial(kart) && RestartTimeTrial(kart)) {
+    // Pressed outside a time trial it does nothing — and while the call to
+    // join a starting Grand Prix is up, R joins it instead (UpdateGathering).
+    if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && !kart.grandPrixCall && CanRestartTimeTrial(kart) && RestartTimeTrial(kart)) {
         if (kart.userMenuOpen) {
             SetUserMenuOpen(slot, kart, false);
         }

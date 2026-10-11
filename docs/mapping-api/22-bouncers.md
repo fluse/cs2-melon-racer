@@ -17,10 +17,11 @@ one swing, so a row of bouncers doesn't swing in step. No name, no
 | Angles | the paddle swings across its broad face, along the model's X in Hammer (ModelDoc turns the generator's Y there): stand it across the track, so the melons come at its face |
 | Scale | any, uniform |
 
-Until its delay is up a bouncer stands upright (`idle`), then swings on for
-good. The console says when the script started some:
-`[melon_drive] bouncers: 4 swinging, 4 new`. A bouncer that doesn't swing
-isn't a `prop_dynamic` or has another model.
+Until its start time a bouncer stands upright (`idle`), then swings on for
+good — the script waits for each one's time itself and only then sends the
+swing. The console says which it found and when each starts:
+`[melon_drive] bouncers: 4 found, 4 new, swinging in 0.31s, 1.92s, …`. A
+bouncer missing there isn't a `prop_dynamic` or has another model.
 
 ## Values
 

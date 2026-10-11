@@ -1,4 +1,4 @@
-import { Instance } from "cs_script/point_script";
+import { Instance, CSInputs } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { GetTrackConfig, GetTrackOrder } from "../track-config.js";
 import { karts } from "../../core/kart-registry.js";
@@ -7,6 +7,7 @@ import { HideHubModal } from "../../hud/hub-modal/hub-modal.js";
 import {
     RacePhase,
     COUNTDOWN_SECONDS,
+    GRAND_PRIX_GATHER_SECONDS,
     BREAK_SECONDS,
     GO_DISPLAY_SECONDS,
     RACE_SPAWN_LATERAL_SPACING,
@@ -15,12 +16,13 @@ import {
     DNF_NO_PROGRESS_SECONDS,
     DNF_WARNING_SECONDS,
     HUD_RESEND_SECONDS,
+    XP_REASON_HEAT,
 } from "../../constants/index.js";
 import { SetIntroLogoVisible } from "../../kart/spawn.js";
-import { GetHubSpawnPoint, GetIntroSpawnPoint, GetStartSpawnPoint, FacePlayerView } from "../../kart/spawn-points.js";
+import { GetHubSpawnPoint, GetIntroSpawnPoint, GetJoinGrandPrixSpawnPoint, GetStartSpawnPoint, FacePlayerView } from "../../kart/spawn-points.js";
 import { RestoreFullHealth } from "../../health/heal/index.js";
 import { StartRun, CancelRun } from "../time-trial/time-trial.js";
-import { BreakCountdownValue, BreakCountdownLabels, CountdownStep, CountdownNumberState, WatchProgress, DnfSecondsLeft, DnfWarningValue } from "./logic.js";
+import { BreakCountdownValue, BreakCountdownLabels, CountdownStep, CountdownNumberState, WatchProgress, DnfSecondsLeft, DnfWarningValue, GatherSecondsValue } from "./logic.js";
 import { SetFreeLook } from "../../dev/free-look.js";
 import { grandPrix, StartGrandPrix, StartGrandPrixHeat, RecordGrandPrixFinish, EndGrandPrix } from "../grand-prix/grand-prix.js";
 import { PlaceOnPodium } from "../podium/podium.js";
@@ -39,7 +41,7 @@ export let phase = RacePhase.HUB;
 /** Which track the current/last heat was run on — undefined while in HUB.
  * @type {number | undefined} */
 export let activeTrackId = undefined;
-/** GetGameTime() at which the current COUNTDOWN/BREAK phase should end. */
+/** GetGameTime() at which the current GATHERING/COUNTDOWN/BREAK phase should end. */
 export let phaseEndTime = 0;
 
 /** The countdown's numbers in countdown_panel (speedometer.xml), in order —
@@ -113,21 +115,40 @@ export function NextTrackId() {
     return order[index + 1];
 }
 
+/** Karts in the hub's start area right now — the ones a Grand Prix takes along. */
+function KartsInStartArea() {
+    return [...karts.values()].filter((kart) => (kart.inHub || kart.joinedGrandPrix) && kart.melon.IsValid());
+}
+
+/**
+ * The hub's "Start Grand Prix" button: always GRAND_PRIX_GATHER_SECONDS
+ * first (GATHERING, see UpdateGathering) — everyone outside the start area
+ * is called to join, everyone in it sees the seconds — then the Grand Prix
+ * starts with whoever stands in the start area.
+ */
 export function TryStartRace() {
     if (phase !== RacePhase.HUB) {
-        Debug("TryStartRace: ignored, a heat is already running");
+        Debug("TryStartRace: ignored, a Grand Prix is already starting or running");
         return;
     }
-    const order = GetTrackOrder();
-    if (order.length === 0) {
+    if (GetTrackOrder().length === 0) {
         Debug("TryStartRace: no start_<id> triggers found, ignoring");
         return;
     }
-    const racers = [...karts.values()].filter((kart) => kart.inHub && kart.melon.IsValid());
-    if (racers.length === 0) {
+    const inStartArea = KartsInStartArea();
+    if (inStartArea.length === 0) {
         Debug("TryStartRace: no karts currently in the hub trigger, ignoring");
         return;
     }
+    phase = RacePhase.GATHERING;
+    gatherJoins = 0;
+    phaseEndTime = Instance.GetGameTime() + GRAND_PRIX_GATHER_SECONDS;
+    Debug(`TryStartRace: ${inStartArea.length} player(s) in the start area — the Grand Prix starts in ${GRAND_PRIX_GATHER_SECONDS}s`);
+}
+
+/** @param {import("../../core/kart-registry.js").Kart[]} racers */
+function StartGrandPrixWith(racers) {
+    const order = GetTrackOrder();
     for (const kart of racers) {
         kart.racing = true;
         const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
@@ -135,9 +156,93 @@ export function TryStartRace() {
             HideHubModal(slot, kart);
         }
     }
-    Debug(`TryStartRace: starting heat on track ${order[0]} with ${racers.length} racer(s)`);
+    Debug(`StartGrandPrixWith: starting heat on track ${order[0]} with ${racers.length} racer(s)`);
     StartGrandPrix(racers, order.length);
     BeginHeat(order[0]);
+}
+
+/** How many melons R has sent to spawn_join_grandprix in this call — the next one's spot in the line. */
+let gatherJoins = 0;
+
+/**
+ * R while the call to join is up (or its test preview): takes the melon out
+ * of whatever it was doing, like the user menu's hub button, onto
+ * spawn_join_grandprix (else hub_spawn), which becomes its respawn point —
+ * each one there in this call a spot further along a line, alternating
+ * sides, so they don't land on each other.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function SendKartToJoinGrandPrix(kart) {
+    SetFreeLook(kart, false);
+    const spawn = GetJoinGrandPrixSpawnPoint();
+    const k = gatherJoins++;
+    const spot = k % 2 === 1 ? (k + 1) / 2 : -k / 2;
+    SendKartsOutOfRace([kart], spawn && { position: LineUpPosition(spawn.position, spawn.angles, spot, 1), angles: spawn.angles }, "Grand Prix join spot");
+}
+
+/**
+ * R while the call to join is up: to the start area (SendKartToJoinGrandPrix).
+ * It counts as in the start area from now on, in case the time runs out
+ * before its hub_enter arrives.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function JoinGrandPrix(kart) {
+    Debug(`JoinGrandPrix: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} joins the Grand Prix`);
+    SendKartToJoinGrandPrix(kart);
+    kart.joinedGrandPrix = true;
+}
+
+/**
+ * GATHERING, every tick: everyone outside the start area sees the call to
+ * join with the seconds left (grand_prix_call), and R takes them to the
+ * hub; everyone in it sees the seconds in the hub window (hub_starting).
+ * Each sent on change and again every HUD_RESEND_SECONDS.
+ * @param {number} now
+ */
+function UpdateGathering(now) {
+    const seconds = GatherSecondsValue(phaseEndTime - now);
+    for (const kart of karts.values()) {
+        const inStartArea = kart.inHub || Boolean(kart.joinedGrandPrix);
+        if (!inStartArea && kart.grandPrixCall && kart.pawn.WasInputJustPressed(CSInputs.RELOAD)) {
+            JoinGrandPrix(kart);
+        }
+        SetGatherHud(kart, kart.inHub || kart.joinedGrandPrix ? `hub:${seconds}` : `call:${seconds}`, now);
+    }
+}
+
+/**
+ * Shows one player's part of GATHERING — "call:<s>" the call to join,
+ * "hub:<s>" the hub window's countdown, undefined neither.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {string | undefined} value @param {number} now
+ */
+function SetGatherHud(kart, value, now) {
+    kart.grandPrixCall = value?.startsWith("call:") ?? false;
+    if (value === kart.gatherShown && now < (kart.gatherResendAt ?? 0)) {
+        return;
+    }
+    kart.gatherShown = value;
+    kart.gatherResendAt = now + HUD_RESEND_SECONDS;
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    const hud = GetSpeedHud();
+    if (slot === undefined || !hud) {
+        return;
+    }
+    const [where, seconds] = value?.split(":") ?? [];
+    if (seconds !== undefined) {
+        hud.SetDialogVariableStringForPlayer(slot, where === "call" ? "grand_prix_call" : "hub_starting", "seconds", seconds);
+    }
+    hud.SetHasClassForPlayer(slot, "grand_prix_call", "Hidden", where !== "call");
+}
+
+/** Ends GATHERING's HUD for everyone and forgets who pressed R. */
+function EndGathering() {
+    gatherJoins = 0;
+    const now = Instance.GetGameTime();
+    for (const kart of karts.values()) {
+        kart.gatherResendAt = undefined;
+        SetGatherHud(kart, undefined, now);
+        kart.joinedGrandPrix = undefined;
+    }
 }
 
 // Moderator-only: cuts a heat short from wherever it's at (COUNTDOWN,
@@ -146,6 +251,12 @@ export function TryStartRace() {
 export function TryAbortRace() {
     if (phase === RacePhase.HUB) {
         Debug("TryAbortRace: ignored, no heat is running");
+        return;
+    }
+    if (phase === RacePhase.GATHERING) {
+        Debug("TryAbortRace: moderator cancelled the Grand Prix before it started");
+        EndGathering();
+        phase = RacePhase.HUB;
         return;
     }
     Debug(`TryAbortRace: moderator aborted the heat on track ${activeTrackId}`);
@@ -268,7 +379,7 @@ export function FinishKart(kart) {
         GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "finish_place", "place", result ? `${OrdinalPlace(result.place)}  ·  +${result.points} PTS` : "");
     }
     if (result) {
-        GrantXp(kart, HeatFinishXp(result.place), `heat on track ${activeTrackId}, ${OrdinalPlace(result.place)}`);
+        GrantXp(kart, HeatFinishXp(result.place), `${XP_REASON_HEAT} ${OrdinalPlace(result.place)}`);
     }
     // Shown the moment this racer crosses the line, not only once the whole
     // heat is over — stays up through BREAK until the next heat/the hub.
@@ -417,6 +528,25 @@ export function TestFinish(kart) {
 }
 
 /**
+ * Developer (user menu "Test Grand Prix Call"): the call to join a starting
+ * Grand Prix that everyone outside the start area gets (UpdateGathering),
+ * for this one player, without a Grand Prix — counting down
+ * GRAND_PRIX_GATHER_SECONDS, R teleports to the hub like the real one. The
+ * melon drives on meanwhile. Same limits as TestCountdown, and not while a
+ * Grand Prix is starting or running.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @returns {boolean} whether it started
+ */
+export function TestGrandPrixCall(kart) {
+    if (phase !== RacePhase.HUB || kart.racing || kart.breaking || kart.testPreview) {
+        return false;
+    }
+    kart.testPreview = { kind: "call", endTime: Instance.GetGameTime() + GRAND_PRIX_GATHER_SECONDS };
+    kart.gatherResendAt = undefined;
+    return true;
+}
+
+/**
  * Developer (user menu "Test Intro"): the Melon Racer logo a player sees on
  * joining, for INTRO_LOGO_SECONDS, without rejoining — the melon held where
  * it is behind it. Same limits as TestCountdown.
@@ -454,6 +584,8 @@ function EndTestPreview(kart) {
     SetBreakCountdown(slot, undefined);
     SetFinishImageVisible(slot, false);
     SetIntroLogoVisible(slot, false);
+    kart.gatherResendAt = undefined;
+    SetGatherHud(kart, undefined, Instance.GetGameTime());
 }
 
 /**
@@ -478,6 +610,18 @@ function UpdateTestPreviews(now) {
                 if (slot !== undefined) {
                     ShowCountdown(slot, remaining);
                 }
+                continue;
+            }
+        } else if (preview.kind === "call") {
+            // A real Grand Prix starting takes the HUD over (UpdateGathering).
+            if (remaining > 0 && phase === RacePhase.HUB) {
+                if (kart.grandPrixCall && kart.pawn.WasInputJustPressed(CSInputs.RELOAD)) {
+                    Debug(`TestGrandPrixCall: slot ${slot} pressed R, to the Grand Prix join spot`);
+                    SendKartToJoinGrandPrix(kart); // ends the preview
+                    gatherJoins = 0; // only a preview — the next starts the line again
+                    continue;
+                }
+                SetGatherHud(kart, `call:${GatherSecondsValue(remaining)}`, now);
                 continue;
             }
         } else if (preview.kind === "finish") {
@@ -555,6 +699,22 @@ function HideDnfWarning(kart) {
 export function UpdateRaceFlow(now) {
     const hud = GetSpeedHud();
     UpdateTestPreviews(now);
+
+    if (phase === RacePhase.GATHERING) {
+        if (now < phaseEndTime) {
+            UpdateGathering(now);
+            return;
+        }
+        const racers = KartsInStartArea();
+        EndGathering();
+        phase = RacePhase.HUB;
+        if (racers.length === 0) {
+            Debug("UpdateRaceFlow: nobody in the start area when the call ran out, no Grand Prix");
+            return;
+        }
+        StartGrandPrixWith(racers);
+        return;
+    }
 
     if (phase === RacePhase.COUNTDOWN) {
         const racers = CurrentRacers();

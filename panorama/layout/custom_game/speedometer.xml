@@ -94,7 +94,9 @@
 		     icon from tools/images/make-route-icons.mjs — and who rides
 		     along (HUB_RACER_ROWS chips, the viewer's own marked Self, "+N MORE"
 		     for the rest). While a heat runs (WaitingForOthers) only a waiting
-		     message, or for the moderator (IsModerator) the abort button. -->
+		     message, or for the moderator (IsModerator) the abort button.
+		     While it's calling the others (Starting, GATHERING) the seconds
+		     left in place of the start button (hub_starting). -->
 		<Panel id="hub_modal" class="HubModal Hidden">
 			<!-- Same build as the user menu: the card under the logo, whose
 			     banner sits on the card's top edge; the close button after
@@ -204,6 +206,7 @@
 			<Button id="hub_start_button" class="HubStartButton">
 				<Label text="START GRAND PRIX" />
 			</Button>
+			<Label id="hub_starting" class="HubStartingLabel" text="GRAND PRIX STARTS IN {s:seconds}" />
 			<Label class="HubWaitingLabel" text="Grand Prix in progress…" />
 			<Button id="hub_abort_button" class="HubAbortButton">
 				<Label text="Cancel Grand Prix" />
@@ -239,6 +242,14 @@
 		     see UpdateDnf in race-flow.js). -->
 		<Label id="dnf_warning" class="DnfWarning Hidden" text="NO CHECKPOINT · OUT IN {s:dnf}" />
 
+		<!-- A Grand Prix about to start (GATHERING, UpdateGathering in
+		     race/heat/race-flow.js): everyone outside the hub's start area is
+		     called to join — R teleports them to the hub. -->
+		<Panel id="grand_prix_call" class="GrandPrixCall Hidden">
+			<Label class="GrandPrixCallTitle" text="GRAND PRIX STARTS IN {s:seconds}" />
+			<Label class="GrandPrixCallHint" text="PRESS R TO JOIN" />
+		</Panel>
+
 		<!-- Level up (race/level/, UpdateLevelUpHud in hud/level-up-panel.js), top center
 		     for LEVEL_UP_HUD_SECONDS — not mid-heat: a racer sees it once they've finished.
 		     The skins it unlocked below (levelup_skins, hidden without). -->
@@ -249,7 +260,7 @@
 		</Panel>
 
 		<!-- XP notifier (UpdateXpGainHud in hud/xp-gain-panel.js), top right for
-		     XP_GAIN_HUD_SECONDS after XP were earned: "+40 XP", the level, the XP bar
+		     XP_GAIN_HUD_SECONDS after XP were earned: "+40 XP", why, the level, the XP bar
 		     (XP_BAR_SEGMENTS, 20) with the fill from before green (xpgain_old_<i>)
 		     and the part just gained gold (xpgain_new_<i>), the XP into the level. -->
 		<Panel id="xpgain_panel" class="XpGainPanel Hidden" hittest="false">
@@ -257,6 +268,8 @@
 				<Label class="XpGainAmount" text="{s:xpgain_amount}" />
 				<Label class="XpGainLevel" text="{s:xpgain_level}" />
 			</Panel>
+			<!-- Why: every reward's reason (XP_REASON_* in race/level/constants.js), see XpGainReasonText. -->
+			<Label class="XpGainReason" text="{s:xpgain_reason}" />
 			<Panel class="XpGainBar">
 			<Panel class="XpGainSegment"><Panel id="xpgain_old_0" class="XpGainOld" /><Panel id="xpgain_new_0" class="XpGainNew" /></Panel>
 			<Panel class="XpGainSegment"><Panel id="xpgain_old_1" class="XpGainOld" /><Panel id="xpgain_new_1" class="XpGainNew" /></Panel>
@@ -543,22 +556,22 @@
 										<Label class="SkinName" text="Honey Melon" />
 										<Label class="SkinLock" text="{s:skin_lock}" />
 									</Button>
-									<Button id="usermenu_skin_strawberry" class="SkinButton">
-										<Panel class="SkinPreviewFrame">
-											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_strawberry.png" />
-											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
-										</Panel>
-										<Label class="SkinName" text="Strawberry" />
-										<Label class="SkinLock" text="{s:skin_lock}" />
-									</Button>
-								</Panel>
-								<Panel class="UserMenuSkinRow">
 									<Button id="usermenu_skin_camo" class="SkinButton">
 										<Panel class="SkinPreviewFrame">
 											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_camo.png" />
 											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
 										</Panel>
 										<Label class="SkinName" text="Camo" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
+									</Button>
+								</Panel>
+								<Panel class="UserMenuSkinRow">
+									<Button id="usermenu_skin_strawberry" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_strawberry.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Strawberry" />
 										<Label class="SkinLock" text="{s:skin_lock}" />
 									</Button>
 									<Button id="usermenu_skin_football" class="SkinButton">
@@ -1225,6 +1238,13 @@
 							     behind it (TestIntro in race/heat/race-flow.js). Not while you race. -->
 							<Button id="usermenu_testintro_button" class="UserMenuToggle">
 								<Label class="UserMenuToggleName" text="Test Intro" />
+								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
+							</Button>
+							<!-- Plays the call everyone outside the hub's start area gets when a Grand
+							     Prix is started: "GRAND PRIX STARTS IN 10 · PRESS R TO JOIN", R takes you
+							     to the hub (TestGrandPrixCall in race/heat/race-flow.js). Not while you race. -->
+							<Button id="usermenu_testgpcall_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Test Grand Prix Call" />
 								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
 							</Button>
 							<!-- Your melon breaks where it is: effects, pieces, break camera, then the

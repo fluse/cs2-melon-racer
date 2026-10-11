@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
 import { FakeHud } from "../helpers/fake-hud.mjs";
 import { readFileSync } from "node:fs";
-import { AddXp, GetXpTotals, GrandPrixXp, HeatFinishXp, LevelOf, LevelProgress, LevelUpText, XpBarFill, XpGainView, XpToNextLevel } from "../../src/melon_drive/race/level/logic.js";
+import { AddXp, GetXpTotals, GrandPrixXp, HeatFinishXp, LevelOf, LevelProgress, LevelUpText, XpBarFill, XpGainReasonText, XpGainView, XpToNextLevel } from "../../src/melon_drive/race/level/logic.js";
 import { IsSkinUnlocked, SkinUnlockLevel, SkinsUnlockedBetween } from "../../src/melon_drive/kart/skin-logic.js";
 import { NewGrandPrix, BeginGrandPrixHeat, RecordHeatFinish } from "../../src/melon_drive/race/grand-prix/logic.js";
 import {
@@ -28,6 +28,10 @@ import {
     LEVEL_UP_HUD_SECONDS,
     XP_GAIN_HUD_SECONDS,
     XP_BAR_SEGMENTS,
+    XP_GAIN_REASONS_SHOWN,
+    XP_REASON_TIME_TRIAL_FINISH,
+    XP_REASON_NEW_BEST,
+    XP_REASON_PERFECT_BOUNCE,
     MELON_TEMPLATE_NAME,
     HUB_SPAWN_NAME,
     SPEED_HUD_ENTITY_NAME,
@@ -210,12 +214,13 @@ test("XP notifier: shown for a reward (adding up), not for the time on the serve
     assert.equal(kart.xpGain, undefined, "time on the server: no notifier");
 
     const before = level.GetKartXp(kart);
-    level.GrantXp(kart, XP_TIME_TRIAL_FINISH, "test");
-    level.GrantXp(kart, XP_NEW_BEST, "test");
+    level.GrantXp(kart, XP_TIME_TRIAL_FINISH, XP_REASON_TIME_TRIAL_FINISH);
+    level.GrantXp(kart, XP_NEW_BEST, XP_REASON_NEW_BEST);
     UpdateXpGainHud(1, kart, world.time);
     assert.ok(!hud.Has(1, "xpgain_panel", "Hidden"));
     const view = XpGainView(before, level.GetKartXp(kart), XP_TIME_TRIAL_FINISH + XP_NEW_BEST, XP_BAR_SEGMENTS);
     assert.equal(hud.Variable(1, "xpgain_panel", "xpgain_amount"), view.amount, "both gains added up");
+    assert.equal(hud.Variable(1, "xpgain_panel", "xpgain_reason"), `${XP_REASON_TIME_TRIAL_FINISH} · ${XP_REASON_NEW_BEST}`, "and why");
     assert.equal(hud.Variable(1, "xpgain_panel", "xpgain_level"), view.level);
     for (let i = 0; i < XP_BAR_SEGMENTS; i++) {
         assert.equal(hud.Has(1, `xpgain_old_${i}`, "On"), i < view.oldFill);
@@ -232,4 +237,16 @@ test("the layout has one XP notifier segment pair per XP_BAR_SEGMENTS", () => {
         assert.ok(xml.includes(`id="xpgain_old_${i}"`) && xml.includes(`id="xpgain_new_${i}"`), `segment ${i}`);
     }
     assert.ok(!xml.includes(`id="xpgain_old_${XP_BAR_SEGMENTS}"`));
+});
+
+test("XP notifier reasons: in order, repeats counted, the rest cut off", () => {
+    assert.equal(XpGainReasonText([]), "");
+    assert.equal(XpGainReasonText([XP_REASON_NEW_BEST]), XP_REASON_NEW_BEST);
+    assert.equal(
+        XpGainReasonText([XP_REASON_PERFECT_BOUNCE, XP_REASON_TIME_TRIAL_FINISH, XP_REASON_PERFECT_BOUNCE]),
+        `${XP_REASON_PERFECT_BOUNCE} \u00d72 \u00b7 ${XP_REASON_TIME_TRIAL_FINISH}`,
+    );
+    const many = Array.from({ length: XP_GAIN_REASONS_SHOWN + 1 }, (_, i) => `R${i}`);
+    assert.ok(XpGainReasonText(many).endsWith("+ MORE"));
+    assert.ok(!XpGainReasonText(many).includes(`R${XP_GAIN_REASONS_SHOWN}`));
 });

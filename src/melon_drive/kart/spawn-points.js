@@ -3,7 +3,7 @@ import { Debug } from "../core/debug.js";
 import { TraceLine } from "../core/trace.js";
 import { ViewAnglesFacing } from "../zones/teleport/logic.js";
 import { NearestWithin } from "./spawn-points-logic.js";
-import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, SPAWN_UP_OFFSET, TELEPORT_UP_OFFSET, FLOOR_TRACE_UP, FLOOR_TRACE_DOWN, START_SPAWN_SHARED_NAME, START_SPAWN_SHARED_MAX_DISTANCE, CHECKPOINT_SPAWN_SHARED_NAME, CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE, CheckpointSpawnName, StartSpawnName, PodiumSpawnName } from "../constants/index.js";
+import { HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME, INTRO_SPAWN_NAME, JOIN_GRAND_PRIX_SPAWN_NAME, SPAWN_UP_OFFSET, TELEPORT_UP_OFFSET, FLOOR_TRACE_UP, FLOOR_TRACE_DOWN, START_SPAWN_SHARED_NAME, START_SPAWN_SHARED_MAX_DISTANCE, CHECKPOINT_SPAWN_SHARED_NAME, CHECKPOINT_SPAWN_SHARED_MAX_DISTANCE, CheckpointSpawnName, StartSpawnName, PodiumSpawnName } from "../constants/index.js";
 
 // The one place that turns a Hammer spawn entity into a melon position.
 // Every caller that puts a melon at the hub or the intro goes through here,
@@ -111,6 +111,16 @@ export function GetHubSpawnPoint() {
     const spawn = FindSpawnPoint(HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME);
     if (!spawn) {
         Debug(`GetHubSpawnPoint: no "${HUB_SPAWN_NAME}" in the map — nowhere to put melons`);
+    }
+    return spawn;
+}
+
+/** Where R takes a melon to join a starting Grand Prix: spawn_join_grandprix, or the hub spawn if there's none. */
+export function GetJoinGrandPrixSpawnPoint() {
+    const spawn = FindSpawnPoint(JOIN_GRAND_PRIX_SPAWN_NAME);
+    if (!spawn) {
+        Debug(`GetJoinGrandPrixSpawnPoint: no "${JOIN_GRAND_PRIX_SPAWN_NAME}" in the map, using the hub spawn`);
+        return GetHubSpawnPoint();
     }
     return spawn;
 }

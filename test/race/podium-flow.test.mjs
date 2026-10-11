@@ -4,6 +4,7 @@
 // held there (jumping works, driving doesn't) until the hold runs out or
 // something takes them down.
 import "../helpers/register-cs-script.mjs";
+import { StartGrandPrixNow } from "../helpers/grand-prix.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
@@ -13,7 +14,7 @@ const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
 const { GetHubSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
 const { RespawnKartAtCheckpoint } = await import("../../src/melon_drive/kart/teleport.js");
 const flow = await import("../../src/melon_drive/race/heat/race-flow.js");
-const { TryStartRace, TryAbortRace, FinishKart, UpdateRaceFlow, RestoreRaceFlowSnapshot } = flow;
+const { TryAbortRace, FinishKart, UpdateRaceFlow, RestoreRaceFlowSnapshot } = flow;
 const { UpdateKart } = await import("../../src/melon_drive/movement/index.js");
 const { UpdatePodiumCamera } = await import("../../src/melon_drive/camera/index.js");
 const C = await import("../../src/melon_drive/constants/index.js");
@@ -46,7 +47,7 @@ function RunGrandPrix(racers, order) {
         kart.inHub = true;
     }
     world.time = 0;
-    TryStartRace();
+    StartGrandPrixNow(flow);
     Tick(C.COUNTDOWN_SECONDS);
     for (const kart of order) {
         FinishKart(kart);
@@ -121,7 +122,7 @@ test("a cancelled Grand Prix puts nobody on the podium", () => {
         kart.inHub = true;
     }
     world.time = 0;
-    TryStartRace();
+    StartGrandPrixNow(flow);
     FinishKart(a);
     TryAbortRace();
     assert.equal(a.podium, undefined);
@@ -191,7 +192,7 @@ test("the respawn button, the hub button and the next Grand Prix take it down", 
     assert.ok(a.podium);
     a.inHub = true;
     world.time = 200;
-    TryStartRace();
+    StartGrandPrixNow(flow);
     assert.equal(a.podium, undefined);
 });
 

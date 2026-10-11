@@ -16,7 +16,7 @@ import { IsFreeLookOn, SetFreeLook } from "../dev/free-look.js";
 import { HandleCameraTuningClick } from "../dev/camera-tuning.js";
 import { HandlePhysicsTuningClick } from "../dev/physics-tuning.js";
 import { TestBreak, TestHeal, TestPerfectBounce, TestXpGain } from "../dev/test-effects.js";
-import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, TestCountdown, TestFinish, TestIntro } from "../race/heat/race-flow.js";
+import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, TestCountdown, TestFinish, TestIntro, TestGrandPrixCall } from "../race/heat/race-flow.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { PlaceOnPodium, TestGrandPrix } from "../race/podium/podium.js";
 import { GetSpeedHud } from "./layout.js";
@@ -172,6 +172,8 @@ const TEST_TRIGGER_BUTTONS = {
     usermenu_testcountdown_button: (slot, kart) => TestCountdown(kart),
     usermenu_testfinish_button: (slot, kart) => TestFinish(kart),
     usermenu_testintro_button: (slot, kart) => TestIntro(kart),
+    // The call to join a starting Grand Prix (race/heat/race-flow.js).
+    usermenu_testgpcall_button: (slot, kart) => TestGrandPrixCall(kart),
     // A break, a PERFECT bounce's feedback or the heal effect on the melon,
     // the XP notifier (dev/test-effects.js).
     usermenu_testbreak_button: (slot, kart) => TestBreak(slot, kart),

@@ -30,6 +30,31 @@ use any trigger with `hub_teleport` — never `hub_enter`.
 |---|---|---|
 | `hub_teleport` | `OnStartTouch` | sends the melon to `hub_spawn` ([spawn points](02-core-entities.md#spawn-points)) at full health and makes it the respawn point, takes it out of a running heat, clears its track progress and cancels a running time trial |
 
+## Joining a starting Grand Prix
+
+"Start Grand Prix" waits `GRAND_PRIX_GATHER_SECONDS` before the heats
+begin: everyone outside `hub_start_trigger` is called ("GRAND PRIX STARTS
+IN 10 · PRESS R TO JOIN"), and **R** teleports their melon here.
+
+| Setting | Value |
+|---|---|
+| Class | any named point entity, e.g. `info_target` |
+| Name | `spawn_join_grandprix` — one |
+| Position | **inside `hub_start_trigger`**, on or just above the floor — whoever stands in the trigger when the time runs out races |
+| Yaw | the way the melons face on arrival (along the line-up) |
+
+- Several players pressing R are lined up side by side
+  (`RACE_SPAWN_LATERAL_SPACING` apart, alternating left and right of it),
+  so leave room on both sides.
+- It becomes their respawn point, like the hub's.
+- Without one, R uses `hub_spawn`.
+
+### Values
+
+| Constant | Value | Meaning | Defined in |
+|---|---|---|---|
+| `GRAND_PRIX_GATHER_SECONDS` | 10 s | how long the others are called before the Grand Prix starts | `race/constants.js` |
+
 ## Podium
 
 After a Grand Prix that ran to its last track, the top three are put on the

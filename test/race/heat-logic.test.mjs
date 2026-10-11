@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BreakCountdownValue, BreakCountdownLabels, CountdownStep, CountdownNumberState, WatchProgress, DnfSecondsLeft, DnfWarningValue } from "../../src/melon_drive/race/heat/logic.js";
-import { BREAK_SECONDS, DNF_NO_PROGRESS_SECONDS, DNF_WARNING_SECONDS } from "../../src/melon_drive/constants/index.js";
+import { BreakCountdownValue, BreakCountdownLabels, CountdownStep, CountdownNumberState, WatchProgress, DnfSecondsLeft, DnfWarningValue, GatherSecondsValue } from "../../src/melon_drive/race/heat/logic.js";
+import { GRAND_PRIX_GATHER_SECONDS, BREAK_SECONDS, DNF_NO_PROGRESS_SECONDS, DNF_WARNING_SECONDS } from "../../src/melon_drive/constants/index.js";
 
 test("the break countdown runs BREAK_SECONDS down to 0", () => {
     assert.equal(BreakCountdownValue(BREAK_SECONDS), BREAK_SECONDS);
@@ -58,4 +58,11 @@ test("DNF warning: whole seconds within the last DNF_WARNING_SECONDS, never 0", 
     assert.equal(DnfWarningValue(2.3, DNF_WARNING_SECONDS), 3, "rounded up");
     assert.equal(DnfWarningValue(0.01, DNF_WARNING_SECONDS), 1);
     assert.equal(DnfWarningValue(0, DNF_WARNING_SECONDS), undefined, "out — nothing left to warn about");
+});
+
+test("the call to join counts GRAND_PRIX_GATHER_SECONDS down, never 0 while there's time", () => {
+    assert.equal(GatherSecondsValue(GRAND_PRIX_GATHER_SECONDS), GRAND_PRIX_GATHER_SECONDS);
+    assert.equal(GatherSecondsValue(GRAND_PRIX_GATHER_SECONDS - 0.1), GRAND_PRIX_GATHER_SECONDS);
+    assert.equal(GatherSecondsValue(0.1), 1);
+    assert.equal(GatherSecondsValue(-1), 0);
 });

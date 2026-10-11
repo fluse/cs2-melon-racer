@@ -11,7 +11,7 @@ import { PlayHealEffect, RestoreFullHealth } from "../health/heal/index.js";
 import { PlayPerfectSpark } from "../movement/wall-bounce/wall-bounce.js";
 import { GetKartXp, ShowXpGain } from "../race/level/level.js";
 import { SetFreeLook } from "./free-look.js";
-import { WALL_BOUNCE_OPTIMAL_ANGLE, XP_GAIN_TEST_AMOUNT } from "../constants/index.js";
+import { WALL_BOUNCE_OPTIMAL_ANGLE, XP_GAIN_TEST_AMOUNT, XP_REASON_NEW_BEST } from "../constants/index.js";
 
 /**
  * Whether a test effect may play on this kart's melon now.
@@ -82,6 +82,6 @@ export function TestHeal(kart) {
  */
 export function TestXpGain(kart) {
     const xp = GetKartXp(kart);
-    ShowXpGain(kart, xp, XP_GAIN_TEST_AMOUNT, xp + XP_GAIN_TEST_AMOUNT);
+    ShowXpGain(kart, xp, XP_GAIN_TEST_AMOUNT, XP_REASON_NEW_BEST, xp + XP_GAIN_TEST_AMOUNT);
     return true;
 }

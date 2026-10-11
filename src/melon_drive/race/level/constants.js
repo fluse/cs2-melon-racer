@@ -45,6 +45,17 @@ export const XP_GAIN_HUD_SECONDS = 3.5;
 // XP the user menu's "Test XP Gain" pretends to give (a new best's) — only
 // shown, not given.
 export const XP_GAIN_TEST_AMOUNT = 25;
+// Why XP were earned, as the XP notifier says it under the "+40 XP" (GrantXp's
+// reason). A heat's and a Grand Prix's add the place ("HEAT 1ST").
+export const XP_REASON_TIME_TRIAL_FINISH = "TIME TRIAL FINISH";
+export const XP_REASON_NEW_BEST = "NEW BEST TIME";
+export const XP_REASON_HEAT = "HEAT";
+export const XP_REASON_GRAND_PRIX = "GRAND PRIX";
+export const XP_REASON_PERFECT_BOUNCE = "PERFECT WALL BOUNCE";
+export const XP_REASON_PERFECT_WALL_JUMP = "PERFECT WALL JUMP";
+export const XP_REASON_CHEAT = "CHEAT";
+// Reasons listed on the notifier at most; more add "+ MORE".
+export const XP_GAIN_REASONS_SHOWN = 3;
 // Segments of the profile's XP bar (usermenu_profile_xp_<i> in speedometer.xml)
 // and of the XP notifier's (xpgain_old_<i>/xpgain_new_<i>).
 export const XP_BAR_SEGMENTS = 20;

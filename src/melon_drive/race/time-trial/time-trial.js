@@ -1,7 +1,7 @@
 import { Instance } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { FormatRaceTime, ParseSaveData, GetBestTimes, RecordRunTime } from "./logic.js";
-import { SAVE_DATA_BEST_TIMES_KEY, XP_TIME_TRIAL_FINISH, XP_NEW_BEST } from "../../constants/index.js";
+import { SAVE_DATA_BEST_TIMES_KEY, XP_TIME_TRIAL_FINISH, XP_NEW_BEST, XP_REASON_TIME_TRIAL_FINISH, XP_REASON_NEW_BEST } from "../../constants/index.js";
 import { CountStat } from "../stats/stats.js";
 import { GrantXp } from "../level/level.js";
 
@@ -78,10 +78,10 @@ export function FinishRun(kart, trackId) {
     CountStat(kart, "finishes");
     // A heat's finish earns its XP by place (FinishKart in race/heat/race-flow.js).
     if (!kart.racing) {
-        GrantXp(kart, XP_TIME_TRIAL_FINISH, `time trial finish, track ${trackId}`);
+        GrantXp(kart, XP_TIME_TRIAL_FINISH, XP_REASON_TIME_TRIAL_FINISH);
     }
     if (newBest) {
-        GrantXp(kart, XP_NEW_BEST, `new best, track ${trackId}`);
+        GrantXp(kart, XP_NEW_BEST, XP_REASON_NEW_BEST);
     }
     Debug(`FinishRun: "${name}" ran track ${trackId} in ${FormatRaceTime(time)}${newBest ? " — new best" : ""}`);
 }

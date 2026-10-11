@@ -10,18 +10,27 @@
 export const MAX_TRACKS = 8;
 export const MAX_CHECKPOINTS_PER_TRACK = 32;
 
-// Race flow: HUB (default/gather) -> COUNTDOWN (locked, pre-race) -> RACING
+// Race flow: HUB (default/gather) -> GATHERING (the call to join, see
+// GRAND_PRIX_GATHER_SECONDS) -> COUNTDOWN (locked, pre-race) -> RACING
 // -> BREAK (finished, waiting for the next heat) -> back to COUNTDOWN on the
 // next track, or back to HUB after the last one. See GAMEPLAY.md's "Hub ->
 // race -> next-track flow" for the full design.
 export const RacePhase = /** @type {const} */ ({
     HUB: "HUB",
+    GATHERING: "GATHERING",
     COUNTDOWN: "COUNTDOWN",
     RACING: "RACING",
     BREAK: "BREAK",
 });
 
 export const HUB_TRIGGER_NAME = "hub_start_trigger";
+
+// "Start Grand Prix" doesn't start at once: for this long everyone outside
+// the hub's start area sees "GRAND PRIX STARTS IN 10 · PRESS R TO JOIN"
+// (grand_prix_call), R teleports them to the hub, everyone in it sees the
+// seconds in the hub window, and whoever stands in the start area when it
+// runs out races.
+export const GRAND_PRIX_GATHER_SECONDS = 10;
 
 export const COUNTDOWN_SECONDS = 3;
 export const GO_DISPLAY_SECONDS = 0.7; // how long "GO" stays on screen once the countdown ends — its grow-and-fade (speedometer.css) is done by .62s

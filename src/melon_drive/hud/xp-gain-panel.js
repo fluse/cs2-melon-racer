@@ -6,9 +6,9 @@ import { XP_BAR_SEGMENTS, HUD_RESEND_SECONDS } from "../constants/index.js";
 /**
  * The XP notifier (xpgain_panel in speedometer.xml, top right): for
  * XP_GAIN_HUD_SECONDS after XP were earned (kart.xpGain, see ShowXpGain) the
- * XP gained ("+40 XP"), the level and the XP into it, and the bar — the
- * fill from before green (xpgain_old_<i>), the part just gained gold
- * (xpgain_new_<i>). Also mid-heat. Sent on change, and again every
+ * XP gained ("+40 XP") and why ("TIME TRIAL FINISH · NEW BEST TIME"), the
+ * level and the XP into it, and the bar — the fill from before green
+ * (xpgain_old_<i>), the part just gained gold (xpgain_new_<i>). Also mid-heat. Sent on change, and again every
  * HUD_RESEND_SECONDS.
  * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {number} now
  */
@@ -17,8 +17,8 @@ export function UpdateXpGainHud(slot, kart, now) {
         kart.xpGain = undefined;
     }
     const gain = kart.xpGain;
-    const view = gain ? XpGainView(gain.fromXp, gain.toXp ?? GetKartXp(kart), gain.amount, XP_BAR_SEGMENTS) : undefined;
-    const key = view ? `${view.amount}|${view.level}|${view.xp}|${view.oldFill}|${view.newFill}` : "";
+    const view = gain ? XpGainView(gain.fromXp, gain.toXp ?? GetKartXp(kart), gain.amount, XP_BAR_SEGMENTS, gain.reasons) : undefined;
+    const key = view ? `${view.amount}|${view.reason}|${view.level}|${view.xp}|${view.oldFill}|${view.newFill}` : "";
     if (key === kart.xpGainShown && now < (kart.xpGainResendAt ?? 0)) {
         return;
     }
@@ -30,6 +30,7 @@ export function UpdateXpGainHud(slot, kart, now) {
     }
     if (view) {
         hud.SetDialogVariableStringForPlayer(slot, "xpgain_panel", "xpgain_amount", view.amount);
+        hud.SetDialogVariableStringForPlayer(slot, "xpgain_panel", "xpgain_reason", view.reason);
         hud.SetDialogVariableStringForPlayer(slot, "xpgain_panel", "xpgain_level", view.level);
         hud.SetDialogVariableStringForPlayer(slot, "xpgain_panel", "xpgain_xp", view.xp);
         for (let i = 0; i < XP_BAR_SEGMENTS; i++) {
