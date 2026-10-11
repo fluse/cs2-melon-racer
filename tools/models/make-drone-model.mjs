@@ -14,15 +14,21 @@
 //           other way round (like a real quadcopter), and the camera's red
 //           recording light blinking (on its own bone, it sinks into the
 //           camera's housing for the off half of each REC_BLINK_SECONDS), looping
+//   spindown  (not looping) the rotors running down from full speed to a
+//           stop over ROTOR_SPINDOWN_SECONDS — the drone has touched down
+//   landed  rotors standing still, the recording light still blinking, looping
+//   spinup  (not looping) the rotors running up to full speed over
+//           ROTOR_SPINUP_SECONDS — taking off again, then "spin"
 //   idle    rotors standing still (one frame)
 // The chassis and arms are woven carbon: a twill color + normal map
 // (drone_carbon_{color,normal}.png), so the surface has structure too.
 // The script spawns it from the point_template DRONE_TEMPLATE_NAME and
-// starts "spin" itself — in the template just a prop_dynamic with this
+// starts "spin" itself (and switches to spindown/landed/spinup on the
+// ground) — in the template just a prop_dynamic with this
 // model. No collision at all: melons drive through a drone, and the
 // script keeps it out of the world with traces (dev/free-look.js). Writes
 //   models/melon_racer/drone/drone.smd             render mesh + skeleton (bind pose)
-//   models/melon_racer/drone/drone_{spin,idle}.smd the animations
+//   models/melon_racer/drone/drone_{spin,spindown,landed,spinup,idle}.smd the animations
 //   models/melon_racer/drone/drone.vmdl
 //   materials/melon_racer/drone/drone_<part>.vmat (+ _color.png; carbon also _normal.png)
 // Compile the .vmdl with resourcecompiler (see the end of the output).
@@ -56,6 +62,11 @@ const REC_COLOR = [0xff, 0x18, 0x18]; // recording red
 const ROTOR_TURNS_PER_SECOND = 10; // 120 degrees a frame at FPS — under half a turn, so it still interpolates the right way round
 const SPIN_SECONDS = 1; // one loop
 const FPS = 30;
+// Touching down / taking off (dev/free-look.js): the rotors run evenly down
+// to a stop / up to full speed. Over T seconds that's ROTOR_TURNS_PER_SECOND
+// x T / 2 turns — a whole number, so the rotors end where "spin" starts.
+const ROTOR_SPINDOWN_SECONDS = 1.2;
+const ROTOR_SPINUP_SECONDS = 0.4;
 
 // --- tessellation: as low as still reads round ---
 const ARM_SIDES = 8;
@@ -108,14 +119,14 @@ const BONES = [
 const REC_BONE = BONES.length - 1;
 
 /**
- * The skeleton t seconds into the spin: every rotor turned around +Z its own
- * way, the recording light up for the first half of each blink, sunk into
+ * The skeleton t seconds into an animation: every rotor turned `turns`
+ * around +Z its own way (by default the full-speed spin), the recording light up for the first half of each blink, sunk into
  * the housing for the second.
  */
-function SpinFrame(t) {
+function SpinFrame(t, turns = ROTOR_TURNS_PER_SECOND * t) {
     const frame = BindFrame(BONES);
     ROTORS.forEach((rotor, i) => {
-        frame[i + 1].rot = [0, 0, rotor.turn * 2 * Math.PI * ROTOR_TURNS_PER_SECOND * t];
+        frame[i + 1].rot = [0, 0, rotor.turn * 2 * Math.PI * turns];
     });
     const on = (t % REC_BLINK_SECONDS) < REC_BLINK_SECONDS / 2 - 1e-9;
     frame[REC_BONE].pos = on ? REC_LED : [REC_LED[0], REC_LED[1], REC_LED[2] - REC_HIDE_DEPTH];
@@ -310,20 +321,32 @@ const looks = [
 const materials = Object.fromEntries(looks.map(([part]) => [part, `${MATERIAL_DIR}/${NAME}_${part}.vmat`]));
 // The last frame repeats the first pose (whole turns): the loop closes seamlessly.
 const spinFrames = Array.from({ length: Math.round(SPIN_SECONDS * FPS) + 1 }, (_, f) => SpinFrame(f / FPS));
+const FramesOver = (seconds, Frame) => Array.from({ length: Math.round(seconds * FPS) + 1 }, (_, f) => Frame(Math.min(f / FPS, seconds)));
+// Evenly slower / faster: the turns covered t seconds into it.
+const spindownFrames = FramesOver(ROTOR_SPINDOWN_SECONDS, (t) => SpinFrame(t, ROTOR_TURNS_PER_SECOND * (t - (t * t) / (2 * ROTOR_SPINDOWN_SECONDS))));
+const spinupFrames = FramesOver(ROTOR_SPINUP_SECONDS, (t) => SpinFrame(t, (ROTOR_TURNS_PER_SECOND * t * t) / (2 * ROTOR_SPINUP_SECONDS)));
+const landedFrames = FramesOver(REC_BLINK_SECONDS, (t) => SpinFrame(t, 0));
 const animations = [
-    { name: "spin", file: `${MODEL_DIR}/${NAME}_spin.smd`, looping: true },
+    { name: "spin", file: `${MODEL_DIR}/${NAME}_spin.smd`, looping: true, frames: spinFrames },
+    { name: "spindown", file: `${MODEL_DIR}/${NAME}_spindown.smd`, looping: false, frames: spindownFrames },
+    { name: "landed", file: `${MODEL_DIR}/${NAME}_landed.smd`, looping: true, frames: landedFrames },
+    { name: "spinup", file: `${MODEL_DIR}/${NAME}_spinup.smd`, looping: false, frames: spinupFrames },
     { name: "idle", file: `${MODEL_DIR}/${NAME}_idle.smd`, looping: true },
 ];
 const mesh = `${MODEL_DIR}/${NAME}.smd`;
 WriteAddonFile(mesh, SmdText(sourceBones, triangles));
-WriteAddonFile(animations[0].file, SmdAnimationText(sourceBones, spinFrames.map(frame => frame.map(bone => ({ ...bone, pos: ToSource(bone.pos) })))));
-WriteAddonFile(animations[1].file, SmdAnimationText(sourceBones, [BindFrame(sourceBones)]));
-WriteAddonFile(`${MODEL_DIR}/${NAME}.vmdl`, VmdlText({ name: NAME, mesh, materials, animations }));
+for (const { file, frames } of animations) {
+    WriteAddonFile(file, SmdAnimationText(sourceBones, frames ? frames.map(frame => frame.map(bone => ({ ...bone, pos: ToSource(bone.pos) }))) : [BindFrame(sourceBones)]));
+}
+WriteAddonFile(`${MODEL_DIR}/${NAME}.vmdl`, VmdlText({ name: NAME, mesh, materials, animations: animations.map(({ name, file, looping }) => ({ name, file, looping })) }));
 WriteAddonFile(`${MATERIAL_DIR}/${NAME}_carbon_normal.png`, carbonNormal);
 for (const [part, rgb, options] of looks) {
     const texture = `${MATERIAL_DIR}/${NAME}_${part}_color.png`;
     WriteAddonFile(texture, rgb ? SolidPng(rgb) : carbonColor);
     WriteAddonFile(materials[part], VmatText({ texture, generator: GENERATOR, tint: 0, ...options }));
 }
-console.log(`${triangles.length} triangles, no collision, spin ${spinFrames.length} frames (${ROTOR_TURNS_PER_SECOND} turns/s); ${SPAN} across, ${((6.3 - SKID_Z + 0.8) * SCALE).toFixed(1)} high`);
+console.log(`${triangles.length} triangles, no collision, spin ${spinFrames.length} frames (${ROTOR_TURNS_PER_SECOND} turns/s), spindown ${ROTOR_SPINDOWN_SECONDS} s, spinup ${ROTOR_SPINUP_SECONDS} s; ${SPAN} across, ${((6.3 - SKID_Z + 0.8) * SCALE).toFixed(1)} high`);
+// The script's box against the world (DRONE_BOTTOM / DRONE_TOP in src/melon_drive/dev/constants.js).
+const zs = triangles.flatMap(t => t.corners.map(c => c.p[2]));
+console.log(`skids ${(-Math.min(...zs)).toFixed(2)} below the origin, top ${Math.max(...zs).toFixed(2)} above it`);
 console.log(`compile: game/bin/win64/resourcecompiler.exe -game csgo -addon melon_racer -i "<content path>/${MODEL_DIR}/${NAME}.vmdl"`);

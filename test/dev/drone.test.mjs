@@ -5,7 +5,7 @@ import "../helpers/register-cs-script.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
-import { DroneWishVelocity, StepDroneVelocity, ClipVelocity, DroneTargetTilt, StepDroneTilt } from "../../src/melon_drive/dev/drone-logic.js";
+import { DroneWishVelocity, StepDroneVelocity, IsDroneLanded, DroneRotorInputs, StepDroneYaw, ClipVelocity, DroneTargetTilt, StepDroneTilt, DroneLaserRay, LaserSegments, DRONE_LASER_SEGMENTS } from "../../src/melon_drive/dev/drone-logic.js";
 
 const { karts } = await import("../../src/melon_drive/core/kart-registry.js");
 const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
@@ -73,6 +73,7 @@ beforeEach(() => {
     world.add(new PointTemplate({ name: C.MELON_TEMPLATE_NAME, spawn: () => [new Entity({ className: "prop_physics_multiplayer" })] }));
     world.add(new Entity({ name: C.HUB_SPAWN_NAME, className: "info_player_start", origin: { x: 0, y: 0, z: 0 } }));
     world.add(new PointTemplate({ name: C.DRONE_TEMPLATE_NAME, spawn: () => [new Entity({ className: "prop_dynamic" })] }));
+    world.add(new PointTemplate({ name: C.DRONE_LASER_TEMPLATE_NAME, spawn: () => [new Entity({ className: "prop_dynamic", origin: { x: 30, y: 0, z: 0 } })] }));
     kart = SetUpPlayerKart(world.add(new CSPlayerPawn({ slot: 0 })), GetHubSpawnPoint());
     assert.equal(SetFreeLook(kart, true), true, "setup: flying");
 });
@@ -96,7 +97,7 @@ test("a wall stops the drone and it slides along; a melon in the way doesn't", (
     kart.drone.velocity = DroneWishVelocity({ forward: 1, strafe: -1, lift: 0 }, { pitch: 0, yaw: 0 }, C.DRONE_SPEED);
     const start = { ...kart.drone.position };
     // A wall facing -x a few units ahead; the other player's melon right in front of it.
-    world.traceSphere = (c) => {
+    world.traceBox = (c) => {
         const ignored = [].concat(c.ignoreEntity ?? []);
         if (!ignored.includes(other.melon) && c.end.x > start.x + 1) {
             return { didHit: true, fraction: 0.1, end: { ...c.start, x: c.start.x + 1 }, normal: { x: -1, y: 0, z: 0 }, hitEntity: other.melon, startedInSolid: false };
@@ -113,4 +114,103 @@ test("a wall stops the drone and it slides along; a melon in the way doesn't", (
     assert.ok(at.x > start.x + 1, "flew through the melon");
     assert.ok(at.y > start.y + 1, "slid along the wall");
     assert.equal(kart.drone.velocity.x, 0, "nothing left into the wall");
+});
+
+test("landed: floor under it — not a wall, not nothing, not while taking off", () => {
+    const floor = { didHit: true, normal: { x: 0, y: 0, z: 1 } };
+    assert.equal(IsDroneLanded(floor, false), true);
+    assert.equal(IsDroneLanded(floor, true), false, "taking off");
+    assert.equal(IsDroneLanded({ didHit: true, normal: { x: 1, y: 0, z: C.DRONE_GROUND_NORMAL_Z - 0.1 } }, false), false, "too steep");
+    assert.equal(IsDroneLanded(undefined, false), false);
+});
+
+test("rotors: run down to a stop on touching down, up again on taking off, nothing in between", () => {
+    assert.deepEqual(DroneRotorInputs(true, false), [["SetAnimationNotLooping", "spindown"], ["SetIdleAnimationLooping", "landed"]]);
+    assert.deepEqual(DroneRotorInputs(false, true), [["SetAnimationNotLooping", "spinup"], ["SetIdleAnimationLooping", "spin"]]);
+    assert.deepEqual(DroneRotorInputs(true, true), []);
+    assert.deepEqual(DroneRotorInputs(false, false), []);
+});
+
+test("yaw: landed it stays put whatever the view; in the air it turns the short way to the view at DRONE_YAW_RATE", () => {
+    assert.equal(StepDroneYaw(10, 170, true, 1), 10);
+    assert.equal(StepDroneYaw(10, 20, false, 1), 20, "close enough: on the view");
+    assert.ok(close(StepDroneYaw(0, 170, false, 0.1), C.DRONE_YAW_RATE * 0.1));
+    assert.ok(close(StepDroneYaw(170, -170, false, 0.01), 170 + C.DRONE_YAW_RATE * 0.01), "across ±180 the short way");
+});
+
+test("landed, looking around doesn't turn the drone; taking off it turns back to the view", () => {
+    world.traceBox = (c) => c.end.z < c.start.z && c.end.x === c.start.x && c.end.y === c.start.y
+        ? { didHit: true, fraction: 0.25, end: { ...c.start, z: c.start.z - 0.5 }, normal: { x: 0, y: 0, z: 1 }, startedInSolid: false }
+        : { didHit: false, fraction: 1, end: c.end, normal: { x: 0, y: 0, z: 0 }, startedInSolid: false };
+    UpdateDrone(kart, 0.1);
+    const yaw = kart.drone.body.GetAbsAngles().yaw;
+    kart.pawn.eyeAngles = { pitch: 0, yaw: yaw + 120, roll: 0 };
+    UpdateDrone(kart, 0.1);
+    UpdateDrone(kart, 0.1);
+    assert.ok(close(kart.drone.body.GetAbsAngles().yaw, yaw), "on the ground: no turning on the spot");
+    kart.pawn.justPressed.add("JUMP");
+    UpdateDrone(kart, 0.1);
+    kart.pawn.justPressed.clear();
+    for (let i = 0; i < 9; i++) {
+        UpdateDrone(kart, 0.1);
+    }
+    assert.ok(close(kart.drone.body.GetAbsAngles().yaw, yaw + 120), "in the air: facing the view again");
+});
+
+test("touching down the drone's rotors run down once; jump takes off and runs them up", () => {
+    const body = kart.drone.body;
+    const Fired = (input) => world.fired.filter((f) => f.target === body && f.input === input).map((f) => f.value);
+    world.traceBox = (c) => c.end.z < c.start.z && c.end.x === c.start.x && c.end.y === c.start.y
+        ? { didHit: true, fraction: 0.25, end: { ...c.start, z: c.start.z - 0.5 }, normal: { x: 0, y: 0, z: 1 }, startedInSolid: false }
+        : { didHit: false, fraction: 1, end: c.end, normal: { x: 0, y: 0, z: 0 }, startedInSolid: false };
+    UpdateDrone(kart, 0.1);
+    UpdateDrone(kart, 0.1);
+    assert.equal(kart.drone.landed, true);
+    assert.deepEqual(Fired("SetAnimationNotLooping"), ["spindown"], "once, not every tick");
+    const parkedAt = { ...kart.drone.position };
+    kart.pawn.pressed.add("FORWARD").add("DUCK").add("RIGHT");
+    UpdateDrone(kart, 0.1);
+    assert.deepEqual(kart.drone.position, parkedAt, "parked: W, duck, D do nothing");
+    assert.equal(kart.drone.landed, true);
+    kart.pawn.pressed.clear();
+    kart.pawn.justPressed.add("JUMP");
+    UpdateDrone(kart, 0.1);
+    assert.equal(kart.drone.landed, false);
+    assert.ok(kart.drone.position.z > parkedAt.z, "hops up");
+    assert.deepEqual(Fired("SetAnimationNotLooping"), ["spindown", "spinup"]);
+    assert.equal(Fired("SetIdleAnimationLooping").at(-1), "spin");
+});
+
+test("laser ray: from the recording light, along the pilot's view, DRONE_LASER_LENGTH long", () => {
+    const { start, end } = DroneLaserRay({ x: 100, y: 0, z: 50 }, { pitch: 0, yaw: 0 }, { pitch: 0, yaw: 90 });
+    assert.ok(close(start.x, 100 + C.DRONE_LASER_FORWARD) && close(start.y, 0) && close(start.z, 50 + C.DRONE_LASER_UP));
+    assert.ok(close(end.x, start.x) && close(end.y, C.DRONE_LASER_LENGTH) && close(end.z, start.z), "where the pilot looks, not where the drone faces");
+});
+
+test("laser segments: end to end, the last one ending exactly at the hit; shorter than one, all scaled down", () => {
+    const seg = C.DRONE_LASER_SEGMENT;
+    const full = LaserSegments({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, C.DRONE_LASER_LENGTH);
+    assert.equal(full.positions.length, DRONE_LASER_SEGMENTS);
+    assert.deepEqual(full.positions.map((p) => p.x), Array.from({ length: DRONE_LASER_SEGMENTS }, (_, i) => Math.min(i * seg, C.DRONE_LASER_LENGTH - seg)));
+    assert.equal(full.scale, 1);
+    const short = LaserSegments({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, 2.5 * seg);
+    assert.deepEqual(short.positions.slice(0, 3).map((p) => p.x), [0, seg, 1.5 * seg], "the third pushed back to end at the hit");
+    assert.ok(short.positions.slice(3).every((p) => p.x === 0), "unused ones on the first");
+    assert.equal(LaserSegments({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, seg / 2).scale, 0.5);
+});
+
+test("the laser runs from the camera to the first wall, at most DRONE_LASER_LENGTH; the drone itself is left alone", () => {
+    const segments = kart.drone.laser;
+    assert.equal(segments.length, DRONE_LASER_SEGMENTS, "one copy of the laser template per segment");
+    UpdateDrone(kart, 0.1);
+    const ray = DroneLaserRay(kart.drone.position, kart.drone.body.GetAbsAngles(), kart.pawn.GetEyeAngles());
+    const tip = (/** @type {any} */ s) => { const p = s.GetAbsOrigin(); return Math.hypot(p.x - ray.start.x, p.y - ray.start.y, p.z - ray.start.z) + C.DRONE_LASER_SEGMENT; };
+    assert.ok(close(Math.max(...segments.map(tip)), C.DRONE_LASER_LENGTH), "nothing in the way: full length");
+    assert.ok(!world.fired.some((f) => segments.includes(f.target) && f.input === "SetIdleAnimationLooping"), "the laser isn't a drone part");
+
+    world.traceLine = (c) => ({ didHit: true, fraction: 0.25, end: { x: c.start.x + (c.end.x - c.start.x) / 4, y: c.start.y + (c.end.y - c.start.y) / 4, z: c.start.z + (c.end.z - c.start.z) / 4 }, normal: { x: -1, y: 0, z: 0 } });
+    UpdateDrone(kart, 0.1);
+    const ray2 = DroneLaserRay(kart.drone.position, kart.drone.body.GetAbsAngles(), kart.pawn.GetEyeAngles());
+    const tip2 = (/** @type {any} */ s) => { const p = s.GetAbsOrigin(); return Math.hypot(p.x - ray2.start.x, p.y - ray2.start.y, p.z - ray2.start.z) + C.DRONE_LASER_SEGMENT; };
+    assert.ok(close(Math.max(...segments.map(tip2)), C.DRONE_LASER_LENGTH / 4), "stops at the wall");
 });

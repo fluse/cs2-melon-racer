@@ -109,6 +109,7 @@ names once, when the script first needs the track list.
 | `particle_boost_trail_template` | `point_template` | — | [Effect templates](03-effect-templates.md#boost-trail) |
 | `prediction_dot_template` | `point_template` | — | [Effect templates](03-effect-templates.md#prediction-dots) |
 | `template_drone` | `point_template` | for free look | [Effect templates](03-effect-templates.md#free-look-drone) |
+| `template_drone_laser` | `point_template` | — | [Effect templates](03-effect-templates.md#laser-pointer-optional) |
 | `particle_podium_confetti` | `info_particle_system` | — | [Hub](05-hub.md#confetti) |
 | `template_ball` | `point_template` | — | [Ball spawner](20-ball-spawner.md) |
 | `spawn_ball` | `info_target` | — | [Ball spawner](20-ball-spawner.md) |

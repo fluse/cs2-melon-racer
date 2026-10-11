@@ -1,7 +1,7 @@
 // Minimal in-process fake of the engine's "cs_script/point_script" module —
 // just enough for the engine-side files in src/ to load and for tests to
 // drive specific functions with fake entities. Not a simulation: traces
-// hit nothing unless a test sets world.traceLine/traceSphere, Delay() resolves on the next microtask (its
+// hit nothing unless a test sets world.traceLine/traceSphere/traceBox, Delay() resolves on the next microtask (its
 // seconds recorded in world.delays), EntFireAtTarget/EntFireAtName calls are recorded in world.fired, ConnectOutput
 // callbacks in world.outputs (world.fireOutput calls them), and every
 // Instance.OnXxx/SetXxx registration is only recorded (see `world.handlers`).
@@ -138,13 +138,14 @@ export const world = {
     /** Optional overrides for what traces hit: (config) => TraceResult. Default: nothing is ever hit. */
     traceLine: undefined,
     traceSphere: undefined,
+    traceBox: undefined,
     /** Every Instance.DebugLine call's argument. @type {any[]} */
     debugLines: [],
     /** The addon's save data, as Instance.GetSaveData/SetSaveData see it. */
     saveData: "",
     /** @template {Entity} T @param {T} e @returns {T} */
     add(e) { this.entities.push(e); return e; },
-    reset() { this.time = 0; this.entities = []; this.playerPawns = []; this.messages = []; this.fired = []; this.outputs = new Map(); this.delays = []; this.traceLine = undefined; this.traceSphere = undefined; this.debugLines = []; this.saveData = ""; },
+    reset() { this.time = 0; this.entities = []; this.playerPawns = []; this.messages = []; this.fired = []; this.outputs = new Map(); this.delays = []; this.traceLine = undefined; this.traceSphere = undefined; this.traceBox = undefined; this.debugLines = []; this.saveData = ""; },
 };
 
 const noHit = (config) => ({ didHit: false, startedInSolid: false, end: clone(config.end), normal: { x: 0, y: 0, z: 1 }, fraction: 1 });
@@ -160,7 +161,7 @@ const instanceMethods = {
     FindEntitiesByClass: (cls) => world.entities.filter((e) => e.valid && e.className === cls),
     TraceLine: (c) => (world.traceLine ?? noHit)(c),
     TraceSphere: (c) => (world.traceSphere ?? noHit)(c),
-    TraceBox: noHit,
+    TraceBox: (c) => (world.traceBox ?? noHit)(c),
     Delay: (seconds) => { world.delays.push(seconds); return Promise.resolve(); },
     EntFireAtTarget: (args) => { world.fired.push(args); },
     EntFireAtName: (args) => { world.fired.push(args); },

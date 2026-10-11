@@ -65,7 +65,7 @@ import { predictionDotSet } from "./trace.js";
  *   xpGainShown?: string, xpGainResendAt?: number, // what the XP notifier last showed, and its next full resend — see UpdateXpGainHud
  *   skinHudLevel?: number, // the level the skin grid's locks were last drawn for — see UpdateSkinHud
  *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud
- *   drone?: { entities: any[], body: any, position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number }, tilt: { pitch: number, roll: number } }, // free look: the drone this player flies, where, how fast, how far it leans — see dev/free-look.js
+ *   drone?: { entities: any[], parts: any[], body: any, laser: any[], position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number }, tilt: { pitch: number, roll: number }, yaw: number, landed: boolean, takeoffUntil?: number }, // free look: the drone this player flies, where, how fast, how far it leans, which way it faces, whether it sits on the floor (rotors still) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js

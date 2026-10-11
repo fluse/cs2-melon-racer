@@ -75,7 +75,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              inputs.js (every button click: one table per kind of button, HandleHudClick dispatches)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
                                           #              boost-trail/, prediction/ (the guide line)
-                                          #   dev/       collision-debug.js (the user-menu collision debug view), free-look.js (+ drone-logic.js: the user-menu free look, flying a drone),
+                                          #   dev/       collision-debug.js (the user-menu collision debug view), free-look.js (+ drone-logic.js: the user menu's "Drone Mode" in ACTIONS, flying a drone),
                                           #              camera-tuning.js (the user-menu camera page, own chase camera distance/height),
                                           #              physics-tuning.js (+ -logic.js: the user-menu physics page, every melon's physics in percent),
                                           #              tuning-scale.js (+ -logic.js: the slider both pages share), test-effects.js (Test Break/Perfect Bounce/Heal), attack-debug.js
@@ -83,6 +83,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              spike-spring/ (prop_dynamic "spike_spring…": rise/sink on the script's clock, breaks melons on its spikes),
                                           #              ball-pit/ (ball_pit_enter/leave: balls that leave the trigger steered back or dropped back in),
                                           #              ball-spawner/ (template_ball copied at spawn_ball at random intervals, removed after a lifetime, capped)
+                                          #              balloon/ (every ball with the ball model floats like a balloon: sinks slowly, knocked far, slowed by air drag)
                                           #              bouncer/ (prop_dynamic with the bouncer model: "swing" loop started once, at a random time within one swing, on the script's clock — delayed inputs arrived all at once)
 src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
 test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one folder per src/melon_drive/ domain (movement/, race/, …): unit tests
@@ -115,8 +116,10 @@ tools/models/make-checkpoint-model.mjs    # the checkpoint gate's frame (glowing
                                           #   (+ _physics.obj collision, materials/melon_racer/checkpoint_gate/checkpoint_gate_{body,trim,glow}.vmat); same footprint as the prefab's old poles
 tools/models/make-drone-model.mjs         # the free-look drone as models/melon_racer/drone/drone.vmdl (~3.6k triangles): white shell stepped over a carbon chassis
                                           #   (twill color + normal map), canopy, vents, battery, antennas, camera gimbal with a blinking red recording light (own bone, in "spin"), amber lights,
-                                          #   about a melon in size (SPAN 16 across), four rotors in guard rings, each on its own bone, looping "spin" (diagonal pairs the other way) + "idle";
+                                          #   about a melon in size (SPAN 16 across), four rotors in guard rings, each on its own bone, looping "spin" (diagonal pairs the other way), "spindown" -> "landed" on touching down, "spinup" taking off, + "idle";
                                           #   no collision (the script traces it against the world); in the point_template template_drone; materials/melon_racer/drone/
+tools/models/make-laser-model.mjs         # one segment of the drone's laser as models/melon_racer/laser/laser.vmdl: a thin glowing red rod
+                                          #   DRONE_LASER_SEGMENT long (imported from src/melon_drive/dev/constants.js), no collision; in template_drone_laser
 tools/models/make-logo-model.mjs          # extrudes MELON RACER (Bungee, slanted like the logo, lime green outline ring around them) into mesh geometry,
                                           #   models/melon_racer/logo_text.dmx for Hammer's File → Import (DmxText in model.mjs),
                                           #   + materials/melon_racer/logo/logo_text_{face,outline,holo}.vmat (holo = an opaque copy of holo_dashes for the letter fronts) (opentype.js + earcut + clipper-lib, devDependencies)
@@ -170,7 +173,7 @@ models/melon_racer/melon/melon.vmdl      # the melon as our own copy: CS2's ital
                                           #   prop_data and break pieces; its fixed mass 2.0 added by hand — the decompiler drops mass_override), material remapped to materials/melon_racer/melon/melon_default.vmat —
                                           #   the base for melon skins (no SetMaterialGroup in cs_script: one .vmdl per skin, swapped by SetModel)
 materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/, melon/ (melon skins),
-                                          #   logo/ (logo_text_*), podium/, bouncer/, drone/, buffer_stop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
+                                          #   logo/ (logo_text_*), podium/, bouncer/, drone/, laser/, buffer_stop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
                                           #   checkpoint_gate/ — a new material goes into the fitting one, never loose in materials/melon_racer/
 materials/melon_racer/decals/*_decal.vmat # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
 ```

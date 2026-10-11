@@ -54,6 +54,11 @@ function TraceSphere(config) {
     return SkipDots((c) => Instance.TraceSphere(c), config);
 }
 
+/** Instance.TraceBox, but never stops on a prediction dot. @param {Parameters<typeof Instance.TraceBox>[0]} config */
+function TraceBox(config) {
+    return SkipDots((c) => Instance.TraceBox(c), config);
+}
+
 /**
  * @typedef {{
  *   pawn: any, melon: any,
@@ -118,7 +123,7 @@ function TraceSphere(config) {
  *   xpGainShown?: string, xpGainResendAt?: number, // what the XP notifier last showed, and its next full resend — see UpdateXpGainHud
  *   skinHudLevel?: number, // the level the skin grid's locks were last drawn for — see UpdateSkinHud
  *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud
- *   drone?: { entities: any[], body: any, position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number }, tilt: { pitch: number, roll: number } }, // free look: the drone this player flies, where, how fast, how far it leans — see dev/free-look.js
+ *   drone?: { entities: any[], parts: any[], body: any, laser: any[], position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number }, tilt: { pitch: number, roll: number }, yaw: number, landed: boolean, takeoffUntil?: number }, // free look: the drone this player flies, where, how fast, how far it leans, which way it faces, whether it sits on the floor (rotors still) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
@@ -1651,6 +1656,21 @@ const HEARTBEAT_INTERVAL = 1; // seconds
 // the chase camera on it. Required for free look: without it in the map
 // the toggle stays off.
 const DRONE_TEMPLATE_NAME = "template_drone";
+// The drone's laser pointer, from the camera's recording light along the
+// pilot's view to the first thing in the way, at most DRONE_LASER_LENGTH.
+// CS2 has no env_beam: the beam is laid from copies of this point_template
+// (a prop_dynamic with models/melon_racer/laser/laser.vmdl from
+// tools/models/make-laser-model.mjs — a glowing rod DRONE_LASER_SEGMENT
+// long), end to end. Optional: without it, no laser.
+const DRONE_LASER_TEMPLATE_NAME = "template_drone_laser";
+const DRONE_LASER_LENGTH = 32;
+const DRONE_LASER_SEGMENT = 4; // the model's length — re-run the generator after changing it
+// The recording light on the drone's camera (REC_LED in
+// tools/models/make-drone-model.mjs, scaled to the model's size): this far
+// ahead of the drone's origin and this far below it, in the drone's frame.
+const DRONE_LASER_FORWARD = 2.9;
+const DRONE_LASER_UP = -1.1;
+
 // Where it appears: this far above the melon.
 const DRONE_START_HEIGHT = 40;
 // Flying speed (units/s) along the view: W/S, A/D, jump up, duck down —
@@ -1663,10 +1683,32 @@ const DRONE_FAST_SPEED = 1400;
 // turn, and coasts on a moment after letting go, like a real drone in the
 // air (a stabilized one: it brakes by itself, it doesn't drift forever).
 const DRONE_RESPONSE = 3;
-// Its size against the world: a sphere this big is traced along every
-// move, the drone stopped and slid along what it hits — but never melons,
-// players or other drones.
-const DRONE_RADIUS = 8; // the model is ~16 across, about a melon
+// Its size against the world: a box this big is traced along every move,
+// the drone stopped and slid along what it hits — but never melons,
+// players or other drones. DRONE_RADIUS to each side (the model is ~16
+// across, about a melon), DRONE_BOTTOM down to its skids and DRONE_TOP up
+// from its origin — the model generator prints both, so it lands on its
+// skids instead of hovering a sphere's radius above the floor.
+const DRONE_RADIUS = 8;
+const DRONE_BOTTOM = 2.5;
+const DRONE_TOP = 2.7;
+// Touching down: with floor (a surface whose normal points up at least
+// DRONE_GROUND_NORMAL_Z) within DRONE_GROUND_DISTANCE under that box, the
+// drone has landed — its rotors run down to a stop ("spindown", then
+// "landed"), and it's parked: every other input does nothing, only jump
+// takes off again — a hop up at DRONE_TAKEOFF_SPEED, not counted as
+// landed for DRONE_TAKEOFF_SECONDS so it gets clear of the floor, the rotors
+// running up ("spinup", then "spin"). The rotor timing is the model's
+// (tools/models/make-drone-model.mjs).
+const DRONE_GROUND_DISTANCE = 2;
+const DRONE_GROUND_NORMAL_Z = 0.7;
+const DRONE_TAKEOFF_SPEED = 180; // units/s up — with DRONE_RESPONSE ~60 units high
+const DRONE_TAKEOFF_SECONDS = 0.3;
+// Which way it faces: in the air the pilot's view (yaw), turned towards it
+// at most this fast (degrees per second) — landed it stays as it touched
+// down, looking around doesn't turn it, and taking off it swings round to
+// the view instead of snapping.
+const DRONE_YAW_RATE = 540;
 // How far it tips (degrees): into the way it's speeding up — forward when
 // pulling away, back when braking, into a turn — at most this much.
 const DRONE_MAX_TILT = 25;
@@ -1680,6 +1722,11 @@ const DRONE_TILT_RATE = 120;
 // below its middle, ~27 degrees here: close, at the bottom of the screen.
 const DRONE_CAMERA_DISTANCE = 50;
 const DRONE_CAMERA_HEIGHT = 25;
+// The point the camera turns around and is pulled in towards at a wall:
+// this far above the drone (DRONE_CAMERA_HEIGHT counts from the drone, as
+// before). Not its own center — landed that's just above the floor, and
+// looking up the floor pulled the camera into the drone.
+const DRONE_CAMERA_PIVOT = 12;
 
 // Camera tuning (dev/camera-tuning.js, its scale CAMERA_TUNING_SCALE in
 // dev/tuning-scale-logic.js): the user menu's "Camera Settings"
@@ -1827,6 +1874,27 @@ const BOUNCER_SWING_SECONDS = 2.4;
 // How often the map is searched for bouncers again, so one that spawned
 // after the script's first look (or after a round restart) isn't missed.
 const BOUNCER_SCAN_SECONDS = 2;
+
+// Balloon balls: every physics ball with the ball model (tools/models/
+// make-ball-model.mjs — in ball pits and from the ball spawner) floats like a
+// balloon in the air: it sinks slowly towards the floor instead of falling,
+// and a melon knocking into it sends it flying far, the air slowing it down
+// again. The script keeps its velocity that way every tick; the map is
+// searched for new balls every BALLOON_SCAN_SECONDS. Rules:
+// world/balloon/logic.js, applied by world/balloon/balloon.js.
+
+// The model that makes a physics prop a balloon (compared without "_c", any case).
+const BALLOON_MODEL = "models/melon_racer/ball.vmdl";
+// The physics prop classes searched for it.
+const BALLOON_CLASSES = ["prop_physics", "prop_physics_multiplayer", "prop_physics_override"];
+// How fast it sinks, at most (units/s) — a real air-filled balloon drifting down.
+const BALLOON_SINK_SPEED = 35;
+// Air drag (per second): a knock's speed is taken away by a factor of e
+// every 1/BALLOON_DRAG seconds — sideways, and up or down towards sinking.
+const BALLOON_DRAG = 1.2;
+// How often the map is searched for new balls (a spawned one falls freely
+// until it's found).
+const BALLOON_SCAN_SECONDS = 0.2;
 
 // All tunable numbers and static/Hammer-naming-convention data for
 // melon_drive, one file per system they configure. Import from here, not
@@ -4436,6 +4504,48 @@ function ClipVelocity(velocity, normal) {
 }
 
 /**
+ * Whether the drone has landed: the trace down from it (DRONE_GROUND_DISTANCE
+ * under its skids) hit floor — a normal pointing up at least
+ * DRONE_GROUND_NORMAL_Z, not a wall or a ceiling's edge — and it isn't
+ * `takingOff` (jump pressed on the ground, DRONE_TAKEOFF_SECONDS ago at most).
+ * @param {{ didHit: boolean, normal: Vec } | undefined} floor @param {boolean} takingOff
+ */
+function IsDroneLanded(floor, takingOff) {
+    return Boolean(floor?.didHit) && floor.normal.z >= DRONE_GROUND_NORMAL_Z && !takingOff;
+}
+
+/**
+ * The drone's yaw after `dt`: landed it keeps `yaw` (looking around with
+ * the mouse doesn't turn it), in the air it turns the shorter way round
+ * towards the pilot's `viewYaw`, at most DRONE_YAW_RATE × `dt` degrees.
+ * @param {number} yaw @param {number} viewYaw @param {boolean} landed @param {number} dt
+ */
+function StepDroneYaw(yaw, viewYaw, landed, dt) {
+    if (landed) {
+        return yaw;
+    }
+    const gap = ((((viewYaw - yaw) % 360) + 540) % 360) - 180; // -180..180
+    const step = DRONE_YAW_RATE * dt;
+    return Math.abs(gap) <= step ? viewYaw : yaw + Math.sign(gap) * step;
+}
+
+/**
+ * The inputs for the drone's prop_dynamic when it touches down
+ * (`landed`) or takes off again: the rotors run down to a stop and stay
+ * still, or run up and spin on. None while nothing changed.
+ * @param {boolean} landed @param {boolean} wasLanded
+ * @returns {[string, string][]}
+ */
+function DroneRotorInputs(landed, wasLanded) {
+    if (landed === wasLanded) {
+        return [];
+    }
+    return landed
+        ? [["SetAnimationNotLooping", "spindown"], ["SetIdleAnimationLooping", "landed"]]
+        : [["SetAnimationNotLooping", "spinup"], ["SetIdleAnimationLooping", "spin"]];
+}
+
+/**
  * The tilt the drone wants (degrees, pitch + = nose down, roll + = right
  * side down): into the horizontal way it's speeding up (`accel`, full tilt
  * at DRONE_RESPONSE × `fullSpeed` — pulling away from a standstill), plus
@@ -4465,6 +4575,57 @@ function StepDroneTilt(tilt, target, dt) {
     return { pitch: Toward(tilt.pitch, target.pitch), roll: Toward(tilt.roll, target.roll) };
 }
 
+/** The unit vector a view (pitch + = down, yaw) looks along. @param {{ pitch: number, yaw: number }} view @returns {Vec} */
+function ViewForward(view) {
+    const p = (view.pitch * Math.PI) / 180, y = (view.yaw * Math.PI) / 180;
+    return { x: Math.cos(p) * Math.cos(y), y: Math.cos(p) * Math.sin(y), z: -Math.sin(p) };
+}
+
+/**
+ * Where the drone's laser starts and the farthest it reaches: from the
+ * camera's recording light (DRONE_LASER_FORWARD ahead, DRONE_LASER_UP up in
+ * the drone's frame — turned and tipped with it) along the pilot's view,
+ * DRONE_LASER_LENGTH long.
+ * @param {Vec} position the drone @param {{ pitch: number, yaw: number }} angles the drone's
+ * @param {{ pitch: number, yaw: number }} view the pilot's
+ * @returns {{ start: Vec, end: Vec }}
+ */
+function DroneLaserRay(position, angles, view) {
+    const ahead = ViewForward(angles);
+    const p = (angles.pitch * Math.PI) / 180, y = (angles.yaw * Math.PI) / 180;
+    const up = { x: Math.sin(p) * Math.cos(y), y: Math.sin(p) * Math.sin(y), z: Math.cos(p) };
+    const start = {
+        x: position.x + ahead.x * DRONE_LASER_FORWARD + up.x * DRONE_LASER_UP,
+        y: position.y + ahead.y * DRONE_LASER_FORWARD + up.y * DRONE_LASER_UP,
+        z: position.z + ahead.z * DRONE_LASER_FORWARD + up.z * DRONE_LASER_UP,
+    };
+    const dir = ViewForward(view);
+    return { start, end: { x: start.x + dir.x * DRONE_LASER_LENGTH, y: start.y + dir.y * DRONE_LASER_LENGTH, z: start.z + dir.z * DRONE_LASER_LENGTH } };
+}
+
+/** How many laser segments a drone needs for a full-length beam. */
+const DRONE_LASER_SEGMENTS = Math.ceil(DRONE_LASER_LENGTH / DRONE_LASER_SEGMENT);
+
+/**
+ * Where each laser segment (DRONE_LASER_SEGMENT long, from its origin along
+ * its +X) starts, for a beam `length` long from `start` along unit `dir`:
+ * end to end, the last one pushed back to end exactly at `length` (it
+ * overlaps the one before, so every segment stays full width); the unused
+ * ones on top of the first. Shorter than one segment, they're all scaled
+ * down to `length` (`scale`).
+ * @param {Vec} start @param {Vec} dir @param {number} length
+ * @returns {{ positions: Vec[], scale: number }}
+ */
+function LaserSegments(start, dir, length) {
+    const scale = Math.min(1, length / DRONE_LASER_SEGMENT);
+    const used = Math.max(1, Math.ceil(length / DRONE_LASER_SEGMENT));
+    const positions = Array.from({ length: DRONE_LASER_SEGMENTS }, (_, i) => {
+        const along = i < used ? Math.max(0, Math.min(i * DRONE_LASER_SEGMENT, length - DRONE_LASER_SEGMENT)) : 0;
+        return { x: start.x + dir.x * along, y: start.y + dir.y * along, z: start.z + dir.z * along };
+    });
+    return { positions, scale };
+}
+
 // Free look: the player turns into a drone and flies it through the map
 // instead of driving. Toggled per player from the user menu (kart.freeLook,
 // see SetFreeLook); off by default. The drone is a fresh copy of the
@@ -4472,13 +4633,16 @@ function StepDroneTilt(tilt, target, dt) {
 // tools/models/make-drone-model.mjs, its rotors spinning), moved by the
 // script every tick (UpdateDrone): W/S along the view, A/D sideways, jump
 // up, duck down, attack faster — with inertia, leaning into its turns
-// (drone-logic.js). It runs into the world — a sphere trace
+// (drone-logic.js). It runs into the world — a box trace
 // along every move, sliding along what it hits — but flies through melons,
 // players and other drones (the model has no collision at all). The chase
 // camera follows the drone; the pawn stays held at its anchor as usual.
 // The melon waits where it was, frozen (UpdateKart skips it; physics motion
 // off), and switching back removes the drone and puts the chase camera
-// back on the melon. The others see the drone — who's flying around.
+// back on the melon. The others see the drone — who's flying around — and
+// its laser pointer (optional, DRONE_LASER_TEMPLATE_NAME): a beam from the
+// camera's recording light along the pilot's view to the first wall, at
+// most DRONE_LASER_LENGTH long, laid from glowing rod segments.
 
 /** @typedef {import("../core/kart-registry.js").Kart} Kart */
 
@@ -4488,6 +4652,8 @@ const MAX_SLIDES = 3;
 const MAX_MELON_SKIPS = 4;
 /** Kept this far off a surface it ran into, so the next trace doesn't start in it. */
 const SURFACE_GAP = 0.5;
+/** The drone against the world: DRONE_RADIUS to each side, down to its skids, up to its top. */
+const DRONE_BOX = { mins: { x: -DRONE_RADIUS, y: -DRONE_RADIUS, z: -DRONE_BOTTOM }, maxs: { x: DRONE_RADIUS, y: DRONE_RADIUS, z: DRONE_TOP } };
 
 /** @param {Kart} kart */
 function IsFreeLookOn(kart) {
@@ -4495,7 +4661,8 @@ function IsFreeLookOn(kart) {
 }
 
 /**
- * Turns free look on/off for this kart's player. Not while the melon is
+ * Turns free look on/off for this kart's player. Not while they're in a
+ * Grand Prix (kart.racing — a heat starting switches it off), not while the melon is
  * breaking (the respawn would switch its motion and the chase camera back
  * on mid-flight), and not without DRONE_TEMPLATE_NAME in the map. Returns
  * whether it's on now.
@@ -4504,6 +4671,10 @@ function IsFreeLookOn(kart) {
 function SetFreeLook(kart, on) {
     if (on === IsFreeLookOn(kart)) {
         return on;
+    }
+    if (on && kart.racing) {
+        Debug("SetFreeLook: in a Grand Prix, not switching free look on");
+        return false;
     }
     if (on && (kart.breaking || !kart.melon.IsValid())) {
         Debug("SetFreeLook: melon is breaking/gone, not switching free look on");
@@ -4546,25 +4717,55 @@ function SpawnDrone(kart) {
         Instance.Msg(`[melon_drive] free look needs a point_template "${DRONE_TEMPLATE_NAME}" with the drone prop_dynamic (models/melon_racer/drone/drone.vmdl) — staying off`);
         return false;
     }
-    for (const entity of entities) {
+    const parts = [...entities];
+    for (const entity of parts) {
         entity.Teleport({ position, angles }); // ForceSpawn keeps its Hammer offset from the template
         // In case it's left solid in Hammer: melons and their traces mustn't bump into a drone.
         Instance.EntFireAtTarget({ target: entity, input: "DisableCollision" });
         Instance.EntFireAtTarget({ target: entity, input: "SetIdleAnimationLooping", value: "spin" });
     }
-    const body = entities.find((entity) => entity.GetClassName() === "prop_dynamic") ?? entities[0];
-    kart.drone = { entities, body, position, velocity: { x: 0, y: 0, z: 0 }, tilt: { pitch: 0, roll: 0 } };
+    const body = parts.find((entity) => entity.GetClassName() === "prop_dynamic") ?? parts[0];
+    if (!body) {
+        Instance.Msg(`[melon_drive] "${DRONE_TEMPLATE_NAME}" has no drone prop_dynamic — staying off`);
+        for (const entity of entities) {
+            entity.Remove();
+        }
+        return false;
+    }
+    const laser = SpawnLaser(position);
+    kart.drone = { entities: [...entities, ...laser], parts, body, laser, position, velocity: { x: 0, y: 0, z: 0 }, tilt: { pitch: 0, roll: 0 }, yaw: angles.yaw, landed: false };
     const camera = kart.pawn.GetCustomCamera();
     camera.SetMode(CustomCameraMode.FOLLOW_POSITION);
     camera.SetFollowConfig({
         followEntity: body,
-        followOffset: { x: 0, y: 0, z: 0 },
-        cameraOffset: { x: -DRONE_CAMERA_DISTANCE, y: 0, z: DRONE_CAMERA_HEIGHT },
+        followOffset: { x: 0, y: 0, z: DRONE_CAMERA_PIVOT },
+        cameraOffset: { x: -DRONE_CAMERA_DISTANCE, y: 0, z: DRONE_CAMERA_HEIGHT - DRONE_CAMERA_PIVOT },
         clipCameraOffset: true,
         cameraOffsetReturnStrength: CAMERA_OFFSET_RETURN_STRENGTH,
     });
     kart.appliedFollowKey = undefined; // the melon's chase camera is written anew when it's back
     return true;
+}
+
+/**
+ * The laser's segments: DRONE_LASER_SEGMENTS copies of the laser template,
+ * never solid. None without the template in the map (no laser).
+ * @param {{ x: number, y: number, z: number }} position
+ */
+function SpawnLaser(position) {
+    /** @type {any[]} */
+    const segments = [];
+    for (let i = 0; i < DRONE_LASER_SEGMENTS; i++) {
+        const spawned = SpawnFromTemplate(DRONE_LASER_TEMPLATE_NAME, position, undefined);
+        if (spawned.length === 0) {
+            break; // no laser template — already logged (DEBUG)
+        }
+        for (const entity of spawned) {
+            Instance.EntFireAtTarget({ target: entity, input: "DisableCollision" });
+        }
+        segments.push(...spawned);
+    }
+    return segments;
 }
 
 /**
@@ -4593,6 +4794,14 @@ function UpdateDrone(kart, dt) {
         return;
     }
     const pawn = kart.pawn;
+    // Landed it's parked: only jump takes off — a hop up, the floor ignored for a moment.
+    const now = Instance.GetGameTime();
+    if (drone.landed && pawn.WasInputJustPressed(CSInputs.JUMP)) {
+        drone.takeoffUntil = now + DRONE_TAKEOFF_SECONDS;
+        drone.velocity = { x: 0, y: 0, z: DRONE_TAKEOFF_SPEED };
+    }
+    const takingOff = now < (drone.takeoffUntil ?? -Infinity);
+    const parked = drone.landed && !takingOff;
     const Axis = (/** @type {any} */ plus, /** @type {any} */ minus) => (pawn.IsInputPressed(plus) ? 1 : 0) - (pawn.IsInputPressed(minus) ? 1 : 0);
     const input = {
         forward: Axis(CSInputs.FORWARD, CSInputs.BACK),
@@ -4602,21 +4811,75 @@ function UpdateDrone(kart, dt) {
     const speed = pawn.IsInputPressed(CSInputs.ATTACK) ? DRONE_FAST_SPEED : DRONE_SPEED;
     const view = pawn.GetEyeAngles();
     const before = drone.velocity;
-    drone.velocity = StepDroneVelocity(before, DroneWishVelocity(input, view, speed), dt);
+    drone.velocity = parked ? { x: 0, y: 0, z: 0 } : StepDroneVelocity(before, DroneWishVelocity(input, view, speed), dt);
     // What the rotors did this tick, before the world stops any of it — that's what it leans into.
-    const accel = dt > 0
+    const accel = dt > 0 && !parked
         ? { x: (drone.velocity.x - before.x) / dt, y: (drone.velocity.y - before.y) / dt, z: (drone.velocity.z - before.z) / dt }
         : { x: 0, y: 0, z: 0 };
     const moved = MoveDrone(kart, drone.position, drone.velocity, dt);
     drone.position = moved.position;
     drone.velocity = moved.velocity;
-    drone.tilt = StepDroneTilt(drone.tilt, DroneTargetTilt(drone.velocity, accel, view.yaw, DRONE_SPEED), dt);
-    const angles = { pitch: drone.tilt.pitch, yaw: view.yaw, roll: drone.tilt.roll };
-    for (const entity of drone.entities) {
+    // On the ground it doesn't turn with the view, in the air it swings back to it.
+    drone.yaw = StepDroneYaw(drone.yaw, view.yaw, drone.landed, dt);
+    drone.tilt = StepDroneTilt(drone.tilt, DroneTargetTilt(drone.velocity, accel, drone.yaw, DRONE_SPEED), dt);
+    const angles = { pitch: drone.tilt.pitch, yaw: drone.yaw, roll: drone.tilt.roll };
+    for (const entity of drone.parts) {
         if (entity.IsValid()) {
             entity.Move({ position: drone.position, angles });
         }
     }
+    UpdateDroneRotors(kart, takingOff);
+    UpdateDroneLaser(kart, angles, view);
+}
+
+/**
+ * Touching down the rotors run down to a stop, taking off they run up
+ * again (IsDroneLanded, DroneRotorInputs) — the floor looked for
+ * DRONE_GROUND_DISTANCE under the drone's skids.
+ * @param {Kart} kart @param {boolean} takingOff jump pressed on the ground just now
+ */
+function UpdateDroneRotors(kart, takingOff) {
+    const drone = kart.drone;
+    const below = { x: drone.position.x, y: drone.position.y, z: drone.position.z - DRONE_GROUND_DISTANCE };
+    const landed = IsDroneLanded(DroneTrace(kart, drone.position, below), takingOff);
+    for (const [input, value] of DroneRotorInputs(landed, drone.landed)) {
+        for (const entity of drone.parts) {
+            if (entity.IsValid()) {
+                Instance.EntFireAtTarget({ target: entity, input, value });
+            }
+        }
+    }
+    drone.landed = landed;
+}
+
+/**
+ * The laser pointer: from the camera's recording light along the pilot's
+ * view to the first thing in the way (not the drone itself, not players),
+ * at most DRONE_LASER_LENGTH — its segments laid end to end (LaserSegments).
+ * @param {Kart} kart @param {{ pitch: number, yaw: number, roll: number }} angles the drone's
+ * @param {{ pitch: number, yaw: number }} view the pilot's
+ */
+function UpdateDroneLaser(kart, angles, view) {
+    const segments = kart.drone?.laser ?? [];
+    if (segments.length === 0) {
+        return;
+    }
+    const { start, end } = DroneLaserRay(kart.drone.position, angles, view);
+    const trace = TraceLine({ start, end, ignoreEntity: kart.drone.entities, ignorePlayers: true });
+    const to = trace.didHit ? trace.end : end;
+    const length = Math.hypot(to.x - start.x, to.y - start.y, to.z - start.z);
+    const { positions, scale } = LaserSegments(start, ViewForward(view), length);
+    const beamAngles = { pitch: view.pitch, yaw: view.yaw, roll: 0 };
+    segments.forEach((segment, i) => {
+        if (!segment.IsValid()) {
+            return;
+        }
+        segment.Move({ position: positions[Math.min(i, positions.length - 1)], angles: beamAngles });
+        if (segment.laserScale !== scale) {
+            segment.laserScale = scale;
+            segment.SetModelScale?.(scale);
+        }
+    });
 }
 
 /**
@@ -4645,8 +4908,8 @@ function MoveDrone(kart, position, velocity, dt) {
 }
 
 /**
- * The world between `start` and `end` for a drone: a DRONE_RADIUS sphere
- * trace (a line trace if the sphere starts stuck), re-run past every melon
+ * The world between `start` and `end` for a drone: a box trace, the
+ * drone's size (DRONE_BOX; a line trace if the box starts stuck), re-run past every melon
  * it meets — drones fly through melons. Undefined if the way is clear.
  * @param {Kart} kart @param {any} start @param {any} end
  */
@@ -4655,7 +4918,7 @@ function DroneTrace(kart, start, end) {
     /** @type {any[]} */
     const ignore = [...(kart.drone?.entities ?? [])];
     for (let skip = 0; skip <= MAX_MELON_SKIPS; skip++) {
-        let result = TraceSphere({ start, end, radius: DRONE_RADIUS, ignoreEntity: ignore, ignorePlayers: true });
+        let result = TraceBox({ start, end, ...DRONE_BOX, ignoreEntity: ignore, ignorePlayers: true });
         if (result.startedInSolid) {
             result = TraceLine({ start, end, ignoreEntity: ignore, ignorePlayers: true });
         }
@@ -10767,8 +11030,6 @@ const USER_MENU_TOGGLES = {
     usermenu_prediction_button: { variable: "prediction_state", isOn: IsPredictionOn },
     // The collision debug view (dev/collision-debug.js).
     usermenu_collisiondebug_button: { variable: "collisiondebug_state", isOn: IsCollisionDebugOn },
-    // Free look (dev/free-look.js).
-    usermenu_freelook_button: { variable: "freelook_state", isOn: IsFreeLookOn },
 };
 
 /**
@@ -10805,6 +11066,7 @@ function SetUserMenuOpen(slot, kart, open) {
         UpdateSkinHud(slot, kart);
         UpdateGlowColorHud(slot, kart);
         UpdateHubButtonHud(slot, kart);
+        UpdateDroneButtonHud(slot, kart);
         RefreshProfileHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
@@ -10838,6 +11100,19 @@ function SetUserMenuPage(slot, kart, page) {
  */
 function UpdateHubButtonHud(slot, kart) {
     GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "usermenu_hub_button", "hub_label", kart.racing ? "Exit Race" : "Return to Hub");
+}
+
+/**
+ * The ACTIONS column's drone button (usermenu_drone_row): "Drone Mode", or
+ * "Exit Drone Mode" while flying — hidden while the player is in a Grand
+ * Prix (kart.racing; SetFreeLook refuses it then, and a heat starting ends it).
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+function UpdateDroneButtonHud(slot, kart) {
+    const hud = GetSpeedHud();
+    const flying = IsFreeLookOn(kart);
+    hud?.SetDialogVariableStringForPlayer(slot, "usermenu_drone_button", "drone_label", flying ? "Exit Drone Mode" : "Drone Mode");
+    hud?.SetHasClassForPlayer(slot, "usermenu_drone_row", "Hidden", kart.racing && !flying);
 }
 
 /**
@@ -10923,6 +11198,7 @@ function UpdateUserMenu(slot, kart) {
         // a heat, the hub) with the menu up, and so can the player's heat.
         GetSpeedHud()?.SetHasClassForPlayer(slot, "usermenu_restart_row", "Hidden", !CanRestartTimeTrial(kart));
         UpdateHubButtonHud(slot, kart);
+        UpdateDroneButtonHud(slot, kart);
         if (kart.skinHudLevel !== GetKartLevel(kart)) {
             UpdateSkinHud(slot, kart); // a level-up with the menu open unlocks skins
         }
@@ -11060,6 +11336,17 @@ const KART_BUTTONS = {
             SetUserMenuOpen(slot, kart, false);
         }
     },
+    // Drone mode (dev/free-look.js): this player flies a drone around, their
+    // melon waits frozen; not while they're in a Grand Prix. Switching it on
+    // or off closes the menu, so the mouse looks around / drives right away.
+    usermenu_drone_button: (slot, kart) => {
+        const on = !IsFreeLookOn(kart);
+        if (SetFreeLook(kart, on) === on) {
+            SetUserMenuOpen(slot, kart, false);
+        } else {
+            UpdateDroneButtonHud(slot, kart);
+        }
+    },
     usermenu_close_button: (slot, kart) => SetUserMenuOpen(slot, kart, false),
     usermenu_respawn_button: (slot, kart) => {
         if (kart.breaking) {
@@ -11133,9 +11420,6 @@ const TOGGLE_BUTTONS = {
     usermenu_prediction_button: (kart) => void SetPrediction(kart, !IsPredictionOn(kart)),
     // Only this player's melon is drawn/logged (tools mode only).
     usermenu_collisiondebug_button: (kart) => void SetCollisionDebug(kart, !IsCollisionDebugOn(kart)),
-    // This player flies their own pawn around, their melon waits frozen.
-    // Switching it on closes the menu so the mouse looks around right away.
-    usermenu_freelook_button: (kart) => SetFreeLook(kart, !IsFreeLookOn(kart)), // true = it is on now
 };
 
 /**
@@ -12484,13 +12768,13 @@ function IsOverSpikeSpring(offset, angles) {
  * @type {Map<Entity, { config: import("./logic.js").SpikeSpringConfig, phase: import("./logic.js").SpikeSpringPhase | undefined }>}
  */
 const spikeSprings = new Map();
-let nextScanTime$1 = -Infinity;
+let nextScanTime$2 = -Infinity;
 let lastError = "";
 
 /** Forgets the springs, so the next update looks them up again (after a round restart). */
 function ResetSpikeSprings() {
     spikeSprings.clear();
-    nextScanTime$1 = -Infinity;
+    nextScanTime$2 = -Infinity;
 }
 
 /** Adds springs not known yet, and says in the console when the set changed. */
@@ -12512,8 +12796,8 @@ function ScanSpikeSprings() {
 /** Every tick: animations in step with the clock, melons on out spikes broken. @param {number} now */
 function UpdateSpikeSprings(now) {
     try {
-        if (now >= nextScanTime$1) {
-            nextScanTime$1 = now + SPIKE_SPRING_SCAN_SECONDS;
+        if (now >= nextScanTime$2) {
+            nextScanTime$2 = now + SPIKE_SPRING_SCAN_SECONDS;
             ScanSpikeSprings();
         }
         for (const [spring, state] of spikeSprings) {
@@ -12829,12 +13113,12 @@ function BouncerSwingInputs() {
  * @type {Map<Entity, { startAt: number, started: boolean }>}
  */
 const bouncers = new Map();
-let nextScanTime = -Infinity;
+let nextScanTime$1 = -Infinity;
 
 /** Forgets the bouncers, so the next update starts them again (after a round restart). */
 function ResetBouncers() {
     bouncers.clear();
-    nextScanTime = -Infinity;
+    nextScanTime$1 = -Infinity;
 }
 
 /** After a hot reload: the bouncers already swinging (or waiting) are kept. @param {Map<Entity, { startAt: number, started: boolean }> | undefined} previous */
@@ -12873,8 +13157,8 @@ function ScanBouncers(now) {
 
 /** Every tick: now and then a look for new bouncers; every bouncer whose time has come starts swinging. @param {number} now */
 function UpdateBouncers(now) {
-    if (now >= nextScanTime) {
-        nextScanTime = now + BOUNCER_SCAN_SECONDS;
+    if (now >= nextScanTime$1) {
+        nextScanTime$1 = now + BOUNCER_SCAN_SECONDS;
         for (const bouncer of [...bouncers.keys()]) {
             if (!bouncer.IsValid()) {
                 bouncers.delete(bouncer);
@@ -12895,11 +13179,84 @@ function RegisterBouncerInputs() {
     Instance.OnRoundStart(ResetBouncers);
 }
 
+// Balloon balls (BALLOON_* in world/balloon/constants.js). Pure rules, no
+// cs_script import; world/balloon/balloon.js applies them
+// (test/world/balloon.test.mjs).
+
+/** @typedef {{ x: number, y: number, z: number }} Vec */
+
+/** Whether an entity with this model is a balloon ball (any case, "\" or "/", with or without "_c"). @param {string} model */
+function IsBalloonModel(model) {
+    return model.toLowerCase().replace(/\\/g, "/").replace(/_c$/, "").endsWith(BALLOON_MODEL);
+}
+
+/**
+ * The velocity to give a balloon for the next tick, from the one physics
+ * left it with (`velocity` — knocks and bounces included): air drag takes
+ * the speed of a knock away (BALLOON_DRAG), sideways towards standing
+ * still, up or down towards sinking at BALLOON_SINK_SPEED; and the
+ * engine's gravity for the coming tick (`gravity` × `dt`) is added on top,
+ * so what's left after it pulls is that slow sinking — not a fall. On the
+ * floor it just rests: physics stops the sinking there.
+ * @param {Vec} velocity @param {number} dt @param {number} gravity GRAVITY
+ * @returns {Vec}
+ */
+function BalloonVelocity(velocity, dt, gravity) {
+    const keep = Math.exp(-BALLOON_DRAG * dt);
+    return {
+        x: velocity.x * keep,
+        y: velocity.y * keep,
+        z: -BALLOON_SINK_SPEED + (velocity.z + BALLOON_SINK_SPEED) * keep + gravity * dt,
+    };
+}
+
+// Balloon balls (see world/balloon/constants.js): every physics ball with
+// the ball model floats — each tick its velocity gets air drag and the
+// engine's gravity taken back out but for a slow sinking (BalloonVelocity).
+// The map is searched for new balls every BALLOON_SCAN_SECONDS, so spawned
+// ones (world/ball-spawner/) and respawned ones are found too.
+
+/** @typedef {import("cs_script/point_script").Entity} Entity */
+
+/** Every balloon ball found. @type {Set<Entity>} */
+const balloons = new Set();
+let nextScanTime = -Infinity;
+
+/** Adds the balloon balls not known yet. */
+function ScanBalloons() {
+    for (const className of BALLOON_CLASSES) {
+        for (const entity of Instance.FindEntitiesByClass(className)) {
+            if (!balloons.has(entity) && IsBalloonModel(/** @type {any} */ (entity).GetModelName?.() ?? "")) {
+                balloons.add(entity);
+            }
+        }
+    }
+}
+
+/** Every tick: now and then a look for new balls; every ball floats. @param {number} now @param {number} dt */
+function UpdateBalloons(now, dt) {
+    if (now >= nextScanTime) {
+        nextScanTime = now + BALLOON_SCAN_SECONDS;
+        ScanBalloons();
+    }
+    if (dt <= 0 || dt > 0.5) {
+        return; // a stall or a reload: no tick worth of gravity to undo
+    }
+    for (const ball of balloons) {
+        if (!ball.IsValid()) {
+            balloons.delete(ball);
+            continue;
+        }
+        ball.Move({ velocity: BalloonVelocity(ball.GetAbsVelocity(), dt, GRAVITY) });
+    }
+}
+
 // Map entities the script keeps running on their own, not tied to a kart:
 // mover/ (func_movelinears going back and forth), spike-spring/ (spike traps
 // popping out of the floor on a clock), ball-pit/ (balls kept in their pit),
 // ball-spawner/ (balls dropping in at a spawn point, removed after a while),
-// bouncer/ (foam bouncers swinging, each started at a random point).
+// bouncer/ (foam bouncers swinging, each started at a random point),
+// balloon/ (the balls floating like balloons).
 
 let lastHeartbeatTime = 0;
 // Real elapsed time since the last Think, used for the movement math below —
@@ -13023,6 +13380,11 @@ function Think() {
         UpdateSpikeSprings(now);
     } catch (err) {
         Debug(`Think: UpdateSpikeSprings threw: ${err}`);
+    }
+    try {
+        UpdateBalloons(now, dt); // before the ball pits: a ball outside is steered back on top of floating
+    } catch (err) {
+        Debug(`Think: UpdateBalloons threw: ${err}`);
     }
     try {
         UpdateBallPits(now);

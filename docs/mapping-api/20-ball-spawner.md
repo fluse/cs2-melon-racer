@@ -33,5 +33,8 @@ is said once in the console: `[melon_drive] SpawnFromTemplate: …`.
 - When the maximum is reached, a due ball is skipped and the next one gets
   a fresh random delay; a round restart removes the balls and starts over.
 
+The spawned balls float like balloons — they sink slowly down from the
+spawn point ([balloon balls](19-ball-pits.md#balloon-balls)).
+
 ---
 [← Ball pits](19-ball-pits.md) · [Mapping API](README.md) · [Gravity zones →](21-gravity-zones.md)

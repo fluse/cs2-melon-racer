@@ -1028,15 +1028,18 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
 - Tests: those two and `test/movement/jump.test.mjs` (the real
   `UpdateKart` against the fake engine).
 
-## Free look (implemented, dev aid)
+## Drone mode — free look (implemented)
 
-The user menu's "FREE LOOK" section (below "COLLISION DEBUG"; `kart.freeLook`,
-off by default) turns the player into a **drone** (decided) and lets them
+The user menu's ACTIONS column has **"Drone Mode"** (decided: an action, not a
+developer toggle; `kart.freeLook`, off by default — "Exit Drone Mode"
+while flying). **Not for a player in a Grand Prix** (decided): while they're
+signed up for one (`kart.racing`) the button is hidden and `SetFreeLook`
+refuses, and a heat starting ends it. It turns the player into a **drone** (decided) and lets them
 fly it through the map: a fresh copy of the `template_drone` point_template
 (the quadcopter from `tools/models/make-drone-model.mjs`, its four rotors
 spinning, the red recording light on its camera blinking) appears above
 their melon, and the chase camera follows it.
-Switching it on closes the menu.
+Switching it on or off closes the menu.
 
 - **Flying:** W/S along the view (looking down and holding W dives), A/D
   sideways, jump up, duck down, attack held for `DRONE_FAST_SPEED`.
@@ -1046,18 +1049,35 @@ Switching it on closes the menu.
   brakes by itself, a stabilized drone). It leans into the way it's
   speeding up — forward pulling away, back braking, into a turn — and a
   little while cruising (`DRONE_MAX_TILT`, `DRONE_CRUISE_TILT`), eased.
-- **Collision** (decided): it runs into the world — a `DRONE_RADIUS` sphere
-  trace along every move, sliding along walls, floors and ceilings — but
+- **Collision** (decided): it runs into the world — a box trace the drone's
+  size (`DRONE_RADIUS` to each side, `DRONE_BOTTOM` down to its skids,
+  `DRONE_TOP` up) along every move, so it lands on its skids, sliding along walls, floors and ceilings — but
   flies **through melons**, players and other drones (the model has no
   collision at all).
-- **The others see the drone** — who's flying around.
+- **Landing:** touching down on a floor (within `DRONE_GROUND_DISTANCE`
+  under its skids) its rotors run down to a stop (the model's `spindown`,
+  then `landed`: still, the recording light blinking on); taking off (jump,
+  on the ground) they run up again (`spinup`, then `spin`).
+  Landed it also **doesn't turn on the spot** (decided): looking around
+  with the mouse leaves it facing the way it touched down; in the air it
+  swings round to the view at `DRONE_YAW_RATE` (`StepDroneYaw`). And it's
+  **parked** (decided): W/A/S/D, duck and attack do nothing, only **jump**
+  takes off again — a hop up at `DRONE_TAKEOFF_SPEED`, not counted as
+  landed for `DRONE_TAKEOFF_SECONDS`, then every control works again.
+  `IsDroneLanded`/`DroneRotorInputs` in `dev/drone-logic.js`.
+- **The others see the drone** — who's flying around — and its **laser
+  pointer** (decided): a red beam from the camera's blinking recording
+  light along where the pilot looks, to the first wall, at most
+  `DRONE_LASER_LENGTH` (32 units). CS2 has no `env_beam`: it's laid from
+  glowing rod segments, copies of the optional `template_drone_laser`
+  (Mapping API: free look drone).
 
 Their melon waits where it was, frozen (`UpdateKart` skips it, physics
 motion off) — no damage, but a running time trial's clock keeps going.
-Switching off (USE → the same button) removes the drone and puts the chase
+Switching off (USE → "Exit Drone Mode") removes the drone and puts the chase
 camera back on the melon. A heat starting, a new pawn, the respawn button
 and "Restart Time Trial" (button or R) switch it off. Not while the melon
-is breaking, and not without `template_drone` in the map (the toggle stays
+is breaking, and not without `template_drone` in the map (it stays
 off, the console says why). Constants: `dev/constants.js`; rules:
 `dev/drone-logic.js`, applied by `dev/free-look.js` (`test/dev/drone.test.mjs`).
 
@@ -1491,6 +1511,23 @@ back in over the middle after `BALL_PIT_DROP_SECONDS`. Constants:
 `world/ball-pit/constants.js`; rules: `world/ball-pit/logic.js`, applied by
 `world/ball-pit/ball-pit.js` (`test/world/ball-pit.test.mjs`). Details for
 mappers: [Mapping API: ball pits](docs/mapping-api/19-ball-pits.md).
+
+## Balloon balls (implemented)
+
+**Every ball floats like a balloon** (decided) — every physics prop with
+the ball model (`models/melon_racer/ball.vmdl`), in ball pits and from the
+ball spawner alike. Like a real air-filled balloon (decided: it sinks, it
+doesn't hover or rise): it drifts down slowly, at most
+`BALLOON_SINK_SPEED` (35 u/s), and rests on the floor; a melon knocking
+into it sends it flying far, and the air slows it down again
+(`BALLOON_DRAG`: a factor of e every 1/1.2 s), back to sinking. The script
+does it every tick (the engine's gravity taken back out but for the
+sinking); no Hammer setting. The map is searched for new balls every
+`BALLOON_SCAN_SECONDS` (0.2), so spawned ones float too — they fall
+freely only until they're found. A ball that left its pit is still
+steered back on top of it. Constants: `world/balloon/constants.js`; rule:
+`world/balloon/logic.js`, applied by `world/balloon/balloon.js`
+(`test/world/balloon.test.mjs`).
 
 ## Ball spawner (implemented)
 

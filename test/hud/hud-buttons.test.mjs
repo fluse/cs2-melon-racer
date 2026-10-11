@@ -291,14 +291,17 @@ test("start in tutorial button: saved per player name, ON by default, OFF sends 
     assert.equal(hud.Variable(0, "usermenu_jointutorial_button", "jointutorial_state"), "ON");
 });
 
-test("free look button: switching it on closes the menu, switching it off doesn't open it", () => {
+test("drone mode button (ACTIONS): switching it on or off closes the menu", () => {
     SetUserMenuOpen(0, a, true);
-    Click(0, "usermenu_freelook_button");
+    assert.equal(hud.Variable(0, "usermenu_drone_button", "drone_label"), "Drone Mode");
+    assert.equal(hud.Has(0, "usermenu_drone_row", "Hidden"), false);
+    Click(0, "usermenu_drone_button");
     assert.equal(a.freeLook, true);
-    assert.equal(hud.Variable(0, "usermenu_freelook_button", "freelook_state"), "ON");
     assert.equal(a.userMenuOpen, false, "the mouse looks around right away");
+    SetUserMenuOpen(0, a, true);
+    assert.equal(hud.Variable(0, "usermenu_drone_button", "drone_label"), "Exit Drone Mode");
 
-    Click(0, "usermenu_freelook_button");
+    Click(0, "usermenu_drone_button");
     assert.equal(a.freeLook, false);
     assert.equal(a.userMenuOpen, false);
 });
@@ -306,7 +309,7 @@ test("free look button: switching it on closes the menu, switching it off doesn'
 test("free look: the player becomes a drone from template_drone, the camera on it — gone again when it's off or the player leaves", async () => {
     const { DropKart } = await import("../../src/melon_drive/core/kart-registry.js");
     const melon = a.melon.GetAbsOrigin();
-    Click(0, "usermenu_freelook_button");
+    Click(0, "usermenu_drone_button");
     const drone = a.drone?.body;
     assert.ok(drone?.IsValid(), "spawned");
     const at = drone.GetAbsOrigin();
@@ -316,12 +319,12 @@ test("free look: the player becomes a drone from template_drone, the camera on i
     assert.ok(world.fired.some((f) => f.target === drone && f.input === "DisableCollision"), "never solid");
     assert.equal(b.drone, undefined, "only the free-looking player");
 
-    Click(0, "usermenu_freelook_button");
+    Click(0, "usermenu_drone_button");
     assert.equal(drone.IsValid(), false, "removed when free look goes off");
     assert.equal(a.drone, undefined);
     assert.equal(a.pawn.GetCustomCamera().config.followEntity, a.melon, "the camera back on the melon");
 
-    Click(0, "usermenu_freelook_button");
+    Click(0, "usermenu_drone_button");
     const again = a.drone.body;
     DropKart(0, a);
     assert.equal(again.IsValid(), false, "removed when the player leaves");
@@ -329,7 +332,7 @@ test("free look: the player becomes a drone from template_drone, the camera on i
 
 test("free look: the respawn and restart buttons end it and put the chase camera back on the melon", async () => {
     const { CustomCameraMode } = await import("../helpers/cs-script-mock.mjs");
-    Click(0, "usermenu_freelook_button");
+    Click(0, "usermenu_drone_button");
     assert.equal(a.freeLook, true);
     SetUserMenuOpen(0, a, true);
     Click(0, "usermenu_respawn_button");
@@ -339,16 +342,27 @@ test("free look: the respawn and restart buttons end it and put the chase camera
     a.trackId = 1; // on track 1, in a free-roaming time trial
     a.racing = false;
     world.add(new Entity({ name: "start_spawn_1", className: "info_target", origin: { x: 3000, y: 0, z: 0 } }));
-    Click(0, "usermenu_freelook_button");
+    Click(0, "usermenu_drone_button");
     Click(0, "usermenu_restart_button");
     assert.equal(a.freeLook, false, "restart");
     assert.equal(a.pawn.GetCustomCamera().GetMode(), CustomCameraMode.FOLLOW_POSITION);
 });
 
+test("drone mode: not while the player is in a Grand Prix — the button hidden, a click does nothing", () => {
+    a.racing = true;
+    SetUserMenuOpen(0, a, true);
+    assert.equal(hud.Has(0, "usermenu_drone_row", "Hidden"), true);
+    Click(0, "usermenu_drone_button");
+    assert.equal(a.freeLook, false);
+    assert.equal(a.drone, undefined);
+    SetUserMenuOpen(1, b, true);
+    assert.equal(hud.Has(1, "usermenu_drone_row", "Hidden"), false, "the others outside it still can");
+});
+
 test("free look without template_drone in the map: stays off", () => {
     world.entities.find((e) => e.name === C.DRONE_TEMPLATE_NAME).Remove();
     SetUserMenuOpen(0, a, true);
-    Click(0, "usermenu_freelook_button");
+    Click(0, "usermenu_drone_button");
     assert.equal(a.freeLook, false);
     assert.equal(a.drone, undefined);
     assert.equal(a.userMenuOpen, true, "the menu stays open");
@@ -483,7 +497,7 @@ test("skin buttons: a broken melon gets its new skin on the respawn, not while i
 });
 
 test("clicks from a player without a kart are ignored", () => {
-    for (const button of ["hub_close_button", "usermenu_close_button", "usermenu_respawn_button", "usermenu_restart_button", "usermenu_hub_button", "usermenu_tutorial_button", "usermenu_glow_button", "usermenu_jointutorial_button", "usermenu_freelook_button", "usermenu_color_red", "usermenu_skin_gold"]) {
+    for (const button of ["hub_close_button", "usermenu_close_button", "usermenu_respawn_button", "usermenu_restart_button", "usermenu_hub_button", "usermenu_tutorial_button", "usermenu_glow_button", "usermenu_jointutorial_button", "usermenu_drone_button", "usermenu_color_red", "usermenu_skin_gold"]) {
         assert.doesNotThrow(() => Click(7, button), button);
     }
 });

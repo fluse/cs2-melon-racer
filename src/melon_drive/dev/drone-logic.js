@@ -1,5 +1,5 @@
 // Pure rules of the free-look drone (no engine calls) — see free-look.js.
-import { DRONE_RESPONSE, DRONE_MAX_TILT, DRONE_CRUISE_TILT, DRONE_TILT_RATE } from "./constants.js";
+import { DRONE_RESPONSE, DRONE_GROUND_NORMAL_Z, DRONE_YAW_RATE, DRONE_MAX_TILT, DRONE_CRUISE_TILT, DRONE_TILT_RATE, DRONE_LASER_FORWARD, DRONE_LASER_UP, DRONE_LASER_LENGTH, DRONE_LASER_SEGMENT } from "./constants.js";
 
 /** @typedef {{ x: number, y: number, z: number }} Vec */
 
@@ -58,6 +58,48 @@ export function ClipVelocity(velocity, normal) {
 }
 
 /**
+ * Whether the drone has landed: the trace down from it (DRONE_GROUND_DISTANCE
+ * under its skids) hit floor — a normal pointing up at least
+ * DRONE_GROUND_NORMAL_Z, not a wall or a ceiling's edge — and it isn't
+ * `takingOff` (jump pressed on the ground, DRONE_TAKEOFF_SECONDS ago at most).
+ * @param {{ didHit: boolean, normal: Vec } | undefined} floor @param {boolean} takingOff
+ */
+export function IsDroneLanded(floor, takingOff) {
+    return Boolean(floor?.didHit) && floor.normal.z >= DRONE_GROUND_NORMAL_Z && !takingOff;
+}
+
+/**
+ * The drone's yaw after `dt`: landed it keeps `yaw` (looking around with
+ * the mouse doesn't turn it), in the air it turns the shorter way round
+ * towards the pilot's `viewYaw`, at most DRONE_YAW_RATE × `dt` degrees.
+ * @param {number} yaw @param {number} viewYaw @param {boolean} landed @param {number} dt
+ */
+export function StepDroneYaw(yaw, viewYaw, landed, dt) {
+    if (landed) {
+        return yaw;
+    }
+    const gap = ((((viewYaw - yaw) % 360) + 540) % 360) - 180; // -180..180
+    const step = DRONE_YAW_RATE * dt;
+    return Math.abs(gap) <= step ? viewYaw : yaw + Math.sign(gap) * step;
+}
+
+/**
+ * The inputs for the drone's prop_dynamic when it touches down
+ * (`landed`) or takes off again: the rotors run down to a stop and stay
+ * still, or run up and spin on. None while nothing changed.
+ * @param {boolean} landed @param {boolean} wasLanded
+ * @returns {[string, string][]}
+ */
+export function DroneRotorInputs(landed, wasLanded) {
+    if (landed === wasLanded) {
+        return [];
+    }
+    return landed
+        ? [["SetAnimationNotLooping", "spindown"], ["SetIdleAnimationLooping", "landed"]]
+        : [["SetAnimationNotLooping", "spinup"], ["SetIdleAnimationLooping", "spin"]];
+}
+
+/**
  * The tilt the drone wants (degrees, pitch + = nose down, roll + = right
  * side down): into the horizontal way it's speeding up (`accel`, full tilt
  * at DRONE_RESPONSE × `fullSpeed` — pulling away from a standstill), plus
@@ -85,4 +127,55 @@ export function StepDroneTilt(tilt, target, dt) {
     const step = DRONE_TILT_RATE * dt;
     const Toward = (/** @type {number} */ from, /** @type {number} */ to) => from + Math.max(-step, Math.min(step, to - from));
     return { pitch: Toward(tilt.pitch, target.pitch), roll: Toward(tilt.roll, target.roll) };
+}
+
+/** The unit vector a view (pitch + = down, yaw) looks along. @param {{ pitch: number, yaw: number }} view @returns {Vec} */
+export function ViewForward(view) {
+    const p = (view.pitch * Math.PI) / 180, y = (view.yaw * Math.PI) / 180;
+    return { x: Math.cos(p) * Math.cos(y), y: Math.cos(p) * Math.sin(y), z: -Math.sin(p) };
+}
+
+/**
+ * Where the drone's laser starts and the farthest it reaches: from the
+ * camera's recording light (DRONE_LASER_FORWARD ahead, DRONE_LASER_UP up in
+ * the drone's frame — turned and tipped with it) along the pilot's view,
+ * DRONE_LASER_LENGTH long.
+ * @param {Vec} position the drone @param {{ pitch: number, yaw: number }} angles the drone's
+ * @param {{ pitch: number, yaw: number }} view the pilot's
+ * @returns {{ start: Vec, end: Vec }}
+ */
+export function DroneLaserRay(position, angles, view) {
+    const ahead = ViewForward(angles);
+    const p = (angles.pitch * Math.PI) / 180, y = (angles.yaw * Math.PI) / 180;
+    const up = { x: Math.sin(p) * Math.cos(y), y: Math.sin(p) * Math.sin(y), z: Math.cos(p) };
+    const start = {
+        x: position.x + ahead.x * DRONE_LASER_FORWARD + up.x * DRONE_LASER_UP,
+        y: position.y + ahead.y * DRONE_LASER_FORWARD + up.y * DRONE_LASER_UP,
+        z: position.z + ahead.z * DRONE_LASER_FORWARD + up.z * DRONE_LASER_UP,
+    };
+    const dir = ViewForward(view);
+    return { start, end: { x: start.x + dir.x * DRONE_LASER_LENGTH, y: start.y + dir.y * DRONE_LASER_LENGTH, z: start.z + dir.z * DRONE_LASER_LENGTH } };
+}
+
+/** How many laser segments a drone needs for a full-length beam. */
+export const DRONE_LASER_SEGMENTS = Math.ceil(DRONE_LASER_LENGTH / DRONE_LASER_SEGMENT);
+
+/**
+ * Where each laser segment (DRONE_LASER_SEGMENT long, from its origin along
+ * its +X) starts, for a beam `length` long from `start` along unit `dir`:
+ * end to end, the last one pushed back to end exactly at `length` (it
+ * overlaps the one before, so every segment stays full width); the unused
+ * ones on top of the first. Shorter than one segment, they're all scaled
+ * down to `length` (`scale`).
+ * @param {Vec} start @param {Vec} dir @param {number} length
+ * @returns {{ positions: Vec[], scale: number }}
+ */
+export function LaserSegments(start, dir, length) {
+    const scale = Math.min(1, length / DRONE_LASER_SEGMENT);
+    const used = Math.max(1, Math.ceil(length / DRONE_LASER_SEGMENT));
+    const positions = Array.from({ length: DRONE_LASER_SEGMENTS }, (_, i) => {
+        const along = i < used ? Math.max(0, Math.min(i * DRONE_LASER_SEGMENT, length - DRONE_LASER_SEGMENT)) : 0;
+        return { x: start.x + dir.x * along, y: start.y + dir.y * along, z: start.z + dir.z * along };
+    });
+    return { positions, scale };
 }

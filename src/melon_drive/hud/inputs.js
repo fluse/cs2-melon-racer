@@ -22,7 +22,7 @@ import { PlaceOnPodium, TestGrandPrix } from "../race/podium/podium.js";
 import { GetSpeedHud } from "./layout.js";
 import { HideHubModal } from "./hub-modal/hub-modal.js";
 import { RefreshProfileHud } from "./profile/index.js";
-import { SetUserMenuOpen, SetUserMenuPage, UpdateGlowColorHud, UpdateSkinHud, UpdateToggleHud } from "./user-menu.js";
+import { SetUserMenuOpen, SetUserMenuPage, UpdateDroneButtonHud, UpdateGlowColorHud, UpdateSkinHud, UpdateToggleHud } from "./user-menu.js";
 import { SelectLeaderboardTab, StepLeaderboardsTrack } from "./leaderboards/index.js";
 import { RacePhase } from "../constants/index.js";
 import { SetWatching, StopSpectating, ToggleWatching } from "../race/spectate/index.js";
@@ -65,6 +65,17 @@ const KART_BUTTONS = {
     usermenu_watch_button: (slot, kart) => {
         if (ToggleWatching(kart, phase)) {
             SetUserMenuOpen(slot, kart, false);
+        }
+    },
+    // Drone mode (dev/free-look.js): this player flies a drone around, their
+    // melon waits frozen; not while they're in a Grand Prix. Switching it on
+    // or off closes the menu, so the mouse looks around / drives right away.
+    usermenu_drone_button: (slot, kart) => {
+        const on = !IsFreeLookOn(kart);
+        if (SetFreeLook(kart, on) === on) {
+            SetUserMenuOpen(slot, kart, false);
+        } else {
+            UpdateDroneButtonHud(slot, kart);
         }
     },
     usermenu_close_button: (slot, kart) => SetUserMenuOpen(slot, kart, false),
@@ -140,9 +151,6 @@ const TOGGLE_BUTTONS = {
     usermenu_prediction_button: (kart) => void SetPrediction(kart, !IsPredictionOn(kart)),
     // Only this player's melon is drawn/logged (tools mode only).
     usermenu_collisiondebug_button: (kart) => void SetCollisionDebug(kart, !IsCollisionDebugOn(kart)),
-    // This player flies their own pawn around, their melon waits frozen.
-    // Switching it on closes the menu so the mouse looks around right away.
-    usermenu_freelook_button: (kart) => SetFreeLook(kart, !IsFreeLookOn(kart)), // true = it is on now
 };
 
 /**
