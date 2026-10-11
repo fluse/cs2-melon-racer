@@ -16,7 +16,7 @@
 // info_targets the same yaw; the output lists their spots
 // (docs/mapping-api/05-hub.md).
 import { BUNGEE, LoadFont, TextShapes } from "../lib/font.mjs";
-import { ChamferedRect, DmxText, Mesh, SolidPng, VmatText, WriteAddonFile } from "../lib/model.mjs";
+import { ChamferedRect, DmxText, Mesh, Shape, SolidPng, VmatText, WriteAddonFile } from "../lib/model.mjs";
 
 // y: the step's center (+Y is the viewer's right looking at the front).
 const STEP_WIDTH = 112; // units along Y, per step
@@ -50,7 +50,6 @@ const MATERIAL_DIR = "materials/melon_racer/podium";
 const GENERATOR = "tools/models/make-podium-model.mjs";
 
 const font = LoadFont(BUNGEE);
-const Shape = outer => [{ outer, holes: [] }];
 
 /** An upright block of the steps' footprint around (0, y), grown by `grow`, from z0 to z1. */
 function Block(mesh, y, grow, z0, z1, part) {

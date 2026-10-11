@@ -13,16 +13,16 @@
 						_class = "DefaultMaterialGroup"
 						remaps =
 						[
-						{ from = "buffer_stop_beam.vmat" to = "materials/melon_racer/buffer_stop/buffer_stop_beam.vmat" },
-						{ from = "buffer_stop_beam" to = "materials/melon_racer/buffer_stop/buffer_stop_beam.vmat" },
-						{ from = "buffer_stop_rim.vmat" to = "materials/melon_racer/buffer_stop/buffer_stop_rim.vmat" },
-						{ from = "buffer_stop_rim" to = "materials/melon_racer/buffer_stop/buffer_stop_rim.vmat" },
-						{ from = "buffer_stop_stripe.vmat" to = "materials/melon_racer/buffer_stop/buffer_stop_stripe.vmat" },
-						{ from = "buffer_stop_stripe" to = "materials/melon_racer/buffer_stop/buffer_stop_stripe.vmat" },
-						{ from = "buffer_stop_steel.vmat" to = "materials/melon_racer/buffer_stop/buffer_stop_steel.vmat" },
-						{ from = "buffer_stop_steel" to = "materials/melon_racer/buffer_stop/buffer_stop_steel.vmat" },
-						{ from = "buffer_stop_plate.vmat" to = "materials/melon_racer/buffer_stop/buffer_stop_plate.vmat" },
-						{ from = "buffer_stop_plate" to = "materials/melon_racer/buffer_stop/buffer_stop_plate.vmat" },
+							{ from = "buffer_stop_beam.vmat" to = "materials/melon_racer/buffer_stop/buffer_stop_beam.vmat" },
+							{ from = "buffer_stop_beam" to = "materials/melon_racer/buffer_stop/buffer_stop_beam.vmat" },
+							{ from = "buffer_stop_rim.vmat" to = "materials/melon_racer/buffer_stop/buffer_stop_rim.vmat" },
+							{ from = "buffer_stop_rim" to = "materials/melon_racer/buffer_stop/buffer_stop_rim.vmat" },
+							{ from = "buffer_stop_stripe.vmat" to = "materials/melon_racer/buffer_stop/buffer_stop_stripe.vmat" },
+							{ from = "buffer_stop_stripe" to = "materials/melon_racer/buffer_stop/buffer_stop_stripe.vmat" },
+							{ from = "buffer_stop_steel.vmat" to = "materials/melon_racer/buffer_stop/buffer_stop_steel.vmat" },
+							{ from = "buffer_stop_steel" to = "materials/melon_racer/buffer_stop/buffer_stop_steel.vmat" },
+							{ from = "buffer_stop_plate.vmat" to = "materials/melon_racer/buffer_stop/buffer_stop_plate.vmat" },
+							{ from = "buffer_stop_plate" to = "materials/melon_racer/buffer_stop/buffer_stop_plate.vmat" },
 						]
 						use_global_default = false
 						global_default_material = ""

@@ -15,7 +15,7 @@
 // The foam uses the inflatable vinyl's roughness (make-inflatable.mjs — run
 // that first). Compile the .vmdl with resourcecompiler (see the end of the
 // output). Origin on the floor under the spring; the arch reaches out along +X.
-import { Mesh, ObjText, SolidPng, VmatText, WriteAddonFile } from "../lib/model.mjs";
+import { BindFrame, Mesh, ObjText, SmdAnimationText, SmdText, SolidPng, VmatText, VmdlText, WriteAddonFile } from "../lib/model.mjs";
 
 // --- shape (units) ---
 const BASE_RADIUS = 14; // the disc the spring stands on
@@ -287,23 +287,7 @@ function FoamRadius(s) {
     Tube(lipRings, WIRE_SIDES, "cap_rim", () => [[HEAD, 1]]);
 }
 
-// --- SMD files (Source coordinates, Z up; rotations in radians, X Y Z). The
-// parser takes no comment lines, so they carry no AUTO-GENERATED banner. ---
-const fmt = n => (Math.abs(n) < 1e-7 ? 0 : n).toFixed(6);
-const Nodes = () => ["nodes", ...BONES.map((b, i) => `${i} "${b.name}" ${b.parent}`), "end"];
-
-/** Local bone transforms of one frame: { pos, rot } per bone. */
-function BindFrame() {
-    return BONES.map(b => ({ pos: b.bind, rot: [0, 0, 0] }));
-}
-
-function Skeleton(frames) {
-    return ["skeleton", ...frames.flatMap((frame, time) => [
-        `time ${time}`,
-        ...frame.map(({ pos, rot }, i) => `${i} ${pos.map(fmt).join(" ")} ${rot.map(fmt).join(" ")}`),
-    ]), "end"];
-}
-
+// --- animations (SMD, written by model.mjs) ---
 /** A damped sine starting at 0, faded to exactly 0 at the clip's end. */
 function Damped(t, amplitude, hz, damping) {
     if (t < 0) return 0;
@@ -312,7 +296,7 @@ function Damped(t, amplitude, hz, damping) {
 }
 
 function BoingFrame(t) {
-    const frame = BindFrame();
+    const frame = BindFrame(BONES);
     // Squash: the first swing compresses (negative), the next stretches.
     const length = 1 - Damped(t, SQUASH, SQUASH_HZ, SQUASH_DAMPING);
     const rad = Math.PI / 180;
@@ -331,144 +315,27 @@ function BoingFrame(t) {
     return frame;
 }
 
-const reference = [
-    "version 1",
-    ...Nodes(),
-    ...Skeleton([BindFrame()]),
-    "triangles",
-    ...Object.entries(tris).flatMap(([part, list]) => list.flatMap(tri => [
-        `${NAME}_${part}`,
-        ...tri.map(i => {
-            const { p, n, uv, weights } = verts[i];
-            const parent = weights.reduce((best, w) => (w[1] > best[1] ? w : best))[0];
-            return `${parent} ${p.map(fmt).join(" ")} ${n.map(fmt).join(" ")} ${fmt(uv[0])} ${fmt(1 - uv[1])} ${weights.length} ${weights.map(([b, w]) => `${b} ${fmt(w)}`).join(" ")}`;
-        }),
-    ])),
-    "end",
-    "",
-].join("\n");
-
-const Animation = frames => ["version 1", ...Nodes(), ...Skeleton(frames), ""].join("\n");
+const triangles = Object.entries(tris).flatMap(([part, list]) => list.map(tri => ({
+    material: `${NAME}_${part}`,
+    corners: tri.map(i => verts[i]),
+})));
 const boingFrames = Array.from({ length: Math.round(BOING_SECONDS * FPS) + 1 }, (_, f) => BoingFrame(f / FPS));
+const materials = Object.fromEntries(PARTS.map(part => [part, `${MATERIAL_DIR}/${NAME}_${part}.vmat`]));
+const vmdl = VmdlText({
+    name: NAME,
+    mesh: `${MODEL_DIR}/${NAME}.smd`,
+    physicsObj: `${MODEL_DIR}/${NAME}_physics.obj`,
+    materials,
+    animations: [
+        { name: "idle", file: `${MODEL_DIR}/${NAME}_idle.smd`, looping: true },
+        { name: "boing", file: `${MODEL_DIR}/${NAME}_boing.smd`, looping: false },
+    ],
+    surfaceProp: SURFACE_PROP,
+});
 
-// --- .vmdl ---
-const remaps = PARTS.flatMap(part => [
-    `\t\t\t\t\t\t\t{ from = "${NAME}_${part}.vmat" to = "${MATERIAL_DIR}/${NAME}_${part}.vmat" },`,
-    `\t\t\t\t\t\t\t{ from = "${NAME}_${part}" to = "${MATERIAL_DIR}/${NAME}_${part}.vmat" },`,
-]).join("\n");
-const AnimFile = (name, looping) => `					{
-						_class = "AnimFile"
-						name = "${name}"
-						activity_name = ""
-						activity_weight = 1
-						weight_list_name = ""
-						fade_in_time = 0.1
-						fade_out_time = 0.1
-						looping = ${looping}
-						delta = false
-						worldSpace = false
-						hidden = false
-						anim_markup_ordered = false
-						disable_compression = false
-						source_filename = "${MODEL_DIR}/${NAME}_${name}.smd"
-						start_frame = -1
-						end_frame = -1
-						framerate = -1.0
-						reverse = false
-					},`;
-const vmdl = `<!-- kv3 encoding:text:version{e21c7f3c-8a33-41c5-9977-a76d3a32aa0d} format:modeldoc36:version{972dada4-b828-45a4-bb93-7795cf0585da} -->
-{
-	rootNode =
-	{
-		_class = "RootNode"
-		children =
-		[
-			{
-				_class = "MaterialGroupList"
-				children =
-				[
-					{
-						_class = "DefaultMaterialGroup"
-						remaps =
-						[
-${remaps}
-						]
-						use_global_default = false
-						global_default_material = ""
-					},
-				]
-			},
-			{
-				_class = "RenderMeshList"
-				children =
-				[
-					{
-						_class = "RenderMeshFile"
-						filename = "${MODEL_DIR}/${NAME}.smd"
-						import_translation = [ 0.0, 0.0, 0.0 ]
-						import_rotation = [ 0.0, 0.0, 0.0 ]
-						import_scale = 1.0
-						align_origin_x_type = "None"
-						align_origin_y_type = "None"
-						align_origin_z_type = "None"
-						parent_bone = ""
-						import_filter =
-						{
-							exclude_by_default = false
-							exception_list = [  ]
-						}
-					},
-				]
-			},
-			{
-				_class = "AnimationList"
-				children =
-				[
-${AnimFile("idle", true)}
-${AnimFile("boing", false)}
-				]
-				default_root_bone_name = ""
-			},
-			{
-				_class = "PhysicsShapeList"
-				children =
-				[
-					{
-						_class = "PhysicsMeshFile"
-						name = "${NAME}"
-						parent_bone = ""
-						surface_prop = "${SURFACE_PROP}"
-						collision_tags = "solid"
-						recenter_on_parent_bone = false
-						offset_origin = [ 0.0, 0.0, 0.0 ]
-						offset_angles = [ 0.0, 0.0, 0.0 ]
-						align_origin_x_type = "None"
-						align_origin_y_type = "None"
-						align_origin_z_type = "None"
-						filename = "${MODEL_DIR}/${NAME}_physics.obj"
-						import_scale = 1.0
-						maxMeshVertices = 0
-						qemError = 0.0
-						import_filter =
-						{
-							exclude_by_default = false
-							exception_list = [  ]
-						}
-					},
-				]
-			},
-		]
-		model_archetype = ""
-		primary_associated_entity = ""
-		anim_graph_name = ""
-		base_model_name = ""
-	}
-}
-`;
-
-WriteAddonFile(`${MODEL_DIR}/${NAME}.smd`, reference);
-WriteAddonFile(`${MODEL_DIR}/${NAME}_idle.smd`, Animation([BindFrame()]));
-WriteAddonFile(`${MODEL_DIR}/${NAME}_boing.smd`, Animation(boingFrames));
+WriteAddonFile(`${MODEL_DIR}/${NAME}.smd`, SmdText(BONES, triangles));
+WriteAddonFile(`${MODEL_DIR}/${NAME}_idle.smd`, SmdAnimationText(BONES, [BindFrame(BONES)]));
+WriteAddonFile(`${MODEL_DIR}/${NAME}_boing.smd`, SmdAnimationText(BONES, boingFrames));
 WriteAddonFile(`${MODEL_DIR}/${NAME}_physics.obj`, ObjText(physics, NAME, GENERATOR));
 WriteAddonFile(`${MODEL_DIR}/${NAME}.vmdl`, vmdl);
 
@@ -483,7 +350,7 @@ for (const [part, rgb, options] of [
 ]) {
     const texture = `${MATERIAL_DIR}/${NAME}_${part}_color.png`;
     WriteAddonFile(texture, SolidPng(rgb));
-    WriteAddonFile(`${MATERIAL_DIR}/${NAME}_${part}.vmat`, VmatText({ texture, generator: GENERATOR, tint: 0, ...options }));
+    WriteAddonFile(materials[part], VmatText({ texture, generator: GENERATOR, tint: 0, ...options }));
 }
 
 const triangleCount = Object.values(tris).reduce((s, t) => s + t.length, 0);

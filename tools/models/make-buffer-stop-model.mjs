@@ -1,5 +1,5 @@
 // Generates a buffer stop (Prellbock) — `node tools/models/make-buffer-stop-model.mjs`:
-// a chunky red beam with a cream top and a white chevron front and back, two
+// a chunky magenta beam with a cream top and a white chevron front and back, two
 // round buffers sticking out of its front, standing on two bent grey steel
 // legs (each an upside-down V with flat feet, like a sawhorse) joined by a
 // crossbar at each foot. A track obstacle: the beam is a wall like any other
@@ -11,7 +11,7 @@
 //   materials/melon_racer/buffer_stop/buffer_stop_{beam,rim,stripe,steel,plate}.vmat (+ _color.png)
 // Compile the .vmdl with resourcecompiler (see the end of the output). Origin
 // on the floor in the middle; the beam runs along Y, the buffers face +X.
-import { Area, ChamferedRect, Mesh, ObjText, SolidPng, VmatText, VmdlText, WriteAddonFile } from "../lib/model.mjs";
+import { ChamferedRect, Circle, Mesh, ObjText, Shape, SolidPng, VmatText, VmdlText, WriteAddonFile } from "../lib/model.mjs";
 
 // --- shape (units; the melon is ~14 across) ---
 const BEAM_LENGTH = 104; // along Y
@@ -42,8 +42,8 @@ const BEND_STEPS = 3; // points around each bend of a leg
 const PHYSICS_BUFFER_SIDES = 6;
 const PHYSICS_BEND_STEPS = 1;
 
-// --- look: warning red/white, off-palette on purpose (an obstacle, not a guide line) ---
-const BEAM_COLOR = [0xe8, 0x3c, 0x2a]; // signal red
+// --- look: magenta/white, the spike spring's rim color (off-palette on purpose: an obstacle, not a start gate) ---
+const BEAM_COLOR = [0xff, 0x20, 0xff]; // #FF20FF
 const RIM_COLOR = [0xf4, 0xe6, 0xc8]; // cream
 const STRIPE_COLOR = [0xf6, 0xf6, 0xf2]; // white
 const STEEL_COLOR = [0x8c, 0x92, 0x9a]; // legs, buffer shafts
@@ -53,15 +53,6 @@ const NAME = "buffer_stop";
 const MODEL_DIR = "models/melon_racer/buffer_stop";
 const MATERIAL_DIR = "materials/melon_racer/buffer_stop";
 const GENERATOR = "tools/models/make-buffer-stop-model.mjs";
-
-/** A shape as Mesh.Extrude/Cap want it, its outline turned counter-clockwise. */
-const Shape = outer => [{ outer: Area(outer) < 0 ? [...outer].reverse() : outer, holes: [] }];
-
-/** A circle of `sides` points around (u, v), counter-clockwise. */
-const Circle = (u, v, r, sides) => Array.from({ length: sides }, (_, i) => {
-    const a = (2 * Math.PI * i) / sides;
-    return [u + r * Math.cos(a), v + r * Math.sin(a)];
-});
 
 /**
  * A bar of `thickness` along a centerline (x, z points), its corners rounded
@@ -159,7 +150,7 @@ const parts = ["beam", "rim", "stripe", "steel", "plate"];
 const materials = Object.fromEntries(parts.map(part => [part, `${MATERIAL_DIR}/${NAME}_${part}.vmat`]));
 WriteAddonFile(obj, ObjText(render, NAME, GENERATOR));
 WriteAddonFile(physicsObj, ObjText(physics, NAME, GENERATOR));
-WriteAddonFile(`${MODEL_DIR}/${NAME}.vmdl`, VmdlText({ name: NAME, obj, physicsObj, materials }));
+WriteAddonFile(`${MODEL_DIR}/${NAME}.vmdl`, VmdlText({ name: NAME, mesh: obj, physicsObj, materials }));
 for (const [part, rgb, options] of [
     ["beam", BEAM_COLOR, {}],
     ["rim", RIM_COLOR, {}],

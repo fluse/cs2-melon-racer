@@ -1,6 +1,7 @@
 // Shared by the model generators in tools/ (make-logo-model.mjs,
-// make-checkpoint-model.mjs, make-podium-model.mjs): a small mesh builder
-// (extruded 2D shapes, single triangles) and the files Hammer needs — the
+// make-checkpoint-model.mjs, make-podium-model.mjs, ...): a small mesh builder
+// (extruded 2D shapes, single triangles), 2D outlines to feed it (Shape,
+// Circle, RadialOutline, Slot, ChamferedRect) and the files Hammer needs — the
 // .obj and ModelDoc .vmdl of a model, a .dmx to import as mesh geometry, and
 // plain or glowing .vmat materials. Coordinates are
 // Source units, Z up; ObjText writes them the way ModelDoc reads an OBJ.
@@ -124,7 +125,150 @@ export class Mesh {
         }
     }
 
+    /** One corner: a new vertex, texcoord and normal. */
+    #Corner(p, n, uv) {
+        return [this.#Add(this.v, p), this.#Add(this.vt, uv), this.#Add(this.vn, n)];
+    }
+
+    /** A smooth-shaded triangle of three corners, turned so it faces the way its normals point. */
+    #SmoothTri(a, b, c, part) {
+        const [pa, pb, pc] = [a, b, c].map(k => this.v[k[0] - 1]);
+        const n = V3.Cross(V3.Sub(pb, pa), V3.Sub(pc, pa));
+        if (Math.hypot(...n) < 1e-9) return;
+        const avg = V3.Add(V3.Add(this.vn[a[2] - 1], this.vn[b[2] - 1]), this.vn[c[2] - 1]);
+        this.#Part(part).push(V3.Dot(n, avg) >= 0 ? [a, b, c] : [a, c, b]);
+    }
+
+    /**
+     * A round tube along `centers` (3D points), smooth all around: `radius` a
+     * number or radius(i) per point, `sides` around; with `caps` both ends
+     * closed flat. Bends without twisting (each ring's frame follows the last).
+     */
+    Tube(centers, radius, sides, part, caps = true) {
+        const R = typeof radius === "function" ? radius : () => radius;
+        const n = centers.length;
+        const tangents = centers.map((_, i) => V3.Unit(V3.Sub(centers[Math.min(i + 1, n - 1)], centers[Math.max(i - 1, 0)])));
+        let normal = V3.Unit(V3.Cross(tangents[0], Math.abs(tangents[0][2]) < 0.9 ? [0, 0, 1] : [1, 0, 0]));
+        let along = 0;
+        const rings = centers.map((c, i) => {
+            const t = tangents[i];
+            normal = V3.Unit(V3.Sub(normal, V3.Scale(t, V3.Dot(normal, t)))); // the last frame, turned onto this tangent
+            const side = V3.Cross(t, normal);
+            if (i > 0) along += Math.hypot(...V3.Sub(c, centers[i - 1]));
+            const r = R(i);
+            const ring = [];
+            for (let k = 0; k <= sides; k++) { // k = sides repeats k = 0 with u = 1, for the UV seam
+                const phi = (2 * Math.PI * k) / sides;
+                const radial = V3.Add(V3.Scale(normal, Math.cos(phi)), V3.Scale(side, Math.sin(phi)));
+                ring.push(this.#Corner(V3.Add(c, V3.Scale(radial, r)), radial, [(k / sides) * ((2 * Math.PI * r) / this.uvTile), along / this.uvTile]));
+            }
+            return { c, t, ring };
+        });
+        for (let i = 0; i + 1 < n; i++) {
+            for (let k = 0; k < sides; k++) {
+                const a = rings[i].ring[k], b = rings[i].ring[k + 1], c = rings[i + 1].ring[k + 1], d = rings[i + 1].ring[k];
+                this.#SmoothTri(a, b, c, part);
+                this.#SmoothTri(a, c, d, part);
+            }
+        }
+        if (!caps) return;
+        for (const [{ c, t, ring }, dir] of [[rings[0], -1], [rings[n - 1], 1]]) {
+            const out = V3.Scale(t, dir);
+            const center = this.#Corner(c, out, [0, 0]);
+            const flat = ring.map(([v, vt]) => this.#Corner(this.v[v - 1], out, this.vt[vt - 1]));
+            for (let k = 0; k < sides; k++) this.#SmoothTri(center, flat[k], flat[k + 1], part);
+        }
+    }
+
+    /** A cone from a round `base` (center, `radius`, `sides`) to the point `tip`, smooth-shaded, its base closed flat. */
+    Cone(base, tip, radius, sides, part) {
+        const axis = V3.Sub(tip, base), height = Math.hypot(...axis), up = V3.Unit(axis);
+        const normal = V3.Unit(V3.Cross(up, Math.abs(up[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0]));
+        const side = V3.Cross(up, normal);
+        const Radial = phi => V3.Add(V3.Scale(normal, Math.cos(phi)), V3.Scale(side, Math.sin(phi)));
+        const SideNormal = phi => V3.Unit(V3.Add(V3.Scale(Radial(phi), height), V3.Scale(up, radius)));
+        const down = V3.Scale(up, -1);
+        const center = this.#Corner(base, down, [0, 0]);
+        for (let k = 0; k < sides; k++) {
+            const p0 = (2 * Math.PI * k) / sides, p1 = (2 * Math.PI * (k + 1)) / sides;
+            const b0 = V3.Add(base, V3.Scale(Radial(p0), radius)), b1 = V3.Add(base, V3.Scale(Radial(p1), radius));
+            const uv = p => [p / (2 * Math.PI), 0];
+            this.#SmoothTri(
+                this.#Corner(b0, SideNormal(p0), uv(p0)),
+                this.#Corner(b1, SideNormal(p1), uv(p1)),
+                this.#Corner(tip, SideNormal((p0 + p1) / 2), [(p0 + p1) / (4 * Math.PI), 1]),
+                part,
+            );
+            this.#SmoothTri(center, this.#Corner(b1, down, [0, 0]), this.#Corner(b0, down, [0, 0]), part);
+        }
+    }
+
     get triangleCount() { return Object.values(this.tris).reduce((s, t) => s + t.length, 0); }
+}
+
+/** 3D vector helpers ([x, y, z] arrays). */
+export const V3 = {
+    Add: (a, b) => a.map((n, i) => n + b[i]),
+    Sub: (a, b) => a.map((n, i) => n - b[i]),
+    Scale: (a, s) => a.map(n => n * s),
+    Dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+    Cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+    Unit: a => a.map(n => n / Math.hypot(...a)),
+};
+
+/**
+ * A helix's centerline around the Z axis through (x, y): from z0 to z1 in
+ * `turns` turns, `stepsPerTurn` points each — a coil spring for Mesh.Tube.
+ */
+export function Helix(x, y, radius, z0, z1, turns, stepsPerTurn) {
+    const steps = Math.round(turns * stepsPerTurn);
+    return Array.from({ length: steps + 1 }, (_, i) => {
+        const a = (2 * Math.PI * i) / stepsPerTurn;
+        return [x + radius * Math.cos(a), y + radius * Math.sin(a), z0 + ((z1 - z0) * i) / steps];
+    });
+}
+
+/**
+ * Shapes as Mesh.Extrude/Cap want them: one outline with optional holes, the
+ * outline turned counter-clockwise and the holes clockwise whichever way they
+ * were drawn.
+ */
+export function Shape(outer, holes = []) {
+    const Turn = (pts, ccw) => ((Area(pts) > 0) === ccw ? pts : [...pts].reverse());
+    return [{ outer: Turn(outer, true), holes: holes.map(h => Turn(h, false)) }];
+}
+
+/** A circle (or regular polygon) of `sides` points around (u, v), counter-clockwise, the first at angle `start` (radians). */
+export const Circle = (u, v, r, sides, start = 0) => Array.from({ length: sides }, (_, i) => {
+    const a = start + (2 * Math.PI * i) / sides;
+    return [u + r * Math.cos(a), v + r * Math.sin(a)];
+});
+
+/**
+ * An outline around (u, v) made of one profile repeated `count` times — saw
+ * teeth, gear teeth, a star, a scalloped edge. `profile` is a list of [t, r]:
+ * t in [0, 1) is the position within one repeat (counter-clockwise), r the
+ * radius there. Counter-clockwise, the first repeat starting at `start`.
+ */
+export function RadialOutline(u, v, count, profile, start = 0) {
+    const pts = [];
+    for (let k = 0; k < count; k++) {
+        for (const [t, r] of profile) {
+            const a = start + (2 * Math.PI * (k + t)) / count;
+            pts.push([u + r * Math.cos(a), v + r * Math.sin(a)]);
+        }
+    }
+    return pts;
+}
+
+/** A point at `radius` and `angle` (radians) around (u, v). */
+export const Polar = (u, v, radius, angle) => [u + radius * Math.cos(angle), v + radius * Math.sin(angle)];
+
+/** A slot (a 2D capsule): rounded ends of `radius` around points a and b, `endSides` points per end, counter-clockwise. */
+export function Slot(a, b, radius, endSides = 6) {
+    const dir = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    const End = (c, from) => Array.from({ length: endSides + 1 }, (_, i) => Polar(c[0], c[1], radius, from + (Math.PI * i) / endSides));
+    return [...End(b, dir - Math.PI / 2), ...End(a, dir + Math.PI / 2)];
 }
 
 /** A rectangle with its corners cut off by `chamfer` (an octagon if it's big enough), counter-clockwise. */
@@ -154,15 +298,134 @@ export function ObjText(mesh, name, generator) {
     ].join("\n");
 }
 
+// --- SMD: a mesh skinned to a skeleton, and its animations (Source
+// coordinates, Z up; rotations in radians, X Y Z). The parser takes no comment
+// lines, so SMD files carry no AUTO-GENERATED banner. Bones are
+// [{ name, parent (index, -1 for the root), bind (position relative to the parent) }],
+// a frame is one { pos, rot } per bone, relative to its parent. ---
+const SmdNum = n => (Math.abs(n) < 1e-7 ? 0 : n).toFixed(6);
+const SmdNodes = bones => ["nodes", ...bones.map((b, i) => `${i} "${b.name}" ${b.parent}`), "end"];
+const SmdSkeleton = frames => ["skeleton", ...frames.flatMap((frame, time) => [
+    `time ${time}`,
+    ...frame.map(({ pos, rot }, i) => `${i} ${pos.map(SmdNum).join(" ")} ${rot.map(SmdNum).join(" ")}`),
+]), "end"];
+
+/** The bind pose as a frame: every bone at its `bind` position, unrotated. */
+export const BindFrame = bones => bones.map(b => ({ pos: b.bind, rot: [0, 0, 0] }));
+
+/** An animation .smd: the skeleton in each of `frames`, one per animation frame. */
+export const SmdAnimationText = (bones, frames) => ["version 1", ...SmdNodes(bones), ...SmdSkeleton(frames), ""].join("\n");
+
 /**
- * A ModelDoc .vmdl: the render mesh from `obj`, collision from `physicsObj`
- * (a concave mesh), each `<name>_<part>` material remapped to materials[part].
+ * A reference .smd (the render mesh): the skeleton in its bind pose and
+ * `triangles`, each { material, corners: [{ p, n, uv, weights: [[bone, weight]] }] },
+ * counter-clockwise seen from the front.
  */
-export function VmdlText({ name, obj, physicsObj, materials }) {
+export function SmdText(bones, triangles) {
+    return [
+        "version 1",
+        ...SmdNodes(bones),
+        ...SmdSkeleton([BindFrame(bones)]),
+        "triangles",
+        ...triangles.flatMap(({ material, corners }) => [
+            material,
+            ...corners.map(({ p, n, uv, weights }) => {
+                const parent = weights.reduce((best, w) => (w[1] > best[1] ? w : best))[0];
+                return `${parent} ${p.map(SmdNum).join(" ")} ${n.map(SmdNum).join(" ")} ${SmdNum(uv[0])} ${SmdNum(1 - uv[1])} ${weights.length} ${weights.map(([b, w]) => `${b} ${SmdNum(w)}`).join(" ")}`;
+            }),
+        ]),
+        "end",
+        "",
+    ].join("\n");
+}
+
+/**
+ * A Mesh's triangles as SmdText wants them, materials named `<name>_<part>`
+ * like ObjText's. `bone` is the bone every corner hangs on, or
+ * bone(position, part) giving each corner's weights ([[bone, weight]]) —
+ * e.g. a spring blended between its two ends.
+ */
+export function MeshSmdTriangles(mesh, name, bone) {
+    const Weights = typeof bone === "function" ? bone : () => [[bone, 1]];
+    return Object.entries(mesh.tris).flatMap(([part, tris]) => tris.map(tri => ({
+        material: `${name}_${part}`,
+        corners: tri.map(([v, vt, vn]) => ({ p: mesh.v[v - 1], n: mesh.vn[vn - 1], uv: mesh.vt[vt - 1], weights: Weights(mesh.v[v - 1], part) })),
+    })));
+}
+
+/** One AnimationList entry of VmdlText. */
+const AnimFile = ({ name, file, looping }) => `					{
+						_class = "AnimFile"
+						name = "${name}"
+						activity_name = ""
+						activity_weight = 1
+						weight_list_name = ""
+						fade_in_time = 0.1
+						fade_out_time = 0.1
+						looping = ${looping}
+						delta = false
+						worldSpace = false
+						hidden = false
+						anim_markup_ordered = false
+						disable_compression = false
+						source_filename = "${file}"
+						start_frame = -1
+						end_frame = -1
+						framerate = -1.0
+						reverse = false
+					},`;
+
+/**
+ * A ModelDoc .vmdl: the render mesh from `mesh` (an .obj, or an .smd with a
+ * skeleton), collision from `physicsObj` (a concave mesh, `surfaceProp`; none
+ * without one — the model is never solid), each
+ * `<name>_<part>` material remapped to materials[part]; with `animations`
+ * ([{ name, file (an .smd from SmdAnimationText), looping }]) also an
+ * animation list — the first one is listed first.
+ */
+export function VmdlText({ name, mesh, physicsObj, materials, animations = [], surfaceProp = "default" }) {
     const remaps = Object.entries(materials).flatMap(([part, vmat]) => [
-        `\t\t\t\t\t\t{ from = "${name}_${part}.vmat" to = "${vmat}" },`,
-        `\t\t\t\t\t\t{ from = "${name}_${part}" to = "${vmat}" },`,
+        `\t\t\t\t\t\t\t{ from = "${name}_${part}.vmat" to = "${vmat}" },`,
+        `\t\t\t\t\t\t\t{ from = "${name}_${part}" to = "${vmat}" },`,
     ]).join("\n");
+    const physicsList = physicsObj ? `
+			{
+				_class = "PhysicsShapeList"
+				children =
+				[
+					{
+						_class = "PhysicsMeshFile"
+						name = "${name}"
+						parent_bone = ""
+						surface_prop = "${surfaceProp}"
+						collision_tags = "solid"
+						recenter_on_parent_bone = false
+						offset_origin = [ 0.0, 0.0, 0.0 ]
+						offset_angles = [ 0.0, 0.0, 0.0 ]
+						align_origin_x_type = "None"
+						align_origin_y_type = "None"
+						align_origin_z_type = "None"
+						filename = "${physicsObj}"
+						import_scale = 1.0
+						maxMeshVertices = 0
+						qemError = 0.0
+						import_filter =
+						{
+							exclude_by_default = false
+							exception_list = [  ]
+						}
+					},
+				]
+			},` : "";
+    const animationList = animations.length ? `
+			{
+				_class = "AnimationList"
+				children =
+				[
+${animations.map(AnimFile).join("\n")}
+				]
+				default_root_bone_name = ""
+			},` : "";
     return `<!-- kv3 encoding:text:version{e21c7f3c-8a33-41c5-9977-a76d3a32aa0d} format:modeldoc36:version{972dada4-b828-45a4-bb93-7795cf0585da} -->
 {
 	rootNode =
@@ -191,7 +454,7 @@ ${remaps}
 				[
 					{
 						_class = "RenderMeshFile"
-						filename = "${obj}"
+						filename = "${mesh}"
 						import_translation = [ 0.0, 0.0, 0.0 ]
 						import_rotation = [ 0.0, 0.0, 0.0 ]
 						import_scale = 1.0
@@ -206,35 +469,7 @@ ${remaps}
 						}
 					},
 				]
-			},
-			{
-				_class = "PhysicsShapeList"
-				children =
-				[
-					{
-						_class = "PhysicsMeshFile"
-						name = "${name}"
-						parent_bone = ""
-						surface_prop = "default"
-						collision_tags = "solid"
-						recenter_on_parent_bone = false
-						offset_origin = [ 0.0, 0.0, 0.0 ]
-						offset_angles = [ 0.0, 0.0, 0.0 ]
-						align_origin_x_type = "None"
-						align_origin_y_type = "None"
-						align_origin_z_type = "None"
-						filename = "${physicsObj}"
-						import_scale = 1.0
-						maxMeshVertices = 0
-						qemError = 0.0
-						import_filter =
-						{
-							exclude_by_default = false
-							exception_list = [  ]
-						}
-					},
-				]
-			},
+			},${animationList}${physicsList}
 		]
 		model_archetype = ""
 		primary_associated_entity = ""

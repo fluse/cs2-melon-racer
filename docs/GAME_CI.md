@@ -24,8 +24,12 @@ reuse a color for something with a different meaning.
   purpose.
 - **Foam bouncer** (`tools/models/make-bouncer-model.mjs`): pink foam, lime cap —
   off-palette on purpose, a playground decoration, not a guide line.
-- **Buffer stop** (`tools/models/make-buffer-stop-model.mjs`): signal red beam, white
-  chevron, grey steel — off-palette on purpose, warning colors for an obstacle.
+- **Buffer stop** (`tools/models/make-buffer-stop-model.mjs`): magenta beam (`#FF20FF`, like the
+  spike spring's rim), white chevron, grey steel — off-palette on purpose, an obstacle, not a start gate.
+- **Saw blade** (`tools/models/make-saw-blade-model.mjs`): bright steel, dark carbide
+  tips, a signal red ring (`#E83C2A`) — off-palette on purpose, warning colors for a hazard.
+- **Spike spring** (`tools/models/make-spike-spring-model.mjs`): steel spikes, chrome spring, a magenta rim
+  (`#FF20FF`) — off-palette on purpose: close to start magenta, but a hazard, not a start gate.
 
 ## Not on the palette yet
 

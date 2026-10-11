@@ -16,7 +16,7 @@
 // _color.png. Compile the .vmdl files with resourcecompiler (see the end of
 // the output). Origin on the floor in the middle of the gate, the pillars on
 // either side along Y, the melon driving through along X.
-import { ChamferedRect, Mesh, ObjText, SolidPng, VmatText, VmdlText, WriteAddonFile } from "../lib/model.mjs";
+import { ChamferedRect, Mesh, ObjText, Shape, SolidPng, VmatText, VmdlText, WriteAddonFile } from "../lib/model.mjs";
 
 // pillarY: pillar centers, ±; beamBottom: the beam's underside; detail: scales
 // every other measure (pillar and beam thickness, feet, strips, diamond).
@@ -33,8 +33,6 @@ const MATERIAL_NAME = "checkpoint_gate";
 const MODEL_DIR = "models/melon_racer";
 const MATERIAL_DIR = "materials/melon_racer/checkpoint_gate";
 const GENERATOR = "tools/models/make-checkpoint-model.mjs";
-
-const Shape = outer => [{ outer, holes: [] }];
 
 /** An upright octagonal block centered on (x, y), from z0 to z1. */
 function Block(mesh, x, y, width, chamfer, z0, z1, part) {
@@ -98,7 +96,7 @@ for (const variant of VARIANTS) {
     // Parts are named after the shared materials, whichever size.
     WriteAddonFile(obj, ObjText(render, MATERIAL_NAME, GENERATOR));
     WriteAddonFile(physicsObj, ObjText(physics, MATERIAL_NAME, GENERATOR));
-    WriteAddonFile(`${MODEL_DIR}/${name}.vmdl`, VmdlText({ name: MATERIAL_NAME, obj, physicsObj, materials }));
+    WriteAddonFile(`${MODEL_DIR}/${name}.vmdl`, VmdlText({ name: MATERIAL_NAME, mesh: obj, physicsObj, materials }));
     console.log(`  ${name}: ${render.triangleCount} triangles (collision ${physics.triangleCount}), ${width.toFixed(1)} wide, ${height.toFixed(1)} high`);
 }
 for (const [part, rgb, options] of [
