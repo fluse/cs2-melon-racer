@@ -5,6 +5,7 @@
 // camera in through ../wall-clip/ (eased), not the engine.
 import { CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
+import { karts } from "../../core/kart-registry.js";
 import { LiftCameraOffset } from "../lift-zoom/logic.js";
 import { PodiumCameraOffset } from "../podium-zoom/logic.js";
 import { WallClippedOffset } from "../wall-clip/wall-clip.js";
@@ -46,12 +47,18 @@ export function ApplyCameraFollow(kart) {
 
 /**
  * Per tick: the chase camera with every zoom and the wall pull-in eased on.
- * Left alone while the melon is breaking — the break camera owns it then,
+ * Spectating (race/spectate/, kart.spectateSlot) it chases that player's
+ * melon instead, with their zooms. Left alone while the melon is breaking — the break camera owns it then,
  * and the respawn re-applies it — in free look (dev/free-look.js) and while
  * the side-view camera has it (../side-view/).
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 export function UpdateFollowCamera(kart, dt) {
+    const watched = kart.spectateSlot !== undefined ? karts.get(kart.spectateSlot) : undefined;
+    if (watched?.melon.IsValid() && !kart.freeLook) {
+        ApplyZonedFollowOffset(kart, dt, watched);
+        return;
+    }
     if (kart.breaking || kart.freeLook || (kart.sideViewBlend ?? 0) > 0) {
         return;
     }
@@ -63,31 +70,36 @@ export function UpdateFollowCamera(kart, dt) {
  * (kart.liftCameraBlend, lift-zoom.js) and the camera-zone zoom
  * (kart.zoneCamera, zone-zoom.js); they add up. Walls pull the camera in
  * (wall-clip.js, eased over `dt`) only while neither turns that off.
+ * `watched` is the kart whose melon (and zooms) the camera chases — the own
+ * one, or the one spectated.
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
+ * @param {import("../../core/kart-registry.js").Kart} [watched]
  */
-export function ApplyZonedFollowOffset(kart, dt) {
-    const liftBlend = kart.liftCameraBlend ?? 0;
-    const offset = ZonedFollowOffset(kart);
-    const clips = liftBlend === 0 && (kart.podiumCameraBlend ?? 0) === 0 && ZoneCameraClips(kart.zoneCamera);
+export function ApplyZonedFollowOffset(kart, dt, watched = kart) {
+    const liftBlend = watched.liftCameraBlend ?? 0;
+    const offset = ZonedFollowOffset(kart, watched);
+    const clips = liftBlend === 0 && (watched.podiumCameraBlend ?? 0) === 0 && ZoneCameraClips(watched.zoneCamera);
     if (!clips) {
         kart.cameraWallScale = undefined; // no wall pull-in out here; starts over once it's back on
     }
-    const placed = clips ? WallClippedOffset(kart, offset, dt) : offset;
-    const key = `${placed.x.toFixed(2)},${placed.y.toFixed(2)},${placed.z.toFixed(2)}`;
+    const placed = clips ? WallClippedOffset(kart, offset, dt, watched.melon) : offset;
+    const key = `${watched === kart ? "" : `${kart.spectateSlot}:`}${placed.x.toFixed(2)},${placed.y.toFixed(2)},${placed.z.toFixed(2)}`;
     if (key === kart.appliedFollowKey) {
         return; // unchanged since the last tick — don't rewrite the engine's config
     }
-    SetFollowOffset(kart, placed, false);
+    SetFollowOffset(kart, placed, false, watched.melon);
     kart.appliedFollowKey = key;
 }
 
 /**
- * The normal offset with both zone zooms on top, before the wall pull-in.
+ * The normal offset (this player's own, see GetCameraOffsetFor) with the
+ * zone zooms of `watched` on top, before the wall pull-in.
  * @param {import("../../core/kart-registry.js").Kart} kart
+ * @param {import("../../core/kart-registry.js").Kart} [watched] whose zooms — the own kart's, or the spectated one's
  */
-export function ZonedFollowOffset(kart) {
-    const lifted = LiftCameraOffset(GetCameraOffsetFor(kart), kart.liftCameraBlend ?? 0);
-    return ZoneCameraOffset(PodiumCameraOffset(lifted, kart.podiumCameraBlend ?? 0), kart.zoneCamera);
+export function ZonedFollowOffset(kart, watched = kart) {
+    const lifted = LiftCameraOffset(GetCameraOffsetFor(kart), watched.liftCameraBlend ?? 0);
+    return ZoneCameraOffset(PodiumCameraOffset(lifted, watched.podiumCameraBlend ?? 0), watched.zoneCamera);
 }
 
 /**
@@ -96,10 +108,11 @@ export function ZonedFollowOffset(kart) {
  * @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} cameraOffset
  * @param {boolean} engineClipsToWalls let the engine pull the camera in at walls (instantly) — only the
  *   break camera does; everything else goes through ApplyZonedFollowOffset's own, eased pull-in
+ * @param {any} [followEntity] the melon to chase — the own, or a spectated one
  */
-export function SetFollowOffset(kart, cameraOffset, engineClipsToWalls) {
+export function SetFollowOffset(kart, cameraOffset, engineClipsToWalls, followEntity = kart.melon) {
     kart.pawn.GetCustomCamera().SetFollowConfig({
-        followEntity: kart.melon,
+        followEntity,
         followOffset: FOLLOW_OFFSET,
         cameraOffset,
         clipCameraOffset: engineClipsToWalls,

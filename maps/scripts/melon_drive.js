@@ -100,6 +100,11 @@ function TraceSphere(config) {
  *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
  *   testPreview?: { kind: "countdown" | "finish" | "intro" | "call", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro/Grand Prix Call playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
+ *   finishTime?: number, timedOut?: boolean, // racing: when it finished this heat; finished by the finish window running out instead (no place) — see FinishKart/TimeOutKart in race/heat/race-flow.js
+ *   graceShown?: number, graceResendAt?: number, // what finish_grace shows (undefined: hidden) and when it's sent again — see UpdateFinishGraceHud
+ *   watching?: boolean, // "Watch Grand Prix": outside the Grand Prix, following it, own melon frozen — see race/spectate/
+ *   spectateSlot?: number, // whose melon the camera follows instead of the own (unset: the own) — see UpdateSpectating
+ *   spectateShown?: string, spectateResendAt?: number, watchRowShown?: string, // what the spectate panel / the user menu's watch row last showed — see race/spectate/spectate.js
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
  *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the page (leaderboards, a developer page) the user menu shows in place of its columns, if any — kept when it closes, so it reopens there (this session only) — see SetUserMenuPage
@@ -964,6 +969,12 @@ const GRAND_PRIX_GATHER_SECONDS = 10;
 const COUNTDOWN_SECONDS = 3;
 const GO_DISPLAY_SECONDS = 0.7; // how long "GO" stays on screen once the countdown ends — its grow-and-fade (speedometer.css) is done by .62s
 const BREAK_SECONDS = 10; // fixed by the original request
+// Once the first racer of a heat finishes, the others have this long to
+// finish too (the finish window, counted down on everyone's HUD as
+// finish_grace). Who hasn't by then gets no place and no points for the
+// heat ("TIME UP"), but stays in the Grand Prix for the next one. Racers
+// who finished spectate the others meanwhile (race/spectate/).
+const FINISH_GRACE_SECONDS = 30;
 // A racer who reaches no new checkpoint (and counts no lap) for this long
 // after GO or their last one is out of the Grand Prix (DNF) and back in the
 // hub — so one player who stops driving can't block a heat for everyone.
@@ -1189,6 +1200,14 @@ const XP_BAR_SEGMENTS = 20;
 // Console command (sv_cheats 1 only) giving every player on the map XP for
 // testing: `melon_give_xp 500`.
 const XP_CHEAT_COMMAND = "melon_give_xp";
+
+// Spectating a Grand Prix (race/spectate/): a racer who finished watches the
+// ones still driving, and a player outside the Grand Prix can follow it all
+// ("Watch Grand Prix"). See GAMEPLAY.md's "Spectating".
+
+// A racer's FINISH image stays up this long before their camera switches
+// to the ones still driving — the moment of crossing the line isn't cut off.
+const SPECTATE_AFTER_FINISH_SECONDS = 3;
 
 // Teleporters and the lift applied to every trigger/destination teleport target.
 
@@ -1918,9 +1937,10 @@ function StepWallClipScale(current, target, dt) {
  * the camera would be, skipping the melon itself and players.
  * @param {import("../../core/kart-registry.js").Kart} kart
  * @param {{ x: number, y: number, z: number }} offset @param {number} dt
+ * @param {any} [melon] the melon the camera chases — the own, or a spectated one
  */
-function WallClippedOffset(kart, offset, dt) {
-    const origin = kart.melon.GetAbsOrigin();
+function WallClippedOffset(kart, offset, dt, melon = kart.melon) {
+    const origin = melon.GetAbsOrigin();
     const pivot = { x: origin.x + FOLLOW_OFFSET.x, y: origin.y + FOLLOW_OFFSET.y, z: origin.z + FOLLOW_OFFSET.z };
     const toCamera = RotateCameraOffset(offset, kart.pawn.GetEyeAngles());
     const length = Math.hypot(toCamera.x, toCamera.y, toCamera.z);
@@ -1929,7 +1949,7 @@ function WallClippedOffset(kart, offset, dt) {
         const trace = TraceLine({
             start: pivot,
             end: { x: pivot.x + toCamera.x, y: pivot.y + toCamera.y, z: pivot.z + toCamera.z },
-            ignoreEntity: kart.melon,
+            ignoreEntity: melon,
             ignorePlayers: true,
         });
         target = trace.startedInSolid ? 1 : WallClipScale(trace.didHit, trace.fraction, length);
@@ -2142,12 +2162,18 @@ function ApplyCameraFollow(kart) {
 
 /**
  * Per tick: the chase camera with every zoom and the wall pull-in eased on.
- * Left alone while the melon is breaking — the break camera owns it then,
+ * Spectating (race/spectate/, kart.spectateSlot) it chases that player's
+ * melon instead, with their zooms. Left alone while the melon is breaking — the break camera owns it then,
  * and the respawn re-applies it — in free look (dev/free-look.js) and while
  * the side-view camera has it (../side-view/).
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 function UpdateFollowCamera(kart, dt) {
+    const watched = kart.spectateSlot !== undefined ? karts.get(kart.spectateSlot) : undefined;
+    if (watched?.melon.IsValid() && !kart.freeLook) {
+        ApplyZonedFollowOffset(kart, dt, watched);
+        return;
+    }
     if (kart.breaking || kart.freeLook || (kart.sideViewBlend ?? 0) > 0) {
         return;
     }
@@ -2159,31 +2185,36 @@ function UpdateFollowCamera(kart, dt) {
  * (kart.liftCameraBlend, lift-zoom.js) and the camera-zone zoom
  * (kart.zoneCamera, zone-zoom.js); they add up. Walls pull the camera in
  * (wall-clip.js, eased over `dt`) only while neither turns that off.
+ * `watched` is the kart whose melon (and zooms) the camera chases — the own
+ * one, or the one spectated.
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
+ * @param {import("../../core/kart-registry.js").Kart} [watched]
  */
-function ApplyZonedFollowOffset(kart, dt) {
-    const liftBlend = kart.liftCameraBlend ?? 0;
-    const offset = ZonedFollowOffset(kart);
-    const clips = liftBlend === 0 && (kart.podiumCameraBlend ?? 0) === 0 && ZoneCameraClips(kart.zoneCamera);
+function ApplyZonedFollowOffset(kart, dt, watched = kart) {
+    const liftBlend = watched.liftCameraBlend ?? 0;
+    const offset = ZonedFollowOffset(kart, watched);
+    const clips = liftBlend === 0 && (watched.podiumCameraBlend ?? 0) === 0 && ZoneCameraClips(watched.zoneCamera);
     if (!clips) {
         kart.cameraWallScale = undefined; // no wall pull-in out here; starts over once it's back on
     }
-    const placed = clips ? WallClippedOffset(kart, offset, dt) : offset;
-    const key = `${placed.x.toFixed(2)},${placed.y.toFixed(2)},${placed.z.toFixed(2)}`;
+    const placed = clips ? WallClippedOffset(kart, offset, dt, watched.melon) : offset;
+    const key = `${watched === kart ? "" : `${kart.spectateSlot}:`}${placed.x.toFixed(2)},${placed.y.toFixed(2)},${placed.z.toFixed(2)}`;
     if (key === kart.appliedFollowKey) {
         return; // unchanged since the last tick — don't rewrite the engine's config
     }
-    SetFollowOffset(kart, placed, false);
+    SetFollowOffset(kart, placed, false, watched.melon);
     kart.appliedFollowKey = key;
 }
 
 /**
- * The normal offset with both zone zooms on top, before the wall pull-in.
+ * The normal offset (this player's own, see GetCameraOffsetFor) with the
+ * zone zooms of `watched` on top, before the wall pull-in.
  * @param {import("../../core/kart-registry.js").Kart} kart
+ * @param {import("../../core/kart-registry.js").Kart} [watched] whose zooms — the own kart's, or the spectated one's
  */
-function ZonedFollowOffset(kart) {
-    const lifted = LiftCameraOffset(GetCameraOffsetFor(kart), kart.liftCameraBlend ?? 0);
-    return ZoneCameraOffset(PodiumCameraOffset(lifted, kart.podiumCameraBlend ?? 0), kart.zoneCamera);
+function ZonedFollowOffset(kart, watched = kart) {
+    const lifted = LiftCameraOffset(GetCameraOffsetFor(kart), watched.liftCameraBlend ?? 0);
+    return ZoneCameraOffset(PodiumCameraOffset(lifted, watched.podiumCameraBlend ?? 0), watched.zoneCamera);
 }
 
 /**
@@ -2192,10 +2223,11 @@ function ZonedFollowOffset(kart) {
  * @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} cameraOffset
  * @param {boolean} engineClipsToWalls let the engine pull the camera in at walls (instantly) — only the
  *   break camera does; everything else goes through ApplyZonedFollowOffset's own, eased pull-in
+ * @param {any} [followEntity] the melon to chase — the own, or a spectated one
  */
-function SetFollowOffset(kart, cameraOffset, engineClipsToWalls) {
+function SetFollowOffset(kart, cameraOffset, engineClipsToWalls, followEntity = kart.melon) {
     kart.pawn.GetCustomCamera().SetFollowConfig({
-        followEntity: kart.melon,
+        followEntity,
         followOffset: FOLLOW_OFFSET,
         cameraOffset,
         clipCameraOffset: engineClipsToWalls,
@@ -2955,11 +2987,12 @@ function SideViewCameraOn(kart) {
  * Per tick: swings the camera to the side while the melon is in a side-view
  * zone and back to the chase camera after it leaves. Left alone while the
  * melon is breaking — the camera just stays where it was, watching the crash
- * site — and in free look (dev/free-look.js).
+ * site — in free look (dev/free-look.js) and while spectating someone else
+ * (race/spectate/).
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 function UpdateSideViewCamera(kart, dt) {
-    if (kart.breaking || kart.freeLook) {
+    if (kart.breaking || kart.freeLook || kart.spectateSlot !== undefined) {
         return;
     }
     const origin = kart.melon.GetAbsOrigin();
@@ -7924,6 +7957,310 @@ function TestGrandPrix(racers) {
     return gp;
 }
 
+// Pure rules of spectating (no engine calls) — see spectate.js.
+
+/**
+ * Whether `phase` is part of a running Grand Prix — what a player outside it
+ * can watch. @param {string} phase
+ */
+function IsHeatPhase(phase) {
+    return phase === RacePhase.COUNTDOWN || phase === RacePhase.RACING || phase === RacePhase.BREAK;
+}
+
+/**
+ * Whether a player spectates right now, and as what:
+ * "racer" — finished at least SPECTATE_AFTER_FINISH_SECONDS ago, while others
+ * still drive this heat (the finish window, FINISH_GRACE_SECONDS);
+ * "watcher" — not in the Grand Prix, watching it ("Watch Grand Prix"), for
+ * as long as one runs; undefined — the own melon.
+ * @param {{ racing: boolean, finished: boolean, finishTime?: number, watching?: boolean }} kart
+ * @param {string} phase @param {number} now
+ * @param {boolean} othersDriving another racer hasn't finished yet
+ * @returns {"racer" | "watcher" | undefined}
+ */
+function SpectateMode(kart, phase, now, othersDriving) {
+    if (kart.watching && !kart.racing && IsHeatPhase(phase)) {
+        return "watcher";
+    }
+    if (kart.racing && kart.finished && phase === RacePhase.RACING && othersDriving
+        && now - (kart.finishTime ?? -Infinity) >= SPECTATE_AFTER_FINISH_SECONDS) {
+        return "racer";
+    }
+    return undefined;
+}
+
+/**
+ * Who can be watched, in the order "next" steps through them: the racers
+ * still driving, most progress first (laps, then checkpoints), ties in the
+ * order given. With nobody driving any more and `fallbackAll`, every racer
+ * instead (a watcher during the countdown's line-up is covered by the
+ * first rule, the break by this one).
+ * @param {{ key: number, laps: number, checkpoint: number, finished: boolean }[]} racers
+ * @param {boolean} fallbackAll
+ * @returns {number[]} their keys
+ */
+function SpectateCandidates(racers, fallbackAll) {
+    const driving = racers.filter((racer) => !racer.finished);
+    const pool = driving.length > 0 || !fallbackAll ? driving : racers;
+    return pool
+        .map((racer, index) => ({ racer, index }))
+        .sort((a, b) => b.racer.laps - a.racer.laps || b.racer.checkpoint - a.racer.checkpoint || a.index - b.index)
+        .map(({ racer }) => racer.key);
+}
+
+/**
+ * The one to watch after stepping `direction` (1 next, -1 previous, 0 stay)
+ * from `current` through `candidates`, wrapping around. A `current` no longer
+ * among them (finished, out, gone) — or none yet — starts on the first, the
+ * one furthest ahead. Undefined with nobody to watch.
+ * @param {number[]} candidates see SpectateCandidates @param {number | undefined} current @param {number} direction
+ * @returns {number | undefined}
+ */
+function StepSpectateTarget(candidates, current, direction) {
+    if (candidates.length === 0) {
+        return undefined;
+    }
+    const index = current === undefined ? -1 : candidates.indexOf(current);
+    if (index === -1) {
+        return candidates[0];
+    }
+    return candidates[(index + direction + candidates.length) % candidates.length];
+}
+
+// Spectating a Grand Prix: the chase camera on someone else's melon. Two
+// ways in (rules in logic.js, SpectateMode):
+// - a racer who finished, while the others still have the finish window
+//   (FINISH_GRACE_SECONDS) — on its own, SPECTATE_AFTER_FINISH_SECONDS
+//   after crossing the line;
+// - a player outside the Grand Prix, by "Watch Grand Prix" (user menu, hub
+//   window) — for as long as it runs. Their own melon waits frozen
+//   meanwhile, like in free look.
+// Mouse1 / D next, Mouse2 / A previous (SpectateCandidates' order: the one
+// furthest ahead first); the mouse turns the view around the watched melon
+// as around one's own. The camera itself is camera/follow/'s, pointed at
+// kart.spectateSlot's melon.
+
+/** @typedef {import("../../core/kart-registry.js").Kart} Kart */
+
+/**
+ * Whether this player may start watching the Grand Prix now: one runs and
+ * they aren't in it, their melon is whole and on the map.
+ * @param {Kart} kart @param {string} phase
+ */
+function CanWatch(kart, phase) {
+    return IsHeatPhase(phase) && !kart.racing && !kart.breaking && kart.melon.IsValid();
+}
+
+/**
+ * "Watch Grand Prix" on/off for a player outside it. On: free look off,
+ * the melon frozen where it is (physics motion off, like free look) — the
+ * camera moves over to the racers on the next UpdateSpectating. Returns
+ * whether they watch now.
+ * @param {Kart} kart @param {boolean} on @param {string} phase
+ */
+function SetWatching(kart, on, phase) {
+    if (!on) {
+        StopSpectating(kart);
+        return false;
+    }
+    if (kart.watching) {
+        return true;
+    }
+    if (!CanWatch(kart, phase)) {
+        Debug(`SetWatching: slot ${SlotOf(kart)} can't watch now (phase=${phase}, racing=${kart.racing}, breaking=${kart.breaking})`);
+        return false;
+    }
+    SetFreeLook(kart, false);
+    kart.watching = true;
+    kart.melon.Move({ velocity: { x: 0, y: 0, z: 0 }, angularVelocity: { x: 0, y: 0, z: 0 } });
+    Instance.EntFireAtTarget({ target: kart.melon, input: "DisableMotion" });
+    kart.lastVelocity = undefined;
+    kart.settled = false;
+    Debug(`SetWatching: slot ${SlotOf(kart)} watches the Grand Prix`);
+    return true;
+}
+
+/**
+ * Back to the own melon, from either kind of spectating: a watcher's melon
+ * let go again, the camera back on it (not in free look or mid-break, which
+ * own the camera), and a finished racer's FINISH image up again. Every path
+ * that sends a melon somewhere (hub, tutorial, respawn, a new heat) calls it.
+ * @param {Kart} kart
+ */
+function StopSpectating(kart) {
+    if (kart.watching) {
+        kart.watching = false;
+        if (kart.melon.IsValid() && !kart.freeLook) {
+            Instance.EntFireAtTarget({ target: kart.melon, input: "EnableMotion" });
+        }
+        kart.lastVelocity = undefined;
+        kart.settled = false;
+        Debug(`StopSpectating: slot ${SlotOf(kart)} stops watching`);
+    }
+    EndSpectateView(kart);
+}
+
+/**
+ * Per tick, after the race flow: who spectates whom, the next/previous
+ * buttons, and the spectate HUD; plus the user menu's "Watch Grand Prix"
+ * row. Watchers drop out once the Grand Prix is over (or they're in a heat,
+ * breaking, in free look).
+ * @param {number} now @param {string} phase
+ */
+function UpdateSpectating(now, phase) {
+    const racers = [...karts.entries()].filter(([, kart]) => kart.racing);
+    for (const [slot, kart] of karts) {
+        if (kart.watching && (!IsHeatPhase(phase) || kart.racing || kart.breaking || kart.freeLook || !kart.melon.IsValid())) {
+            StopSpectating(kart);
+        }
+        UpdateWatchRow(slot, kart, phase);
+        const othersDriving = racers.some(([, other]) => other !== kart && !other.finished);
+        const mode = SpectateMode(kart, phase, now, othersDriving);
+        const candidates = mode === undefined ? [] : SpectateCandidates(
+            racers
+                .filter(([, other]) => other !== kart && other.melon.IsValid())
+                .map(([key, other]) => ({ key, laps: other.lapsCompleted, checkpoint: other.checkpointIndex, finished: other.finished })),
+            mode === "watcher",
+        );
+        const target = StepSpectateTarget(candidates, kart.spectateSlot, SpectateInput(kart));
+        if (target === undefined) {
+            EndSpectateView(kart);
+            continue;
+        }
+        if (kart.spectateSlot === undefined) {
+            BeginSpectateView(slot, kart);
+        }
+        if (target !== kart.spectateSlot) {
+            kart.spectateSlot = target;
+            kart.cameraWallScale = undefined; // the wall pull-in starts over at the new melon
+            kart.appliedFollowKey = undefined;
+            Debug(`UpdateSpectating: slot ${slot} (${mode}) watches slot ${target}`);
+        }
+        const name = karts.get(target)?.pawn.GetPlayerController()?.GetPlayerName() ?? "";
+        SetSpectateHud(slot, kart, `${mode}|${name}`, now);
+    }
+}
+
+/**
+ * This tick's next (1) / previous (-1) press: Mouse1 or D / Mouse2 or A.
+ * Not while Tab holds the scoreboard (A/D page it) or a menu has the mouse.
+ * @param {Kart} kart
+ */
+function SpectateInput(kart) {
+    const pawn = kart.pawn;
+    if (!pawn.IsValid() || pawn.IsInputPressed(CSInputs.SHOW_SCORES) || kart.userMenuOpen || kart.hubModalOpen) {
+        return 0;
+    }
+    if (pawn.WasInputJustPressed(CSInputs.ATTACK) || pawn.WasInputJustPressed(CSInputs.RIGHT)) {
+        return 1;
+    }
+    if (pawn.WasInputJustPressed(CSInputs.ATTACK2) || pawn.WasInputJustPressed(CSInputs.LEFT)) {
+        return -1;
+    }
+    return 0;
+}
+
+/**
+ * The camera leaves the own melon: a side view the own melon had is dropped
+ * (the follow camera takes over), a finished racer's FINISH image hidden —
+ * it would cover the watched melon.
+ * @param {number} slot @param {Kart} kart
+ */
+function BeginSpectateView(slot, kart) {
+    if ((kart.sideViewBlend ?? 0) > 0) {
+        kart.sideViewBlend = 0;
+        kart.sideViewZone = undefined;
+        kart.sideViewLast = undefined;
+        kart.pawn.GetCustomCamera().SetMode(CustomCameraMode.FOLLOW_POSITION);
+    }
+    const hud = GetSpeedHud();
+    hud?.SetHasClassForPlayer(slot, "finish_image", "Hidden", true);
+    hud?.SetHasClassForPlayer(slot, "finish_place", "Hidden", true);
+}
+
+/** Back to the own melon's camera and HUD (see StopSpectating). @param {Kart} kart */
+function EndSpectateView(kart) {
+    if (kart.spectateSlot === undefined) {
+        return;
+    }
+    kart.spectateSlot = undefined;
+    const slot = SlotOf(kart);
+    if (kart.melon.IsValid() && !kart.breaking && !kart.freeLook && kart.pawn.IsValid()) {
+        ApplyCameraFollow(kart);
+    }
+    kart.spectateResendAt = undefined;
+    SetSpectateHud(slot, kart, undefined, Instance.GetGameTime());
+    if (slot !== undefined && kart.racing && kart.finished) {
+        // FINISH again (TIME UP has no image) — up until the next heat or the hub.
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_image", "Hidden", Boolean(kart.timedOut));
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_place", "Hidden", false);
+    }
+}
+
+/**
+ * The spectate panel: "mode|name" — who's watched, with the stop hint for a
+ * watcher — or hidden with undefined. Sent on change and again every
+ * HUD_RESEND_SECONDS.
+ * @param {number | undefined} slot @param {Kart} kart @param {string | undefined} value @param {number} now
+ */
+function SetSpectateHud(slot, kart, value, now) {
+    if (value === kart.spectateShown && now < (kart.spectateResendAt ?? 0)) {
+        return;
+    }
+    kart.spectateShown = value;
+    kart.spectateResendAt = now + HUD_RESEND_SECONDS;
+    const hud = GetSpeedHud();
+    if (slot === undefined || !hud) {
+        return;
+    }
+    const [mode, name] = value?.split("|") ?? [];
+    if (name !== undefined) {
+        hud.SetDialogVariableStringForPlayer(slot, "spectate_panel", "name", name);
+    }
+    hud.SetHasClassForPlayer(slot, "spectate_panel", "Watching", mode === "watcher");
+    hud.SetHasClassForPlayer(slot, "spectate_panel", "Hidden", value === undefined);
+}
+
+/**
+ * The user menu's "Watch Grand Prix" / "Stop Watching" row: only while a
+ * Grand Prix runs that the player isn't in. Sent on change.
+ * @param {number} slot @param {Kart} kart @param {string} phase
+ */
+function UpdateWatchRow(slot, kart, phase) {
+    const key = kart.watching ? "stop" : CanWatch(kart, phase) ? "watch" : "";
+    if (key === kart.watchRowShown) {
+        return;
+    }
+    kart.watchRowShown = key;
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    if (key !== "") {
+        hud.SetDialogVariableStringForPlayer(slot, "usermenu_watch_button", "watch_label", key === "stop" ? "Stop Watching" : "Watch Grand Prix");
+    }
+    hud.SetHasClassForPlayer(slot, "usermenu_watch_row", "Hidden", key === "");
+}
+
+/**
+ * Clicked "Watch Grand Prix" / "Stop Watching" (the user menu's row):
+ * toggles watching. Returns whether anything changed.
+ * @param {Kart} kart @param {string} phase
+ */
+function ToggleWatching(kart, phase) {
+    const was = Boolean(kart.watching);
+    const now = SetWatching(kart, !was, phase);
+    kart.watchRowShown = undefined; // the label changes right away
+    return now !== was;
+}
+
+/** @param {Kart} kart */
+function SlotOf(kart) {
+    return kart.pawn.IsValid() ? kart.pawn.GetPlayerController()?.GetPlayerSlot() : undefined;
+}
+
+// Spectating a Grand Prix — see spectate.js.
+
 // --- Race flow: hub -> countdown -> racing -> break --------------------
 // See GAMEPLAY.md's "Hub -> race -> next-track flow" for the full design.
 // Lives here (not a separate point_script) because it's tightly coupled to
@@ -7937,6 +8274,9 @@ let phase = RacePhase.HUB;
 let activeTrackId = undefined;
 /** GetGameTime() at which the current GATHERING/COUNTDOWN/BREAK phase should end. */
 let phaseEndTime = 0;
+/** RACING: when the finish window closes — FINISH_GRACE_SECONDS after the
+ * heat's first finisher; undefined before that. */
+let graceEndTime = undefined;
 
 /** The countdown's numbers in countdown_panel (speedometer.xml), in order —
  * index = CountdownStep. Each gets "In" or "Out" (CountdownNumberState),
@@ -7978,10 +8318,10 @@ function SetBreakCountdown(slot, value) {
 }
 
 /**
- * Restores phase/activeTrackId/phaseEndTime from an OnScriptReload snapshot
+ * Restores phase/activeTrackId/phaseEndTime/graceEndTime from an OnScriptReload snapshot
  * (see index.js) — the counterpart write to these otherwise-internal `let`s
  * for the one caller outside this module that legitimately needs to set them.
- * @param {{ phase?: typeof RacePhase[keyof typeof RacePhase], activeTrackId?: number, phaseEndTime?: number } | undefined} snapshot
+ * @param {{ phase?: typeof RacePhase[keyof typeof RacePhase], activeTrackId?: number, phaseEndTime?: number, graceEndTime?: number } | undefined} snapshot
  */
 function RestoreRaceFlowSnapshot(snapshot) {
     if (!snapshot) {
@@ -7990,6 +8330,7 @@ function RestoreRaceFlowSnapshot(snapshot) {
     phase = snapshot.phase ?? phase;
     activeTrackId = snapshot.activeTrackId;
     phaseEndTime = snapshot.phaseEndTime ?? phaseEndTime;
+    graceEndTime = snapshot.graceEndTime;
 }
 
 function CurrentRacers() {
@@ -8229,6 +8570,9 @@ function BeginHeat(trackId) {
         kart.lapsCompleted = 0;
         CancelRun(kart); // a free-roaming run doesn't carry into the heat — its clock starts at GO
         kart.finished = false;
+        kart.finishTime = undefined;
+        kart.timedOut = undefined;
+        StopSpectating(kart); // a finished racer still watching the last heat
         kart.locked = true;
         kart.progressWatch = undefined; // the DNF clock starts at GO
         HideDnfWarning(kart);
@@ -8246,6 +8590,7 @@ function BeginHeat(trackId) {
 
     phase = RacePhase.COUNTDOWN;
     phaseEndTime = Instance.GetGameTime() + COUNTDOWN_SECONDS;
+    graceEndTime = undefined;
     Debug(`BeginHeat: track ${trackId}, ${racers.length} racer(s), countdown started`);
 }
 
@@ -8266,6 +8611,12 @@ function SetFinishImageVisible(slot, visible) {
 function FinishKart(kart) {
     kart.finished = true;
     kart.locked = true;
+    kart.finishTime = Instance.GetGameTime();
+    if (phase === RacePhase.RACING && graceEndTime === undefined) {
+        // The heat's first finisher: the others have FINISH_GRACE_SECONDS left.
+        graceEndTime = kart.finishTime + FINISH_GRACE_SECONDS;
+        Debug(`FinishKart: first finish on track ${activeTrackId}, the finish window closes in ${FINISH_GRACE_SECONDS}s`);
+    }
     const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
     // The place this racer crossed the line in, and the Grand Prix points for it.
     const result = activeTrackId !== undefined ? RecordGrandPrixFinish(kart, activeTrackId) : undefined;
@@ -8279,6 +8630,55 @@ function FinishKart(kart) {
     // heat is over — stays up through BREAK until the next heat/the hub.
     SetFinishImageVisible(slot, true);
     Debug(`FinishKart: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} finished track ${activeTrackId}`);
+}
+
+/**
+ * The finish window closed before this racer finished: parked like a
+ * finisher, but without a place or points for the heat ("TIME UP" where the
+ * place would be, no FINISH image) — and still in the Grand Prix, for the
+ * next heat. Its run's clock is dropped, no time saved.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function TimeOutKart(kart) {
+    kart.finished = true;
+    kart.timedOut = true;
+    kart.locked = true;
+    kart.finishTime = Instance.GetGameTime();
+    CancelRun(kart);
+    HideDnfWarning(kart);
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot !== undefined) {
+        GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "finish_place", "place", "TIME UP  ·  NO POINTS");
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_image", "Hidden", true);
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_place", "Hidden", false);
+    }
+    Debug(`TimeOutKart: slot ${slot} didn't finish track ${activeTrackId} within the finish window — no points`);
+}
+
+/**
+ * The finish window's seconds left (finish_grace, "FINISH CLOSES IN 27"),
+ * for everyone in the heat and everyone watching it — hidden outside it.
+ * Sent on change and again every HUD_RESEND_SECONDS.
+ * @param {number} now
+ */
+function UpdateFinishGraceHud(now) {
+    const open = phase === RacePhase.RACING && graceEndTime !== undefined;
+    for (const kart of karts.values()) {
+        const value = open && (kart.racing || kart.watching) ? Math.max(0, Math.ceil(graceEndTime - now)) : undefined;
+        if (value === kart.graceShown && now < (kart.graceResendAt ?? 0)) {
+            continue;
+        }
+        kart.graceShown = value;
+        kart.graceResendAt = now + HUD_RESEND_SECONDS;
+        const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+        if (slot === undefined) {
+            continue;
+        }
+        if (value !== undefined) {
+            GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "finish_grace", "seconds", String(value));
+        }
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_grace", "Hidden", value === undefined);
+    }
 }
 
 /** @param {import("../../core/kart-registry.js").Kart[]} returning */
@@ -8306,8 +8706,10 @@ function SendKartToTutorial(kart) {
 function SendKartsOutOfRace(returning, spawn, label) {
     Debug(`SendKartsOutOfRace: sending ${returning.length} kart(s) to the ${label} at ${spawn ? JSON.stringify(spawn.position) : "nowhere (spawn entity missing)"}`);
     returning.forEach((kart, i) => {
+        StopSpectating(kart); // back to the own melon, which is about to move
         kart.racing = false;
         kart.finished = false;
+        kart.timedOut = undefined;
         kart.locked = false;
         kart.progressWatch = undefined;
         HideDnfWarning(kart);
@@ -8588,11 +8990,17 @@ function HideDnfWarning(kart) {
     SetDnfWarning(kart, undefined, Instance.GetGameTime());
 }
 
-/** Drives the COUNTDOWN/RACING/BREAK timers and transitions — called once per Think tick (see core/think.js). */
+/** Drives the GATHERING/COUNTDOWN/RACING/BREAK timers and transitions — called once per Think tick (see core/think.js). */
 /** @param {number} now */
 function UpdateRaceFlow(now) {
-    const hud = GetSpeedHud();
     UpdateTestPreviews(now);
+    UpdateRacePhase(now);
+    UpdateFinishGraceHud(now); // after this tick's transitions
+}
+
+/** @param {number} now */
+function UpdateRacePhase(now) {
+    const hud = GetSpeedHud();
 
     if (phase === RacePhase.GATHERING) {
         if (now < phaseEndTime) {
@@ -8650,6 +9058,13 @@ function UpdateRaceFlow(now) {
     if (phase === RacePhase.RACING) {
         UpdateDnf(CurrentRacers(), now); // may send racers out — counted again below
         const racers = CurrentRacers();
+        if (graceEndTime !== undefined && now >= graceEndTime) {
+            for (const kart of racers) {
+                if (!kart.finished) {
+                    TimeOutKart(kart);
+                }
+            }
+        }
         if (now >= phaseEndTime) {
             for (const kart of racers) {
                 const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
@@ -8673,6 +9088,7 @@ function UpdateRaceFlow(now) {
         }
         if (racers.every((kart) => kart.finished)) {
             phase = RacePhase.BREAK;
+            graceEndTime = undefined;
             phaseEndTime = now + BREAK_SECONDS;
             // The countdown itself is drawn by the BREAK branch below, under
             // the finish_image FinishKart already shows.
@@ -9727,6 +10143,7 @@ function RestartTimeTrial(kart) {
     // Back to driving: a free-looking player's restart ends free look (pawn
     // back on its anchor, chase camera on the melon) before the melon moves.
     SetFreeLook(kart, false);
+    StopSpectating(kart);
     if (!SendToTrackStart(kart, trackId)) {
         return false;
     }
@@ -10449,6 +10866,19 @@ const KART_BUTTONS = {
     // so they're still pulled into the next heat that starts while they're
     // standing in hub_start_trigger.
     hub_close_button: (slot, kart) => HideHubModal(slot, kart),
+    // Outside a running Grand Prix: follow it (race/spectate/). The window
+    // closes so the mouse is free for Mouse1/Mouse2.
+    hub_watch_button: (slot, kart) => {
+        if (SetWatching(kart, true, phase)) {
+            HideHubModal(slot, kart);
+        }
+    },
+    // The same from the user menu, and "Stop Watching" again.
+    usermenu_watch_button: (slot, kart) => {
+        if (ToggleWatching(kart, phase)) {
+            SetUserMenuOpen(slot, kart, false);
+        }
+    },
     usermenu_close_button: (slot, kart) => SetUserMenuOpen(slot, kart, false),
     usermenu_respawn_button: (slot, kart) => {
         if (kart.breaking) {
@@ -10467,6 +10897,7 @@ const KART_BUTTONS = {
         // Back to driving: a free-looking player's respawn ends free look
         // (pawn back on its anchor, chase camera on the melon) first.
         SetFreeLook(kart, false);
+        StopSpectating(kart); // a watcher's frozen melon drives again
         RespawnKartAtCheckpoint(kart);
         SetUserMenuOpen(slot, kart, false);
     },
@@ -11124,6 +11555,15 @@ function UpdateKart(slot, kart, dt) {
         kart.settled = false;
         kart.attackBoosting = false;
         UpdateSpectatorHat(kart);
+        return;
+    }
+
+    // Watching the Grand Prix (race/spectate/): like free look, the melon
+    // waits frozen where it was.
+    if (kart.watching) {
+        kart.lastVelocity = undefined;
+        kart.settled = false;
+        kart.attackBoosting = false;
         return;
     }
 
@@ -12384,6 +12824,11 @@ function Think() {
         Debug(`Think: UpdateRaceFlow threw: ${err}`);
     }
     try {
+        UpdateSpectating(now, phase);
+    } catch (err) {
+        Debug(`Think: UpdateSpectating threw: ${err}`);
+    }
+    try {
         UpdateStats(now, Math.min(dt, 1)); // a long pause (a stall, a reload) isn't time on the server
     } catch (err) {
         Debug(`Think: UpdateStats threw: ${err}`);
@@ -12780,7 +13225,7 @@ Instance.SetNextThink(Instance.GetGameTime());
 // reloading mid-heat during dev iteration doesn't strand locked racers in a
 // phase that's forgotten it's supposed to unlock/advance them.
 Instance.OnScriptReload({
-    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers, grandPrix, spawnedBalls, bouncers }),
+    before: () => ({ karts, phase, activeTrackId, phaseEndTime, graceEndTime, moderatorSlot, movers, grandPrix, spawnedBalls, bouncers }),
     after: (memory) => {
         if (memory?.karts) {
             for (const [slot, kart] of memory.karts) {

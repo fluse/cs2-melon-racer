@@ -25,6 +25,7 @@ import { RefreshProfileHud } from "./profile/index.js";
 import { SetUserMenuOpen, SetUserMenuPage, UpdateGlowColorHud, UpdateSkinHud, UpdateToggleHud } from "./user-menu.js";
 import { SelectLeaderboardTab, StepLeaderboardsTrack } from "./leaderboards/index.js";
 import { RacePhase } from "../constants/index.js";
+import { SetWatching, StopSpectating, ToggleWatching } from "../race/spectate/index.js";
 
 /** @typedef {import("../core/kart-registry.js").Kart} Kart */
 
@@ -53,6 +54,19 @@ const KART_BUTTONS = {
     // so they're still pulled into the next heat that starts while they're
     // standing in hub_start_trigger.
     hub_close_button: (slot, kart) => HideHubModal(slot, kart),
+    // Outside a running Grand Prix: follow it (race/spectate/). The window
+    // closes so the mouse is free for Mouse1/Mouse2.
+    hub_watch_button: (slot, kart) => {
+        if (SetWatching(kart, true, phase)) {
+            HideHubModal(slot, kart);
+        }
+    },
+    // The same from the user menu, and "Stop Watching" again.
+    usermenu_watch_button: (slot, kart) => {
+        if (ToggleWatching(kart, phase)) {
+            SetUserMenuOpen(slot, kart, false);
+        }
+    },
     usermenu_close_button: (slot, kart) => SetUserMenuOpen(slot, kart, false),
     usermenu_respawn_button: (slot, kart) => {
         if (kart.breaking) {
@@ -71,6 +85,7 @@ const KART_BUTTONS = {
         // Back to driving: a free-looking player's respawn ends free look
         // (pawn back on its anchor, chase camera on the melon) first.
         SetFreeLook(kart, false);
+        StopSpectating(kart); // a watcher's frozen melon drives again
         RespawnKartAtCheckpoint(kart);
         SetUserMenuOpen(slot, kart, false);
     },

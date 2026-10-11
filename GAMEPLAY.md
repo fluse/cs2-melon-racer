@@ -515,7 +515,8 @@ run by `race/heat/`):
    `DnfWarningValue` in `race/heat/logic.js`, applied by `UpdateDnf` in
    `race/heat/race-flow.js`.
 5. **BREAK** — once every kart that started this heat is either `finished`
-   or out (disconnected — `OnPlayerDisconnect` drops its kart entry —, left
+   (in time, or when the finish window closed — see "Finish window &
+   spectating") or out (disconnected — `OnPlayerDisconnect` drops its kart entry —, left
    via "Exit Race", or DNF), the heat is over; if nobody finished, it ends
    like a heat everyone left.
    After a fixed `BREAK_SECONDS` (10, decided) the flow either starts a
@@ -587,6 +588,49 @@ is stopped when the hold ends. Constants:
 (`test/race/podium.test.mjs`), applied by `race/podium/podium.js` and the
 hold in `movement/driving/drive.js` (`test/race/podium-flow.test.mjs`).
 Details for mappers: [Mapping API: podium](docs/mapping-api/05-hub.md#podium).
+
+## Finish window & spectating (decided, implemented)
+
+**Finish window:** once the first racer of a heat finishes, the others
+have `FINISH_GRACE_SECONDS` (30, `race/constants.js`) to finish too,
+counted down top center for everyone in the heat and everyone watching it
+("FINISH CLOSES IN 27", `finish_grace`). Whoever hasn't finished when it
+closes gets **no place and no points** for the heat — "TIME UP · NO
+POINTS" where the place would be, no FINISH image, no time saved — but
+**stays in the Grand Prix** for the next heat (decided; only the DNF rule
+takes a racer out of it). Then the heat is over and BREAK starts.
+`TimeOutKart`/`UpdateFinishGraceHud` in `race/heat/race-flow.js`.
+
+**Spectating** (`race/spectate/`) — the chase camera on someone else's
+melon:
+
+- **Finished racers** watch the ones still driving, on their own,
+  `SPECTATE_AFTER_FINISH_SECONDS` (3) after crossing the line (the FINISH
+  image first, then hidden while spectating), **only during the finish
+  window** (decided) — the heat ending puts the camera back on their own
+  melon, FINISH again.
+- **Players outside the Grand Prix** can follow the whole of it (decided):
+  "Watch Grand Prix" in the user menu's ACTIONS column (only while one runs
+  that they aren't in; then "Stop Watching") or under the hub window's
+  "Grand Prix in progress…". Their own melon waits frozen meanwhile (motion
+  off, like free look). It ends with the Grand Prix, by "Stop Watching", or
+  by anything that moves the melon (hub, tutorial, respawn, restart, free
+  look).
+- **Whom:** the racers still driving, the one furthest ahead first (laps,
+  then checkpoints); a watcher with nobody driving (countdown done, break)
+  sees every racer. When the watched one finishes, is out or leaves, the
+  camera moves on by itself.
+- **Switching** like CS2's spectator mode (decided): **Mouse1 / D** next,
+  **Mouse2 / A** previous, wrapping around — not while Tab holds the
+  scoreboard or a menu has the mouse. The mouse turns the view around the
+  watched melon as around one's own; that melon's lift/podium/camera-zone
+  zooms apply, the viewer's own camera distance from the camera page.
+- HUD: "SPECTATING" and the name bottom center above the speed panel
+  (`spectate_panel`), with the keys, and for a watcher how to stop.
+
+Constants: `race/spectate/constants.js`; rules: `race/spectate/logic.js`
+(`test/race/spectate.test.mjs`), applied by `race/spectate/spectate.js`
+and `camera/follow/follow.js` (`test/race/spectate-flow.test.mjs`).
 
 ## Scoreboard (implemented)
 

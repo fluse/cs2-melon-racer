@@ -86,6 +86,15 @@ export function UpdateKart(slot, kart, dt) {
         return;
     }
 
+    // Watching the Grand Prix (race/spectate/): like free look, the melon
+    // waits frozen where it was.
+    if (kart.watching) {
+        kart.lastVelocity = undefined;
+        kart.settled = false;
+        kart.attackBoosting = false;
+        return;
+    }
+
     // Broken and waiting out BREAK_RESPAWN_DELAY (see BreakMelon) — unlike
     // `locked` above, freeze completely (gravity included). It's already
     // hidden at the crash site, and should just hold still until the delayed

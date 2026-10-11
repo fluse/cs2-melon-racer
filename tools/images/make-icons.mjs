@@ -160,6 +160,13 @@ const ICONS = {
         cut(ellipse(32, 32, 28, 15), ellipse(32, 32, 23.5, 10.5)),
         cut(circle(32, 32, 10), circle(35, 29, 3.5)),
     ),
+    // Screen on a stand with a play triangle — "Watch Grand Prix".
+    spectate: union(
+        rectOutline(5, 9, 59, 47, 5, 4.5),
+        polygon([26, 19], [42, 28], [26, 37]),
+        line(32, 47, 32, 54, 3.5),
+        line(20, 56, 44, 56, 3.5),
+    ),
     // Podium steps 2-1-3 with a star over the winner — "Leaderboards".
     leaderboard: union(
         rect(6, 36, 24, 58, 1.5),

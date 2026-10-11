@@ -33,7 +33,7 @@ import { Think } from "./core/think.js";
 import { RegisterKartInputs } from "./kart/index.js";
 import { RegisterBreakInputs } from "./health/index.js";
 import { RegisterZoneInputs } from "./zones/index.js";
-import { phase, activeTrackId, phaseEndTime, RestoreRaceFlowSnapshot, RegisterRaceInputs, grandPrix, RestoreGrandPrix } from "./race/index.js";
+import { phase, activeTrackId, phaseEndTime, graceEndTime, RestoreRaceFlowSnapshot, RegisterRaceInputs, grandPrix, RestoreGrandPrix } from "./race/index.js";
 import { RegisterHudInputs } from "./hud/index.js";
 import { RegisterMovementInputs } from "./movement/index.js";
 import { RegisterAttackDebug } from "./dev/index.js";
@@ -51,7 +51,7 @@ Instance.SetNextThink(Instance.GetGameTime());
 // reloading mid-heat during dev iteration doesn't strand locked racers in a
 // phase that's forgotten it's supposed to unlock/advance them.
 Instance.OnScriptReload({
-    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers, grandPrix, spawnedBalls, bouncers }),
+    before: () => ({ karts, phase, activeTrackId, phaseEndTime, graceEndTime, moderatorSlot, movers, grandPrix, spawnedBalls, bouncers }),
     after: (memory) => {
         if (memory?.karts) {
             for (const [slot, kart] of memory.karts) {

@@ -24,6 +24,7 @@ export * from "../race/grand-prix/constants.js";
 export * from "../race/podium/constants.js";
 export * from "../race/stats/constants.js";
 export * from "../race/level/constants.js";
+export * from "../race/spectate/constants.js";
 export * from "../zones/teleport/constants.js";
 export * from "../kart/constants.js";
 export * from "../camera/follow/constants.js";

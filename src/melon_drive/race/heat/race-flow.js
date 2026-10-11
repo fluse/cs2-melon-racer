@@ -9,6 +9,7 @@ import {
     COUNTDOWN_SECONDS,
     GRAND_PRIX_GATHER_SECONDS,
     BREAK_SECONDS,
+    FINISH_GRACE_SECONDS,
     GO_DISPLAY_SECONDS,
     RACE_SPAWN_LATERAL_SPACING,
     HEAT_POINTS,
@@ -29,6 +30,7 @@ import { PlaceOnPodium } from "../podium/podium.js";
 import { GrantXp, GrantGrandPrixXp } from "../level/level.js";
 import { HeatFinishXp } from "../level/logic.js";
 import { OrdinalPlace } from "../grand-prix/logic.js";
+import { StopSpectating } from "../spectate/index.js";
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
 // See GAMEPLAY.md's "Hub -> race -> next-track flow" for the full design.
@@ -43,6 +45,9 @@ export let phase = RacePhase.HUB;
 export let activeTrackId = undefined;
 /** GetGameTime() at which the current GATHERING/COUNTDOWN/BREAK phase should end. */
 export let phaseEndTime = 0;
+/** RACING: when the finish window closes — FINISH_GRACE_SECONDS after the
+ * heat's first finisher; undefined before that. */
+export let graceEndTime = undefined;
 
 /** The countdown's numbers in countdown_panel (speedometer.xml), in order —
  * index = CountdownStep. Each gets "In" or "Out" (CountdownNumberState),
@@ -84,10 +89,10 @@ function SetBreakCountdown(slot, value) {
 }
 
 /**
- * Restores phase/activeTrackId/phaseEndTime from an OnScriptReload snapshot
+ * Restores phase/activeTrackId/phaseEndTime/graceEndTime from an OnScriptReload snapshot
  * (see index.js) — the counterpart write to these otherwise-internal `let`s
  * for the one caller outside this module that legitimately needs to set them.
- * @param {{ phase?: typeof RacePhase[keyof typeof RacePhase], activeTrackId?: number, phaseEndTime?: number } | undefined} snapshot
+ * @param {{ phase?: typeof RacePhase[keyof typeof RacePhase], activeTrackId?: number, phaseEndTime?: number, graceEndTime?: number } | undefined} snapshot
  */
 export function RestoreRaceFlowSnapshot(snapshot) {
     if (!snapshot) {
@@ -96,6 +101,7 @@ export function RestoreRaceFlowSnapshot(snapshot) {
     phase = snapshot.phase ?? phase;
     activeTrackId = snapshot.activeTrackId;
     phaseEndTime = snapshot.phaseEndTime ?? phaseEndTime;
+    graceEndTime = snapshot.graceEndTime;
 }
 
 export function CurrentRacers() {
@@ -335,6 +341,9 @@ export function BeginHeat(trackId) {
         kart.lapsCompleted = 0;
         CancelRun(kart); // a free-roaming run doesn't carry into the heat — its clock starts at GO
         kart.finished = false;
+        kart.finishTime = undefined;
+        kart.timedOut = undefined;
+        StopSpectating(kart); // a finished racer still watching the last heat
         kart.locked = true;
         kart.progressWatch = undefined; // the DNF clock starts at GO
         HideDnfWarning(kart);
@@ -352,6 +361,7 @@ export function BeginHeat(trackId) {
 
     phase = RacePhase.COUNTDOWN;
     phaseEndTime = Instance.GetGameTime() + COUNTDOWN_SECONDS;
+    graceEndTime = undefined;
     Debug(`BeginHeat: track ${trackId}, ${racers.length} racer(s), countdown started`);
 }
 
@@ -372,6 +382,12 @@ function SetFinishImageVisible(slot, visible) {
 export function FinishKart(kart) {
     kart.finished = true;
     kart.locked = true;
+    kart.finishTime = Instance.GetGameTime();
+    if (phase === RacePhase.RACING && graceEndTime === undefined) {
+        // The heat's first finisher: the others have FINISH_GRACE_SECONDS left.
+        graceEndTime = kart.finishTime + FINISH_GRACE_SECONDS;
+        Debug(`FinishKart: first finish on track ${activeTrackId}, the finish window closes in ${FINISH_GRACE_SECONDS}s`);
+    }
     const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
     // The place this racer crossed the line in, and the Grand Prix points for it.
     const result = activeTrackId !== undefined ? RecordGrandPrixFinish(kart, activeTrackId) : undefined;
@@ -385,6 +401,55 @@ export function FinishKart(kart) {
     // heat is over — stays up through BREAK until the next heat/the hub.
     SetFinishImageVisible(slot, true);
     Debug(`FinishKart: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} finished track ${activeTrackId}`);
+}
+
+/**
+ * The finish window closed before this racer finished: parked like a
+ * finisher, but without a place or points for the heat ("TIME UP" where the
+ * place would be, no FINISH image) — and still in the Grand Prix, for the
+ * next heat. Its run's clock is dropped, no time saved.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function TimeOutKart(kart) {
+    kart.finished = true;
+    kart.timedOut = true;
+    kart.locked = true;
+    kart.finishTime = Instance.GetGameTime();
+    CancelRun(kart);
+    HideDnfWarning(kart);
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+    if (slot !== undefined) {
+        GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "finish_place", "place", "TIME UP  ·  NO POINTS");
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_image", "Hidden", true);
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_place", "Hidden", false);
+    }
+    Debug(`TimeOutKart: slot ${slot} didn't finish track ${activeTrackId} within the finish window — no points`);
+}
+
+/**
+ * The finish window's seconds left (finish_grace, "FINISH CLOSES IN 27"),
+ * for everyone in the heat and everyone watching it — hidden outside it.
+ * Sent on change and again every HUD_RESEND_SECONDS.
+ * @param {number} now
+ */
+function UpdateFinishGraceHud(now) {
+    const open = phase === RacePhase.RACING && graceEndTime !== undefined;
+    for (const kart of karts.values()) {
+        const value = open && (kart.racing || kart.watching) ? Math.max(0, Math.ceil(graceEndTime - now)) : undefined;
+        if (value === kart.graceShown && now < (kart.graceResendAt ?? 0)) {
+            continue;
+        }
+        kart.graceShown = value;
+        kart.graceResendAt = now + HUD_RESEND_SECONDS;
+        const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
+        if (slot === undefined) {
+            continue;
+        }
+        if (value !== undefined) {
+            GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "finish_grace", "seconds", String(value));
+        }
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "finish_grace", "Hidden", value === undefined);
+    }
 }
 
 /** @param {import("../../core/kart-registry.js").Kart[]} returning */
@@ -412,8 +477,10 @@ export function SendKartToTutorial(kart) {
 function SendKartsOutOfRace(returning, spawn, label) {
     Debug(`SendKartsOutOfRace: sending ${returning.length} kart(s) to the ${label} at ${spawn ? JSON.stringify(spawn.position) : "nowhere (spawn entity missing)"}`);
     returning.forEach((kart, i) => {
+        StopSpectating(kart); // back to the own melon, which is about to move
         kart.racing = false;
         kart.finished = false;
+        kart.timedOut = undefined;
         kart.locked = false;
         kart.progressWatch = undefined;
         HideDnfWarning(kart);
@@ -694,11 +761,17 @@ function HideDnfWarning(kart) {
     SetDnfWarning(kart, undefined, Instance.GetGameTime());
 }
 
-/** Drives the COUNTDOWN/RACING/BREAK timers and transitions — called once per Think tick (see core/think.js). */
+/** Drives the GATHERING/COUNTDOWN/RACING/BREAK timers and transitions — called once per Think tick (see core/think.js). */
 /** @param {number} now */
 export function UpdateRaceFlow(now) {
-    const hud = GetSpeedHud();
     UpdateTestPreviews(now);
+    UpdateRacePhase(now);
+    UpdateFinishGraceHud(now); // after this tick's transitions
+}
+
+/** @param {number} now */
+function UpdateRacePhase(now) {
+    const hud = GetSpeedHud();
 
     if (phase === RacePhase.GATHERING) {
         if (now < phaseEndTime) {
@@ -756,6 +829,13 @@ export function UpdateRaceFlow(now) {
     if (phase === RacePhase.RACING) {
         UpdateDnf(CurrentRacers(), now); // may send racers out — counted again below
         const racers = CurrentRacers();
+        if (graceEndTime !== undefined && now >= graceEndTime) {
+            for (const kart of racers) {
+                if (!kart.finished) {
+                    TimeOutKart(kart);
+                }
+            }
+        }
         if (now >= phaseEndTime) {
             for (const kart of racers) {
                 const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot();
@@ -779,6 +859,7 @@ export function UpdateRaceFlow(now) {
         }
         if (racers.every((kart) => kart.finished)) {
             phase = RacePhase.BREAK;
+            graceEndTime = undefined;
             phaseEndTime = now + BREAK_SECONDS;
             // The countdown itself is drawn by the BREAK branch below, under
             // the finish_image FinishKart already shows.

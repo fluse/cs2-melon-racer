@@ -63,7 +63,8 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs),
                                           #              grand-prix/ (places + points per heat, standings over the heats), podium/ (top 3 held on the hub podium),
                                           #              stats/ (saved all-time player stats: time on the server, crashes, finishes, boost time, PERFECT hits),
-                                          #              level/ (saved XP per player, levels, skins unlocked by level, the level-up message's timing)
+                                          #              level/ (saved XP per player, levels, skins unlocked by level, the level-up message's timing),
+                                          #              spectate/ (finished racers watch the others in the finish window, "Watch Grand Prix" from outside: the camera on another melon)
                                           #   camera/    follow/ (chase camera, the only SetFollowConfig), wall-clip/ (eased pull-in at walls), break-zoom/, lift-zoom/, podium-zoom/, zone-zoom/,
                                           #              side-view/ (fixed side camera, CONTROLLED mode)
                                           #   hud/       layout.js (the custom_hud_layout), one folder per panel with its own rules: speedometer/ (km/h, health bar, jump dots),

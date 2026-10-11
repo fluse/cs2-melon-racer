@@ -9,6 +9,7 @@ import { UpdateKart } from "../movement/index.js";
 import { HandleMelonLost } from "../health/index.js";
 import { phase, UpdateRaceFlow } from "../race/heat/race-flow.js";
 import { UpdateStats } from "../race/stats/stats.js";
+import { UpdateSpectating } from "../race/spectate/index.js";
 import { UpdateLevel } from "../race/level/level.js";
 import { UpdatePrediction, HidePrediction } from "../fx/prediction/prediction.js";
 import { UpdateLiftCamera, UpdatePodiumCamera, UpdateZoneCamera, UpdateSideViewCamera, UpdateFollowCamera } from "../camera/index.js";
@@ -117,6 +118,11 @@ export function Think() {
         UpdateRaceFlow(now);
     } catch (err) {
         Debug(`Think: UpdateRaceFlow threw: ${err}`);
+    }
+    try {
+        UpdateSpectating(now, phase);
+    } catch (err) {
+        Debug(`Think: UpdateSpectating threw: ${err}`);
     }
     try {
         UpdateStats(now, Math.min(dt, 1)); // a long pause (a stall, a reload) isn't time on the server

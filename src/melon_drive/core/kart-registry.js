@@ -47,6 +47,11 @@ import { predictionDotSet } from "./trace.js";
  *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
  *   testPreview?: { kind: "countdown" | "finish" | "intro" | "call", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro/Grand Prix Call playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
+ *   finishTime?: number, timedOut?: boolean, // racing: when it finished this heat; finished by the finish window running out instead (no place) — see FinishKart/TimeOutKart in race/heat/race-flow.js
+ *   graceShown?: number, graceResendAt?: number, // what finish_grace shows (undefined: hidden) and when it's sent again — see UpdateFinishGraceHud
+ *   watching?: boolean, // "Watch Grand Prix": outside the Grand Prix, following it, own melon frozen — see race/spectate/
+ *   spectateSlot?: number, // whose melon the camera follows instead of the own (unset: the own) — see UpdateSpectating
+ *   spectateShown?: string, spectateResendAt?: number, watchRowShown?: string, // what the spectate panel / the user menu's watch row last showed — see race/spectate/spectate.js
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
  *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the page (leaderboards, a developer page) the user menu shows in place of its columns, if any — kept when it closes, so it reopens there (this session only) — see SetUserMenuPage
