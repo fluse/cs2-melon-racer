@@ -2,6 +2,51 @@
 
 Player-facing changes per release. Versions are semver, tagged `v<version>` in git.
 
+## [0.7.0] — 2026-10-11 — Podium, Skins & Spikes
+
+Tag `v0.7.0`.
+
+### New
+- Grand Prix: the heats from the hub's start button back to the hub are one Grand Prix. Finishers score points by place (10, 8, 6, 5, 4, 3, 2, 1, then 1 each) — most points after the last track wins. Your place shows under FINISH.
+- Podium in the hub: after a Grand Prix the top three stand on the podium, with confetti and the camera looking at them.
+- Scoreboard (Tab) in place of CS2's own: the Grand Prix standings, or the best times per route — A/D page through the routes.
+- "Start Grand Prix" window in the hub: a card per heat with route name, icon, laps and checkpoints, and who rides along.
+- DNF: a racer who reaches no new checkpoint for 60 s is out of the Grand Prix, so nobody can block a heat. The last 15 s are counted down on the HUD.
+- "Exit Race" in the menu while racing: leave the Grand Prix, the others race on.
+- Melon skins (menu → SETTINGS → MELON): Melon, Gold, Football, Golf, Honey Melon, Camo, Strawberry, Pumpkin, Pineapple, Zebra — saved per player.
+- "Start in Tutorial" setting: join straight in the hub if you know the tutorial already.
+- New route "Pipe Pump".
+- Spike springs: spike traps that pop out of floors, walls and ceilings and break your melon.
+- Ball pits, and balls that keep dropping in from a spawner.
+- Side view: depth zones where W/S drive into and out of the screen.
+- New logo (a melon slice with a MELON RACER banner), flying in on a rubber band in the intro.
+- Developer pages in the menu: camera settings, physics settings, test buttons (countdown, finish, intro, podium).
+
+### Changed
+- Side Slice got new obstacles: saw blades, spike springs, a ball pit and a foam floor.
+- The hub got a locker room, a first ramp and a 3D logo.
+- New look for the checkpoints.
+- User menu, scoreboard and hub window in the logo's colors, with square corners.
+- Countdowns are now falling numbers; GO grows and fades out.
+- Wall jumps: no cooldown — the next one needs a new wall contact, and a press a little too early is kept for 0.2 s.
+- A jump pressed just before landing jumps on touchdown.
+- Side view: only A/D drive, and the camera follows smoothly instead of jerking at walls.
+- Free look: the others see a ghost avatar where you're flying.
+- "Respawn at Checkpoint" comes before "Restart Time Trial" in the menu.
+
+### Fixed
+- A timed jump press on a wall bounce was sometimes taken for mashing.
+- The melon fell through the foam floor on Side Slice.
+- In free look your invisible body shoved balls and melons around.
+- The podium tops were nearly black.
+
+### Mapping/Dev
+- Mapping API pages 18 (spike springs: `prop_dynamic` named `spike_spring…`), 19 (ball pits: `ball_pit_enter`/`_leave`) and 20 (ball spawner: `template_ball` + `spawn_ball`).
+- New inputs `side_view_depth_enter`/`_leave`; podium spots `podium_spawn_1`…`_3`, `particle_podium_confetti`.
+- Model generators in `tools/` (one folder per kind of output): saw blade, spike spring, bouncer, buffer stop, ball, podium, melon skins; materials in one folder per use.
+- Route icons and names for the hub window are generated from the .vmap (`tools/images/make-route-icons.mjs`).
+- `npm test` fails on a hub/route prefab in the map that's excluded from vis (not a vis contributor).
+
 ## [0.6.0] — 2026-10-04 — Side Slice
 
 Tag `v0.6.0`.

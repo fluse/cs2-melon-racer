@@ -26,7 +26,7 @@ easier to find in search.)
 
 [b]No guns. No bullets. Just you, a watermelon, and the track.[/b]
 
-Melon Racer turns Counter-Strike 2 into a kart racer. Each player gets their own physics melon and races it through checkpoints, over ramps and off walls. Race in heats with your friends and see whose melon makes it to the finish line in one piece, or drive alone against the clock and beat your best time.
+Melon Racer turns Counter-Strike 2 into a kart racer. Each player gets their own physics melon and races it through checkpoints, over ramps and off walls. Race a Grand Prix with your friends and see whose melon makes it onto the podium in one piece, or drive alone against the clock and beat your best time.
 
 [h2]🎮 Play now on server[/h2]
 Open the CS2 console ([b]~[/b]) and type:
@@ -45,7 +45,8 @@ The game mode's code (the cs_script scripts, HUD logic and build tools) was writ
 [*][b]Hub[/b] — everyone gathers here. Drive around, pick a color for your melon, and step on the start area when you're ready.
 [*][b]Countdown[/b] — [i]3… 2… 1… GO![/i] Everyone on the start area joins the heat.
 [*][b]Race[/b] — pass every checkpoint in order and finish the laps. Shortcuts that skip a checkpoint don't count!
-[*][b]Next track[/b] — a short break, then the next track starts. After the last track everyone goes back to the hub.
+[*][b]Next track[/b] — a short break, then the next track starts. Every finish scores points by place.
+[*][b]Podium[/b] — after the last track the three with the most points stand on the podium in the hub.
 [/list]
 [b]No group? No problem:[/b] drive across any track's start line on your own and the clock starts. That's a time trial.
 
@@ -63,11 +64,15 @@ The game mode's code (the cs_script scripts, HUD logic and build tools) was writ
 [*][b]2D sections[/b] — on the Side Slice route the camera locks to the side and the track turns into a jump & run: A/D drive left and right, and wall jumps chain from wall to wall.
 [*][b]Jump refills[/b] — blue rings refill all your wall-jump charges and keep them full while you're inside.
 [*][b]Moving obstacles[/b] — blocks that slide across the track. Time your pass.
+[*][b]Spike traps[/b] — spikes that pop out of floors, walls and ceilings. Touch them while they're out and your melon breaks.
+[*][b]Ball pits[/b] — plough through a pit full of bouncy balls.
 [*][b]Heal zones & teleporters[/b] — patch up your melon and take the fast way around.
 [*][b]Water[/b] — splash down and your melon loses all its speed. Better jump over it.
 [*][b]Paint your melon[/b] — drive over a paint pad in the hub or choose a color in the menu. Your melon glows in its color, so everyone can see who's who.
+[*][b]Melon skins[/b] — gold, football, golf, honey melon, camo, strawberry, pumpkin, pineapple or zebra. Your pick is saved.
 [*][b]Time trial[/b] — every run over a track is timed, alone or in a heat. Your best time on each track is saved, and beating it shows a gold [b]NEW BEST[/b]. After the finish you're put straight back at the start for the next try. Messed up the start? Press [b]R[/b] to restart the run.
-[*][b]Multiple tracks[/b] — loops with several laps or A-to-B tracks, raced one after another in a heat.
+[*][b]Grand Prix[/b] — loops with several laps or A-to-B tracks, raced one after another. Points by place in every heat, most points wins. Stuck for 60 seconds without a checkpoint? You're out, so nobody holds up the race.
+[*][b]Scoreboard[/b] — hold Tab for the Grand Prix standings or the best times on every route.
 [*][b]Custom HUD[/b] — speedometer with health bar and wall-jump charges, run clock with your best time, a checkpoint strip showing which checkpoints you've passed, lap counter, bounce rating and jump timing.
 [/list]
 
@@ -80,7 +85,8 @@ The game mode's code (the cs_script scripts, HUD logic and build tools) was writ
 [tr][td]Left mouse button (hold)[/td][td]Boost — costs health, too long and the melon breaks[/td][/tr]
 [tr][td]Space[/td][td]Jump / wall jump / time a wall bounce[/td][/tr]
 [tr][td]R[/td][td]Restart the time trial (on a track, outside a heat)[/td][/tr]
-[tr][td]E[/td][td]Menu: respawn at checkpoint, restart time trial, back to hub, tutorial, melon color and glow, free look[/td][/tr]
+[tr][td]Tab (hold)[/td][td]Scoreboard — A / D page through the routes' best times[/td][/tr]
+[tr][td]E[/td][td]Menu: respawn at checkpoint, restart time trial, back to hub / exit race, tutorial, melon color, skin and glow, free look[/td][/tr]
 [/table]
 
 [h2]▶ How to play[/h2]
@@ -96,8 +102,6 @@ The game mode's code (the cs_script scripts, HUD logic and build tools) was writ
 [h2]🚧 Work in progress[/h2]
 Melon Racer is still being built. Things will change and there will be bugs. Known gaps right now:
 [list]
-[*]No 1st/2nd/3rd placing yet — the game only knows when a racer has finished.
-[*]If someone gets stuck, the others have to wait until they finish or leave.
 [*]No melon sound effects yet.
 [/list]
 Found a bug or have an idea? Please leave a comment below or open an issue on GitHub.
@@ -122,7 +126,7 @@ the German version automatically.
 
 [b]Keine Waffen. Keine Kugeln. Nur du, eine Wassermelone und die Strecke.[/b]
 
-Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt seine eigene Physik-Melone und rast damit durch Checkpoints, über Rampen und von Wänden ab. Fahrt Rennen gegen eure Freunde und schaut, wessen Melone heil im Ziel ankommt, oder fahr allein gegen die Uhr und knack deine Bestzeit.
+Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt seine eigene Physik-Melone und rast damit durch Checkpoints, über Rampen und von Wänden ab. Fahrt einen Grand Prix gegen eure Freunde und schaut, wessen Melone heil aufs Podest kommt, oder fahr allein gegen die Uhr und knack deine Bestzeit.
 
 [h2]🎮 Jetzt auf unserem Server spielen[/h2]
 Öffne die CS2-Konsole ([b]~[/b]) und gib ein:
@@ -136,7 +140,8 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [*][b]Hub[/b] — hier treffen sich alle. Fahrt herum, wählt eine Farbe für eure Melone und stellt euch auf die Startfläche, wenn ihr bereit seid.
 [*][b]Countdown[/b] — [i]3… 2… 1… GO![/i] Alle auf der Startfläche fahren mit.
 [*][b]Rennen[/b] — fahrt alle Checkpoints der Reihe nach ab und schafft die Runden. Abkürzungen, die einen Checkpoint auslassen, zählen nicht!
-[*][b]Nächste Strecke[/b] — kurze Pause, dann startet die nächste Strecke. Nach der letzten geht es zurück in den Hub.
+[*][b]Nächste Strecke[/b] — kurze Pause, dann startet die nächste Strecke. Jede Zieleinfahrt gibt Punkte nach Platz.
+[*][b]Podest[/b] — nach der letzten Strecke stehen die drei mit den meisten Punkten im Hub auf dem Podest.
 [/list]
 [b]Keine Gruppe? Kein Problem:[/b] fahr allein über die Startlinie einer Strecke und die Uhr läuft. Das ist ein Zeitfahren.
 
@@ -154,11 +159,15 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [*][b]2D-Abschnitte[/b] — auf der Strecke Side Slice schaut die Kamera fest von der Seite und die Strecke wird zum Jump & Run: A/D fahren nach links und rechts, und Wandsprünge gehen von Wand zu Wand.
 [*][b]Sprung-Aufladung[/b] — blaue Ringe füllen alle Wandsprung-Ladungen auf und halten sie voll, solange du drin bist.
 [*][b]Bewegliche Hindernisse[/b] — Blöcke, die quer über die Strecke gleiten. Pass den richtigen Moment ab.
+[*][b]Stachelfallen[/b] — Stacheln, die aus Böden, Wänden und Decken schießen. Berührst du sie, während sie draußen sind, zerplatzt deine Melone.
+[*][b]Bällebäder[/b] — pflüg durch ein Becken voller Hüpfbälle.
 [*][b]Heilzonen & Teleporter[/b] — flick deine Melone und nimm den schnellen Weg.
 [*][b]Wasser[/b] — landest du im Wasser, ist dein ganzer Schwung weg. Spring lieber drüber.
 [*][b]Melone anmalen[/b] — fahr im Hub über ein Farbfeld oder wähl eine Farbe im Menü. Deine Melone leuchtet in ihrer Farbe, so sieht jeder, wer wer ist.
+[*][b]Melonen-Skins[/b] — Gold, Fußball, Golf, Honigmelone, Camo, Erdbeere, Kürbis, Ananas oder Zebra. Deine Wahl wird gespeichert.
 [*][b]Zeitfahren[/b] — jede Fahrt über eine Strecke wird gestoppt, allein oder im Rennen. Deine Bestzeit pro Strecke wird gespeichert, und schlägst du sie, erscheint ein goldenes [b]NEW BEST[/b]. Nach dem Ziel stehst du sofort wieder am Start für den nächsten Versuch. Start verpatzt? Drück [b]R[/b] und die Fahrt beginnt von vorn.
-[*][b]Mehrere Strecken[/b] — Rundkurse mit mehreren Runden oder Strecken von A nach B, im Rennen nacheinander gefahren.
+[*][b]Grand Prix[/b] — Rundkurse mit mehreren Runden oder Strecken von A nach B, nacheinander gefahren. In jedem Rennen Punkte nach Platz, die meisten Punkte gewinnen. 60 Sekunden ohne Checkpoint? Dann bist du raus, so hält niemand das Rennen auf.
+[*][b]Scoreboard[/b] — halte Tab für den Grand-Prix-Stand oder die Bestzeiten auf jeder Strecke.
 [*][b]Eigenes HUD[/b] — Tacho mit Lebensbalken und Wandsprung-Ladungen, Fahrzeit mit deiner Bestzeit, eine Checkpoint-Leiste, die zeigt, welche Checkpoints du schon hast, Rundenanzeige, Abpraller-Bewertung und Sprung-Timing.
 [/list]
 
@@ -171,7 +180,8 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [tr][td]Linke Maustaste (halten)[/td][td]Boost — kostet Leben, zu lange und die Melone zerplatzt[/td][/tr]
 [tr][td]Leertaste[/td][td]Springen / Wandsprung / Timing für den Abpraller[/td][/tr]
 [tr][td]R[/td][td]Zeitfahren neu starten (auf einer Strecke, außerhalb eines Rennens)[/td][/tr]
-[tr][td]E[/td][td]Menü: am Checkpoint neu starten, Zeitfahren neu starten, zurück zum Hub, Tutorial, Farbe und Leuchten, freie Kamera[/td][/tr]
+[tr][td]Tab (halten)[/td][td]Scoreboard — A / D blättern durch die Bestzeiten der Strecken[/td][/tr]
+[tr][td]E[/td][td]Menü: am Checkpoint neu starten, Zeitfahren neu starten, zurück zum Hub / Rennen verlassen, Tutorial, Farbe, Skin und Leuchten, freie Kamera[/td][/tr]
 [/table]
 
 [h2]▶ So spielst du[/h2]
@@ -187,8 +197,6 @@ Melon Racer macht aus Counter-Strike 2 ein Kart-Rennspiel. Jeder Spieler bekommt
 [h2]🚧 Noch in Arbeit[/h2]
 Melon Racer ist noch nicht fertig. Es wird sich noch einiges ändern, und es gibt Bugs. Was gerade noch fehlt:
 [list]
-[*]Noch keine Platzierung (1./2./3.) — das Spiel weiß nur, wann jemand im Ziel ist.
-[*]Bleibt jemand stecken, müssen die anderen warten, bis er ankommt oder das Spiel verlässt.
 [*]Noch keine Melonen-Sounds.
 [/list]
 Bug gefunden oder eine Idee? Schreib einen Kommentar oder mach ein Issue auf GitHub auf.
@@ -342,6 +350,40 @@ For the Side Slice update (v0.6.0):
 [*]Neu: mit R startest du ein Zeitfahren neu, ganz ohne Menü
 [*]Geändert: die Strecke Canals wurde umgebaut
 [*]Behoben: wirst du aus einem 2D-Abschnitt teleportiert, bleibt die Kamera nicht mehr in der Seitenansicht hängen
+[/list]
+```
+
+For the Podium, Skins & Spikes update (v0.7.0):
+
+```
+[b]Update — Podium, Skins & Spikes[/b]
+[list]
+[*]New: Grand Prix — every heat scores points by place, most points after the last track wins
+[*]New: the top three stand on a podium in the hub, with confetti
+[*]New: scoreboard (Tab) with the Grand Prix standings or the best times per route
+[*]New: 10 melon skins in the menu — gold, football, golf, pumpkin, zebra and more
+[*]New: the Pipe Pump route, spike traps, ball pits and falling balls
+[*]New: stuck for 60 s without a checkpoint? You're out, so nobody blocks a heat
+[*]Changed: Side Slice got saw blades and spike traps, the hub a locker room and a ramp
+[*]Changed: new logo and menus, falling countdown numbers
+[*]Changed: wall jumps have no cooldown, a press a little too early still counts
+[*]Fixed: in free look your invisible body no longer shoves balls and melons
+[/list]
+```
+
+```
+[b]Update — Podest, Skins & Stacheln[/b]
+[list]
+[*]Neu: Grand Prix — jedes Rennen gibt Punkte nach Platz, die meisten Punkte nach der letzten Strecke gewinnen
+[*]Neu: die besten Drei stehen im Hub auf einem Podest, mit Konfetti
+[*]Neu: Scoreboard (Tab) mit dem Grand-Prix-Stand oder den Bestzeiten pro Strecke
+[*]Neu: 10 Melonen-Skins im Menü — Gold, Fußball, Golf, Kürbis, Zebra und mehr
+[*]Neu: die Strecke Pipe Pump, Stachelfallen, Bällebäder und herabfallende Bälle
+[*]Neu: 60 Sekunden ohne Checkpoint? Dann bist du raus, so blockiert niemand ein Rennen
+[*]Geändert: Side Slice hat Kreissägen und Stachelfallen bekommen, der Hub eine Umkleide und eine Rampe
+[*]Geändert: neues Logo und neue Menüs, herabfallende Countdown-Zahlen
+[*]Geändert: Wandsprünge haben keine Abklingzeit mehr, ein etwas zu früher Druck zählt trotzdem
+[*]Behoben: im Free Look schubst dein unsichtbarer Körper keine Bälle und Melonen mehr
 [/list]
 ```
 
