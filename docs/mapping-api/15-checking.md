@@ -20,6 +20,7 @@ Reads `maps/melon_racer.vmap` and every [prefab](14-prefabs.md) placed in it (sa
 | Tracks | `checkpoint_spawn_<t>_<i>` whose checkpoint no trigger fires | [Tracks](04-tracks.md#checkpoints) |
 | Teleporters | `melon_teleport` from a misnamed trigger, a missing destination, or a `teleport_to_*` trigger without the output | [Teleporters](07-teleporters.md) |
 | Prefabs | a placed prefab with "Fix Up Entity Names" ticked (renames every entity the script looks up) | [Prefabs](14-prefabs.md#rules) |
+| Prefabs | a hub/route prefab in the map excluded from vis — not a vis contributor (its walls don't block sight lines) | [Prefabs](14-prefabs.md#rules) |
 | Prefabs | a map with no prefabs placed at all (sanity check of the prefab reader) | [Prefabs](14-prefabs.md) |
 | Templates | `melon_template` missing, duplicated, not a `point_template`, without Template entries or a `prop_physics` | [Core entities](02-core-entities.md) |
 | Templates | a break template missing or without a `.vpcf` particle system, any extra `melon_break_*` template | [Effect templates](03-effect-templates.md#break-burst) |

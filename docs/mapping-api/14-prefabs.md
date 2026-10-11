@@ -171,6 +171,10 @@ Nothing to set per copy; place it as often as needed.
   Hammer prefixes every entity name inside with the instance's name — the
   script no longer finds `start_2`, `start_spawn`, `hub_start_trigger`, …
   and the triggers do nothing in-game.
+- **The hub and route prefabs are vis contributors**: excluded from vis
+  (`visexclude`), their walls don't block sight lines and everything
+  behind them is drawn. The `melon` prefab and gates/obstacles nested in
+  a route don't count.
 - **Names that must be unique stay in prefabs placed once**: `hub_spawn`,
   `hub_start_trigger`, `intro_spawn`, a track's `start_<trackId>`/`checkpoint_<trackId>_<index>`.
   Names that may repeat (`heal_zone_full`, `start_spawn`,
@@ -194,6 +198,7 @@ them — the copy's override, else the default — so every check in
 | Mistake | |
 |---|---|
 | a placed prefab with "Fix Up Entity Names" ticked | ✗ |
+| a hub/route prefab in the map excluded from vis (not a vis contributor) | ✗ |
 | two start triggers for one track (e.g. two gate copies with the same override) | ✗ |
 | `start_line`/`checkpoint`/`finish_line` from a trigger whose name names no track (e.g. a gate copy without its override) | ✗ |
 
