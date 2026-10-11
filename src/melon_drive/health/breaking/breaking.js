@@ -102,6 +102,26 @@ function RespawnDestroyedMelon(slot, kart) {
     ApplyCameraFollow(kart);
 }
 
+/**
+ * Breaks a melon on the spot, whatever its health — a kill trigger, a spike
+ * spring. Broken or race-locked melons (countdown, finished) are left alone.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @param {string} reason for the debug log
+ * @returns {boolean} whether it broke
+ */
+export function BreakKartNow(kart, reason) {
+    if (kart.breaking || kart.locked) {
+        return false;
+    }
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot() ?? -1;
+    const velocity = kart.melon.GetAbsVelocity();
+    const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
+    kart.health = 0;
+    Debug(`BreakKartNow: slot ${slot} broken by ${reason}`);
+    BreakMelon(slot, kart, speed > 0 ? velocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+    return true;
+}
+
 /** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed */
 export function BreakMelon(slot, kart, impactDir, impactSpeed) {
     if (kart.breaking) {

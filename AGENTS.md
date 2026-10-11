@@ -31,7 +31,7 @@ docs/TRACK_CREATION.md                   # step-by-step Hammer guide for a new t
 docs/GAME_CI.md                          # the map's color palette (guide lines, heal, checkpoint, start gate) — use it for new materials/models/HUD
 docs/valve/scripting_api.html            # saved copy of Valve's cs_script API wiki page (the site blocks automated fetches)
 docs/mapping-api/*.md                    # Mapping API (map↔script contract): README.md = index of every input/name/pattern,
-                                          #   01-…17-*.md one page per topic, each with setup / name-variant / "Values" tables
+                                          #   01-…19-*.md one page per topic, each with setup / name-variant / "Values" tables
 maps/melon_racer.vmap                    # main map (binary DMX, Hammer-authoritative)
 maps/prefabs/*.vmap                      # prefabs placed in melon_racer.vmap (hub, routes, gates, jump pads); the start/checkpoint/finish gates and jump_pad are set up by a
                                           #   map variable per copy (docs/mapping-api/14-prefabs.md) — test/helpers/vmap.mjs reads prefabs, overrides resolved
@@ -74,7 +74,9 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              camera-tuning.js (the user-menu camera page, own chase camera distance/height),
                                           #              physics-tuning.js (+ -logic.js: the user-menu physics page, every melon's physics in percent),
                                           #              tuning-scale.js (+ -logic.js: the slider both pages share), test-effects.js (Test Break/Perfect Bounce/Heal), attack-debug.js
-                                          #   world/     mover/ (func_movelinear "mover…" started and kept going back and forth)
+                                          #   world/     mover/ (func_movelinear "mover…" started and kept going back and forth),
+                                          #              spike-spring/ (prop_dynamic "spike_spring…": rise/sink on the script's clock, breaks melons on its spikes),
+                                          #              ball-pit/ (ball_pit_enter/leave: balls that leave the trigger steered back or dropped back in)
 src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
 test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one folder per src/melon_drive/ domain (movement/, race/, …): unit tests
                                           #   for the pure files, engine-side tests against the fake engine (filed under the domain they're mainly about)
@@ -90,14 +92,16 @@ tools/                                    # generators, `node tools/<folder>/<fi
                                           #   lib/ shared helpers (no output of their own), models/, materials/, images/ (panorama PNGs), media/ (GIFs); a new tool goes
                                           #   into the fitting one, never loose in tools/
 tools/lib/font.mjs                        # shared by make-logo-model.mjs and make-podium-model.mjs: a line of text in a font (Bungee) as 2D shapes
-tools/lib/model.mjs                       # shared by the model generators: mesh builder (extrude, triangles), .obj/.vmdl/.dmx/.vmat writers
+tools/lib/model.mjs                       # shared by the model generators: mesh builder (extrude, triangles), Mesh.Tube/Cone, Helix, V3 vector math, 2D outlines (Shape, Circle,
+                                          #   RadialOutline for teeth/stars, Slot, ChamferedRect), .obj/.smd/.vmdl/.dmx/.vmat writers (SmdText + SmdAnimationText + VmdlText's
+                                          #   animations for skinned, animated models) — reuse them before writing a generator-local helper
 tools/lib/png.mjs                         # the PNG encoder make-icons.mjs uses
 tools/models/make-ball-model.mjs          # a ball-pit ball as models/melon_racer/ball.vmdl (+ ball.obj): 320-triangle icosphere in inflatable.vmat,
                                           #   a sphere primitive for collision, light (mass_override) — color each prop_physics by its render color
 tools/models/make-bouncer-model.mjs       # a foam bouncer on a spring as models/melon_racer/bouncer/bouncer.vmdl: pink ribbed foam arch, lime cap, chrome coil
-                                          #   skinned to a bone chain (SMD, the only animated model: idle + boing — squash, overshoot, wobble); a prop_dynamic,
+                                          #   skinned to a bone chain (SMD: idle + boing — squash, overshoot, wobble); a prop_dynamic,
                                           #   SetAnimationNotLooping "boing" from a trigger; static collision; materials/melon_racer/bouncer/
-tools/models/make-buffer-stop-model.mjs   # a buffer stop (Prellbock) as models/melon_racer/buffer_stop/buffer_stop.vmdl: red beam with a white chevron,
+tools/models/make-buffer-stop-model.mjs   # a buffer stop (Prellbock) as models/melon_racer/buffer_stop/buffer_stop.vmdl: magenta beam with a white chevron,
                                           #   two buffers, bent grey legs on crossbars (696 triangles); a track obstacle, coarser _physics.obj collision; materials/melon_racer/buffer_stop/
 tools/models/make-checkpoint-model.mjs    # the checkpoint gate's frame (glowing pillars, beam, floating diamond) as models/melon_racer/checkpoint_gate.vmdl
                                           #   (+ _physics.obj collision, materials/melon_racer/checkpoint_gate/checkpoint_gate_{body,trim,glow}.vmat); same footprint as the prefab's old poles
@@ -106,6 +110,12 @@ tools/models/make-logo-model.mjs          # extrudes MELON RACER (Bungee, slante
                                           #   + materials/melon_racer/logo/logo_text_{face,outline,holo}.vmat (holo = an opaque copy of holo_dashes for the letter fronts) (opentype.js + earcut + clipper-lib, devDependencies)
 tools/models/make-podium-model.mjs        # the hub podium (steps 2-1-3 in the docs/GAME_CI.md colors, glowing Bungee place numbers) as mesh geometry,
                                           #   models/melon_racer/podium.dmx for Hammer's File → Import (DmxText in model.mjs), + materials/melon_racer/podium/podium_*.vmat; prints where the podium_spawn_<place> info_targets go
+tools/models/make-saw-blade-model.mjs     # a circular saw blade as models/melon_racer/saw_blade/saw_blade.vmdl (DIAMETER 36, scaled in the script — never non-uniformly in Hammer): 24 hooked teeth with wider carbide tips,
+                                          #   expansion slots, red ring, flange + hex nut (1292 triangles); one bone, looping "spin" animation (+ "idle") around Y, a prop_dynamic
+                                          #   with Idle Animation "spin", Idle Animation Loop Mode "Loop"; origin at the center, collision a thicker plain disc; materials/melon_racer/saw_blade/
+tools/models/make-spike-spring-model.mjs  # a spike spring trap as models/melon_racer/spike_spring/spike_spring.vmdl: spiked steel plate on a chrome coil in a shaft
+                                          #   with a magenta rim (1248 triangles); the spring skinned between root and plate; animations cycle (looping), rise, sink, up, down;
+                                          #   no collision (an optional 32x32 floor hole needs a nodraw lid); timing imported from src/melon_drive/world/spike-spring/constants.js; materials/melon_racer/spike_spring/
 tools/materials/make-decal.mjs            # generates materials/melon_racer/decals/<decal>_{color,trans}.png for every decal in its DECALS list
                                           #   (HUD logo, rawDecals/*.png|jpg — JPG via Windows System.Drawing; can key out a baked-in checkerboard, writes <name>_transparent.png)
 tools/materials/make-holo.mjs             # the gates' hologram textures (materials/melon_racer/holo/holo_*: color, trans, illum; the material scrolls them)
@@ -144,7 +154,7 @@ models/melon_racer/melon/melon.vmdl      # the melon as our own copy: CS2's ital
                                           #   prop_data and break pieces; its fixed mass 2.0 added by hand — the decompiler drops mass_override), material remapped to materials/melon_racer/melon/melon_default.vmat —
                                           #   the base for melon skins (no SetMaterialGroup in cs_script: one .vmdl per skin, swapped by SetModel)
 materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/, melon/ (melon skins),
-                                          #   logo/ (logo_text_*), podium/, bouncer/, buffer_stop/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
+                                          #   logo/ (logo_text_*), podium/, bouncer/, buffer_stop/, saw_blade/, spike_spring/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
                                           #   checkpoint_gate/ — a new material goes into the fitting one, never loose in materials/melon_racer/
 materials/melon_racer/decals/*_decal.vmat # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
 ```

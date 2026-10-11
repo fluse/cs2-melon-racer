@@ -24,7 +24,7 @@ import { Instance } from "cs_script/point_script";
 //   hud/       one file per HUD panel, button clicks
 //   fx/        particles, boost trail, guide line
 //   dev/       debug views
-//   world/     map entities kept running on their own (movers)
+//   world/     map entities kept running on their own (movers, spike springs, ball pits)
 // Tunables: each folder's constants.js, all re-exported by constants/index.js.
 
 import { Debug } from "./core/debug.js";
@@ -37,7 +37,7 @@ import { phase, activeTrackId, phaseEndTime, RestoreRaceFlowSnapshot, RegisterRa
 import { RegisterHudInputs } from "./hud/index.js";
 import { RegisterMovementInputs } from "./movement/index.js";
 import { RegisterAttackDebug } from "./dev/index.js";
-import { movers, RestoreMovers, RegisterMoverInputs } from "./world/index.js";
+import { movers, RestoreMovers, RegisterMoverInputs, RegisterSpikeSpringInputs, RegisterBallPitInputs } from "./world/index.js";
 
 Instance.SetThink(Think);
 Instance.SetNextThink(Instance.GetGameTime());
@@ -74,3 +74,5 @@ RegisterHudInputs(); // OnCustomHudClicked
 RegisterMovementInputs(); // OnKnifeAttack (knife guard)
 RegisterAttackDebug();
 RegisterMoverInputs(); // OnActivate/OnRoundStart: start the func_movelinear movers
+RegisterSpikeSpringInputs(); // OnRoundStart: look the spike springs up again
+RegisterBallPitInputs(); // ball_pit_enter/ball_pit_leave

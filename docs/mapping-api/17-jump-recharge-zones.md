@@ -1,4 +1,4 @@
-[Mapping API](README.md) › **17. Jump recharge zones** · [← Movers](16-movers.md)
+[Mapping API](README.md) › **17. Jump recharge zones** · [← Movers](16-movers.md) · [Spike springs →](18-spike-springs.md)
 
 # 17. Jump recharge zones
 
@@ -55,4 +55,4 @@ raise it in a copy of the file.
   melon in its zones, like [heal zones](09-heal-zones.md#rules).
 
 ---
-[← Movers](16-movers.md) · [Mapping API](README.md)
+[← Movers](16-movers.md) · [Mapping API](README.md) · [Spike springs →](18-spike-springs.md)

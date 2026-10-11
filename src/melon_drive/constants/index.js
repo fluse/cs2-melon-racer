@@ -39,3 +39,5 @@ export * from "../hud/hub-modal/constants.js";
 export * from "../core/constants.js";
 export * from "../dev/constants.js";
 export * from "../world/mover/constants.js";
+export * from "../world/spike-spring/constants.js";
+export * from "../world/ball-pit/constants.js";

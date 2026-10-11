@@ -1218,6 +1218,42 @@ script). Constants:
 `world/mover/mover.js` (`test/world/mover.test.mjs`). Details for mappers:
 [Mapping API: movers](docs/mapping-api/16-movers.md).
 
+## Spike springs (implemented)
+
+A spike trap in a floor, wall or ceiling: a `prop_dynamic` with the spike spring model
+(`tools/models/make-spike-spring-model.mjs`), named `spike_spring…` (the first two
+numbers in its name are seconds down and up, `offset<seconds>` shifts its
+clock, words are ignored). **Run by the script,
+not by Hammer logic** (decided): no `logic_timer`, no trigger. Every tick
+each spring's phase on one shared clock (down → rise → up → sink, shifted
+by its offset) is turned into its animation (`SetAnimationNotLooping`
+rise/sink with the end pose as idle animation), and while its spikes are out
+— from the pop out of the floor until halfway into the sink — every melon
+whose center is over its square — in the prop's own frame, so any
+rotation works (decided: walls and ceilings too), within
+`SPIKE_SPRING_HEIGHT` of its surface — breaks at once, like a kill trigger (`BreakKartNow`;
+broken and race-locked melons are left alone). Jumping over it high enough
+over a floor spring is safe. The map is searched for springs every `SPIKE_SPRING_SCAN_SECONDS`, and
+the console names each one the script runs, with its timing. The
+animation lengths are shared with the model's generator, which imports them.
+Constants: `world/spike-spring/constants.js`; rules:
+`world/spike-spring/logic.js`, applied by `world/spike-spring/spike-spring.js`
+(`test/world/spike-spring.test.mjs`). Details for mappers:
+[Mapping API: spike springs](docs/mapping-api/18-spike-springs.md).
+
+## Ball pits (implemented)
+
+Physics balls (`tools/models/make-ball-model.mjs`) are kept in their pit by
+a `trigger_multiple` around it (`ball_pit_enter`/`ball_pit_leave`) — no
+texture can do it, since melons are physics props too and must drive in and
+out freely (decided). A ball (any physics prop that isn't a melon) that
+leaves the trigger is steered back towards the trigger's origin every tick
+(`BALL_PIT_RETURN_SPEED`, horizontal only) until it's in again, or dropped
+back in over the middle after `BALL_PIT_DROP_SECONDS`. Constants:
+`world/ball-pit/constants.js`; rules: `world/ball-pit/logic.js`, applied by
+`world/ball-pit/ball-pit.js` (`test/world/ball-pit.test.mjs`). Details for
+mappers: [Mapping API: ball pits](docs/mapping-api/19-ball-pits.md).
+
 ## Open design questions (not yet decided — ask before assuming)
 
 - **Per-track progress**: should a free-roaming melon that switches tracks

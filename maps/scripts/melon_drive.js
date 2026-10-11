@@ -1482,6 +1482,64 @@ const MOVER_NAME_PATTERN = /^mover(?:_wait(\d+(?:\.\d+)?))?(?:_.*)?$/;
 // Seconds a mover without "_wait<seconds>" in its name stands at each end.
 const MOVER_DEFAULT_WAIT = 0;
 
+// Spike springs: a prop_dynamic with the spike spring model whose name starts
+// with "spike_spring" pops its spikes out of the floor again and again — the
+// script plays its animations on a fixed clock and breaks every melon over
+// it while the spikes are out. No logic_timer or trigger in Hammer needed.
+// Rule: world/spike-spring/logic.js, applied by world/spike-spring/spike-spring.js.
+// The animation lengths are shared with the model's generator,
+// tools/models/make-spike-spring-model.mjs (it imports them from here):
+// change one, re-run it and recompile the model.
+
+// The class the script looks for spike springs in.
+const SPIKE_SPRING_CLASS = "prop_dynamic";
+// "spike_spring" or "spike_spring_<parts>", parts split by "_": the first two
+// numbers in a row are seconds down and seconds up, "offset<seconds>" is how
+// far its clock runs ahead of the others, words are ignored — e.g.
+// "spike_spring_2_1", "spike_spring_downtime_uptime_1.5_0.5_offset0.3_left".
+const SPIKE_SPRING_NAME_PATTERN = /^spike_spring(?:_.*)?$/;
+// Seconds a spike spring without "_<down>_<up>" in its name stays down / up.
+const SPIKE_SPRING_DOWN_SECONDS = 1.6;
+const SPIKE_SPRING_UP_SECONDS = 1;
+// How often the map is searched for spike springs again, so one that spawned
+// after the script's first look (or after a round restart) isn't missed.
+const SPIKE_SPRING_SCAN_SECONDS = 2;
+
+// The model's animations: "rise" pops the spikes out (the first
+// SPIKE_SPRING_POP_SECONDS of it), "sink" pulls them back in; "up"/"down" hold.
+const SPIKE_SPRING_RISE_SECONDS = 0.7;
+const SPIKE_SPRING_POP_SECONDS = 0.12;
+const SPIKE_SPRING_SINK_SECONDS = 0.45;
+// While sinking the spikes still hurt for this share of it.
+const SPIKE_SPRING_SINK_LETHAL_SHARE = 0.5;
+
+// Where a melon counts as "on the spikes", in the prop's own frame (any
+// rotation: floor, wall, ceiling), around its origin (the surface, the
+// shaft's middle): half the side of a square (the 32-unit shaft plus about a
+// melon's radius) and how far out its center can be (the spikes reach 35,
+// plus a melon's radius).
+const SPIKE_SPRING_HALF_SIZE = 19;
+const SPIKE_SPRING_HEIGHT = 44;
+// …and how far behind the surface (a melon sunk into the lid a little).
+const SPIKE_SPRING_DEPTH = 8;
+
+// Ball pits: a trigger_multiple around a pit of physics balls keeps them in
+// it — OnStartTouch → RunScriptInput "ball_pit_enter", OnEndTouch →
+// "ball_pit_leave". A ball (any physics prop that isn't a melon) that leaves
+// the trigger is steered back towards its middle, and dropped back in over
+// it if it hasn't made it after BALL_PIT_DROP_SECONDS. Melons drive in and
+// out freely. Rule: world/ball-pit/logic.js, applied by world/ball-pit/ball-pit.js.
+
+// Horizontal speed (u/s) a ball outside is pulled back towards the middle
+// with, at least — one flying back faster keeps its speed.
+const BALL_PIT_RETURN_SPEED = 150;
+// Seconds outside before it's dropped back in over the middle.
+const BALL_PIT_DROP_SECONDS = 2;
+// …this high above the trigger's origin, and up to this far off its middle
+// each way (so dropped balls don't stack up).
+const BALL_PIT_DROP_HEIGHT = 40;
+const BALL_PIT_DROP_SPREAD = 16;
+
 // All tunable numbers and static/Hammer-naming-convention data for
 // melon_drive, one file per system they configure. Import from here, not
 // from the single files. Actual mutable runtime state (kart registry, race
@@ -4932,6 +4990,26 @@ function RespawnDestroyedMelon(slot, kart) {
     kart.pendingBounce = undefined;
     LeaveZones(kart); // a new melon entity — the old one's zones never send heal_leave/lift_leave
     ApplyCameraFollow(kart);
+}
+
+/**
+ * Breaks a melon on the spot, whatever its health — a kill trigger, a spike
+ * spring. Broken or race-locked melons (countdown, finished) are left alone.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ * @param {string} reason for the debug log
+ * @returns {boolean} whether it broke
+ */
+function BreakKartNow(kart, reason) {
+    if (kart.breaking || kart.locked) {
+        return false;
+    }
+    const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot() ?? -1;
+    const velocity = kart.melon.GetAbsVelocity();
+    const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
+    kart.health = 0;
+    Debug(`BreakKartNow: slot ${slot} broken by ${reason}`);
+    BreakMelon(slot, kart, speed > 0 ? velocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+    return true;
 }
 
 /** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed */
@@ -9795,15 +9873,7 @@ function RegisterBreakInputs() {
             Debug("melon_break: activator wasn't a tracked melon, ignoring");
             return;
         }
-        if (kart.breaking || kart.locked) {
-            return; // already broken, or parked by the race flow (countdown, finished)
-        }
-        const slot = kart.pawn.GetPlayerController()?.GetPlayerSlot() ?? -1;
-        const velocity = kart.melon.GetAbsVelocity();
-        const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
-        kart.health = 0;
-        Debug(`melon_break: slot ${slot} broken by trigger`);
-        BreakMelon(slot, kart, speed > 0 ? velocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+        BreakKartNow(kart, "melon_break trigger"); // ignored while broken or parked by the race flow (countdown, finished)
     });
 }
 
@@ -9903,6 +9973,397 @@ function StopBoostTrail(kart) {
     RemoveAfter(kart.boostTrail.entities, BOOST_TRAIL_FADE_SECONDS);
     kart.boostTrail = undefined;
 }
+
+// Movers (MOVER_* in world/mover/constants.js). Pure rules, no cs_script
+// import; world/mover/mover.js applies them (test/world/mover.test.mjs).
+
+/**
+ * A mover's config from its entity name, or undefined if the name doesn't
+ * make it one.
+ * @param {string} name
+ * @returns {{ wait: number } | undefined} wait: seconds it stands at each end
+ */
+function ParseMoverName(name) {
+    const match = MOVER_NAME_PATTERN.exec(name);
+    if (!match) {
+        return undefined;
+    }
+    return { wait: match[1] === undefined ? MOVER_DEFAULT_WAIT : Number(match[1]) };
+}
+
+// Starting the map's movers and keeping them going back and forth (see
+// world/mover/constants.js). Each mover's output connections are kept here,
+// by entity, so one is never set up twice and a hot reload can swap them
+// for its new callbacks.
+
+/** @typedef {import("cs_script/point_script").Entity} Entity */
+
+/** mover entity -> its OnFullyOpen/OnFullyClosed connection ids. @type {Map<Entity, (number | undefined)[]>} */
+const movers = new Map();
+
+/** @param {Entity} mover @param {number} wait */
+function Connect(mover, wait) {
+    const turn = (/** @type {string} */ input) => () => {
+        Instance.EntFireAtTarget({ target: mover, input, delay: wait });
+    };
+    movers.set(mover, [
+        Instance.ConnectOutput(mover, "OnFullyOpen", turn("Close")),
+        Instance.ConnectOutput(mover, "OnFullyClosed", turn("Open")),
+    ]);
+}
+
+/** Drops a mover's connections (and the entry). @param {Entity} mover */
+function Disconnect(mover) {
+    for (const id of movers.get(mover) ?? []) {
+        if (id !== undefined) {
+            Instance.DisconnectOutput(id);
+        }
+    }
+    movers.delete(mover);
+}
+
+/**
+ * Sets up and starts every mover that isn't going yet: on activation, and
+ * after a round restart (which may have respawned them). One already
+ * running is left alone — an Open would turn it round mid-way.
+ */
+function StartMovers() {
+    for (const mover of [...movers.keys()]) {
+        if (!mover.IsValid()) {
+            Disconnect(mover);
+        }
+    }
+    for (const mover of Instance.FindEntitiesByClass(MOVER_CLASS)) {
+        const config = ParseMoverName(mover.GetEntityName());
+        if (!config || movers.has(mover)) {
+            continue;
+        }
+        Connect(mover, config.wait);
+        Instance.EntFireAtTarget({ target: mover, input: "Open" });
+        Debug(`StartMovers: ${mover.GetEntityName()} started, wait ${config.wait}s`);
+    }
+}
+
+/**
+ * After a hot reload: the movers carried over from before keep moving, but
+ * their connections point at the old script's callbacks — swap them for
+ * new ones (no Open, they're already on their way).
+ * @param {Map<Entity, (number | undefined)[]> | undefined} previous
+ */
+function RestoreMovers(previous) {
+    // A copy: `previous` may be `movers` itself, which this loop changes.
+    for (const [mover, ids] of [...(previous ?? [])]) {
+        movers.set(mover, ids);
+        Disconnect(mover);
+        const config = mover.IsValid() ? ParseMoverName(mover.GetEntityName()) : undefined;
+        if (config) {
+            Connect(mover, config.wait);
+        }
+    }
+}
+
+/** Starts the movers when the script activates and after every round restart. */
+function RegisterMoverInputs() {
+    Instance.OnActivate(StartMovers);
+    Instance.OnRoundStart(StartMovers);
+}
+
+// Spike springs (SPIKE_SPRING_* in world/spike-spring/constants.js). Pure
+// rules, no cs_script import; world/spike-spring/spike-spring.js applies them
+// (test/world/spike-spring.test.mjs).
+
+/** @typedef {{ down: number, up: number, offset: number }} SpikeSpringConfig */
+/** @typedef {"down" | "rise" | "up" | "sink"} SpikeSpringPhase */
+
+/**
+ * A spike spring's config from its entity name, or undefined if the name
+ * doesn't make it one.
+ * @param {string} name
+ * @returns {SpikeSpringConfig | undefined} seconds down and up, clock offset
+ */
+function ParseSpikeSpringName(name) {
+    if (!SPIKE_SPRING_NAME_PATTERN.test(name)) {
+        return undefined;
+    }
+    const parts = name.split("_").slice(2); // after "spike" and "spring"
+    const IsNumber = (/** @type {string | undefined} */ part) => part !== undefined && /^\d+(?:\.\d+)?$/.test(part);
+    const at = parts.findIndex((part, i) => IsNumber(part) && IsNumber(parts[i + 1]));
+    const offset = parts.map((part) => /^offset(\d+(?:\.\d+)?)$/.exec(part)).find(Boolean);
+    return {
+        down: at < 0 ? SPIKE_SPRING_DOWN_SECONDS : Number(parts[at]),
+        up: at < 0 ? SPIKE_SPRING_UP_SECONDS : Number(parts[at + 1]),
+        offset: offset ? Number(offset[1]) : 0,
+    };
+}
+
+/** One full round: down, rise, up, sink. @param {SpikeSpringConfig} config */
+const SpikeSpringPeriod = (config) => config.down + SPIKE_SPRING_RISE_SECONDS + config.up + SPIKE_SPRING_SINK_SECONDS;
+
+/**
+ * Where a spike spring is in its round at game time `time` — every one runs
+ * on the same clock (shifted by its offset), so springs with the same
+ * timing go up together — and whether its spikes hurt: from the pop out of
+ * the floor until partway into the sink.
+ * @param {number} time
+ * @param {SpikeSpringConfig} config
+ * @returns {{ phase: SpikeSpringPhase, lethal: boolean }}
+ */
+function SpikeSpringState(time, config) {
+    const period = SpikeSpringPeriod(config);
+    let t = (((time + config.offset) % period) + period) % period;
+    if (t < config.down) return { phase: "down", lethal: false };
+    t -= config.down;
+    if (t < SPIKE_SPRING_RISE_SECONDS) return { phase: "rise", lethal: t >= SPIKE_SPRING_POP_SECONDS };
+    t -= SPIKE_SPRING_RISE_SECONDS;
+    if (t < config.up) return { phase: "up", lethal: true };
+    t -= config.up;
+    return { phase: "sink", lethal: t < SPIKE_SPRING_SINK_SECONDS * SPIKE_SPRING_SINK_LETHAL_SHARE };
+}
+
+/**
+ * The prop_dynamic inputs to fire when a spike spring goes from `previous`
+ * to `phase` ([input, animation] pairs). Rise and sink play once, the idle
+ * animation set with them holds the end pose afterwards; any other jump (the
+ * first update, a hot reload, a skipped phase) puts it straight in the pose.
+ * @param {SpikeSpringPhase | undefined} previous
+ * @param {SpikeSpringPhase} phase
+ * @returns {[string, string][]}
+ */
+function SpikeSpringInputs(previous, phase) {
+    if (previous === phase) return [];
+    if (phase === "rise" && previous === "down") return [["SetAnimationNotLooping", "rise"], ["SetIdleAnimationLooping", "up"]];
+    if (phase === "sink" && previous === "up") return [["SetAnimationNotLooping", "sink"], ["SetIdleAnimationLooping", "down"]];
+    if ((phase === "up" && previous === "rise") || (phase === "down" && previous === "sink")) return [];
+    const pose = phase === "rise" || phase === "up" ? "up" : "down";
+    return [["SetAnimationLooping", pose], ["SetIdleAnimationLooping", pose]];
+}
+
+/**
+ * A spring's own axes from its angles (degrees, Source's pitch/yaw/roll):
+ * forward (x), left (y) and up (z, the way the spikes come out).
+ * @param {{ pitch: number, yaw: number, roll: number }} angles
+ */
+function SpikeSpringAxes({ pitch, yaw, roll }) {
+    const r = Math.PI / 180;
+    const sp = Math.sin(pitch * r), cp = Math.cos(pitch * r);
+    const sy = Math.sin(yaw * r), cy = Math.cos(yaw * r);
+    const sr = Math.sin(roll * r), cr = Math.cos(roll * r);
+    return {
+        forward: [cp * cy, cp * sy, -sp],
+        left: [sr * sp * cy - cr * sy, sr * sp * sy + cr * cy, sr * cp],
+        up: [cr * sp * cy + sr * sy, cr * sp * sy - sr * cy, cr * cp],
+    };
+}
+
+/**
+ * Whether a melon center `offset` from a spike spring's origin is on it, in
+ * the spring's own frame (any rotation — floor, wall, ceiling): inside its
+ * square, and between SPIKE_SPRING_DEPTH behind its surface and
+ * SPIKE_SPRING_HEIGHT out of it.
+ * @param {{ x: number, y: number, z: number }} offset
+ * @param {{ pitch: number, yaw: number, roll: number }} angles
+ */
+function IsOverSpikeSpring(offset, angles) {
+    const { forward, left, up } = SpikeSpringAxes(angles);
+    const d = [offset.x, offset.y, offset.z];
+    const Along = (/** @type {number[]} */ axis) => d[0] * axis[0] + d[1] * axis[1] + d[2] * axis[2];
+    const height = Along(up);
+    if (height < -SPIKE_SPRING_DEPTH || height > SPIKE_SPRING_HEIGHT) return false;
+    return Math.abs(Along(forward)) <= SPIKE_SPRING_HALF_SIZE && Math.abs(Along(left)) <= SPIKE_SPRING_HALF_SIZE;
+}
+
+// Running the map's spike springs (see world/spike-spring/constants.js): every
+// tick each one's animation is kept in step with the shared clock, and while
+// its spikes are out every melon over it breaks. The map is searched for
+// springs every SPIKE_SPRING_SCAN_SECONDS, so one that spawned after the
+// script's first look (or was respawned by a round restart) still joins.
+
+/** @typedef {import("cs_script/point_script").Entity} Entity */
+
+/**
+ * spike spring entity -> its config and the phase last applied to it.
+ * @type {Map<Entity, { config: import("./logic.js").SpikeSpringConfig, phase: import("./logic.js").SpikeSpringPhase | undefined }>}
+ */
+const spikeSprings = new Map();
+let nextScanTime = -Infinity;
+let lastError = "";
+
+/** Forgets the springs, so the next update looks them up again (after a round restart). */
+function ResetSpikeSprings() {
+    spikeSprings.clear();
+    nextScanTime = -Infinity;
+}
+
+/** Adds springs not known yet, and says in the console when the set changed. */
+function ScanSpikeSprings() {
+    const added = [];
+    for (const entity of Instance.FindEntitiesByClass(SPIKE_SPRING_CLASS)) {
+        const name = entity.GetEntityName();
+        const config = spikeSprings.has(entity) ? undefined : ParseSpikeSpringName(name);
+        if (config) {
+            spikeSprings.set(entity, { config, phase: undefined });
+            added.push(`${name} (${config.down}s down, ${config.up}s up, offset ${config.offset}s)`);
+        }
+    }
+    if (added.length) {
+        Instance.Msg(`[melon_drive] spike springs: ${spikeSprings.size} running, new: ${added.join(", ")}`);
+    }
+}
+
+/** Every tick: animations in step with the clock, melons on out spikes broken. @param {number} now */
+function UpdateSpikeSprings(now) {
+    try {
+        if (now >= nextScanTime) {
+            nextScanTime = now + SPIKE_SPRING_SCAN_SECONDS;
+            ScanSpikeSprings();
+        }
+        for (const [spring, state] of spikeSprings) {
+            if (!spring.IsValid()) {
+                spikeSprings.delete(spring);
+                continue;
+            }
+            UpdateSpikeSpring(spring, state, now);
+        }
+    } catch (err) {
+        // Said once per kind of error, not every tick (Think's own catch only logs with DEBUG on).
+        if (String(err) !== lastError) {
+            lastError = String(err);
+            Instance.Msg(`[melon_drive] spike springs: ${err}`);
+        }
+    }
+}
+
+/**
+ * @param {Entity} spring
+ * @param {{ config: import("./logic.js").SpikeSpringConfig, phase: import("./logic.js").SpikeSpringPhase | undefined }} state
+ * @param {number} now
+ */
+function UpdateSpikeSpring(spring, state, now) {
+    const { phase, lethal } = SpikeSpringState(now, state.config);
+    for (const [input, value] of SpikeSpringInputs(state.phase, phase)) {
+        Instance.EntFireAtTarget({ target: spring, input, value });
+    }
+    state.phase = phase;
+    if (!lethal) {
+        return;
+    }
+    const origin = spring.GetAbsOrigin();
+    const angles = spring.GetAbsAngles();
+    for (const kart of karts.values()) {
+        if (!kart.melon.IsValid()) {
+            continue;
+        }
+        const p = kart.melon.GetAbsOrigin();
+        if (IsOverSpikeSpring({ x: p.x - origin.x, y: p.y - origin.y, z: p.z - origin.z }, angles)) {
+            BreakKartNow(kart, `spike spring ${spring.GetEntityName()}`);
+        }
+    }
+}
+
+/** A round restart respawns the spike springs: look them up again. */
+function RegisterSpikeSpringInputs() {
+    Instance.OnRoundStart(ResetSpikeSprings);
+}
+
+// Ball pits (BALL_PIT_* in world/ball-pit/constants.js). Pure rules, no
+// cs_script import; world/ball-pit/ball-pit.js applies them
+// (test/world/ball-pit.test.mjs).
+
+/** @typedef {{ x: number, y: number, z: number }} Vec */
+
+/**
+ * A ball outside its pit, steered back: its horizontal velocity turned
+ * towards the pit's middle, at least BALL_PIT_RETURN_SPEED (faster if it
+ * already flies that way faster); its vertical velocity is left alone.
+ * @param {Vec} position the ball
+ * @param {Vec} velocity the ball's
+ * @param {Vec} center the pit trigger's origin
+ * @returns {Vec}
+ */
+function BallReturnVelocity(position, velocity, center) {
+    const dx = center.x - position.x, dy = center.y - position.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance < 1e-3) {
+        return { ...velocity };
+    }
+    const towards = (velocity.x * dx + velocity.y * dy) / distance;
+    const speed = Math.max(towards, BALL_PIT_RETURN_SPEED);
+    return { x: (dx / distance) * speed, y: (dy / distance) * speed, z: velocity.z };
+}
+
+/**
+ * Where a ball is dropped back in: BALL_PIT_DROP_HEIGHT above the pit's
+ * middle, up to BALL_PIT_DROP_SPREAD off it each way.
+ * @param {Vec} center
+ * @param {number} randomX 0..1
+ * @param {number} randomY 0..1
+ * @returns {Vec}
+ */
+function BallDropPosition(center, randomX, randomY) {
+    return {
+        x: center.x + (randomX * 2 - 1) * BALL_PIT_DROP_SPREAD,
+        y: center.y + (randomY * 2 - 1) * BALL_PIT_DROP_SPREAD,
+        z: center.z + BALL_PIT_DROP_HEIGHT,
+    };
+}
+
+// Keeping the balls in their ball pits (see world/ball-pit/constants.js):
+// every ball that left its pit trigger is steered back every tick until it's
+// in again (ball_pit_enter), or dropped back in over the middle after
+// BALL_PIT_DROP_SECONDS.
+
+/** @typedef {import("cs_script/point_script").Entity} Entity */
+
+/** ball outside its pit -> the pit trigger it left and when. @type {Map<Entity, { pit: Entity, since: number }>} */
+const ballsOutside = new Map();
+
+/** Whether `entity` is a ball a pit keeps: a physics prop that isn't a melon. @param {Entity | undefined} entity */
+function IsBall(entity) {
+    return !!entity && entity.IsValid() && entity.GetClassName().startsWith("prop_physics") && !FindKartByMelon(entity);
+}
+
+/** ball_pit_leave: `ball` left the pit trigger `pit`. @param {Entity | undefined} ball @param {Entity | undefined} pit */
+function BallLeftPit(ball, pit) {
+    if (!IsBall(ball) || !pit) {
+        return;
+    }
+    ballsOutside.set(/** @type {Entity} */ (ball), { pit, since: Instance.GetGameTime() });
+}
+
+/** ball_pit_enter: `ball` is in a pit (again). @param {Entity | undefined} ball */
+function BallEnteredPit(ball) {
+    if (ball) {
+        ballsOutside.delete(ball);
+    }
+}
+
+/** Every tick: the balls outside steered back, or dropped back in. @param {number} now */
+function UpdateBallPits(now) {
+    for (const [ball, { pit, since }] of ballsOutside) {
+        if (!ball.IsValid() || !pit.IsValid()) {
+            ballsOutside.delete(ball);
+            continue;
+        }
+        const center = pit.GetAbsOrigin();
+        if (now - since >= BALL_PIT_DROP_SECONDS) {
+            ball.Teleport({ position: BallDropPosition(center, Math.random(), Math.random()), velocity: { x: 0, y: 0, z: 0 } });
+            ballsOutside.delete(ball);
+            Debug(`UpdateBallPits: a ball didn't make it back into ${pit.GetEntityName() || "its pit"}, dropped back in`);
+            continue;
+        }
+        ball.Teleport({ velocity: BallReturnVelocity(ball.GetAbsOrigin(), ball.GetAbsVelocity(), center) });
+    }
+}
+
+/** ball_pit_enter / ball_pit_leave from the trigger around a ball pit. */
+function RegisterBallPitInputs() {
+    Instance.OnScriptInput("ball_pit_enter", ({ activator }) => BallEnteredPit(activator));
+    Instance.OnScriptInput("ball_pit_leave", ({ caller, activator }) => BallLeftPit(activator, caller));
+}
+
+// Map entities the script keeps running on their own, not tied to a kart:
+// mover/ (func_movelinears going back and forth), spike-spring/ (spike traps
+// popping out of the floor on a clock), ball-pit/ (balls kept in their pit).
 
 let lastHeartbeatTime = 0;
 // Real elapsed time since the last Think, used for the movement math below —
@@ -10004,6 +10465,16 @@ function Think() {
         UpdateRaceFlow(now);
     } catch (err) {
         Debug(`Think: UpdateRaceFlow threw: ${err}`);
+    }
+    try {
+        UpdateSpikeSprings(now);
+    } catch (err) {
+        Debug(`Think: UpdateSpikeSprings threw: ${err}`);
+    }
+    try {
+        UpdateBallPits(now);
+    } catch (err) {
+        Debug(`Think: UpdateBallPits threw: ${err}`);
     }
     // Re-think as soon as possible (every engine tick) rather than on a fixed
     // interval — WasInputJustPressed only reports a button edge for the
@@ -10331,103 +10802,6 @@ function RegisterRaceInputs() {
 // Developer aids only: the user menu's collision debug view (collision-debug.js),
 // its free look (free-look.js), its camera and physics settings pages (camera-tuning.js, physics-tuning.js) and the attack button log (attack-debug.js, with DEBUG on).
 
-// Movers (MOVER_* in world/mover/constants.js). Pure rules, no cs_script
-// import; world/mover/mover.js applies them (test/world/mover.test.mjs).
-
-/**
- * A mover's config from its entity name, or undefined if the name doesn't
- * make it one.
- * @param {string} name
- * @returns {{ wait: number } | undefined} wait: seconds it stands at each end
- */
-function ParseMoverName(name) {
-    const match = MOVER_NAME_PATTERN.exec(name);
-    if (!match) {
-        return undefined;
-    }
-    return { wait: match[1] === undefined ? MOVER_DEFAULT_WAIT : Number(match[1]) };
-}
-
-// Starting the map's movers and keeping them going back and forth (see
-// world/mover/constants.js). Each mover's output connections are kept here,
-// by entity, so one is never set up twice and a hot reload can swap them
-// for its new callbacks.
-
-/** @typedef {import("cs_script/point_script").Entity} Entity */
-
-/** mover entity -> its OnFullyOpen/OnFullyClosed connection ids. @type {Map<Entity, (number | undefined)[]>} */
-const movers = new Map();
-
-/** @param {Entity} mover @param {number} wait */
-function Connect(mover, wait) {
-    const turn = (/** @type {string} */ input) => () => {
-        Instance.EntFireAtTarget({ target: mover, input, delay: wait });
-    };
-    movers.set(mover, [
-        Instance.ConnectOutput(mover, "OnFullyOpen", turn("Close")),
-        Instance.ConnectOutput(mover, "OnFullyClosed", turn("Open")),
-    ]);
-}
-
-/** Drops a mover's connections (and the entry). @param {Entity} mover */
-function Disconnect(mover) {
-    for (const id of movers.get(mover) ?? []) {
-        if (id !== undefined) {
-            Instance.DisconnectOutput(id);
-        }
-    }
-    movers.delete(mover);
-}
-
-/**
- * Sets up and starts every mover that isn't going yet: on activation, and
- * after a round restart (which may have respawned them). One already
- * running is left alone — an Open would turn it round mid-way.
- */
-function StartMovers() {
-    for (const mover of [...movers.keys()]) {
-        if (!mover.IsValid()) {
-            Disconnect(mover);
-        }
-    }
-    for (const mover of Instance.FindEntitiesByClass(MOVER_CLASS)) {
-        const config = ParseMoverName(mover.GetEntityName());
-        if (!config || movers.has(mover)) {
-            continue;
-        }
-        Connect(mover, config.wait);
-        Instance.EntFireAtTarget({ target: mover, input: "Open" });
-        Debug(`StartMovers: ${mover.GetEntityName()} started, wait ${config.wait}s`);
-    }
-}
-
-/**
- * After a hot reload: the movers carried over from before keep moving, but
- * their connections point at the old script's callbacks — swap them for
- * new ones (no Open, they're already on their way).
- * @param {Map<Entity, (number | undefined)[]> | undefined} previous
- */
-function RestoreMovers(previous) {
-    // A copy: `previous` may be `movers` itself, which this loop changes.
-    for (const [mover, ids] of [...(previous ?? [])]) {
-        movers.set(mover, ids);
-        Disconnect(mover);
-        const config = mover.IsValid() ? ParseMoverName(mover.GetEntityName()) : undefined;
-        if (config) {
-            Connect(mover, config.wait);
-        }
-    }
-}
-
-/** Starts the movers when the script activates and after every round restart. */
-function RegisterMoverInputs() {
-    Instance.OnActivate(StartMovers);
-    Instance.OnRoundStart(StartMovers);
-}
-
-// Map entities the script keeps running on their own, not tied to a kart:
-// mover/ (func_movelinears going back and forth).
-
 Instance.SetThink(Think);
 Instance.SetNextThink(Instance.GetGameTime());
 
@@ -10463,3 +10837,5 @@ RegisterHudInputs(); // OnCustomHudClicked
 RegisterMovementInputs(); // OnKnifeAttack (knife guard)
 RegisterAttackDebug();
 RegisterMoverInputs(); // OnActivate/OnRoundStart: start the func_movelinear movers
+RegisterSpikeSpringInputs(); // OnRoundStart: look the spike springs up again
+RegisterBallPitInputs(); // ball_pit_enter/ball_pit_leave

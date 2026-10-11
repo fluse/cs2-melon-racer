@@ -30,10 +30,12 @@ this folder, the script doesn't know about it.
 | 11 | [Camera zones](11-camera-zones.md) | Zoom out/in, front view, close-up, side view (2D) |
 | 12 | [Jump pads](12-jump-pads.md) | Timed launch pads, no damage |
 | 13 | [Water zones](13-water-zones.md) | Landing in water stops the melon, no bounces in it |
-| 14 | [Prefabs](14-prefabs.md) | Hub, routes, tutorial, start/finish/heal gates, jump pad, obstacle mover, refill jumps; map variables, rules |
+| 14 | [Prefabs](14-prefabs.md) | Hub, routes, tutorial, start/finish/heal gates, jump pad, obstacle mover, refill jumps, spike spring; map variables, rules |
 | 15 | [Checking your map](15-checking.md) | What `npm test` catches, debug log, minimal checklist |
 | 16 | [Movers](16-movers.md) | `func_movelinear`s the script keeps going back and forth |
 | 17 | [Jump recharge zones](17-jump-recharge-zones.md) | Wall jumps recharged at once, kept full inside |
+| 18 | [Spike springs](18-spike-springs.md) | Spike traps popping out of the floor on the script's clock |
+| 19 | [Ball pits](19-ball-pits.md) | Physics balls kept in their pit, melons drive in and out |
 
 ## All script inputs
 
@@ -72,6 +74,8 @@ script, and `npm test` fails on it.
 | `water_leave` | **End** | the same water trigger | — | [Water zones](13-water-zones.md) |
 | `jump_recharge_enter` | Start | any jump recharge trigger | — | [Jump recharge zones](17-jump-recharge-zones.md) |
 | `jump_recharge_leave` | **End** | the same jump recharge trigger | — | [Jump recharge zones](17-jump-recharge-zones.md) |
+| `ball_pit_enter` | Start | the trigger around a ball pit | origin (the pit's middle) | [Ball pits](19-ball-pits.md) |
+| `ball_pit_leave` | **End** | the same ball pit trigger | — | [Ball pits](19-ball-pits.md) |
 
 ## All entity names
 
@@ -122,3 +126,4 @@ Names the script parses — the name carries the config.
 | `side_view_<yaw>[_<distance>[_<height>]]` | `side_view_90_300_40` | `trigger_multiple` | [Camera zones](11-camera-zones.md#side-view-zones) |
 | `jump_pad_<up>[_<forward>]` | `jump_pad_1000_400` | `trigger_multiple` | [Jump pads](12-jump-pads.md) |
 | `mover[_wait<seconds>][_<anything>]` | `mover_wait1.5_left` | `func_movelinear` | [Movers](16-movers.md) |
+| `spike_spring[_<words>][_<down>_<up>][_offset<seconds>]` | `spike_spring_downtime_uptime_2_0.5` | `prop_dynamic` | [Spike springs](18-spike-springs.md) |

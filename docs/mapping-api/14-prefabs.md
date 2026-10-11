@@ -25,6 +25,7 @@ never knows whether an entity came from a prefab.
 | `finish_gate.vmap` | a route | a track's [finish line](#finish-gate): finish trigger | `track` = `finish_<trackId>` |
 | `heal_gate.vmap` | a route | a [full-heal](09-heal-zones.md#full-heal-zone) gate: `heal_zone_full` (`heal_enter`/`heal_leave`) | — |
 | `obstacle_mover.vmap` | a route | an [obstacle mover](#obstacle-mover): a [mover](16-movers.md) and a [kill trigger](08-kill-triggers.md#kill-trigger) riding along on it | `Mover Name` = `mover_<anything>`, plus direction, distance, speed, kill on/off |
+| `spike_spring.vmap` | — (to be built) | a [spike spring](#spike-spring): the trap's `prop_dynamic` and the floor around its hole | `Spike Spring Name` = `spike_spring[_<words>][_<down>_<up>][_offset<seconds>]` (optional) |
 | `refill_jumps.vmap` | — (not placed yet) | a [jump recharge zone](#refill-jumps): trigger (`jump_recharge_enter`/`jump_recharge_leave`) and its marker particles | — |
 
 A route prefab's **file name is the route's name** in the hub window's heat
@@ -141,6 +142,19 @@ place a finish gate on the start line, overlapping the start gate. Never add
 Movers may share a name, but this prefab's kill trigger finds its mover
 **by name** (its Parent): two copies with the same `Mover Name` can leave
 a kill trigger riding on the other copy's mover. Give every copy its own.
+
+## Spike spring
+
+| Inside `spike_spring.vmap` | Set to |
+|---|---|
+| `prop_dynamic` | `models/melon_racer/spike_spring/spike_spring.vmdl`, **Name** bound to `Spike Spring Name` (`target_source`), default `spike_spring`; Starting Animation and Idle Animation empty, scale `1` |
+| floor | optional: a floor piece with a 32 × 32 hole under the prop's origin, closed by a `toolsnodraw` brush level with the floor (the model has no collision, so melons would fall in) |
+
+That's all — no trigger, no `logic_timer`: the script runs it
+([Spike springs](18-spike-springs.md)). The override is **optional**: the
+default is a working spring (1.6 s down, 1 s up). Override it for other
+timing or to shift a copy along the clock, e.g. `spike_spring_2_0.5` or
+`spike_spring_offset0.6`. Spike springs may repeat and share a name.
 
 ## Refill jumps
 
