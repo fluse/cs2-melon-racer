@@ -8,7 +8,8 @@
 //   meanwhile, like in free look.
 // Mouse1 / D next, Mouse2 / A previous (SpectateCandidates' order: the one
 // furthest ahead first); the mouse turns the view around the watched melon
-// as around one's own. The camera itself is camera/follow/'s, pointed at
+// as around one's own. R leaves: a watcher stops watching, a finished racer
+// goes back to their own melon for the rest of the heat. The camera itself is camera/follow/'s, pointed at
 // kart.spectateSlot's melon.
 import { Instance, CSInputs, CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
@@ -93,6 +94,14 @@ export function UpdateSpectating(now, phase) {
             StopSpectating(kart);
         }
         UpdateWatchRow(slot, kart, phase);
+        if (kart.spectateSlot !== undefined && kart.pawn.IsValid() && kart.pawn.WasInputJustPressed(CSInputs.RELOAD)) {
+            Debug(`UpdateSpectating: slot ${slot} pressed R, back to the own melon`);
+            if (kart.racing) {
+                kart.spectateDismissed = true;
+            }
+            StopSpectating(kart);
+            continue;
+        }
         const othersDriving = racers.some(([, other]) => other !== kart && !other.finished);
         const mode = SpectateMode(kart, phase, now, othersDriving);
         const candidates = mode === undefined ? [] : SpectateCandidates(
@@ -177,8 +186,8 @@ function EndSpectateView(kart) {
 }
 
 /**
- * The spectate panel: "mode|name" — who's watched, with the stop hint for a
- * watcher — or hidden with undefined. Sent on change and again every
+ * The spectate panel: "mode|name" — who's watched (mode "watcher" or
+ * "racer", the panel's Watching class) — or hidden with undefined. Sent on change and again every
  * HUD_RESEND_SECONDS.
  * @param {number | undefined} slot @param {Kart} kart @param {string | undefined} value @param {number} now
  */

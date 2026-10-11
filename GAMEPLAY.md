@@ -622,11 +622,14 @@ melon:
   camera moves on by itself.
 - **Switching** like CS2's spectator mode (decided): **Mouse1 / D** next,
   **Mouse2 / A** previous, wrapping around — not while Tab holds the
-  scoreboard or a menu has the mouse. The mouse turns the view around the
+  scoreboard or a menu has the mouse.
+- **R leaves** (decided): a watcher stops watching, a finished racer goes
+  back to their own melon (FINISH again) for the rest of the heat. While
+  spectating, R doesn't restart a time trial. The mouse turns the view around the
   watched melon as around one's own; that melon's lift/podium/camera-zone
   zooms apply, the viewer's own camera distance from the camera page.
 - HUD: "SPECTATING" and the name bottom center above the speed panel
-  (`spectate_panel`), with the keys, and for a watcher how to stop.
+  (`spectate_panel`), with the keys and "R → BACK TO YOUR MELON".
 
 Constants: `race/spectate/constants.js`; rules: `race/spectate/logic.js`
 (`test/race/spectate.test.mjs`), applied by `race/spectate/spectate.js`
@@ -1028,19 +1031,35 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
 ## Free look (implemented, dev aid)
 
 The user menu's "FREE LOOK" section (below "COLLISION DEBUG"; `kart.freeLook`,
-off by default) lets a player fly through the map: their own pawn (NOCLIP
-anyway) is let go — `HoldPawn` stops pulling it back, WASD flies it along
-the view — and the camera switches to its eyes, starting roughly where the
-chase camera was. Switching it on closes the menu. Their melon waits where
-it was, frozen (`UpdateKart` skips it, physics motion off) — no damage, but
-a running time trial's clock keeps going. Switching off (USE → the same
-button) puts the pawn back on its anchor and the chase camera on the melon.
-A heat starting, a new pawn, the respawn button and "Restart Time Trial"
-(button or R) switch it off. Not while the melon is
-breaking. While it's on, a **ghost avatar** hangs on the flying pawn — a
-copy of the `template_spectator_hat` point_template, at eye height, flying
-along — so the others see who's flying around (the pawn itself is
-invisible). All of it in `dev/free-look.js`.
+off by default) turns the player into a **drone** (decided) and lets them
+fly it through the map: a fresh copy of the `template_drone` point_template
+(the quadcopter from `tools/models/make-drone-model.mjs`, its four rotors
+spinning, the red recording light on its camera blinking) appears above
+their melon, and the chase camera follows it.
+Switching it on closes the menu.
+
+- **Flying:** W/S along the view (looking down and holding W dives), A/D
+  sideways, jump up, duck down, attack held for `DRONE_FAST_SPEED`.
+- **Inertia, like a real drone in the air** (decided): the velocity only
+  follows the input gradually (`DRONE_RESPONSE`), so it carries its
+  momentum into a turn and coasts on a moment after letting go (then
+  brakes by itself, a stabilized drone). It leans into the way it's
+  speeding up — forward pulling away, back braking, into a turn — and a
+  little while cruising (`DRONE_MAX_TILT`, `DRONE_CRUISE_TILT`), eased.
+- **Collision** (decided): it runs into the world — a `DRONE_RADIUS` sphere
+  trace along every move, sliding along walls, floors and ceilings — but
+  flies **through melons**, players and other drones (the model has no
+  collision at all).
+- **The others see the drone** — who's flying around.
+
+Their melon waits where it was, frozen (`UpdateKart` skips it, physics
+motion off) — no damage, but a running time trial's clock keeps going.
+Switching off (USE → the same button) removes the drone and puts the chase
+camera back on the melon. A heat starting, a new pawn, the respawn button
+and "Restart Time Trial" (button or R) switch it off. Not while the melon
+is breaking, and not without `template_drone` in the map (the toggle stays
+off, the console says why). Constants: `dev/constants.js`; rules:
+`dev/drone-logic.js`, applied by `dev/free-look.js` (`test/dev/drone.test.mjs`).
 
 ## Camera settings (implemented, dev aid)
 

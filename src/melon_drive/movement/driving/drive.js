@@ -39,7 +39,7 @@ import { ApplyJump, RechargeWallJumpCharge, GetWallJumpCharges } from "../jump/j
 import { UpdatePadFlight, TryPadLaunch } from "../../zones/jump-pad/jump-pad.js";
 import { UpdateGrounded, UpdateWallContact } from "../contact/contact.js";
 import { DrawCollisionDebug } from "../../dev/collision-debug.js";
-import { UpdateSpectatorHat } from "../../dev/free-look.js";
+import { UpdateDrone } from "../../dev/free-look.js";
 import { ApplyImpactDamage } from "../../health/damage/damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage, WallBounceBreaksAtImpact } from "../wall-bounce/wall-bounce.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
@@ -76,13 +76,13 @@ export function UpdateKart(slot, kart, dt) {
         return;
     }
 
-    // Free look (dev/free-look.js): the player is flying their pawn around,
+    // Free look (dev/free-look.js): the player is flying a drone around,
     // the melon waits where it was, motion off — no driving, no impacts.
     if (kart.freeLook) {
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.attackBoosting = false;
-        UpdateSpectatorHat(kart);
+        UpdateDrone(kart, dt);
         return;
     }
 

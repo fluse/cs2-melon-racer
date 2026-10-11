@@ -53,6 +53,7 @@ beforeEach(() => {
     world.add(new Entity({ name: HUB_SPAWN_NAME, className: "info_player_start", origin: HUB }));
     world.add(new Entity({ name: INTRO_SPAWN_NAME, className: "info_player_start", origin: INTRO }));
     world.add(new Entity({ name: C.JOIN_GRAND_PRIX_SPAWN_NAME, className: "info_target", origin: JOIN }));
+    world.add(new PointTemplate({ name: C.DRONE_TEMPLATE_NAME, spawn: () => [new Entity({ className: "prop_dynamic", origin: { x: 500, y: 0, z: 0 } })] }));
     world.add(new Entity({ name: "start_1", className: "trigger_multiple", origin: { x: 3000, y: 0, z: 0 } }));
     a = SetUpPlayerKart(world.add(new CSPlayerPawn({ slot: 0 })), GetHubSpawnPoint()); // the moderator: first in
     b = SetUpPlayerKart(world.add(new CSPlayerPawn({ slot: 1 })), GetHubSpawnPoint());
@@ -302,43 +303,26 @@ test("free look button: switching it on closes the menu, switching it off doesn'
     assert.equal(a.userMenuOpen, false);
 });
 
-test("free look: a ghost avatar from template_spectator_hat hangs on the flying pawn, gone again when it's off or the player leaves", async () => {
+test("free look: the player becomes a drone from template_drone, the camera on it — gone again when it's off or the player leaves", async () => {
     const { DropKart } = await import("../../src/melon_drive/core/kart-registry.js");
-    world.add(new PointTemplate({ name: C.SPECTATOR_HAT_TEMPLATE_NAME, spawn: () => [new Entity({ className: "prop_dynamic", origin: { x: 500, y: 0, z: 0 } })] }));
+    const melon = a.melon.GetAbsOrigin();
     Click(0, "usermenu_freelook_button");
-    const [hat] = a.spectatorHat ?? [];
-    assert.ok(hat?.IsValid(), "spawned");
-    assert.equal(hat.GetParent(), undefined, "moved by script, not parented (parented it sat in the camera)");
-    const feet = a.pawn.GetAbsOrigin();
-    const yaw = a.pawn.GetEyeAngles().yaw * Math.PI / 180;
-    const at = hat.GetAbsOrigin();
-    assert.ok(Math.abs(at.x - (feet.x - Math.cos(yaw) * C.SPECTATOR_HAT_BACK)) < 1e-6
-        && Math.abs(at.y - (feet.y - Math.sin(yaw) * C.SPECTATOR_HAT_BACK)) < 1e-6
-        && at.z === feet.z + C.SPECTATOR_HAT_HEIGHT, "at eye height, a little behind the eyes, not at its Hammer offset");
-    assert.equal(b.spectatorHat, undefined, "only the free-looking player");
-
-    const { UpdateSpectatorHat } = await import("../../src/melon_drive/dev/free-look.js");
-    a.pawn.Teleport({ position: { x: 100, y: 200, z: 300 }, angles: { pitch: 0, yaw: 90, roll: 0 } });
-    UpdateSpectatorHat(a);
-    const moved = hat.GetAbsOrigin();
-    assert.ok(Math.abs(moved.x - 100) < 1e-6 && Math.abs(moved.y - (200 - C.SPECTATOR_HAT_BACK)) < 1e-6
-        && moved.z === 300 + C.SPECTATOR_HAT_HEIGHT, "follows the flying pawn, behind its current view");
-
-    a.pawn.Teleport({ angles: { pitch: 30, yaw: 90, roll: 0 } });
-    UpdateSpectatorHat(a);
-    const tilted = hat.GetAbsOrigin();
-    const down = 30 * Math.PI / 180;
-    assert.ok(Math.abs(tilted.y - (200 - Math.cos(down) * C.SPECTATOR_HAT_BACK)) < 1e-6
-        && Math.abs(tilted.z - (300 + C.SPECTATOR_HAT_HEIGHT + Math.sin(down) * C.SPECTATOR_HAT_BACK)) < 1e-6,
-        "looking down it swings up behind the eyes, around them");
-    assert.equal(hat.GetAbsAngles().pitch, 30, "tilted with the view");
+    const drone = a.drone?.body;
+    assert.ok(drone?.IsValid(), "spawned");
+    const at = drone.GetAbsOrigin();
+    assert.deepEqual([at.x, at.y, at.z], [melon.x, melon.y, melon.z + C.DRONE_START_HEIGHT], "above the melon, not at its Hammer offset");
+    assert.equal(a.pawn.GetCustomCamera().config.followEntity, drone, "the camera chases the drone");
+    assert.ok(world.fired.some((f) => f.target === drone && f.input === "SetIdleAnimationLooping" && f.value === "spin"), "rotors spinning");
+    assert.ok(world.fired.some((f) => f.target === drone && f.input === "DisableCollision"), "never solid");
+    assert.equal(b.drone, undefined, "only the free-looking player");
 
     Click(0, "usermenu_freelook_button");
-    assert.equal(hat.IsValid(), false, "removed when free look goes off");
-    assert.equal(a.spectatorHat, undefined);
+    assert.equal(drone.IsValid(), false, "removed when free look goes off");
+    assert.equal(a.drone, undefined);
+    assert.equal(a.pawn.GetCustomCamera().config.followEntity, a.melon, "the camera back on the melon");
 
     Click(0, "usermenu_freelook_button");
-    const [again] = a.spectatorHat;
+    const again = a.drone.body;
     DropKart(0, a);
     assert.equal(again.IsValid(), false, "removed when the player leaves");
 });
@@ -361,10 +345,13 @@ test("free look: the respawn and restart buttons end it and put the chase camera
     assert.equal(a.pawn.GetCustomCamera().GetMode(), CustomCameraMode.FOLLOW_POSITION);
 });
 
-test("free look without template_spectator_hat in the map: no avatar, free look still works", () => {
+test("free look without template_drone in the map: stays off", () => {
+    world.entities.find((e) => e.name === C.DRONE_TEMPLATE_NAME).Remove();
+    SetUserMenuOpen(0, a, true);
     Click(0, "usermenu_freelook_button");
-    assert.equal(a.freeLook, true);
-    assert.deepEqual(a.spectatorHat, []);
+    assert.equal(a.freeLook, false);
+    assert.equal(a.drone, undefined);
+    assert.equal(a.userMenuOpen, true, "the menu stays open");
 });
 
 test("test triggers button: its page in place of the columns, Back swaps them back, reopening keeps it", () => {

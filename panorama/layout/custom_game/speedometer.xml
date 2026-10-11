@@ -247,12 +247,12 @@
 		<Label id="finish_grace" class="FinishGrace Hidden" text="FINISH CLOSES IN {s:seconds}" />
 
 		<!-- Spectating (race/spectate/): whose melon the camera follows, how to
-		     switch, and for a player watching from outside (Watching) how to stop. -->
+		     switch, and that R goes back to the own melon. -->
 		<Panel id="spectate_panel" class="SpectatePanel Hidden">
 			<Label class="SpectateTitle" text="SPECTATING" />
 			<Label class="SpectateName" text="{s:name}" />
 			<Label class="SpectateHint" text="◀ MOUSE2 / A        D / MOUSE1 ▶" />
-			<Label class="SpectateStopHint" text="MENU (E) → STOP WATCHING" />
+			<Label class="SpectateStopHint" text="R → BACK TO YOUR MELON" />
 		</Panel>
 
 		<!-- A racer who's gone DNF_WARNING_SECONDS without a new checkpoint:

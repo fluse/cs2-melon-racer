@@ -124,7 +124,7 @@ test("a finished racer watches the one furthest ahead, steps with Mouse1/Mouse2,
     assert.equal(a.spectateSlot, 2, "c is furthest ahead");
     assert.equal(Followed(a), c.melon, "the camera chases c's melon");
     assert.equal(hud.Has(0, "spectate_panel", "Hidden"), false);
-    assert.equal(hud.Has(0, "spectate_panel", "Watching"), false, "no stop hint for a racer");
+    assert.equal(hud.Has(0, "spectate_panel", "Watching"), false);
     assert.equal(hud.Has(0, "finish_image", "Hidden"), true, "FINISH out of the way");
 
     Press(a, "ATTACK", GO + 15);
@@ -160,7 +160,7 @@ test("Watch Grand Prix: a player outside it follows the racers, own melon frozen
     Tick(GO + 2);
     assert.equal(d.spectateSlot, 0, "the first racer");
     assert.equal(Followed(d), a.melon);
-    assert.equal(hud.Has(3, "spectate_panel", "Watching"), true, "with the stop hint");
+    assert.equal(hud.Has(3, "spectate_panel", "Watching"), true);
     assert.equal(hud.Variable(3, "usermenu_watch_button", "watch_label"), "Stop Watching");
 
     TryAbortRace();
@@ -180,4 +180,26 @@ test("Stop Watching from the menu puts the camera back on the own melon at once"
     ToggleWatching(d, flow.phase);
     assert.equal(d.watching, false);
     assert.equal(Followed(d), d.melon);
+});
+
+test("R leaves spectating: a watcher stops watching, a finished racer is back on their melon for the rest of the heat", () => {
+    const [a, b, c, d] = kartList;
+    ToggleWatching(d, flow.phase);
+    Tick(GO + 1);
+    assert.equal(Followed(d), a.melon);
+    Press(d, "RELOAD", GO + 2);
+    assert.equal(d.watching, false);
+    assert.equal(Followed(d), d.melon);
+    assert.ok(world.fired.some((f) => f.target === d.melon && f.input === "EnableMotion"), "melon let go");
+
+    world.time = GO + 10;
+    FinishKart(a);
+    Tick(GO + 10 + SPECTATE_AFTER_FINISH_SECONDS);
+    assert.notEqual(a.spectateSlot, undefined, "setup: a spectates");
+    Press(a, "RELOAD", GO + 15);
+    assert.equal(a.spectateSlot, undefined);
+    assert.equal(Followed(a), a.melon);
+    assert.equal(hud.Has(0, "finish_image", "Hidden"), false, "FINISH again");
+    Tick(GO + 16);
+    assert.equal(a.spectateSlot, undefined, "stays on the own melon");
 });

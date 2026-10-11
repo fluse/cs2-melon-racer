@@ -75,7 +75,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              inputs.js (every button click: one table per kind of button, HandleHudClick dispatches)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
                                           #              boost-trail/, prediction/ (the guide line)
-                                          #   dev/       collision-debug.js (the user-menu collision debug view), free-look.js (the user-menu free look),
+                                          #   dev/       collision-debug.js (the user-menu collision debug view), free-look.js (+ drone-logic.js: the user-menu free look, flying a drone),
                                           #              camera-tuning.js (the user-menu camera page, own chase camera distance/height),
                                           #              physics-tuning.js (+ -logic.js: the user-menu physics page, every melon's physics in percent),
                                           #              tuning-scale.js (+ -logic.js: the slider both pages share), test-effects.js (Test Break/Perfect Bounce/Heal), attack-debug.js
@@ -113,6 +113,10 @@ tools/models/make-buffer-stop-model.mjs   # a buffer stop (Prellbock) as models/
                                           #   two buffers, bent grey legs on crossbars (696 triangles); a track obstacle, coarser _physics.obj collision; materials/melon_racer/buffer_stop/
 tools/models/make-checkpoint-model.mjs    # the checkpoint gate's frame (glowing pillars, beam, floating diamond) as models/melon_racer/checkpoint_gate.vmdl
                                           #   (+ _physics.obj collision, materials/melon_racer/checkpoint_gate/checkpoint_gate_{body,trim,glow}.vmat); same footprint as the prefab's old poles
+tools/models/make-drone-model.mjs         # the free-look drone as models/melon_racer/drone/drone.vmdl (~3.6k triangles): white shell stepped over a carbon chassis
+                                          #   (twill color + normal map), canopy, vents, battery, antennas, camera gimbal with a blinking red recording light (own bone, in "spin"), amber lights,
+                                          #   about a melon in size (SPAN 16 across), four rotors in guard rings, each on its own bone, looping "spin" (diagonal pairs the other way) + "idle";
+                                          #   no collision (the script traces it against the world); in the point_template template_drone; materials/melon_racer/drone/
 tools/models/make-logo-model.mjs          # extrudes MELON RACER (Bungee, slanted like the logo, lime green outline ring around them) into mesh geometry,
                                           #   models/melon_racer/logo_text.dmx for Hammer's File → Import (DmxText in model.mjs),
                                           #   + materials/melon_racer/logo/logo_text_{face,outline,holo}.vmat (holo = an opaque copy of holo_dashes for the letter fronts) (opentype.js + earcut + clipper-lib, devDependencies)
@@ -166,7 +170,7 @@ models/melon_racer/melon/melon.vmdl      # the melon as our own copy: CS2's ital
                                           #   prop_data and break pieces; its fixed mass 2.0 added by hand — the decompiler drops mass_override), material remapped to materials/melon_racer/melon/melon_default.vmat —
                                           #   the base for melon skins (no SetMaterialGroup in cs_script: one .vmdl per skin, swapped by SetModel)
 materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/, melon/ (melon skins),
-                                          #   logo/ (logo_text_*), podium/, bouncer/, buffer_stop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
+                                          #   logo/ (logo_text_*), podium/, bouncer/, drone/, buffer_stop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
                                           #   checkpoint_gate/ — a new material goes into the fitting one, never loose in materials/melon_racer/
 materials/melon_racer/decals/*_decal.vmat # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
 ```

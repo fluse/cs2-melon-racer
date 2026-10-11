@@ -51,6 +51,7 @@ import { predictionDotSet } from "./trace.js";
  *   graceShown?: number, graceResendAt?: number, // what finish_grace shows (undefined: hidden) and when it's sent again — see UpdateFinishGraceHud
  *   watching?: boolean, // "Watch Grand Prix": outside the Grand Prix, following it, own melon frozen — see race/spectate/
  *   spectateSlot?: number, // whose melon the camera follows instead of the own (unset: the own) — see UpdateSpectating
+ *   spectateDismissed?: boolean, // a finished racer pressed R: their own melon for the rest of the heat
  *   spectateShown?: string, spectateResendAt?: number, watchRowShown?: string, // what the spectate panel / the user menu's watch row last showed — see race/spectate/spectate.js
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
@@ -64,7 +65,7 @@ import { predictionDotSet } from "./trace.js";
  *   xpGainShown?: string, xpGainResendAt?: number, // what the XP notifier last showed, and its next full resend — see UpdateXpGainHud
  *   skinHudLevel?: number, // the level the skin grid's locks were last drawn for — see UpdateSkinHud
  *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud
- *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
+ *   drone?: { entities: any[], body: any, position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number }, tilt: { pitch: number, roll: number } }, // free look: the drone this player flies, where, how fast, how far it leans — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
@@ -153,7 +154,7 @@ export function DropKart(slot, kart) {
             entity.Remove();
         }
     }
-    for (const entity of kart.spectatorHat ?? []) {
+    for (const entity of kart.drone?.entities ?? []) {
         if (entity.IsValid()) {
             entity.Remove();
         }

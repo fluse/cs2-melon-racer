@@ -16,7 +16,9 @@ export function IsHeatPhase(phase) {
  * still drive this heat (the finish window, FINISH_GRACE_SECONDS);
  * "watcher" — not in the Grand Prix, watching it ("Watch Grand Prix"), for
  * as long as one runs; undefined — the own melon.
- * @param {{ racing: boolean, finished: boolean, finishTime?: number, watching?: boolean }} kart
+ * A racer who pressed R (`spectateDismissed`) stays on their own melon for
+ * the rest of the heat.
+ * @param {{ racing: boolean, finished: boolean, finishTime?: number, watching?: boolean, spectateDismissed?: boolean }} kart
  * @param {string} phase @param {number} now
  * @param {boolean} othersDriving another racer hasn't finished yet
  * @returns {"racer" | "watcher" | undefined}
@@ -25,7 +27,7 @@ export function SpectateMode(kart, phase, now, othersDriving) {
     if (kart.watching && !kart.racing && IsHeatPhase(phase)) {
         return "watcher";
     }
-    if (kart.racing && kart.finished && phase === RacePhase.RACING && othersDriving
+    if (kart.racing && kart.finished && !kart.spectateDismissed && phase === RacePhase.RACING && othersDriving
         && now - (kart.finishTime ?? -Infinity) >= SPECTATE_AFTER_FINISH_SECONDS) {
         return "racer";
     }

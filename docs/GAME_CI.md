@@ -30,6 +30,8 @@ reuse a color for something with a different meaning.
   tips, a signal red ring (`#E83C2A`) — off-palette on purpose, warning colors for a hazard.
 - **Spike spring** (`tools/models/make-spike-spring-model.mjs`): steel spikes, chrome spring, a magenta rim
   (`#FF20FF`) — off-palette on purpose: close to start magenta, but a hazard, not a start gate.
+- **Drone** (`tools/models/make-drone-model.mjs`): white shell, woven carbon chassis and arms, graphite
+  frame, silver motor bells, amber lights, a red recording light on the camera — off-palette on purpose: a player avatar (free look), not a map signal.
 - **Spinning hammer** (`tools/models/make-spin-hammer-model.mjs`): steel head, signal red rubber faces
   (`#E83C2A`, like the saw blade's ring), wooden handle, dark grey pedestal — off-palette on purpose, a hazard.
 

@@ -182,7 +182,8 @@ export function UpdateUserMenu(slot, kart) {
     // open or not, so a bad start costs one key instead of USE + a click.
     // Pressed outside a time trial it does nothing — and while the call to
     // join a starting Grand Prix is up, R joins it instead (UpdateGathering).
-    if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && !kart.grandPrixCall && CanRestartTimeTrial(kart) && RestartTimeTrial(kart)) {
+    // Spectating, R leaves that instead (race/spectate/).
+    if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && !kart.grandPrixCall && !kart.watching && kart.spectateSlot === undefined && CanRestartTimeTrial(kart) && RestartTimeTrial(kart)) {
         if (kart.userMenuOpen) {
             SetUserMenuOpen(slot, kart, false);
         }

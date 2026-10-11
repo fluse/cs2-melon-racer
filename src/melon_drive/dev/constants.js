@@ -1,21 +1,41 @@
 // Developer aids (dev/).
 
-// Free look (dev/free-look.js): the player's own pawn flies through the map
-// (it's already NOCLIP, see FreezePawn) and the view switches to its eyes.
-// Switching it on puts those eyes where the chase camera was: the pawn's
-// origin goes FREE_LOOK_EYE_HEIGHT below that spot (CS2's standing eye height).
-export const FREE_LOOK_EYE_HEIGHT = 64;
-
-// The ghost avatar of a free-looking player: a fresh copy of this
-// point_template's entities (e.g. a hat prop_dynamic, "Not solid") hangs on
-// their flying pawn while free look is on — the pawn itself is invisible, so
-// it shows the others who's flying around. Optional: without it, no avatar.
-export const SPECTATOR_HAT_TEMPLATE_NAME = "template_spectator_hat";
-// Where it hangs: this far above the pawn's origin (its feet) — at its eyes.
-export const SPECTATOR_HAT_HEIGHT = 80;
-// …and this far behind the eyes, against the view's yaw — so the player's
-// own camera (at the eyes) doesn't look out through it.
-export const SPECTATOR_HAT_BACK = -20;
+// Free look (dev/free-look.js): the player turns into a drone and flies it
+// through the map — a fresh copy of this point_template (a prop_dynamic
+// with models/melon_racer/drone/drone.vmdl, from
+// tools/models/make-drone-model.mjs) at their melon, moved by the script,
+// the chase camera on it. Required for free look: without it in the map
+// the toggle stays off.
+export const DRONE_TEMPLATE_NAME = "template_drone";
+// Where it appears: this far above the melon.
+export const DRONE_START_HEIGHT = 40;
+// Flying speed (units/s) along the view: W/S, A/D, jump up, duck down —
+// with attack held DRONE_FAST_SPEED.
+export const DRONE_SPEED = 600;
+export const DRONE_FAST_SPEED = 1400;
+// Inertia: its rotors pull the velocity towards the one asked for only
+// this fast (per second) — after 1/DRONE_RESPONSE seconds two thirds of
+// the way, after three times that 95 %. So it carries its momentum into a
+// turn, and coasts on a moment after letting go, like a real drone in the
+// air (a stabilized one: it brakes by itself, it doesn't drift forever).
+export const DRONE_RESPONSE = 3;
+// Its size against the world: a sphere this big is traced along every
+// move, the drone stopped and slid along what it hits — but never melons,
+// players or other drones.
+export const DRONE_RADIUS = 8; // the model is ~16 across, about a melon
+// How far it tips (degrees): into the way it's speeding up — forward when
+// pulling away, back when braking, into a turn — at most this much.
+export const DRONE_MAX_TILT = 25;
+// How much of that it keeps while cruising at DRONE_SPEED (0..1): a drone
+// leans into the air it flies against.
+export const DRONE_CRUISE_TILT = 0.35;
+// How fast it gets to that tilt (degrees per second) — no snapping.
+export const DRONE_TILT_RATE = 120;
+// The chase camera on the drone: this far behind it, this high above. The
+// ratio sets where the drone sits in the picture — atan(height / distance)
+// below its middle, ~27 degrees here: close, at the bottom of the screen.
+export const DRONE_CAMERA_DISTANCE = 50;
+export const DRONE_CAMERA_HEIGHT = 25;
 
 // Camera tuning (dev/camera-tuning.js, its scale CAMERA_TUNING_SCALE in
 // dev/tuning-scale-logic.js): the user menu's "Camera Settings"

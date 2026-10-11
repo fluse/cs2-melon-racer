@@ -817,8 +817,7 @@
 }
 
 /* #spectate_panel: whose melon the camera follows (race/spectate/), bottom
-   center above the speed panel. The stop hint only for a watcher
-   (.Watching) — a finished racer goes back to their melon on their own. */
+   center above the speed panel, with the keys and that R leaves. */
 .SpectatePanel {
     horizontal-align: center;
     vertical-align: bottom;
@@ -864,11 +863,6 @@
     font-size: 13px;
     letter-spacing: 2px;
     color: #ffffff88;
-    visibility: collapse;
-}
-
-.SpectatePanel.Watching .SpectateStopHint {
-    visibility: visible;
 }
 
 /* #grand_prix_call: a Grand Prix about to start, for everyone outside the

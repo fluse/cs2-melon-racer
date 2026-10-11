@@ -12,6 +12,7 @@ test("a finished racer spectates SPECTATE_AFTER_FINISH_SECONDS after the line, w
     assert.equal(SpectateMode(racer, RacePhase.RACING, 50, false), undefined, "nobody left driving");
     assert.equal(SpectateMode(racer, RacePhase.BREAK, 50, true), undefined, "the heat is over");
     assert.equal(SpectateMode({ racing: true, finished: false }, RacePhase.RACING, 50, true), undefined, "still driving");
+    assert.equal(SpectateMode({ ...racer, spectateDismissed: true }, RacePhase.RACING, 50, true), undefined, "pressed R");
 });
 
 test("a watcher spectates for as long as the Grand Prix runs, never a racer or in the hub", () => {

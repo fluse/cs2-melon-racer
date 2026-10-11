@@ -26,7 +26,6 @@
     - auf jeder Strecke ein eigenes Scoreboard mit den temporären Zeiten, die aller spieler, die die strecke gefahren sind und jeweils auch nur die beste zeit. Sortiert schnellste oben, langsamste unten.
 
 # Spectator
-- Beim Spectaten wird man selber zu eine drohne, die im raum fliegt, mit animierten rotoren.
 
 # Melon Skins
 - Coconut

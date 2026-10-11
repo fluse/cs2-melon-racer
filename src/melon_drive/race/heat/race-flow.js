@@ -383,6 +383,7 @@ export function FinishKart(kart) {
     kart.finished = true;
     kart.locked = true;
     kart.finishTime = Instance.GetGameTime();
+    kart.spectateDismissed = undefined; // a new finish: spectating the others again (R leaves it)
     if (phase === RacePhase.RACING && graceEndTime === undefined) {
         // The heat's first finisher: the others have FINISH_GRACE_SECONDS left.
         graceEndTime = kart.finishTime + FINISH_GRACE_SECONDS;
