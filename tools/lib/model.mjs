@@ -378,7 +378,8 @@ const AnimFile = ({ name, file, looping }) => `					{
 /**
  * A ModelDoc .vmdl: the render mesh from `mesh` (an .obj, or an .smd with a
  * skeleton), collision from `physicsObj` (a concave mesh, `surfaceProp`; none
- * without one — the model is never solid), each
+ * without one — the model is never solid; or a list [{ file, bone }] of
+ * meshes, each moving with its bone — model space, bind pose), each
  * `<name>_<part>` material remapped to materials[part]; with `animations`
  * ([{ name, file (an .smd from SmdAnimationText), looping }]) also an
  * animation list — the first one is listed first.
@@ -388,15 +389,16 @@ export function VmdlText({ name, mesh, physicsObj, materials, animations = [], s
         `\t\t\t\t\t\t\t{ from = "${name}_${part}.vmat" to = "${vmat}" },`,
         `\t\t\t\t\t\t\t{ from = "${name}_${part}" to = "${vmat}" },`,
     ]).join("\n");
-    const physicsList = physicsObj ? `
+    const shapes = !physicsObj ? [] : typeof physicsObj === "string" ? [{ file: physicsObj, bone: "" }] : physicsObj;
+    const physicsList = shapes.length ? `
 			{
 				_class = "PhysicsShapeList"
 				children =
-				[
+				[${shapes.map(({ file, bone }, i) => `
 					{
 						_class = "PhysicsMeshFile"
-						name = "${name}"
-						parent_bone = ""
+						name = "${i === 0 ? name : `${name}_${i}`}"
+						parent_bone = "${bone}"
 						surface_prop = "${surfaceProp}"
 						collision_tags = "solid"
 						recenter_on_parent_bone = false
@@ -405,7 +407,7 @@ export function VmdlText({ name, mesh, physicsObj, materials, animations = [], s
 						align_origin_x_type = "None"
 						align_origin_y_type = "None"
 						align_origin_z_type = "None"
-						filename = "${physicsObj}"
+						filename = "${file}"
 						import_scale = 1.0
 						maxMeshVertices = 0
 						qemError = 0.0
@@ -414,7 +416,7 @@ export function VmdlText({ name, mesh, physicsObj, materials, animations = [], s
 							exclude_by_default = false
 							exception_list = [  ]
 						}
-					},
+					},`).join("")}
 				]
 			},` : "";
     const animationList = animations.length ? `

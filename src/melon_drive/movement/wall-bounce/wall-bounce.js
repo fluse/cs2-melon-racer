@@ -26,6 +26,7 @@ import {
 import { DamageKart } from "../../health/damage/damage.js";
 import { IsPadProtected } from "../../zones/jump-pad/jump-pad.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
+import { CountStat } from "../../race/stats/stats.js";
 
 /**
  * Whether the impact this tick was against a wall, and if so that wall's
@@ -163,6 +164,7 @@ export function ComputeWallBounce(kart, n, now) {
     kart.perfectBounceBoost = GetBounceRating(bounce.angleFactor) === BOUNCE_RATINGS[0];
     if (kart.perfectBounceBoost) {
         PlayPerfectSpark(kart);
+        CountStat(kart, "perfectHits");
     }
     return { ...bounce, jumpFactor };
 }

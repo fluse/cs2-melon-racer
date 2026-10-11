@@ -12,6 +12,7 @@ import { DirectionToAngles, SpawnBreakParticles } from "./effects.js";
 import { RespawnKartAtCheckpoint } from "../../kart/teleport.js";
 import { LeaveZones } from "../../zones/registry.js";
 import { ShowMelonPaint, HideMelonGlow } from "../../kart/look.js";
+import { CountStat } from "../../race/stats/stats.js";
 
 /**
  * Common tail end of every break, whether it was caught by our own
@@ -122,12 +123,18 @@ export function BreakKartNow(kart, reason) {
     return true;
 }
 
-/** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed */
-export function BreakMelon(slot, kart, impactDir, impactSpeed) {
+/**
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed
+ * @param {boolean} [crash] counts toward the player's crashes stat (not the user menu's "Test Break")
+ */
+export function BreakMelon(slot, kart, impactDir, impactSpeed, crash = true) {
     if (kart.breaking) {
         return; // already broken and counting down to its respawn
     }
     kart.breaking = true;
+    if (crash) {
+        CountStat(kart, "crashes");
+    }
     kart.breakTime = Instance.GetGameTime();
     const breakPosition = kart.melon.GetAbsOrigin();
     // Oriented along the velocity change the impact caused, not the melon's
@@ -176,6 +183,7 @@ export function HandleMelonLost(slot, kart) {
     }
     kart.breaking = true;
     kart.health = 0;
+    CountStat(kart, "crashes");
     const breakPosition = kart.lastKnownPosition ?? kart.checkpointPosition;
     const breakAngles = kart.lastKnownAngles ?? kart.checkpointAngles;
     Debug(`slot ${slot}: melon was destroyed at ${JSON.stringify(breakPosition)} — respawning at checkpoint ${kart.checkpointIndex} in ${BREAK_RESPAWN_DELAY}s`);

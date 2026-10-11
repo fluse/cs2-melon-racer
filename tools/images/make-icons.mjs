@@ -160,6 +160,16 @@ const ICONS = {
         cut(ellipse(32, 32, 28, 15), ellipse(32, 32, 23.5, 10.5)),
         cut(circle(32, 32, 10), circle(35, 29, 3.5)),
     ),
+    // Podium steps 2-1-3 with a star over the winner — "Leaderboards".
+    leaderboard: union(
+        rect(6, 36, 24, 58, 1.5),
+        rect(23, 26, 41, 58, 1.5),
+        rect(40, 42, 58, 58, 1.5),
+        polygon(...Array.from({ length: 10 }, (_, i) => {
+            const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 === 0 ? 11 : 4.6;
+            return [32 + r * Math.cos(a), 13 + r * Math.sin(a)];
+        })),
+    ),
     // Bug — COLLISION DEBUG.
     debug: union(
         cut(ellipse(32, 40, 12, 15), line(32, 29, 32, 56, 1.3)),

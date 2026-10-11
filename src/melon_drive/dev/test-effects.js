@@ -38,7 +38,7 @@ export function TestBreak(slot, kart) {
     const v = kart.melon.GetAbsVelocity();
     const speed = Math.hypot(v.x, v.y, v.z);
     // Standing still the pieces still need a direction to fly out along.
-    BreakMelon(slot, kart, speed > 1 ? v : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+    BreakMelon(slot, kart, speed > 1 ? v : { x: 1, y: 0, z: 0 }, Math.max(speed, 1), false); // not a crash for the stats
     return true;
 }
 

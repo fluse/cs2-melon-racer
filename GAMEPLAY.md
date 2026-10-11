@@ -585,18 +585,72 @@ can't tell whether Tab is held). What it shows, per viewer
 - **Time trial** — otherwise (or when the viewer is on a track): the best
   times on the viewer's track (else the last Grand Prix's last track, else
   the first one), fastest first, saved times of players who aren't on the
-  map included. The subtitle names the route. **Paging** (decided): with
-  Tab held, A and D page to the previous/next track's best times
-  (wrapping around, "◀ A  ROUTE 2 / 3  D ▶" under the subtitle); letting go
-  of Tab forgets it, so every opening starts on the viewer's own track.
-  While Tab is held A/D don't strafe the melon. Not on the Grand Prix
-  board. `StepTrack` in `hud/scoreboard/logic.js`, `UpdateScoreboardInput`
-  in `hud/scoreboard/scoreboard.js`.
+  map included. The subtitle names the route.
+- **Stats** — one page per player stat (see "Player stats" below), the
+  highest total first, saved totals of players who aren't on the map
+  included; players with nothing yet get no rank.
+
+**Paging** (decided): with Tab held, A and D page to the previous/next
+page, wrapping around — every track's best times in race order (or, on
+the Grand Prix board, its standings as one page), then the stat pages; the
+hint under the subtitle says where ("◀ A  ROUTE 2 / 3  D ▶", "STATS 1 / 5",
+"STANDINGS"). Letting go of Tab forgets it, so every opening starts on the
+viewer's own board. While Tab is held A/D don't strafe the melon.
+`ScoreboardPages`/`StepPage` in `hud/scoreboard/logic.js`,
+`UpdateScoreboardInput` in `hud/scoreboard/scoreboard.js`.
 
 `SCOREBOARD_ROWS` (12) rows; with more players the viewer's own row takes
 the last one. The viewer's row is tinted. Rebuilt every
 `SCOREBOARD_UPDATE_SECONDS` whether open or not, sent on change plus every
 `HUD_RESEND_SECONDS` (`hud/scoreboard/scoreboard.js`).
+
+## Player stats (implemented)
+
+All-time totals per player, **saved** like the best times (decided): in
+the addon's save data under `SAVE_DATA_STATS_KEY`, keyed by player name
+(renaming starts from scratch), so they survive map restarts. Shown as the
+scoreboard's stat pages (`STAT_SLIDES`, in this order):
+
+- **Longest on the server** — time with a melon on the map (from the first
+  spawn after the logo, spectators don't count), every tick.
+- **Most crashes** — every break: health at 0, a kill trigger, a spike
+  spring, the engine destroying the melon. Not the user menu's "Test
+  Break".
+- **Most finishes** — every completed run: a time trial's or a heat's
+  finish of the last lap.
+- **Longest boost time** — every second the attack boost was on, **added
+  up** (decided), not the longest single boost.
+- **Most PERFECT wall hits** — every wall bounce *and* wall jump rated
+  PERFECT (the ones with the perfect spark). Not "Test Perfect Bounce".
+
+Counted in memory and written to the save data every
+`STATS_SAVE_SECONDS` (30) while something changed, and when a player
+disconnects — a crash of the server loses at most that much. Constants:
+`race/stats/constants.js`; rules: `race/stats/logic.js`
+(`test/race/stats.test.mjs`), counted by `race/stats/stats.js`
+(`test/race/stats-count.test.mjs`).
+
+## Leaderboards page (implemented)
+
+The user menu's ACTIONS column has **"Leaderboards"**: it swaps the menu's
+columns for a page with **one leaderboard at a time, picked by a button**
+(decided — the boards fill up differently, so side-by-side cards were
+uneven). Laid out like the menu's columns: on the left a column with the
+ACTIONS column's measures, a button per board (the picked one gold), a
+divider, the board on the right.
+The boards: **Best Times** (one track; ◀ ▶ beside the title page through
+the tracks, the player's own track first), then one tab per player stat
+(`STAT_SLIDES`, same order and values as the scoreboard's stat pages). The
+board shows up to `LEADERBOARD_ROWS` (**20**, decided) players, one under
+the other (decided, not two columns), saved totals of players who aren't on the map
+included; the viewer's own row is outlined in gold and takes the last row
+if they're further down. The tab and track picked stay while the player is
+connected, so the page reopens on them. Rebuilt every
+`LEADERBOARD_UPDATE_SECONDS` while the page is open; "Back" returns to the
+columns. A new stat needs its tab button (`lb_tab_<key>`) in
+`speedometer.xml`. Constants: `hud/leaderboards/constants.js`; rules:
+`hud/leaderboards/logic.js` (rows and ranks from `hud/scoreboard/logic.js`),
+applied by `hud/leaderboards/leaderboards.js` (`test/hud/leaderboards.test.mjs`).
 
 ## Moderator (decided, implemented)
 

@@ -7,6 +7,7 @@ import { SetUpPlayerKart, ForgetIntroLogo } from "./spawn.js";
 import { SetKartPaintColor } from "./look.js";
 import { RespawnKartAtCheckpoint } from "./teleport.js";
 import { ResetHudForPlayer } from "../hud/layout.js";
+import { SaveStats } from "../race/stats/stats.js";
 import { PAINT_TRIGGER_NAME_PATTERN } from "../constants/index.js";
 
 export function RegisterKartInputs() {
@@ -25,6 +26,7 @@ export function RegisterKartInputs() {
             DropKart(playerSlot, kart);
         }
         ResetHudForPlayer(playerSlot);
+        SaveStats(); // their time on the server so far, without waiting for the next periodic save
         // Promotes the next-oldest remaining player (Map preserves insertion
         // order) so there's always a moderator whenever anyone's still on the
         // map — see EnsureModerator's comment for why this can't just wait for

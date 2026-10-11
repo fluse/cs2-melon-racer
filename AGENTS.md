@@ -61,12 +61,14 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              gravity/ (lower/higher gravity, less rolling loss: gravity_zone_<gravity>[_roll<roll>]), teleport/ (melon_teleport)
                                           #   race/      track-config.js (tracks from trigger names), checkpoints/ (progress, start_/checkpoint_/finish_ inputs),
                                           #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs),
-                                          #              grand-prix/ (places + points per heat, standings over the heats), podium/ (top 3 held on the hub podium)
+                                          #              grand-prix/ (places + points per heat, standings over the heats), podium/ (top 3 held on the hub podium),
+                                          #              stats/ (saved all-time player stats: time on the server, crashes, finishes, boost time, PERFECT hits)
                                           #   camera/    follow/ (chase camera, the only SetFollowConfig), wall-clip/ (eased pull-in at walls), break-zoom/, lift-zoom/, podium-zoom/, zone-zoom/,
                                           #              side-view/ (fixed side camera, CONTROLLED mode)
                                           #   hud/       layout.js (the custom_hud_layout), one folder per panel with its own rules: speedometer/ (km/h, health bar, jump dots),
-                                          #              track/ (time trial + checkpoint strip), scoreboard/ (Tab: Grand Prix standings / best times,
-                                          #              in place of CS2's own), hub-modal/ ("Start Grand Prix": heat cards + who rides along; routes.js is generated); one file per panel without: bounce-panel.js, user-menu.js;
+                                          #              track/ (time trial + checkpoint strip), scoreboard/ (Tab: Grand Prix standings / best times / player stats,
+                                          #              in place of CS2's own), leaderboards/ (the user menu's page: one leaderboard per tab, top 20),
+                                          #              hub-modal/ ("Start Grand Prix": heat cards + who rides along; routes.js is generated); one file per panel without: bounce-panel.js, user-menu.js;
                                           #              inputs.js (every button click: one table per kind of button, HandleHudClick dispatches)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
                                           #              boost-trail/, prediction/ (the guide line)
@@ -99,9 +101,10 @@ tools/lib/model.mjs                       # shared by the model generators: mesh
 tools/lib/png.mjs                         # the PNG encoder make-icons.mjs uses
 tools/models/make-ball-model.mjs          # a ball-pit ball as models/melon_racer/ball.vmdl (+ ball.obj): 320-triangle icosphere in inflatable.vmat,
                                           #   a sphere primitive for collision, light (mass_override) — color each prop_physics by its render color
-tools/models/make-bouncer-model.mjs       # a foam bouncer on a spring as models/melon_racer/bouncer/bouncer.vmdl: pink ribbed foam arch, lime cap, chrome coil
-                                          #   skinned to a bone chain (SMD: idle + boing — squash, overshoot, wobble); a prop_dynamic,
-                                          #   SetAnimationNotLooping "boing" from a trigger; static collision; materials/melon_racer/bouncer/
+tools/models/make-bouncer-model.mjs       # a foam swinger on a spring as models/melon_racer/bouncer/bouncer.vmdl: a tall flat pink ribbed foam paddle,
+                                          #   lime top edge, upright on a chrome coil skinned to a bone chain; looping "swing" (side to side, the coil bending
+                                          #   along) + "idle"; a prop_dynamic, Idle Animation "swing", loop — an obstacle in the air; collision: base + coil
+                                          #   static, the paddle on the "head" bone (VmdlText physicsObj as [{ file, bone }]); materials/melon_racer/bouncer/
 tools/models/make-buffer-stop-model.mjs   # a buffer stop (Prellbock) as models/melon_racer/buffer_stop/buffer_stop.vmdl: magenta beam with a white chevron,
                                           #   two buffers, bent grey legs on crossbars (696 triangles); a track obstacle, coarser _physics.obj collision; materials/melon_racer/buffer_stop/
 tools/models/make-checkpoint-model.mjs    # the checkpoint gate's frame (glowing pillars, beam, floating diamond) as models/melon_racer/checkpoint_gate.vmdl
@@ -114,6 +117,10 @@ tools/models/make-podium-model.mjs        # the hub podium (steps 2-1-3 in the d
 tools/models/make-saw-blade-model.mjs     # a circular saw blade as models/melon_racer/saw_blade/saw_blade.vmdl (DIAMETER 36, scaled in the script — never non-uniformly in Hammer): 24 hooked teeth with wider carbide tips,
                                           #   expansion slots, red ring, flange + hex nut (1292 triangles); one bone, looping "spin" animation (+ "idle") around Y, a prop_dynamic
                                           #   with Idle Animation "spin", Idle Animation Loop Mode "Loop"; origin at the center, collision a thicker plain disc; materials/melon_racer/saw_blade/
+tools/models/make-spin-hammer-model.mjs   # a spinning sledgehammer as models/melon_racer/spin_hammer/spin_hammer.vmdl: steel octagon head with red rubber faces just above
+                                          #   the floor, its wooden handle the arm sweeping around a low pedestal (304 triangles); one bone ("arm") turning around Z, looping
+                                          #   "spin" (+ "idle"), a prop_dynamic with Idle Animation "spin", Loop Mode "Loop"; collision: pedestal static, hub + handle + head on "arm";
+                                          #   origin on the floor at the axis; materials/melon_racer/spin_hammer/
 tools/models/make-spike-spring-model.mjs  # a spike spring trap as models/melon_racer/spike_spring/spike_spring.vmdl: spiked steel plate on a chrome coil in a shaft
                                           #   with a magenta rim (1248 triangles); the spring skinned between root and plate; animations cycle (looping), rise, sink, up, down;
                                           #   no collision (an optional 32x32 floor hole needs a nodraw lid); timing imported from src/melon_drive/world/spike-spring/constants.js; materials/melon_racer/spike_spring/
@@ -155,7 +162,7 @@ models/melon_racer/melon/melon.vmdl      # the melon as our own copy: CS2's ital
                                           #   prop_data and break pieces; its fixed mass 2.0 added by hand — the decompiler drops mass_override), material remapped to materials/melon_racer/melon/melon_default.vmat —
                                           #   the base for melon skins (no SetMaterialGroup in cs_script: one .vmdl per skin, swapped by SetModel)
 materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/, melon/ (melon skins),
-                                          #   logo/ (logo_text_*), podium/, bouncer/, buffer_stop/, saw_blade/, spike_spring/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
+                                          #   logo/ (logo_text_*), podium/, bouncer/, buffer_stop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
                                           #   checkpoint_gate/ — a new material goes into the fitting one, never loose in materials/melon_racer/
 materials/melon_racer/decals/*_decal.vmat # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
 ```
@@ -273,7 +280,8 @@ instead; if it looks older than the d.ts, ask the user to save it again.
   `Msg`, `DebugScreenText`, `DebugLine`, `DebugSphere`, `DebugBox`.
 - **Persistence**: `SetSaveData(string)` / `GetSaveData()` — synchronous
   read/write to disk, scoped to the addon. Holds the time trial's best
-  times (`race/time-trial/`).
+  times (`race/time-trial/`), the player stats (`race/stats/`) and
+  per-player settings (`kart/`), each under its own key.
 - **Scheduling**: `SetThink(fn)` + `SetNextThink(time)` (tick-driven, time
   in `GetGameTime()` units), `Delay(seconds)` (returns a `Promise`),
   `QueueAfterThinks(fn)` (runs once after all entities'
@@ -442,7 +450,7 @@ examples — read these instead of guessing signatures:
   of the generator, set to the lowest value that still looks round, not
   the smoothest. Props placed many times stay in the hundreds of triangles
   (the ball-pit ball: 320); a single decorative set piece in the low
-  thousands at most (the foam bouncer: ~3.3k). Collision is a separate,
+  thousands at most (the foam bouncer: ~3.1k). Collision is a separate,
   much coarser mesh or a primitive (sphere, capsule), never the render
   mesh. Every generator prints its triangle count — check it, and say it
   when handing over a model.

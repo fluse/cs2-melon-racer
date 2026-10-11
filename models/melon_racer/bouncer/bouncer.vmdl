@@ -17,8 +17,6 @@
 							{ from = "bouncer_foam" to = "materials/melon_racer/bouncer/bouncer_foam.vmat" },
 							{ from = "bouncer_cap.vmat" to = "materials/melon_racer/bouncer/bouncer_cap.vmat" },
 							{ from = "bouncer_cap" to = "materials/melon_racer/bouncer/bouncer_cap.vmat" },
-							{ from = "bouncer_cap_rim.vmat" to = "materials/melon_racer/bouncer/bouncer_cap_rim.vmat" },
-							{ from = "bouncer_cap_rim" to = "materials/melon_racer/bouncer/bouncer_cap_rim.vmat" },
 							{ from = "bouncer_spring.vmat" to = "materials/melon_racer/bouncer/bouncer_spring.vmat" },
 							{ from = "bouncer_spring" to = "materials/melon_racer/bouncer/bouncer_spring.vmat" },
 							{ from = "bouncer_base.vmat" to = "materials/melon_racer/bouncer/bouncer_base.vmat" },
@@ -57,6 +55,26 @@
 				[
 					{
 						_class = "AnimFile"
+						name = "swing"
+						activity_name = ""
+						activity_weight = 1
+						weight_list_name = ""
+						fade_in_time = 0.1
+						fade_out_time = 0.1
+						looping = true
+						delta = false
+						worldSpace = false
+						hidden = false
+						anim_markup_ordered = false
+						disable_compression = false
+						source_filename = "models/melon_racer/bouncer/bouncer_swing.smd"
+						start_frame = -1
+						end_frame = -1
+						framerate = -1.0
+						reverse = false
+					},
+					{
+						_class = "AnimFile"
 						name = "idle"
 						activity_name = ""
 						activity_weight = 1
@@ -70,26 +88,6 @@
 						anim_markup_ordered = false
 						disable_compression = false
 						source_filename = "models/melon_racer/bouncer/bouncer_idle.smd"
-						start_frame = -1
-						end_frame = -1
-						framerate = -1.0
-						reverse = false
-					},
-					{
-						_class = "AnimFile"
-						name = "boing"
-						activity_name = ""
-						activity_weight = 1
-						weight_list_name = ""
-						fade_in_time = 0.1
-						fade_out_time = 0.1
-						looping = false
-						delta = false
-						worldSpace = false
-						hidden = false
-						anim_markup_ordered = false
-						disable_compression = false
-						source_filename = "models/melon_racer/bouncer/bouncer_boing.smd"
 						start_frame = -1
 						end_frame = -1
 						framerate = -1.0
@@ -115,6 +113,28 @@
 						align_origin_y_type = "None"
 						align_origin_z_type = "None"
 						filename = "models/melon_racer/bouncer/bouncer_physics.obj"
+						import_scale = 1.0
+						maxMeshVertices = 0
+						qemError = 0.0
+						import_filter =
+						{
+							exclude_by_default = false
+							exception_list = [  ]
+						}
+					},
+					{
+						_class = "PhysicsMeshFile"
+						name = "bouncer_1"
+						parent_bone = "head"
+						surface_prop = "rubber"
+						collision_tags = "solid"
+						recenter_on_parent_bone = false
+						offset_origin = [ 0.0, 0.0, 0.0 ]
+						offset_angles = [ 0.0, 0.0, 0.0 ]
+						align_origin_x_type = "None"
+						align_origin_y_type = "None"
+						align_origin_z_type = "None"
+						filename = "models/melon_racer/bouncer/bouncer_physics_paddle.obj"
 						import_scale = 1.0
 						maxMeshVertices = 0
 						qemError = 0.0

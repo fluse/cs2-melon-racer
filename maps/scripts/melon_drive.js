@@ -81,6 +81,7 @@ function TraceSphere(config) {
  *   hudResendAt?: { health?: number, jump?: number }, // when they send their whole state again — see HUD_RESEND_SECONDS
  *   hubRacersResendAt?: number, hubRacersShown?: Record<string, string>, // the hub window's heats and racers: next full resend, and what it last sent — see UpdateHubLists
  *   scoreboardPick?: number, // track the time trial board was paged to while Tab is held (unset: the viewer's own) — see UpdateScoreboardInput
+ *   scoreboardStat?: string, // stat page (STAT_SLIDES key) the scoreboard was paged to while Tab is held (unset: the standings or a track's best times) — see UpdateScoreboardInput
  *   scoreboardNextUpdate?: number, scoreboardResendAt?: number, scoreboardShown?: Record<string, string>, // the scoreboard's next rebuild, next full resend, and what it last sent — see UpdateScoreboardHud
  *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
@@ -99,7 +100,10 @@ function TraceSphere(config) {
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
- *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the developer page the user menu shows in place of its columns, if any — see SetUserMenuPage
+ *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the page (leaderboards, a developer page) the user menu shows in place of its columns, if any — see SetUserMenuPage
+ *   leaderboardTab?: string, // leaderboard the user menu's leaderboards page shows (unset: the best times) — see SelectLeaderboardTab
+ *   leaderboardTrack?: number, // track the leaderboards page's best times were paged to (unset: the player's own track, else the first) — see StepLeaderboardsTrack
+ *   leaderboardNextUpdate?: number, leaderboardResendAt?: number, leaderboardShown?: Record<string, string>, // the leaderboards page's next rebuild, next full resend, and what it last sent — see UpdateLeaderboardsHud
  *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
@@ -1075,6 +1079,30 @@ const PODIUM_CONFETTI_NAME = "particle_podium_confetti";
 const PODIUM_CONFETTI_INTERVAL = 2; // seconds between bursts
 const PODIUM_CONFETTI_RESTART_GAP = 0.1; // seconds between a burst's Stop and its Start
 
+// Player stats: all-time totals per player, saved to disk, shown as pages of
+// the scoreboard (A/D with Tab held). See "Player stats" in GAMEPLAY.md.
+
+// Key of the stats inside the addon's save data (next to the best times,
+// SAVE_DATA_BEST_TIMES_KEY).
+const SAVE_DATA_STATS_KEY = "stats";
+
+// The totals are counted in memory and written to the save data at most
+// this often (seconds) — SetSaveData writes the file to disk, and time on
+// the server and boost time grow every tick. Also written when a player
+// disconnects.
+const STATS_SAVE_SECONDS = 30;
+
+// The scoreboard's stat pages, in paging order: `key` in the save data,
+// `title` of the page, `column` the value column's header, `format` how the
+// value reads ("duration": seconds as 1h 05m / 4m 12s / 37s, "count").
+const STAT_SLIDES = [
+    { key: "playTime", title: "LONGEST ON THE SERVER", column: "TIME", format: "duration" },
+    { key: "crashes", title: "MOST CRASHES", column: "CRASHES", format: "count" },
+    { key: "finishes", title: "MOST FINISHES", column: "FINISHES", format: "count" },
+    { key: "boostTime", title: "LONGEST BOOST TIME", column: "BOOST", format: "duration" },
+    { key: "perfectHits", title: "MOST PERFECT WALL HITS", column: "PERFECT", format: "count" },
+];
+
 // Teleporters and the lift applied to every trigger/destination teleport target.
 
 // Generic teleporters, same name-carries-the-config convention: a
@@ -1424,6 +1452,22 @@ const SCOREBOARD_ROWS = 12;
 // How often each player's scoreboard is rebuilt (seconds) — it's filled in
 // whether it's open or not, so not every tick.
 const SCOREBOARD_UPDATE_SECONDS = 0.25;
+
+// Leaderboards page of the user menu (ACTIONS → "Leaderboards", see
+// hud/leaderboards/leaderboards.js): one leaderboard at a time, picked by a
+// button in a column like ACTIONS.
+
+// The tab with the best times on one track (◀ ▶ page through the tracks);
+// every other tab is a STAT_SLIDES key. Buttons "lb_tab_<tab>" in
+// speedometer.xml — add one there when adding a stat
+// (test/hud/leaderboards.test.mjs checks every tab has its button).
+const LEADERBOARD_TIMES_TAB = "times";
+// Player rows, "lb_row_0" .. "lb_row_{N-1}" in speedometer.xml, one under
+// the other; with more players the viewer's own row takes the last one.
+const LEADERBOARD_ROWS = 20;
+// How often the open page is rebuilt (seconds): time on the server grows
+// every tick, but nobody needs it to the tick.
+const LEADERBOARD_UPDATE_SECONDS = 0.5;
 
 // The hub's "Start Grand Prix" window (hud/hub-modal/hub-modal.js). Its
 // heat cards are "hub_heat_<trackId>" for every track id up to MAX_TRACKS,
@@ -3200,13 +3244,13 @@ function WithStartsInTutorial(saveData, playerName, on) {
 // kart/join-spot-logic.js.
 
 /** The name per-player settings are saved under. @param {import("../core/kart-registry.js").Kart | { pawn: any }} kart */
-function PlayerName$2(kart) {
+function PlayerName$3(kart) {
     return kart.pawn?.GetPlayerController()?.GetPlayerName() ?? "";
 }
 
 /** Whether this kart's player starts in the tutorial when joining. @param {import("../core/kart-registry.js").Kart} kart */
 function IsStartInTutorialOn(kart) {
-    return StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$2(kart));
+    return StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$3(kart));
 }
 
 /**
@@ -3215,9 +3259,9 @@ function IsStartInTutorialOn(kart) {
  */
 function SetStartInTutorial(kart, on) {
     // Re-read so the best times and everyone else's settings survive.
-    const data = WithStartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$2(kart), on);
+    const data = WithStartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$3(kart), on);
     Instance.SetSaveData(JSON.stringify(data));
-    Debug(`SetStartInTutorial: "${PlayerName$2(kart)}" starts ${on ? "in the tutorial" : "in the hub"} on join`);
+    Debug(`SetStartInTutorial: "${PlayerName$3(kart)}" starts ${on ? "in the tutorial" : "in the hub"} on join`);
 }
 
 /**
@@ -3227,7 +3271,7 @@ function SetStartInTutorial(kart, on) {
  * @param {any} pawn
  */
 function GetJoinSpawnPoint(pawn) {
-    if (StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$2({ pawn }))) {
+    if (StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$3({ pawn }))) {
         return GetIntroSpawnPoint();
     }
     return GetHubSpawnPoint() ?? GetIntroSpawnPoint();
@@ -3320,7 +3364,7 @@ function WithSkin(saveData, playerName, skin) {
 /** This kart's skin: picked this session, else saved for its player. @param {Kart} kart */
 function GetMelonSkin(kart) {
     if (kart.skin === undefined) {
-        kart.skin = SavedSkin(ParseSaveData(Instance.GetSaveData()), PlayerName$2(kart));
+        kart.skin = SavedSkin(ParseSaveData(Instance.GetSaveData()), PlayerName$3(kart));
     }
     return kart.skin;
 }
@@ -3344,8 +3388,8 @@ function SetMelonSkin(kart, skin) {
     }
     kart.skin = skin;
     // Re-read so the best times and everyone else's settings survive.
-    Instance.SetSaveData(JSON.stringify(WithSkin(ParseSaveData(Instance.GetSaveData()), PlayerName$2(kart), skin)));
-    Debug(`SetMelonSkin: "${PlayerName$2(kart)}" drives the ${skin} skin`);
+    Instance.SetSaveData(JSON.stringify(WithSkin(ParseSaveData(Instance.GetSaveData()), PlayerName$3(kart), skin)));
+    Debug(`SetMelonSkin: "${PlayerName$3(kart)}" drives the ${skin} skin`);
     return true;
 }
 
@@ -4960,6 +5004,159 @@ function TeleportKartTo(kart, position, angles, velocity) {
     // a new OnStartTouch, and leaving one by teleport still sends OnEndTouch.
 }
 
+// Pure rules of the player stats (race/stats/stats.js): the totals in the
+// save data, adding to them, and how a value reads. No cs_script import
+// (test/race/stats.test.mjs).
+
+/** @typedef {Record<string, Record<string, number>>} Stats every player's totals by name, then by stat key */
+
+const STAT_KEYS = new Set(STAT_SLIDES.map((slide) => slide.key));
+
+/**
+ * The stats in parsed save data — anything that isn't a known stat with a
+ * non-negative number is dropped.
+ * @param {Record<string, unknown>} saveData @returns {Stats}
+ */
+function GetStats(saveData) {
+    const raw = saveData[SAVE_DATA_STATS_KEY];
+    /** @type {Stats} */
+    const stats = {};
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+        return stats;
+    }
+    for (const [name, totals] of Object.entries(raw)) {
+        if (!totals || typeof totals !== "object") {
+            continue;
+        }
+        for (const [key, value] of Object.entries(totals)) {
+            if (STAT_KEYS.has(key) && typeof value === "number" && Number.isFinite(value) && value >= 0) {
+                (stats[name] ??= {})[key] = value;
+            }
+        }
+    }
+    return stats;
+}
+
+/**
+ * Adds `amount` to a player's total, in place. Ignores an empty name and
+ * anything that isn't a positive amount.
+ * @param {Stats} stats @param {string} name @param {string} key @param {number} amount
+ * @returns {boolean} whether anything changed
+ */
+function AddStat(stats, name, key, amount) {
+    if (name === "" || !STAT_KEYS.has(key) || !(amount > 0)) {
+        return false;
+    }
+    const totals = (stats[name] ??= {});
+    totals[key] = (totals[key] ?? 0) + amount;
+    return true;
+}
+
+/** Every player's total of one stat, by name (players without one left out). @param {Stats} stats @param {string} key */
+function StatTotals(stats, key) {
+    /** @type {Record<string, number>} */
+    const totals = {};
+    for (const [name, values] of Object.entries(stats)) {
+        if (values[key] !== undefined) {
+            totals[name] = values[key];
+        }
+    }
+    return totals;
+}
+
+/**
+ * Seconds as a duration: "1h 05m" from an hour on, "4m 12s" from a minute
+ * on, else "37s".
+ * @param {number} seconds
+ */
+function FormatDuration(seconds) {
+    const whole = Math.floor(Math.max(seconds, 0));
+    const hours = Math.floor(whole / 3600);
+    const minutes = Math.floor((whole % 3600) / 60);
+    const secs = whole % 60;
+    if (hours > 0) {
+        return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+    }
+    if (minutes > 0) {
+        return `${minutes}m ${String(secs).padStart(2, "0")}s`;
+    }
+    return `${secs}s`;
+}
+
+/** A stat's value as the scoreboard shows it. @param {{ format: string }} slide @param {number} value */
+function FormatStat(slide, value) {
+    return slide.format === "duration" ? FormatDuration(value) : String(Math.round(value));
+}
+
+// Player stats: all-time totals per player name, kept in the addon's save
+// data like the best times (the API has no stable player id, so renaming
+// starts from scratch). Counted here from wherever they happen — time on the
+// server (UpdateStats, every tick for every player with a melon), crashes
+// (health/breaking/), finishes (race/time-trial/), boost time
+// (movement/driving/drive.js) and PERFECT wall hits (movement/wall-bounce/,
+// movement/jump/) — and shown as the scoreboard's stat pages
+// (hud/scoreboard/). Rules: race/stats/logic.js.
+
+// Read from the save data once, then kept in memory and written back every
+// STATS_SAVE_SECONDS while something changed (SetSaveData writes the file).
+/** @type {import("./logic.js").Stats | undefined} */
+let stats = undefined;
+let dirty = false;
+let nextSaveTime = 0;
+
+function Stats() {
+    stats ??= GetStats(ParseSaveData(Instance.GetSaveData()));
+    return stats;
+}
+
+/** @param {import("../../core/kart-registry.js").Kart} kart */
+function PlayerName$2(kart) {
+    return kart.pawn.GetPlayerController()?.GetPlayerName() ?? "";
+}
+
+/**
+ * Adds to a player's total (`key` from STAT_SLIDES; 1 for a count, seconds
+ * for a duration).
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {string} key @param {number} [amount]
+ */
+function CountStat(kart, key, amount = 1) {
+    if (AddStat(Stats(), PlayerName$2(kart), key, amount)) {
+        dirty = true;
+    }
+}
+
+/** Writes the totals to the save data if anything changed since the last time. */
+function SaveStats() {
+    if (!dirty || !stats) {
+        return;
+    }
+    // Re-read so keys other systems keep in the save data survive.
+    const data = ParseSaveData(Instance.GetSaveData());
+    data[SAVE_DATA_STATS_KEY] = stats;
+    Instance.SetSaveData(JSON.stringify(data));
+    dirty = false;
+}
+
+/**
+ * Per tick, from core/think.js: time on the server for every player with a
+ * melon, and the periodic save.
+ * @param {number} now @param {number} dt
+ */
+function UpdateStats(now, dt) {
+    for (const kart of karts.values()) {
+        CountStat(kart, "playTime", dt);
+    }
+    if (now >= nextSaveTime) {
+        nextSaveTime = now + STATS_SAVE_SECONDS;
+        SaveStats();
+    }
+}
+
+/** Every player's total of one stat, by name, saved ones included. @param {string} key */
+function GetStatTotals(key) {
+    return StatTotals(Stats(), key);
+}
+
 // A melon breaking: BreakMelon (health ran out) / HandleMelonLost (the
 // entity vanished), the delay at the crash site, and the respawn after it.
 
@@ -5072,12 +5269,18 @@ function BreakKartNow(kart, reason) {
     return true;
 }
 
-/** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed */
-function BreakMelon(slot, kart, impactDir, impactSpeed) {
+/**
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed
+ * @param {boolean} [crash] counts toward the player's crashes stat (not the user menu's "Test Break")
+ */
+function BreakMelon(slot, kart, impactDir, impactSpeed, crash = true) {
     if (kart.breaking) {
         return; // already broken and counting down to its respawn
     }
     kart.breaking = true;
+    if (crash) {
+        CountStat(kart, "crashes");
+    }
     kart.breakTime = Instance.GetGameTime();
     const breakPosition = kart.melon.GetAbsOrigin();
     // Oriented along the velocity change the impact caused, not the melon's
@@ -5126,6 +5329,7 @@ function HandleMelonLost(slot, kart) {
     }
     kart.breaking = true;
     kart.health = 0;
+    CountStat(kart, "crashes");
     const breakPosition = kart.lastKnownPosition ?? kart.checkpointPosition;
     const breakAngles = kart.lastKnownAngles ?? kart.checkpointAngles;
     Debug(`slot ${slot}: melon was destroyed at ${JSON.stringify(breakPosition)} — respawning at checkpoint ${kart.checkpointIndex} in ${BREAK_RESPAWN_DELAY}s`);
@@ -5274,6 +5478,7 @@ function ComputeWallBounce(kart, n, now) {
     kart.perfectBounceBoost = GetBounceRating(bounce.angleFactor) === BOUNCE_RATINGS[0];
     if (kart.perfectBounceBoost) {
         PlayPerfectSpark(kart);
+        CountStat(kart, "perfectHits");
     }
     return { ...bounce, jumpFactor };
 }
@@ -5807,6 +6012,7 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
         kart.perfectBounceBoost = rated.rating === BOUNCE_RATINGS[0];
         if (kart.perfectBounceBoost) {
             PlayPerfectSpark(kart);
+            CountStat(kart, "perfectHits");
         }
     }
     kart.lastWallJump = { time: now, normal: wallContact.normal };
@@ -6117,6 +6323,7 @@ function FinishRun(kart, trackId) {
         SaveBestTimes();
     }
     kart.lastRun = { trackId, time, newBest, at: now };
+    CountStat(kart, "finishes");
     Debug(`FinishRun: "${name}" ran track ${trackId} in ${FormatRaceTime(time)}${newBest ? " — new best" : ""}`);
 }
 
@@ -6363,8 +6570,9 @@ function OrdinalPlace(place) {
 }
 
 // Pure rules of the scoreboard (hud/scoreboard/scoreboard.js): what it shows for one
-// viewer — the Grand Prix standings, or the best times on a track — as
-// ready-to-send strings. No cs_script import (test/hud/scoreboard.test.mjs).
+// viewer — the Grand Prix standings, the best times on a track, or one of the
+// players' all-time stats — as ready-to-send strings, and the pages A/D step
+// through. No cs_script import (test/hud/scoreboard.test.mjs).
 
 /**
  * @typedef {{ rank: string, name: string, points: string, heat: string, best: string, self: boolean }} ScoreRow
@@ -6380,7 +6588,7 @@ const NO_TIME = "-:--.--";
  * time trial, then that track's best times. The best-time column is for
  * the heat's track in a Grand Prix, else the viewer's own track, else the
  * last Grand Prix's last track, else the first track. In a time trial the
- * viewer can page to another track (`pickedTrackId`, see StepTrack).
+ * viewer can page to another track (`pickedTrackId`, see StepPage).
  * @param {{ grandPrix: import("../../race/grand-prix/logic.js").GrandPrix | undefined, activeTrackId: number | undefined, kartTrackId: number | undefined, trackOrder: number[], pickedTrackId?: number }} input
  */
 function ScoreboardView({ grandPrix, activeTrackId, kartTrackId, trackOrder, pickedTrackId }) {
@@ -6393,19 +6601,61 @@ function ScoreboardView({ grandPrix, activeTrackId, kartTrackId, trackOrder, pic
 }
 
 /**
- * The track `direction` (-1 / +1) steps from `current` in race order,
- * wrapping around; the first track if `current` isn't one.
- * @param {number[]} trackOrder @param {number | undefined} current @param {number} direction
+ * The pages A/D step through with Tab held, in order: the Grand Prix
+ * standings (one page) or every track's best times (one per track, race
+ * order), then every stat (STAT_SLIDES). Page ids: "standings",
+ * "track:<id>" ("track:" without any track), "stat:<key>".
+ * @param {boolean} grandPrixMode @param {number[]} trackOrder
  */
-function StepTrack(trackOrder, current, direction) {
-    if (trackOrder.length === 0) {
-        return undefined;
+function ScoreboardPages(grandPrixMode, trackOrder) {
+    const main = grandPrixMode ? ["standings"] : trackOrder.length > 0 ? trackOrder.map((id) => `track:${id}`) : ["track:"];
+    return [...main, ...STAT_SLIDES.map((slide) => `stat:${slide.key}`)];
+}
+
+/**
+ * The page a viewer is on: a stat they paged to, else the standings or
+ * the board's track (ScoreboardView).
+ * @param {boolean} grandPrixMode @param {number | undefined} boardTrackId @param {string | undefined} pickedStat
+ */
+function CurrentPage(grandPrixMode, boardTrackId, pickedStat) {
+    if (pickedStat !== undefined && STAT_SLIDES.some((slide) => slide.key === pickedStat)) {
+        return `stat:${pickedStat}`;
     }
-    const index = current !== undefined ? trackOrder.indexOf(current) : -1;
+    return grandPrixMode ? "standings" : `track:${boardTrackId ?? ""}`;
+}
+
+/** The STAT_SLIDES entry a page shows, if it's a stat page. @param {string} page */
+function StatSlideOf(page) {
+    return STAT_SLIDES.find((slide) => `stat:${slide.key}` === page);
+}
+
+/**
+ * The page `direction` (-1 / +1) steps from `current`, wrapping around;
+ * the first page if `current` isn't one.
+ * @param {string[]} pages @param {string} current @param {number} direction
+ */
+function StepPage(pages, current, direction) {
+    const index = pages.indexOf(current);
     if (index === -1) {
-        return trackOrder[0];
+        return pages[0];
     }
-    return trackOrder[(index + direction + trackOrder.length) % trackOrder.length];
+    return pages[(index + direction + pages.length) % pages.length];
+}
+
+/**
+ * The paging hint under the subtitle: which page of its kind this is
+ * ("ROUTE 2 / 3", "STATS 1 / 5", "STANDINGS") between the A and D arrows;
+ * empty with nothing to page to.
+ * @param {string[]} pages @param {string} current
+ */
+function PageSwitcher(pages, current) {
+    if (pages.length <= 1) {
+        return "";
+    }
+    const kind = current.split(":")[0];
+    const same = pages.filter((page) => page.split(":")[0] === kind);
+    const label = kind === "standings" ? "STANDINGS" : `${kind === "stat" ? "STATS" : "ROUTE"} ${same.indexOf(current) + 1} / ${same.length}`;
+    return `◀  A      ${label}      D  ▶`;
 }
 
 /**
@@ -6458,12 +6708,11 @@ function KeepSelf(rows, maxRows) {
  *   self: { key: string, name: string },
  *   bestTimes: Record<string, number>, // best time on boardTrackId by player name, saved ones included
  *   maxRows: number,
- *   trackOrder?: number[], // every track — a time trial with more than one shows how to page through them
  *   routeNames?: Record<number, string>, // route names by track id (hud/hub-modal/routes.js)
  * }} input
  * @returns {Scoreboard}
  */
-function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self, bestTimes, maxRows, trackOrder = [], routeNames = {} }) {
+function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self, bestTimes, maxRows, routeNames = {} }) {
     const bestHeader = boardTrackId !== undefined ? `BEST T${boardTrackId}` : "BEST";
     if (grandPrixMode && grandPrix) {
         const heatTrack = grandPrix.trackIds[grandPrix.trackIds.length - 1];
@@ -6506,14 +6755,12 @@ function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self
     const entries = [...names].map((name) => ({ name, best: bestTimes[name] })).sort(ByBestTime);
     const ranks = SharedRanks(entries, (a, b) => a.best === b.best);
     const route = boardTrackId !== undefined ? (routeNames[boardTrackId] ?? `Track ${boardTrackId}`).toUpperCase() : undefined;
-    const position = boardTrackId !== undefined ? trackOrder.indexOf(boardTrackId) + 1 : 0;
     return {
         grandPrixMode: false,
         title: "TIME TRIAL",
         subtitle: route !== undefined ? `${route}  ·  BEST TIMES` : "NO TRACKS",
         bestHeader,
-        // Paging hint (hold Tab, A/D — see UpdateScoreboardInput).
-        switcher: trackOrder.length > 1 && position > 0 ? `◀  A      ROUTE ${position} / ${trackOrder.length}      D  ▶` : "",
+        switcher: "", // the paging hint: PageSwitcher
         rows: KeepSelf(
             entries.map((entry, i) => ({
                 rank: entry.best !== undefined ? String(ranks[i]) : NONE,
@@ -6521,6 +6768,45 @@ function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self
                 points: NONE,
                 heat: NONE,
                 best: TimeText(entry.best),
+                self: entry.name === self.name,
+            })),
+            maxRows
+        ),
+    };
+}
+
+/**
+ * A stat page: every player with a total — saved ones of players who
+ * aren't on the map included — and everyone on the map without one, the
+ * highest first; nobody gets a rank for nothing yet.
+ * @param {{
+ *   slide: { key: string, title: string, column: string, format: string }, // from STAT_SLIDES
+ *   totals: Record<string, number>, // the stat's totals by player name
+ *   players: { name: string }[], // everyone on the map now
+ *   self: { name: string },
+ *   maxRows: number,
+ * }} input
+ * @returns {Scoreboard}
+ */
+function BuildStatBoard({ slide, totals, players, self, maxRows }) {
+    const names = new Set([...Object.keys(totals), ...players.map((player) => player.name)]);
+    const entries = [...names]
+        .map((name) => ({ name, value: totals[name] ?? 0 }))
+        .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+    const ranks = SharedRanks(entries, (a, b) => a.value === b.value);
+    return {
+        grandPrixMode: false,
+        title: slide.title,
+        subtitle: "ALL TIME",
+        bestHeader: slide.column,
+        switcher: "", // the paging hint: PageSwitcher
+        rows: KeepSelf(
+            entries.map((entry, i) => ({
+                rank: entry.value > 0 ? String(ranks[i]) : NONE,
+                name: entry.name,
+                points: NONE,
+                heat: NONE,
+                best: FormatStat(slide, entry.value),
                 self: entry.name === self.name,
             })),
             maxRows
@@ -7644,27 +7930,29 @@ function UpdateScoreboardHud(slot, kart) {
         }
     };
 
-    const trackOrder = GetTrackOrder();
-    const { grandPrixMode, boardTrackId } = ScoreboardView({ grandPrix, activeTrackId, kartTrackId: kart.trackId, trackOrder, pickedTrackId: kart.scoreboardPick });
-    const players = [...karts.values()].map((other) => ({ key: PlayerKey(other), name: other.pawn.GetPlayerController()?.GetPlayerName() ?? "" }));
-    const board = BuildScoreboard({
-        grandPrix,
-        grandPrixMode,
-        boardTrackId,
-        players,
-        self: { key: PlayerKey(kart), name: kart.pawn.GetPlayerController()?.GetPlayerName() ?? "" },
-        bestTimes: boardTrackId !== undefined ? GetTrackBestTimes(boardTrackId) : {},
-        maxRows: SCOREBOARD_ROWS,
-        trackOrder,
-        routeNames: ROUTE_NAMES,
-    });
+    const { pages, page, grandPrixMode, boardTrackId } = ScoreboardPage(kart);
+    const { players, self } = BoardPlayers(kart);
+    const slide = StatSlideOf(page);
+    const board = slide
+        ? BuildStatBoard({ slide, totals: GetStatTotals(slide.key), players, self, maxRows: SCOREBOARD_ROWS })
+        : BuildScoreboard({
+            grandPrix,
+            grandPrixMode,
+            boardTrackId,
+            players,
+            self,
+            bestTimes: boardTrackId !== undefined ? GetTrackBestTimes(boardTrackId) : {},
+            maxRows: SCOREBOARD_ROWS,
+            routeNames: ROUTE_NAMES,
+        });
+    const switcher = PageSwitcher(pages, page);
 
     SetClass("scoreboard", "TimeTrial", !board.grandPrixMode);
     SetText("scoreboard", "title", board.title);
     SetText("scoreboard", "subtitle", board.subtitle);
     SetText("scoreboard", "best_header", board.bestHeader);
-    SetText("score_switch", "switcher", board.switcher);
-    SetClass("score_switch", "Unused", board.switcher === "");
+    SetText("score_switch", "switcher", switcher);
+    SetClass("score_switch", "Unused", switcher === "");
     for (let i = 0; i < SCOREBOARD_ROWS; i++) {
         const row = board.rows[i];
         const id = `score_row_${i}`;
@@ -7681,29 +7969,59 @@ function UpdateScoreboardHud(slot, kart) {
 }
 
 /**
- * Paging the time trial board through the tracks: while the scoreboard is
- * open (Tab held, SHOW_SCORES), A shows the previous track's best times and
- * D the next one's, wrapping around. Every opening starts on the viewer's
- * own track again (the pick is dropped when Tab is let go). Per tick, from
- * core/think.js — a tap is only seen on the tick it happens.
+ * Everyone on the map and the viewer, as the boards' rules want them (also
+ * the user menu's leaderboards page, hud/leaderboards/).
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function BoardPlayers(kart) {
+    /** @param {import("../../core/kart-registry.js").Kart} k */
+    const Player = (k) => ({ key: PlayerKey(k), name: k.pawn.GetPlayerController()?.GetPlayerName() ?? "" });
+    return { players: [...karts.values()].map(Player), self: Player(kart) };
+}
+
+/**
+ * Which page the viewer's scoreboard is on (hud/scoreboard/logic.js), and
+ * every page there is.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function ScoreboardPage(kart) {
+    const trackOrder = GetTrackOrder();
+    const { grandPrixMode, boardTrackId } = ScoreboardView({ grandPrix, activeTrackId, kartTrackId: kart.trackId, trackOrder, pickedTrackId: kart.scoreboardPick });
+    return {
+        pages: ScoreboardPages(grandPrixMode, trackOrder),
+        page: CurrentPage(grandPrixMode, boardTrackId, kart.scoreboardStat),
+        grandPrixMode,
+        boardTrackId,
+    };
+}
+
+/**
+ * Paging the scoreboard: while it's open (Tab held, SHOW_SCORES), A shows
+ * the previous page and D the next one, wrapping around — the Grand Prix
+ * standings or every track's best times, then the players' stats
+ * (ScoreboardPages). Every opening starts on the viewer's own board again
+ * (the pick is dropped when Tab is let go). Per tick, from core/think.js —
+ * a tap is only seen on the tick it happens.
  * @param {import("../../core/kart-registry.js").Kart} kart
  */
 function UpdateScoreboardInput(kart) {
     const pawn = kart.pawn;
     if (!pawn.IsInputPressed(CSInputs.SHOW_SCORES)) {
         kart.scoreboardPick = undefined;
+        kart.scoreboardStat = undefined;
         return;
     }
     const direction = (pawn.WasInputJustPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.WasInputJustPressed(CSInputs.LEFT) ? 1 : 0);
     if (direction === 0) {
         return;
     }
-    const trackOrder = GetTrackOrder();
-    const { grandPrixMode, boardTrackId } = ScoreboardView({ grandPrix, activeTrackId, kartTrackId: kart.trackId, trackOrder, pickedTrackId: kart.scoreboardPick });
-    if (grandPrixMode) {
-        return;
+    const { pages, page } = ScoreboardPage(kart);
+    const next = StepPage(pages, page, direction);
+    const [kind, id] = next.split(":");
+    kart.scoreboardStat = kind === "stat" ? id : undefined;
+    if (kind === "track" && id !== "") {
+        kart.scoreboardPick = Number(id);
     }
-    kart.scoreboardPick = StepTrack(trackOrder, boardTrackId, direction);
     kart.scoreboardNextUpdate = undefined; // show it now, not on the next rebuild
 }
 
@@ -8671,6 +8989,206 @@ function RegisterCheckpointAndFinishInputs() {
     }
 }
 
+// Pure rules of the user menu's leaderboards page (hud/leaderboards/leaderboards.js):
+// its tabs — one track's best times, then every player stat —, which track
+// the best times are on, and the board a tab shows as ready-to-send
+// strings. Rows and ranks come from the scoreboard's rules. No cs_script
+// import (test/hud/leaderboards.test.mjs).
+
+/**
+ * @typedef {{ rank: string, name: string, value: string, self: boolean }} LeaderboardRow
+ * @typedef {{ title: string, subtitle: string, column: string, rows: LeaderboardRow[] }} Leaderboard
+ */
+
+/** Every tab, in order: the best times, then STAT_SLIDES. */
+function LeaderboardTabs() {
+    return [LEADERBOARD_TIMES_TAB, ...STAT_SLIDES.map((slide) => slide.key)];
+}
+
+/** The tab shown: the one picked, else (none, or one that's gone) the best times. @param {string | undefined} picked */
+function LeaderboardTab(picked) {
+    return picked !== undefined && LeaderboardTabs().includes(picked) ? picked : LEADERBOARD_TIMES_TAB;
+}
+
+/**
+ * The track the best times are on: the one the viewer paged to, else their
+ * own track, else the first one (undefined: no tracks).
+ * @param {number[]} trackOrder @param {number | undefined} picked @param {number | undefined} kartTrackId
+ */
+function LeaderboardTrack(trackOrder, picked, kartTrackId) {
+    for (const id of [picked, kartTrackId]) {
+        if (id !== undefined && trackOrder.includes(id)) {
+            return id;
+        }
+    }
+    return trackOrder[0];
+}
+
+/**
+ * The track `direction` (-1 / +1) pages to from `current`, wrapping around.
+ * @param {number[]} trackOrder @param {number | undefined} current @param {number} direction
+ */
+function StepLeaderboardTrack(trackOrder, current, direction) {
+    return current === undefined ? trackOrder[0] : StepPage(trackOrder, current, direction);
+}
+
+/**
+ * The board one tab shows: the best times on `trackId`, or one stat's
+ * all-time totals — saved ones of players who aren't on the map included.
+ * @param {{
+ *   tab: string, // from LeaderboardTab
+ *   trackOrder: number[],
+ *   trackId: number | undefined, // from LeaderboardTrack
+ *   bestTimes: Record<string, number>, // best times on trackId by player name (the times tab)
+ *   statTotals: Record<string, number>, // the tab's stat by player name (a stat tab)
+ *   players: { key: string, name: string }[], // everyone on the map now
+ *   self: { key: string, name: string },
+ *   maxRows: number,
+ *   routeNames?: Record<number, string>, // route names by track id (hud/hub-modal/routes.js)
+ * }} input
+ * @returns {Leaderboard}
+ */
+function BuildLeaderboard({ tab, trackOrder, trackId, bestTimes, statTotals, players, self, maxRows, routeNames = {} }) {
+    /** @param {{ rank: string, name: string, best: string, self: boolean }[]} rows */
+    const Rows = (rows) => rows.map((row) => ({ rank: row.rank, name: row.name, value: row.best, self: row.self }));
+    const slide = STAT_SLIDES.find((s) => s.key === tab);
+    if (slide) {
+        const board = BuildStatBoard({ slide, totals: statTotals, players, self, maxRows });
+        return { title: slide.title, subtitle: "ALL TIME", column: slide.column, rows: Rows(board.rows) };
+    }
+    const board = BuildScoreboard({ grandPrix: undefined, grandPrixMode: false, boardTrackId: trackId, players, self, bestTimes, maxRows, routeNames });
+    const route = trackId !== undefined ? (routeNames[trackId] ?? `Track ${trackId}`).toUpperCase() : undefined;
+    const paging = trackOrder.length > 1 && trackId !== undefined ? `  ·  ROUTE ${trackOrder.indexOf(trackId) + 1} / ${trackOrder.length}` : "";
+    // The route is the title: the button on the left already says it's the best times.
+    if (route === undefined) {
+        return { title: "BEST TIMES", subtitle: "NO TRACKS", column: "TIME", rows: Rows(board.rows) };
+    }
+    return { title: route, subtitle: `BEST TIMES${paging}`, column: "TIME", rows: Rows(board.rows) };
+}
+
+const PAGE = "usermenu_leaderboards_page";
+
+/**
+ * The user menu's leaderboards page (usermenu_leaderboards_page in
+ * speedometer.xml, opened from ACTIONS): one leaderboard at a time, picked
+ * by its button ("lb_tab_<tab>", the current one Selected) — the best times on
+ * one track (◀ ▶ page through the tracks, shown with Paging) or a player
+ * stat. Up to LEADERBOARD_ROWS players ("lb_row_<i>", one column), the
+ * viewer's own row marked Self (it takes the last row if they're further
+ * down). Title, subtitle and value column header are dialog variables on
+ * the page. Rebuilt every LEADERBOARD_UPDATE_SECONDS while the page is open
+ * (UpdateUserMenu), each value sent only when it changes, plus everything
+ * again every HUD_RESEND_SECONDS. Rules: hud/leaderboards/logic.js.
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function UpdateLeaderboardsHud(slot, kart) {
+    const now = Instance.GetGameTime();
+    if (kart.leaderboardNextUpdate !== undefined && now < kart.leaderboardNextUpdate) {
+        return;
+    }
+    kart.leaderboardNextUpdate = now + LEADERBOARD_UPDATE_SECONDS;
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    if (kart.leaderboardResendAt === undefined || now >= kart.leaderboardResendAt) {
+        kart.leaderboardResendAt = now + HUD_RESEND_SECONDS;
+        kart.leaderboardShown = {};
+    }
+    const shown = (kart.leaderboardShown ??= {});
+    /** @param {string} panel @param {string} name @param {string} value */
+    const SetText = (panel, name, value) => {
+        const key = `${panel}/${name}`;
+        if (shown[key] !== value) {
+            shown[key] = value;
+            hud.SetDialogVariableStringForPlayer(slot, panel, name, value);
+        }
+    };
+    /** @param {string} panel @param {string} cls @param {boolean} on */
+    const SetClass = (panel, cls, on) => {
+        const key = `${panel}.${cls}`;
+        const value = on ? "1" : "";
+        if (shown[key] !== value) {
+            shown[key] = value;
+            hud.SetHasClassForPlayer(slot, panel, cls, on);
+        }
+    };
+
+    const tab = LeaderboardTab(kart.leaderboardTab);
+    const trackOrder = GetTrackOrder();
+    const trackId = LeaderboardTrack(trackOrder, kart.leaderboardTrack, kart.trackId);
+    const timesTab = tab === LEADERBOARD_TIMES_TAB;
+    const { players, self } = BoardPlayers(kart);
+    const board = BuildLeaderboard({
+        tab,
+        trackOrder,
+        trackId,
+        bestTimes: timesTab && trackId !== undefined ? GetTrackBestTimes(trackId) : {},
+        statTotals: timesTab ? {} : GetStatTotals(tab),
+        players,
+        self,
+        maxRows: LEADERBOARD_ROWS,
+        routeNames: ROUTE_NAMES,
+    });
+    for (const other of LeaderboardTabs()) {
+        SetClass(`lb_tab_${other}`, "Selected", other === tab);
+    }
+    SetClass(PAGE, "Paging", timesTab && trackOrder.length > 1);
+    SetText(PAGE, "lb_title", board.title);
+    SetText(PAGE, "lb_subtitle", board.subtitle);
+    SetText(PAGE, "lb_column", board.column);
+    for (let i = 0; i < LEADERBOARD_ROWS; i++) {
+        const row = board.rows[i];
+        const id = `lb_row_${i}`;
+        SetClass(id, "Unused", !row);
+        SetClass(id, "Self", Boolean(row?.self));
+        if (row) {
+            SetText(id, "rank", row.rank);
+            SetText(id, "name", row.name);
+            SetText(id, "value", row.value);
+        }
+    }
+}
+
+/**
+ * Fills the page in right away, everything sent again — on opening it
+ * (USER_MENU_PAGES in hud/user-menu.js), on a tab click and after paging.
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function RefreshLeaderboardsHud(slot, kart) {
+    kart.leaderboardNextUpdate = undefined;
+    kart.leaderboardResendAt = undefined;
+    UpdateLeaderboardsHud(slot, kart);
+}
+
+/**
+ * A tab button ("lb_tab_<tab>"): shows that leaderboard. Kept while the
+ * player is connected, so the page reopens on it.
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {string} tab
+ * @returns {boolean} whether it's a tab
+ */
+function SelectLeaderboardTab(slot, kart, tab) {
+    if (!LeaderboardTabs().includes(tab)) {
+        return false;
+    }
+    kart.leaderboardTab = tab;
+    RefreshLeaderboardsHud(slot, kart);
+    return true;
+}
+
+/**
+ * The best times' ◀ / ▶ (direction -1 / +1): the previous/next track,
+ * wrapping around. Kept while the player is connected, like the tab.
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} direction
+ */
+function StepLeaderboardsTrack(slot, kart, direction) {
+    const trackOrder = GetTrackOrder();
+    kart.leaderboardTrack = StepLeaderboardTrack(trackOrder, LeaderboardTrack(trackOrder, kart.leaderboardTrack, kart.trackId), direction);
+    RefreshLeaderboardsHud(slot, kart);
+}
+
+// The user menu's leaderboards page: one leaderboard at a time, picked by tab (see leaderboards.js).
+
 // User menu: press USE anywhere (regardless of race phase) to open a small
 // panel with actions/settings that aren't tied to any single map trigger
 // (see the button tables in hud/inputs.js's OnCustomHudClicked).
@@ -8697,12 +9215,14 @@ const USER_MENU_TOGGLES = {
 };
 
 /**
- * The developer pages the menu can show in place of its columns: per page,
- * its panel in speedometer.xml and what to refresh when it opens.
- * @typedef {"camera" | "physics" | "triggers"} UserMenuPage
+ * The pages the menu can show in place of its columns — the leaderboards
+ * (ACTIONS) and the developer pages: per page, its panel in speedometer.xml
+ * and what to refresh when it opens.
+ * @typedef {"leaderboards" | "camera" | "physics" | "triggers"} UserMenuPage
  * @type {Record<UserMenuPage, { panel: string, refresh?: (slot: number, kart: import("../core/kart-registry.js").Kart) => void }>}
  */
 const USER_MENU_PAGES = {
+    leaderboards: { panel: "usermenu_leaderboards_page", refresh: RefreshLeaderboardsHud }, // hud/leaderboards/
     camera: { panel: "usermenu_camera_page", refresh: UpdateCameraTuningHud }, // dev/camera-tuning.js
     physics: { panel: "usermenu_physics_page", refresh: UpdatePhysicsTuningHud }, // dev/physics-tuning.js
     triggers: { panel: "usermenu_triggers_page" }, // Test Podium/Countdown/…, clicks in hud/inputs.js
@@ -8716,7 +9236,7 @@ function SetUserMenuOpen(slot, kart, open) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
-    // Always (re)opens on its columns, not on one of its developer pages.
+    // Always (re)opens on its columns, not on one of its pages.
     SetUserMenuPage(slot, kart, undefined);
     if (open) {
         // Refreshed on every open: a layout or script reload in tools mode
@@ -8731,7 +9251,7 @@ function SetUserMenuOpen(slot, kart, open) {
 }
 
 /**
- * Shows one developer page in place of the menu's columns, or (undefined)
+ * Shows one page (USER_MENU_PAGES) in place of the menu's columns, or (undefined)
  * the columns again. Every page panel is set, so whichever was open closes.
  * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {UserMenuPage | undefined} page
  */
@@ -8810,6 +9330,9 @@ function UpdateUserMenu(slot, kart) {
         // a heat, the hub) with the menu up, and so can the player's heat.
         GetSpeedHud()?.SetHasClassForPlayer(slot, "usermenu_restart_row", "Hidden", !CanRestartTimeTrial(kart));
         UpdateHubButtonHud(slot, kart);
+        if (kart.userMenuPage === "leaderboards") {
+            UpdateLeaderboardsHud(slot, kart); // the totals keep growing while it's open
+        }
     }
 }
 
@@ -8846,7 +9369,7 @@ function TestBreak(slot, kart) {
     const v = kart.melon.GetAbsVelocity();
     const speed = Math.hypot(v.x, v.y, v.z);
     // Standing still the pieces still need a direction to fly out along.
-    BreakMelon(slot, kart, speed > 1 ? v : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+    BreakMelon(slot, kart, speed > 1 ? v : { x: 1, y: 0, z: 0 }, Math.max(speed, 1), false); // not a crash for the stats
     return true;
 }
 
@@ -8954,6 +9477,9 @@ const KART_BUTTONS = {
         SetUserMenuOpen(slot, kart, false);
         SendKartToTutorial(kart);
     },
+    // The leaderboards page's best times: previous/next track.
+    lb_track_prev: (slot, kart) => StepLeaderboardsTrack(slot, kart, -1),
+    lb_track_next: (slot, kart) => StepLeaderboardsTrack(slot, kart, 1),
 };
 
 /**
@@ -8979,17 +9505,19 @@ const TOGGLE_BUTTONS = {
 };
 
 /**
- * Buttons that open a developer page in place of the menu's columns
- * (SetUserMenuPage), and each page's Back button.
+ * Buttons that open a page in place of the menu's columns (SetUserMenuPage)
+ * — the leaderboards and the developer pages —, and each page's Back button.
  * @type {Record<string, import("./user-menu.js").UserMenuPage | undefined>}
  */
 const PAGE_BUTTONS = {
+    usermenu_leaderboards_button: "leaderboards",
     usermenu_camera_button: "camera",
     usermenu_physics_button: "physics",
     usermenu_triggers_button: "triggers",
     camtune_back_button: undefined,
     phytune_back_button: undefined,
     triggers_back_button: undefined,
+    leaderboards_back_button: undefined,
 };
 
 /**
@@ -9026,8 +9554,9 @@ const TEST_TRIGGER_BUTTONS = {
 };
 
 /**
- * Buttons handled by id prefix: the color swatches, the skins and the tuning pages'
- * controls. Each returns whether the id was one of its buttons.
+ * Buttons handled by id prefix: the color swatches, the skins, the
+ * leaderboards' tabs and the tuning pages' controls. Each returns whether
+ * the id was one of its buttons.
  * @type {[string, (slot: number, kart: Kart, buttonId: string) => boolean][]}
  */
 const PREFIX_BUTTONS = [
@@ -9054,6 +9583,7 @@ const PREFIX_BUTTONS = [
             return true;
         },
     ],
+    ["lb_tab_", (slot, kart, buttonId) => SelectLeaderboardTab(slot, kart, buttonId.slice("lb_tab_".length))], // hud/leaderboards/
     ["camtune_", HandleCameraTuningClick], // dev/camera-tuning.js
     ["phytune_", HandlePhysicsTuningClick], // dev/physics-tuning.js
 ];
@@ -9122,8 +9652,9 @@ function RegisterHudInputs() {
 // The custom HUD (panorama/layout/custom_game/speedometer.xml). A panel
 // with its own rules has its own folder — speedometer/ (speed, jump and
 // health bars), track/ (time trial clock + checkpoint strip), scoreboard/
-// (Tab: Grand Prix points, best times), hub-modal/ ("Start Grand
-// Prix": the heats and who rides along) — the others are one file each: bounce-panel.js, user-menu.js.
+// (Tab: Grand Prix points, best times), leaderboards/ (the user menu's
+// page with every leaderboard), hub-modal/ ("Start Grand Prix": the heats
+// and who rides along) — the others are one file each: bounce-panel.js, user-menu.js.
 // layout.js finds the custom_hud_layout entity; inputs.js handles every
 // button click.
 
@@ -9721,6 +10252,9 @@ function UpdateKart(slot, kart, dt) {
     const boost = AttackBoost(kart.health, attackHeld, dt);
     kart.health = boost.health;
     kart.attackBoosting = boost.boosting; // shows the boost trail, see fx/boost-trail/boost-trail.js
+    if (boost.boosting) {
+        CountStat(kart, "boostTime", dt);
+    }
     if (attackHeld) {
         LogAttackHeld(slot, kart, currentVelocity, boost.boosting);
     }
@@ -10695,6 +11229,11 @@ function Think() {
         Debug(`Think: UpdateRaceFlow threw: ${err}`);
     }
     try {
+        UpdateStats(now, Math.min(dt, 1)); // a long pause (a stall, a reload) isn't time on the server
+    } catch (err) {
+        Debug(`Think: UpdateStats threw: ${err}`);
+    }
+    try {
         UpdateSpikeSprings(now);
     } catch (err) {
         Debug(`Think: UpdateSpikeSprings threw: ${err}`);
@@ -10760,6 +11299,7 @@ function RegisterKartInputs() {
             DropKart(playerSlot, kart);
         }
         ResetHudForPlayer(playerSlot);
+        SaveStats(); // their time on the server so far, without waiting for the next periodic save
         // Promotes the next-oldest remaining player (Map preserves insertion
         // order) so there's always a moderator whenever anyone's still on the
         // map — see EnsureModerator's comment for why this can't just wait for
@@ -11028,7 +11568,8 @@ function RegisterHeatInputs() {
 // Racing: the tracks read from trigger names (track-config.js), checkpoint and
 // lap progress (checkpoints/), the time trial clock and best times
 // (time-trial/), the hub -> countdown -> racing -> break flow (heat/), and
-// the Grand Prix places and points over its heats (grand-prix/).
+// the Grand Prix places and points over its heats (grand-prix/), and the
+// players' all-time stats (stats/).
 
 function RegisterRaceInputs() {
     RegisterCheckpointAndFinishInputs();

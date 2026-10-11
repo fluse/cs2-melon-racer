@@ -11,6 +11,7 @@ import { MELON_SKINS } from "../constants/index.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { CanRestartTimeTrial } from "../race/time-trial/time-trial.js";
 import { GetSpeedHud, SyncInputCapture } from "./layout.js";
+import { RefreshLeaderboardsHud, UpdateLeaderboardsHud } from "./leaderboards/index.js";
 
 // User menu: press USE anywhere (regardless of race phase) to open a small
 // panel with actions/settings that aren't tied to any single map trigger
@@ -38,12 +39,14 @@ export const USER_MENU_TOGGLES = {
 };
 
 /**
- * The developer pages the menu can show in place of its columns: per page,
- * its panel in speedometer.xml and what to refresh when it opens.
- * @typedef {"camera" | "physics" | "triggers"} UserMenuPage
+ * The pages the menu can show in place of its columns — the leaderboards
+ * (ACTIONS) and the developer pages: per page, its panel in speedometer.xml
+ * and what to refresh when it opens.
+ * @typedef {"leaderboards" | "camera" | "physics" | "triggers"} UserMenuPage
  * @type {Record<UserMenuPage, { panel: string, refresh?: (slot: number, kart: import("../core/kart-registry.js").Kart) => void }>}
  */
 export const USER_MENU_PAGES = {
+    leaderboards: { panel: "usermenu_leaderboards_page", refresh: RefreshLeaderboardsHud }, // hud/leaderboards/
     camera: { panel: "usermenu_camera_page", refresh: UpdateCameraTuningHud }, // dev/camera-tuning.js
     physics: { panel: "usermenu_physics_page", refresh: UpdatePhysicsTuningHud }, // dev/physics-tuning.js
     triggers: { panel: "usermenu_triggers_page" }, // Test Podium/Countdown/…, clicks in hud/inputs.js
@@ -57,7 +60,7 @@ export function SetUserMenuOpen(slot, kart, open) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
-    // Always (re)opens on its columns, not on one of its developer pages.
+    // Always (re)opens on its columns, not on one of its pages.
     SetUserMenuPage(slot, kart, undefined);
     if (open) {
         // Refreshed on every open: a layout or script reload in tools mode
@@ -72,7 +75,7 @@ export function SetUserMenuOpen(slot, kart, open) {
 }
 
 /**
- * Shows one developer page in place of the menu's columns, or (undefined)
+ * Shows one page (USER_MENU_PAGES) in place of the menu's columns, or (undefined)
  * the columns again. Every page panel is set, so whichever was open closes.
  * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {UserMenuPage | undefined} page
  */
@@ -151,5 +154,8 @@ export function UpdateUserMenu(slot, kart) {
         // a heat, the hub) with the menu up, and so can the player's heat.
         GetSpeedHud()?.SetHasClassForPlayer(slot, "usermenu_restart_row", "Hidden", !CanRestartTimeTrial(kart));
         UpdateHubButtonHud(slot, kart);
+        if (kart.userMenuPage === "leaderboards") {
+            UpdateLeaderboardsHud(slot, kart); // the totals keep growing while it's open
+        }
     }
 }

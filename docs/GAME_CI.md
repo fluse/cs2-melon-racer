@@ -22,7 +22,7 @@ reuse a color for something with a different meaning.
 - **Melon skins** (`tools/materials/make-melon-skins.mjs`): gold is one plain,
   faintly glowing metal gold (`#FFC456`), not checkpoint gold; camo is off-palette on
   purpose.
-- **Foam bouncer** (`tools/models/make-bouncer-model.mjs`): pink foam, lime cap —
+- **Foam bouncer** (`tools/models/make-bouncer-model.mjs`): pink foam paddle, lime top edge —
   off-palette on purpose, a playground decoration, not a guide line.
 - **Buffer stop** (`tools/models/make-buffer-stop-model.mjs`): magenta beam (`#FF20FF`, like the
   spike spring's rim), white chevron, grey steel — off-palette on purpose, an obstacle, not a start gate.
@@ -30,6 +30,8 @@ reuse a color for something with a different meaning.
   tips, a signal red ring (`#E83C2A`) — off-palette on purpose, warning colors for a hazard.
 - **Spike spring** (`tools/models/make-spike-spring-model.mjs`): steel spikes, chrome spring, a magenta rim
   (`#FF20FF`) — off-palette on purpose: close to start magenta, but a hazard, not a start gate.
+- **Spinning hammer** (`tools/models/make-spin-hammer-model.mjs`): steel head, signal red rubber faces
+  (`#E83C2A`, like the saw blade's ring), wooden handle, dark grey pedestal — off-palette on purpose, a hazard.
 
 ## Not on the palette yet
 

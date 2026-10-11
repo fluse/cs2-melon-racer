@@ -1,66 +1,63 @@
-// Generates a foam bouncer on a spring — `node tools/models/make-bouncer-model.mjs`:
-// a pink, cushion-ribbed foam tube arching up and over from a chrome coil
-// spring, ending in a lime cap, like a playground spring rider. The spring
-// is skinned to a chain of bones, so it really compresses and bends:
-//   idle    the rest pose (one frame)
-//   boing   hit: the spring squashes, overshoots, and wobbles out (BOING_SECONDS)
-// Use it as a prop_dynamic (Idle Animation "idle") and fire
-// SetAnimationNotLooping "boing" at it, e.g. from a trigger_multiple around
-// it (OnStartTouch) — no script involved. Writes
+// Generates a foam swinger on a spring — `node tools/models/make-bouncer-model.mjs`:
+// a tall, flat, cushion-ribbed pink foam paddle standing straight up on a
+// chrome coil spring, its top edge lime, swinging from side to side like a
+// metronome — an obstacle in the air the melons have to time their way past.
+// Flat and board-like on purpose (a rounded rectangle in cross-section, flat
+// top): a round foam column read as something else entirely. The spring is
+// skinned to a chain of bones and bends with the swing; the paddle rides
+// rigidly on the top one ("head"):
+//   swing   one full swing there and back (SWING_SECONDS), looping
+//   idle    the rest pose, upright (one frame)
+// Use it as a prop_dynamic with Idle Animation "swing", Idle Animation Loop
+// Mode "Loop". The paddle swings across its broad face, along Y (stand it
+// across the track: the melons come at its face). Collision: the base and
+// coil on the root, the paddle on "head", so it swings along. Writes
 //   models/melon_racer/bouncer/bouncer.smd           render mesh + skeleton (bind pose)
-//   models/melon_racer/bouncer/bouncer_{idle,boing}.smd   the animations
-//   models/melon_racer/bouncer/bouncer_physics.obj   collision (static, the rest pose)
+//   models/melon_racer/bouncer/bouncer_{swing,idle}.smd   the animations
+//   models/melon_racer/bouncer/bouncer_physics{,_paddle}.obj   collision: base + coil, paddle
 //   models/melon_racer/bouncer/bouncer.vmdl
-//   materials/melon_racer/bouncer/bouncer_{foam,cap,cap_rim,spring,base}.vmat (+ _color.png)
+//   materials/melon_racer/bouncer/bouncer_{foam,cap,spring,base}.vmat (+ _color.png)
 // The foam uses the inflatable vinyl's roughness (make-inflatable.mjs — run
 // that first). Compile the .vmdl with resourcecompiler (see the end of the
-// output). Origin on the floor under the spring; the arch reaches out along +X.
+// output). Origin on the floor under the spring.
 import { BindFrame, Mesh, ObjText, SmdAnimationText, SmdText, SolidPng, VmatText, VmdlText, WriteAddonFile } from "../lib/model.mjs";
 
 // --- shape (units) ---
-const BASE_RADIUS = 14; // the disc the spring stands on
+const BASE_RADIUS = 18; // the disc the spring stands on
 const BASE_HEIGHT = 3;
 const COIL_RADIUS = 9; // helix, to the wire's center
 const WIRE_RADIUS = 1.6;
 const COIL_TURNS = 6;
 const COIL_BOTTOM = BASE_HEIGHT + WIRE_RADIUS;
 const COIL_TOP = 30;
-const COLLAR_RADIUS = 12; // the ring the foam tube sits in, on top of the spring
+const COLLAR_RADIUS = 12; // the ring the paddle sits in, on top of the spring
 const COLLAR_HEIGHT = 5;
-const TUBE_RADIUS = 11;
-const TUBE_RISE = 20; // straight up out of the collar before the arch
-const ARCH_RADIUS = 34; // the arch's centerline: a half circle over to +X
-const TUBE_SEGMENTS = 12; // foam cushions along the tube
-const GROOVE_DEPTH = 0.13; // how far the tube narrows between two cushions (share of its radius)
-const CAP_LENGTH = 12; // the lime end cap, straight down at the arch's end
-const CAP_RADIUS = TUBE_RADIUS * 1.04;
-const RIM_RADIUS = 1.8; // the lighter lip around the cap's open end
+const PADDLE_LENGTH = 110; // from the collar up
+const PADDLE_HALF_WIDTH = 24; // across, along Y
+const PADDLE_HALF_THICKNESS = 6; // along X
+const PADDLE_ROUNDNESS = 4; // cross-section exponent: 2 = an oval, higher = a rectangle with rounded corners
+const PADDLE_SEGMENTS = 7; // foam cushions along the paddle
+const GROOVE_DEPTH = 0.18; // how far the paddle narrows between two cushions (share of its thickness)
+const CAP_LENGTH = 12; // the lime top edge (part of the paddle's length, same cross-section)
 
-// --- spring animation ---
-const SPRING_BONES = 4; // segments the coil bends/compresses in
+// --- swing animation ---
+const SPRING_BONES = 4; // segments the coil bends in
 const FPS = 30;
-const BOING_SECONDS = 1.8;
-const SQUASH = 0.42; // first compression, share of the coil's length
-const SQUASH_HZ = 2.6;
-const SQUASH_DAMPING = 2.4; // 1/s
-const WOBBLE_DEGREES = 16; // first sway along the arch (around Y), over the whole coil
-const WOBBLE_HZ = 1.7;
-const WOBBLE_DAMPING = 2.0;
-const SIDE_WOBBLE_DEGREES = 7; // a smaller, faster sway across it (around X)
-const SIDE_WOBBLE_HZ = 2.3;
-const HEAD_LAG_SECONDS = 0.08; // the foam tube follows the spring's sway a little late …
-const HEAD_FOLLOW = 0.45; // … with this share of it on top
+const SWING_SECONDS = 2.4; // one full swing there and back
+const SWING_DEGREES = 38; // how far the paddle leans out to each side
+const SPRING_SHARE = 0.4; // the share of the lean the coil bends; the paddle tilts the rest on top
+const HEAD_LAG = 0.06; // the paddle follows the coil's bend this share of a swing late: a soft, springy swing
 
 // --- look ---
 const FOAM_COLOR = [0xf2, 0x6c, 0xb8]; // bubblegum pink
 const BASE_COLOR = [0xd0, 0x4a, 0x98]; // darker pink: base disc, collar
 const CAP_COLOR = [0x9a, 0xd8, 0x3c]; // lime — off-palette on purpose (decoration, not a guide line)
-const CAP_RIM_COLOR = [0xc8, 0xf0, 0x8c];
 const SPRING_COLOR = [0xd8, 0xdc, 0xe0]; // chrome
 const SPRING_ROUGHNESS = 0.25;
 const SURFACE_PROP = "rubber";
 const UV_TILE = 64;
-const SIDES = 14; // around the foam tube
+const SIDES = 14; // around the base and the collar
+const PADDLE_SIDES = 24; // around the paddle: enough for its rounded corners
 const RINGS_PER_SEGMENT = 5; // enough for the groove between two cushions
 const WIRE_SIDES = 6; // a thin wire: reads round at play distance
 const COIL_STEPS_PER_TURN = 16;
@@ -69,7 +66,7 @@ const NAME = "bouncer";
 const MODEL_DIR = "models/melon_racer/bouncer";
 const MATERIAL_DIR = "materials/melon_racer/bouncer";
 const GENERATOR = "tools/models/make-bouncer-model.mjs";
-const PARTS = ["foam", "cap", "cap_rim", "spring", "base"];
+const PARTS = ["foam", "cap", "spring", "base"];
 
 // --- vector helpers ---
 const Add = (a, b) => a.map((n, i) => n + b[i]);
@@ -79,7 +76,7 @@ const Dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const Cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const Normalize = a => Scale(a, 1 / Math.hypot(...a));
 
-// --- skeleton: root, then a chain up the coil; the last one ("head") carries the collar and the tube ---
+// --- skeleton: root, then a chain up the coil; the last one ("head") carries the collar and the paddle ---
 const SEGMENT = (COIL_TOP - COIL_BOTTOM) / SPRING_BONES;
 const BONES = [{ name: "root", parent: -1, bind: [0, 0, 0] }];
 for (let i = 0; i <= SPRING_BONES; i++) {
@@ -103,7 +100,8 @@ function CoilWeights(z) {
 const verts = [];
 /** @type {Record<string, number[][]>} */
 const tris = Object.fromEntries(PARTS.map(p => [p, []]));
-const physics = new Mesh(UV_TILE);
+const physics = new Mesh(UV_TILE); // on the root: base and coil
+const paddlePhysics = new Mesh(UV_TILE); // on the head: swings with the paddle
 
 function Vertex(p, n, uv, weights) {
     verts.push({ p, n, uv, weights });
@@ -121,20 +119,30 @@ function Tri(a, b, c, part) {
 
 /**
  * A closed tube from rings of points: rings[i] = { center, normal (any
- * direction ⟂ the tube), side (⟂ both), radius, slope (dradius/ds), v }.
+ * direction ⟂ the tube), side (⟂ both), radius (along normal), width (its
+ * radius along side as a share of `radius`, default 1), roundness (the
+ * cross-section's exponent, default 2: an ellipse), slope (dradius/ds), v }.
  * Ends stay open unless `caps`.
  */
 function Tube(rings, sides, part, weightsOf, caps = false) {
     const ids = rings.map(r => {
         const t = Normalize(Cross(r.normal, r.side));
+        const a = r.radius, b = r.radius * (r.width ?? 1), n = r.roundness ?? 2;
         const ring = [];
+        let around = 0, last = null;
         for (let k = 0; k <= sides; k++) { // k = sides repeats k = 0 with u = 1, for the UV seam
             const phi = (2 * Math.PI * k) / sides;
-            const radial = Add(Scale(r.normal, Math.cos(phi)), Scale(r.side, Math.sin(phi)));
-            const p = Add(r.center, Scale(radial, r.radius));
+            const c = Math.cos(phi), s = Math.sin(phi);
+            // A superellipse |x/a|^n + |y/b|^n = 1, and its normal from the gradient.
+            const x = a * Math.sign(c) * Math.abs(c) ** (2 / n), y = b * Math.sign(s) * Math.abs(s) ** (2 / n);
+            const p = Add(r.center, Add(Scale(r.normal, x), Scale(r.side, y)));
+            const gx = Math.sign(x) * Math.abs(x / a) ** (n - 1) / a, gy = Math.sign(y) * Math.abs(y / b) ** (n - 1) / b;
+            const outward = Normalize(Add(Scale(r.normal, gx), Scale(r.side, gy)));
             // A widening tube leans its surface back: tilt the normal against the tangent.
-            const n = Normalize(Sub(radial, Scale(t, r.slope ?? 0)));
-            ring.push(Vertex(p, n, [(k / sides) * ((2 * Math.PI * r.radius) / UV_TILE), r.v / UV_TILE], weightsOf(r)));
+            const normal = Normalize(Sub(outward, Scale(t, r.slope ?? 0)));
+            if (last) around += Math.hypot(...Sub(p, last));
+            last = p;
+            ring.push(Vertex(p, normal, [around / UV_TILE, r.v / UV_TILE], weightsOf(r)));
         }
         return ring;
     });
@@ -156,51 +164,46 @@ function Tube(rings, sides, part, weightsOf, caps = false) {
 }
 
 /** An upright cylinder (with top and bottom) for render and collision, rigid on one bone. */
-function Cylinder(radius, z0, z1, part, bone) {
+function Cylinder(radius, z0, z1, part, bone, collision) {
     const rings = [z0, z1].map(z => ({ center: [0, 0, z], normal: [1, 0, 0], side: [0, 1, 0], radius, v: z }));
     // Sharp edges: the side and the caps get their own vertices.
     Tube(rings, SIDES, part, () => [[bone, 1]], true);
-    PhysicsTube(rings.map(r => r.center), () => radius, [0, 1, 0], 12, true);
+    PhysicsPrism(collision, rings.map(r => r.center[2]), Array.from({ length: 12 }, (_, k) => {
+        const phi = (2 * Math.PI * k) / 12;
+        return [radius * Math.cos(phi), radius * Math.sin(phi)];
+    }));
 }
 
-/** The collision version of a tube along `centers` (low poly, flat triangles in Mesh). */
-function PhysicsTube(centers, radiusAt, side, sides, caps) {
-    const rings = centers.map((c, i) => {
-        const t = Normalize(Sub(centers[Math.min(i + 1, centers.length - 1)], centers[Math.max(i - 1, 0)]));
-        const normal = Normalize(Cross(side, t));
-        const s = Normalize(Cross(t, normal));
-        return Array.from({ length: sides }, (_, k) => {
-            const phi = (2 * Math.PI * k) / sides;
-            return Add(c, Scale(Add(Scale(normal, Math.cos(phi)), Scale(s, Math.sin(phi))), radiusAt(i)));
-        });
-    });
+/**
+ * A closed upright prism for collision (low poly, flat triangles in Mesh):
+ * the 2D `outline` (XY, counter-clockwise) from height z0 to z1.
+ */
+function PhysicsPrism(mesh, [z0, z1], outline) {
+    const lo = outline.map(([x, y]) => [x, y, z0]), hi = outline.map(([x, y]) => [x, y, z1]);
     const Out = (a, b, c, outward) => {
         const n = Cross(Sub(b, a), Sub(c, a));
-        if (Dot(n, outward) >= 0) physics.Tri(a, b, c, "physics");
-        else physics.Tri(a, c, b, "physics");
+        if (Dot(n, outward) >= 0) mesh.Tri(a, b, c, "physics");
+        else mesh.Tri(a, c, b, "physics");
     };
-    for (let i = 0; i + 1 < rings.length; i++) {
-        for (let k = 0; k < sides; k++) {
-            const k1 = (k + 1) % sides;
-            const mid = Scale(Add(centers[i], centers[i + 1]), 0.5);
-            const outward = Sub(rings[i][k], mid);
-            Out(rings[i][k], rings[i][k1], rings[i + 1][k1], outward);
-            Out(rings[i][k], rings[i + 1][k1], rings[i + 1][k], outward);
-        }
+    const count = outline.length;
+    for (let k = 0; k < count; k++) {
+        const k1 = (k + 1) % count;
+        const outward = [...Scale(Add(outline[k], outline[k1]), 0.5), 0];
+        Out(lo[k], lo[k1], hi[k1], outward);
+        Out(lo[k], hi[k1], hi[k], outward);
     }
-    if (!caps) return;
-    for (const [end, other] of [[0, 1], [rings.length - 1, rings.length - 2]]) {
-        const outward = Sub(centers[end], centers[other]);
-        for (let k = 1; k + 1 < sides; k++) Out(rings[end][0], rings[end][k], rings[end][k + 1], outward);
+    for (let k = 1; k + 1 < count; k++) {
+        Out(lo[0], lo[k], lo[k + 1], [0, 0, -1]);
+        Out(hi[0], hi[k], hi[k + 1], [0, 0, 1]);
     }
 }
 
-// Base disc (on root) and the collar on top of the spring (on head, so it rides along).
-Cylinder(BASE_RADIUS, 0, BASE_HEIGHT, "base", 0);
-Cylinder(COLLAR_RADIUS, COIL_TOP, COIL_TOP + COLLAR_HEIGHT, "base", HEAD);
+// Base disc (on root) and the collar on top of the spring (on head, so it tilts with the paddle).
+Cylinder(BASE_RADIUS, 0, BASE_HEIGHT, "base", 0, physics);
+Cylinder(COLLAR_RADIUS, COIL_TOP, COIL_TOP + COLLAR_HEIGHT, "base", HEAD, paddlePhysics);
 
 // The coil: a helix tube, each ring skinned by its centerline's height so the
-// wire's cross-section stays round while the spring squashes.
+// wire's cross-section stays round while the spring bends.
 {
     const steps = COIL_TURNS * COIL_STEPS_PER_TURN;
     const rings = [];
@@ -213,105 +216,59 @@ Cylinder(COLLAR_RADIUS, COIL_TOP, COIL_TOP + COLLAR_HEIGHT, "base", HEAD);
     }
     Tube(rings, WIRE_SIDES, "spring", r => CoilWeights(r.z), true);
     // Collision: the coil as one solid cylinder — the melon can't get between its turns anyway.
-    PhysicsTube([[0, 0, COIL_BOTTOM - WIRE_RADIUS], [0, 0, COIL_TOP]], () => COIL_RADIUS + WIRE_RADIUS, [0, 1, 0], 12, true);
+    PhysicsPrism(physics, [COIL_BOTTOM - WIRE_RADIUS, COIL_TOP], Array.from({ length: 12 }, (_, k) => {
+        const phi = (2 * Math.PI * k) / 12;
+        return [(COIL_RADIUS + WIRE_RADIUS) * Math.cos(phi), (COIL_RADIUS + WIRE_RADIUS) * Math.sin(phi)];
+    }));
 }
 
-// The foam tube: up out of the collar, then a half circle over to +X, ending
-// pointing straight down. Its centerline lies in the XZ plane.
-const ARCH_BASE = COIL_TOP + COLLAR_HEIGHT - 2 + TUBE_RISE; // where the bend starts
-const TUBE_START = COIL_TOP + COLLAR_HEIGHT - 2; // a little inside the collar
-const TUBE_LENGTH = TUBE_RISE + Math.PI * ARCH_RADIUS;
+// The paddle: straight up out of the collar, a flat board in cross-section
+// (thin along X, wide along Y), ribbed into cushions, its top edge lime.
+const PADDLE_START = COIL_TOP + COLLAR_HEIGHT - 2; // a little inside the collar
+const FOAM_LENGTH = PADDLE_LENGTH - CAP_LENGTH;
 
-/** Centerline point and tangent at distance s along the tube (0 = in the collar). */
-function TubeAt(s) {
-    if (s <= TUBE_RISE) return { p: [0, 0, TUBE_START + s], t: [0, 0, 1] };
-    const theta = Math.PI - (s - TUBE_RISE) / ARCH_RADIUS; // π .. 0, over the top
-    return {
-        p: [ARCH_RADIUS + ARCH_RADIUS * Math.cos(theta), 0, ARCH_BASE + ARCH_RADIUS * Math.sin(theta)],
-        t: [Math.sin(theta), 0, -Math.cos(theta)],
-    };
-}
-
-/** The foam's radius at s: full in each cushion, narrowing into a groove between two. */
-function FoamRadius(s) {
-    const f = (s / TUBE_LENGTH) * TUBE_SEGMENTS;
+/** The paddle's thickness factor at s along the foam: full in each cushion, narrowing into a groove between two. */
+function Cushion(s) {
+    const f = (s / FOAM_LENGTH) * PADDLE_SEGMENTS;
     const frac = f - Math.floor(f);
-    return TUBE_RADIUS * (1 - GROOVE_DEPTH * (1 - Math.sin(Math.PI * frac)) ** 3);
+    return 1 - GROOVE_DEPTH * (1 - Math.sin(Math.PI * frac)) ** 3;
 }
 
 {
-    const side = [0, 1, 0];
-    const count = TUBE_SEGMENTS * RINGS_PER_SEGMENT;
+    const PaddleRing = (s, factor, slope) => ({
+        center: [0, 0, PADDLE_START + s], normal: [1, 0, 0], side: [0, 1, 0],
+        radius: PADDLE_HALF_THICKNESS * factor, width: PADDLE_HALF_WIDTH / PADDLE_HALF_THICKNESS,
+        roundness: PADDLE_ROUNDNESS, slope, v: s,
+    });
+    const count = PADDLE_SEGMENTS * RINGS_PER_SEGMENT;
     const rings = [];
     for (let i = 0; i <= count; i++) {
-        const s = (TUBE_LENGTH * i) / count;
-        const { p, t } = TubeAt(s);
+        const s = (FOAM_LENGTH * i) / count;
         const ds = 0.01;
-        const slope = (FoamRadius(Math.min(s + ds, TUBE_LENGTH)) - FoamRadius(Math.max(s - ds, 0))) / (2 * ds);
-        rings.push({ center: p, normal: Cross(t, side), side, radius: FoamRadius(s), slope, v: s });
+        const slope = PADDLE_HALF_THICKNESS * (Cushion(Math.min(s + ds, FOAM_LENGTH)) - Cushion(Math.max(s - ds, 0))) / (2 * ds);
+        rings.push(PaddleRing(s, Cushion(s), slope));
     }
-    Tube(rings, SIDES, "foam", () => [[HEAD, 1]], true);
-    const physicsCount = 24;
-    PhysicsTube(Array.from({ length: physicsCount + 1 }, (_, i) => TubeAt((TUBE_LENGTH * i) / physicsCount).p), () => TUBE_RADIUS, side, 12, true);
+    Tube(rings, PADDLE_SIDES, "foam", () => [[HEAD, 1]], true);
+    // The lime top edge: the same board, flat on top.
+    Tube([PaddleRing(FOAM_LENGTH - 0.5, 1, 0), PaddleRing(PADDLE_LENGTH, 1, 0)], PADDLE_SIDES, "cap", () => [[HEAD, 1]], true);
 
-    // The cap: straight down from the tube's end, slightly wider, its far end
-    // rounded off; a lighter lip around its open end.
-    const end = TubeAt(TUBE_LENGTH);
-    const down = end.t; // [0, 0, -1]
-    const capRings = [];
-    const dome = CAP_RADIUS * 0.45;
-    const capSteps = 6;
-    for (let i = 0; i <= capSteps; i++) {
-        const u = (i / capSteps) * (CAP_LENGTH + dome);
-        let radius = CAP_RADIUS, slope = 0;
-        if (u > CAP_LENGTH) { // an ellipse quarter closing the end
-            const e = (u - CAP_LENGTH) / dome;
-            radius = CAP_RADIUS * Math.sqrt(Math.max(1 - e * e, 0));
-            slope = e < 1 ? (-CAP_RADIUS * e) / (dome * Math.sqrt(1 - e * e)) : 0;
-        }
-        capRings.push({ center: Add(end.p, Scale(down, u - 1)), normal: Cross(down, side), side, radius: Math.max(radius, 0.01), slope: Math.max(slope, -8), v: TUBE_LENGTH + u });
-    }
-    Tube(capRings, SIDES, "cap", () => [[HEAD, 1]], true);
-    PhysicsTube([Add(end.p, Scale(down, -1)), Add(end.p, Scale(down, CAP_LENGTH + dome * 0.6))], () => CAP_RADIUS, side, 12, true);
-
-    // The lip: a torus around the cap's open end.
-    const lipCenter = Add(end.p, Scale(down, -0.5));
-    const lipRings = [];
-    const lipSteps = SIDES;
-    for (let i = 0; i <= lipSteps; i++) {
-        const a = (2 * Math.PI * i) / lipSteps;
-        const radial = Add(Scale(Cross(down, side), Math.cos(a)), Scale(side, Math.sin(a)));
-        const tangent = Add(Scale(Cross(down, side), -Math.sin(a)), Scale(side, Math.cos(a)));
-        lipRings.push({ center: Add(lipCenter, Scale(radial, CAP_RADIUS)), normal: radial, side: Cross(tangent, radial), radius: RIM_RADIUS, v: i * 4 });
-    }
-    Tube(lipRings, WIRE_SIDES, "cap_rim", () => [[HEAD, 1]]);
+    // Collision: one box-like prism around the whole paddle.
+    PhysicsPrism(paddlePhysics, [PADDLE_START, PADDLE_START + PADDLE_LENGTH], Array.from({ length: 12 }, (_, k) => {
+        const c = Math.cos((2 * Math.PI * k) / 12), s = Math.sin((2 * Math.PI * k) / 12);
+        const e = 2 / PADDLE_ROUNDNESS;
+        return [PADDLE_HALF_THICKNESS * Math.sign(c) * Math.abs(c) ** e, PADDLE_HALF_WIDTH * Math.sign(s) * Math.abs(s) ** e];
+    }));
 }
 
 // --- animations (SMD, written by model.mjs) ---
-/** A damped sine starting at 0, faded to exactly 0 at the clip's end. */
-function Damped(t, amplitude, hz, damping) {
-    if (t < 0) return 0;
-    const fade = 1 - (t / BOING_SECONDS) ** 6;
-    return amplitude * Math.sin(2 * Math.PI * hz * t) * Math.exp(-damping * t) * Math.max(fade, 0);
-}
+/** The swing at time t: the lean out to the side (radians, around X), a smooth sine. */
+const Lean = t => (SWING_DEGREES * Math.PI / 180) * Math.sin((2 * Math.PI * t) / SWING_SECONDS);
 
-function BoingFrame(t) {
+function SwingFrame(t) {
     const frame = BindFrame(BONES);
-    // Squash: the first swing compresses (negative), the next stretches.
-    const length = 1 - Damped(t, SQUASH, SQUASH_HZ, SQUASH_DAMPING);
-    const rad = Math.PI / 180;
-    const sway = Damped(t, WOBBLE_DEGREES * rad, WOBBLE_HZ, WOBBLE_DAMPING);
-    const sideSway = Damped(t, SIDE_WOBBLE_DEGREES * rad, SIDE_WOBBLE_HZ, WOBBLE_DAMPING);
-    for (let i = 1; i <= SPRING_BONES + 1; i++) {
-        const isHead = i === HEAD;
-        // spring_0 (index 1) stays at the coil's bottom; every bone above sits one compressed segment up.
-        if (i > 1) frame[i].pos = [0, 0, SEGMENT * length];
-        // The bend is spread over the bones below the head; the head adds its lagging follow-through.
-        frame[i].rot = isHead
-            ? [HEAD_FOLLOW * Damped(t - HEAD_LAG_SECONDS, SIDE_WOBBLE_DEGREES * rad, SIDE_WOBBLE_HZ, WOBBLE_DAMPING),
-                HEAD_FOLLOW * Damped(t - HEAD_LAG_SECONDS, WOBBLE_DEGREES * rad, WOBBLE_HZ, WOBBLE_DAMPING), 0]
-            : [sideSway / SPRING_BONES, sway / SPRING_BONES, 0];
-    }
+    // The coil bends its share, spread over its bones; the paddle tilts the rest a little later.
+    for (let i = 1; i <= SPRING_BONES; i++) frame[i].rot = [(SPRING_SHARE * Lean(t)) / SPRING_BONES, 0, 0];
+    frame[HEAD].rot = [(1 - SPRING_SHARE) * Lean(t - HEAD_LAG * SWING_SECONDS), 0, 0];
     return frame;
 }
 
@@ -319,24 +276,29 @@ const triangles = Object.entries(tris).flatMap(([part, list]) => list.map(tri =>
     material: `${NAME}_${part}`,
     corners: tri.map(i => verts[i]),
 })));
-const boingFrames = Array.from({ length: Math.round(BOING_SECONDS * FPS) + 1 }, (_, f) => BoingFrame(f / FPS));
+// The loop's last frame would repeat its first: leave it out.
+const swingFrames = Array.from({ length: Math.round(SWING_SECONDS * FPS) }, (_, f) => SwingFrame(f / FPS));
 const materials = Object.fromEntries(PARTS.map(part => [part, `${MATERIAL_DIR}/${NAME}_${part}.vmat`]));
 const vmdl = VmdlText({
     name: NAME,
     mesh: `${MODEL_DIR}/${NAME}.smd`,
-    physicsObj: `${MODEL_DIR}/${NAME}_physics.obj`,
+    physicsObj: [
+        { file: `${MODEL_DIR}/${NAME}_physics.obj`, bone: "" },
+        { file: `${MODEL_DIR}/${NAME}_physics_paddle.obj`, bone: "head" },
+    ],
     materials,
     animations: [
+        { name: "swing", file: `${MODEL_DIR}/${NAME}_swing.smd`, looping: true },
         { name: "idle", file: `${MODEL_DIR}/${NAME}_idle.smd`, looping: true },
-        { name: "boing", file: `${MODEL_DIR}/${NAME}_boing.smd`, looping: false },
     ],
     surfaceProp: SURFACE_PROP,
 });
 
 WriteAddonFile(`${MODEL_DIR}/${NAME}.smd`, SmdText(BONES, triangles));
+WriteAddonFile(`${MODEL_DIR}/${NAME}_swing.smd`, SmdAnimationText(BONES, swingFrames));
 WriteAddonFile(`${MODEL_DIR}/${NAME}_idle.smd`, SmdAnimationText(BONES, [BindFrame(BONES)]));
-WriteAddonFile(`${MODEL_DIR}/${NAME}_boing.smd`, SmdAnimationText(BONES, boingFrames));
 WriteAddonFile(`${MODEL_DIR}/${NAME}_physics.obj`, ObjText(physics, NAME, GENERATOR));
+WriteAddonFile(`${MODEL_DIR}/${NAME}_physics_paddle.obj`, ObjText(paddlePhysics, NAME, GENERATOR));
 WriteAddonFile(`${MODEL_DIR}/${NAME}.vmdl`, vmdl);
 
 const rough = `${MATERIAL_DIR}/${NAME}_spring_rough.png`;
@@ -345,7 +307,6 @@ for (const [part, rgb, options] of [
     ["foam", FOAM_COLOR, { roughness: "materials/melon_racer/surfaces/inflatable_rough.png" }],
     ["base", BASE_COLOR, { roughness: "materials/melon_racer/surfaces/inflatable_rough.png" }],
     ["cap", CAP_COLOR, { roughness: "materials/melon_racer/surfaces/inflatable_rough.png" }],
-    ["cap_rim", CAP_RIM_COLOR, { roughness: "materials/melon_racer/surfaces/inflatable_rough.png" }],
     ["spring", SPRING_COLOR, { metalness: 1, roughness: rough }],
 ]) {
     const texture = `${MATERIAL_DIR}/${NAME}_${part}_color.png`;
@@ -354,6 +315,6 @@ for (const [part, rgb, options] of [
 }
 
 const triangleCount = Object.values(tris).reduce((s, t) => s + t.length, 0);
-const top = ARCH_BASE + ARCH_RADIUS + TUBE_RADIUS;
-console.log(`${triangleCount} triangles (collision ${physics.triangleCount}), ${BONES.length} bones, boing ${boingFrames.length} frames; ${(2 * ARCH_RADIUS + CAP_RADIUS + COLLAR_RADIUS).toFixed(0)} long, ${top.toFixed(0)} high`);
+const top = PADDLE_START + PADDLE_LENGTH;
+console.log(`${triangleCount} triangles (collision ${physics.triangleCount} + paddle ${paddlePhysics.triangleCount}), ${BONES.length} bones, swing ${swingFrames.length} frames; ${top.toFixed(0)} high, ${(2 * PADDLE_HALF_WIDTH).toFixed(0)} wide, sweeps ${(2 * top * Math.sin(SWING_DEGREES * Math.PI / 180)).toFixed(0)} across at the top`);
 console.log(`compile: game/bin/win64/resourcecompiler.exe -game csgo -addon melon_racer -i "<content path>/${MODEL_DIR}/${NAME}.vmdl"`);

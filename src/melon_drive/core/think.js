@@ -8,6 +8,7 @@ import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud, UpdateJumpHud, UpdateH
 import { UpdateKart } from "../movement/index.js";
 import { HandleMelonLost } from "../health/index.js";
 import { phase, UpdateRaceFlow } from "../race/heat/race-flow.js";
+import { UpdateStats } from "../race/stats/stats.js";
 import { UpdatePrediction, HidePrediction } from "../fx/prediction/prediction.js";
 import { UpdateLiftCamera, UpdatePodiumCamera, UpdateZoneCamera, UpdateSideViewCamera, UpdateFollowCamera } from "../camera/index.js";
 import { UpdateBoostTrail, StopBoostTrail } from "../fx/boost-trail/boost-trail.js";
@@ -113,6 +114,11 @@ export function Think() {
         UpdateRaceFlow(now);
     } catch (err) {
         Debug(`Think: UpdateRaceFlow threw: ${err}`);
+    }
+    try {
+        UpdateStats(now, Math.min(dt, 1)); // a long pause (a stall, a reload) isn't time on the server
+    } catch (err) {
+        Debug(`Think: UpdateStats threw: ${err}`);
     }
     try {
         UpdateSpikeSprings(now);

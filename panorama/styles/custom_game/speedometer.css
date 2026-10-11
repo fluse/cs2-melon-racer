@@ -1548,6 +1548,149 @@
     flow-children: down;
 }
 
+/* The leaderboards page (usermenu_leaderboards_page, hud/leaderboards/):
+   laid out like the menu's columns — on the left the ACTIONS column
+   (.UserMenuActions, its buttons; the picked one gold), a divider, then the
+   picked board: its title and its players in one column, like the
+   scoreboard's rows, the viewer's own row outlined in gold (.ScoreRow.Self).
+   Rows a little lower than the scoreboard's, so 20 fit on the screen. */
+/* As tall as its buttons: .UserMenuActions' height: 100% follows the column
+   next to it, and a board with one player cut all but the first button off. */
+.UserMenuActions.LeaderboardButtons {
+    height: fit-children;
+}
+
+.UserMenuActionButton.LeaderboardTab.Selected {
+    border: 2px solid #ffd84d;
+    background-color: #ffd84d26;
+}
+
+/* A fixed width, not fill-parent-flow: the rows inside, at 100%, sized to
+   their content. The card's inside is 1240 - 2 x (32 padding + 2 border) =
+   1172 wide; less the ACTIONS column (360) and the divider (1 + 2 x 32)
+   leaves 747. */
+.LeaderboardBoard {
+    width: 747px;
+    flow-children: down;
+}
+
+.LeaderboardHeader {
+    width: 100%;
+    height: 50px;
+    flow-children: right;
+}
+
+.LeaderboardTitles {
+    width: fill-parent-flow( 1.0 );
+    vertical-align: center;
+    flow-children: down;
+}
+
+.LeaderboardTitle {
+    horizontal-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: white;
+}
+
+.LeaderboardSubtitle {
+    horizontal-align: center;
+    margin-top: 2px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #ff7a7e;
+}
+
+/* ◀ ▶ beside the title: the best times with more than one track (Paging). */
+.LeaderboardPager {
+    width: 40px;
+    height: 40px;
+    vertical-align: center;
+    border: 2px solid #cfe8a855;
+    background-color: #00000000;
+    visibility: collapse;
+
+    &:hover {
+        background-color: #cfe8a81a;
+    }
+}
+
+#usermenu_leaderboards_page.Paging .LeaderboardPager {
+    visibility: visible;
+}
+
+.LeaderboardPagerLabel {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: 16px;
+    color: #cfe8a8;
+}
+
+.LeaderboardTable {
+    width: 100%;
+    margin-top: 6px;
+    flow-children: down;
+}
+
+.LeaderboardRow {
+    width: 100%;
+    height: 27px;
+    margin-top: 2px;
+    flow-children: right;
+    border: 2px solid #00000000;
+    background-color: #ffffff08;
+
+    &.Unused {
+        visibility: collapse;
+    }
+
+    &.Self {
+        border: 2px solid #ffd84d;
+    }
+}
+
+.LeaderboardRow Label {
+    vertical-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+}
+
+.LeaderboardRow.LeaderboardColumns {
+    height: 22px;
+    margin-top: 0px;
+    border: 0px solid #00000000;
+    border-bottom: 1px solid #ffffff1f;
+    background-color: #00000000;
+}
+
+.LeaderboardRow.LeaderboardColumns Label {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: #cfe8a8aa;
+}
+
+.LbRank {
+    width: 56px;
+    text-align: center;
+}
+
+.LbName {
+    width: fill-parent-flow( 1.0 );
+    margin-left: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.LeaderboardRow .LbValue {
+    width: 160px;
+    margin-right: 12px;
+    text-align: right;
+    color: #cfe8a8;
+}
+
 .TuningFooter {
     width: 100%;
     margin-top: 28px;

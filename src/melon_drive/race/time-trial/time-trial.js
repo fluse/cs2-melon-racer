@@ -2,6 +2,7 @@ import { Instance } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { FormatRaceTime, ParseSaveData, GetBestTimes, RecordRunTime } from "./logic.js";
 import { SAVE_DATA_BEST_TIMES_KEY } from "../../constants/index.js";
+import { CountStat } from "../stats/stats.js";
 
 // Time trial: every run over a track is timed, for every player on their
 // own — from crossing the start line (outside a heat) or GO (in a heat) to
@@ -73,6 +74,7 @@ export function FinishRun(kart, trackId) {
         SaveBestTimes();
     }
     kart.lastRun = { trackId, time, newBest, at: now };
+    CountStat(kart, "finishes");
     Debug(`FinishRun: "${name}" ran track ${trackId} in ${FormatRaceTime(time)}${newBest ? " — new best" : ""}`);
 }
 

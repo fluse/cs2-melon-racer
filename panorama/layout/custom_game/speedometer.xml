@@ -438,6 +438,14 @@
 									<Label class="UserMenuButtonLabel" text="{s:hub_label}" />
 								</Panel>
 							</Button>
+							<!-- Every leaderboard on one page, in place of the columns
+							     (usermenu_leaderboards_page below, hud/leaderboards/). -->
+							<Button id="usermenu_leaderboards_button" class="UserMenuActionButton UserMenuButtonGold">
+								<Panel class="UserMenuButtonContent">
+									<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/leaderboard.png" />
+									<Label class="UserMenuButtonLabel" text="Leaderboards" />
+								</Panel>
+							</Button>
 							<!-- Pushes the tutorial button down to the column's bottom edge,
 							     apart from the buttons above (.UserMenuActionsSpacer). -->
 							<Panel class="UserMenuActionsSpacer" hittest="false" />
@@ -1027,6 +1035,177 @@
 						</Panel>
 						<Panel class="TuningFooter">
 							<Button id="triggers_back_button" class="UserMenuToggle TuningFooterButton">
+								<Label class="UserMenuToggleName" text="◀ Back" />
+							</Button>
+						</Panel>
+					</Panel>
+
+					<!-- Leaderboards page (ACTIONS → "Leaderboards", SetUserMenuPage in
+					     hud/user-menu.js, filled in by hud/leaderboards/leaderboards.js): laid
+					     out like the menu's columns — on the left a column like ACTIONS with a
+					     button per leaderboard (lb_tab_<tab>: "times", then a STAT_SLIDES key
+					     each — add one here with a new stat; Selected marks the current one),
+					     a divider, the picked board on the right. The best times page through
+					     the tracks with ◀ ▶ (shown with Paging). LEADERBOARD_ROWS rows in one
+					     column, unused ones collapsed (Unused), the viewer's own one Self. -->
+					<Panel id="usermenu_leaderboards_page" class="TuningPage Hidden">
+						<Panel class="UserMenuColumns">
+							<Panel class="UserMenuActions LeaderboardButtons">
+								<Label class="UserMenuColumnTitle" text="LEADERBOARDS" />
+								<Button id="lb_tab_times" class="UserMenuActionButton UserMenuButtonPlain LeaderboardTab">
+									<Panel class="UserMenuButtonContent">
+										<Label class="UserMenuButtonLabel" text="Best Times" />
+									</Panel>
+								</Button>
+								<Button id="lb_tab_playTime" class="UserMenuActionButton UserMenuButtonPlain LeaderboardTab">
+									<Panel class="UserMenuButtonContent">
+										<Label class="UserMenuButtonLabel" text="Time on Server" />
+									</Panel>
+								</Button>
+								<Button id="lb_tab_crashes" class="UserMenuActionButton UserMenuButtonPlain LeaderboardTab">
+									<Panel class="UserMenuButtonContent">
+										<Label class="UserMenuButtonLabel" text="Most Crashes" />
+									</Panel>
+								</Button>
+								<Button id="lb_tab_finishes" class="UserMenuActionButton UserMenuButtonPlain LeaderboardTab">
+									<Panel class="UserMenuButtonContent">
+										<Label class="UserMenuButtonLabel" text="Most Finishes" />
+									</Panel>
+								</Button>
+								<Button id="lb_tab_boostTime" class="UserMenuActionButton UserMenuButtonPlain LeaderboardTab">
+									<Panel class="UserMenuButtonContent">
+										<Label class="UserMenuButtonLabel" text="Boost Time" />
+									</Panel>
+								</Button>
+								<Button id="lb_tab_perfectHits" class="UserMenuActionButton UserMenuButtonPlain LeaderboardTab">
+									<Panel class="UserMenuButtonContent">
+										<Label class="UserMenuButtonLabel" text="Most Perfect Hits" />
+									</Panel>
+								</Button>
+							</Panel>
+
+							<Panel class="UserMenuDivider" />
+
+							<Panel class="LeaderboardBoard">
+								<Panel class="LeaderboardHeader">
+									<Button id="lb_track_prev" class="LeaderboardPager"><Label class="LeaderboardPagerLabel" text="◀" /></Button>
+									<Panel class="LeaderboardTitles">
+										<Label class="LeaderboardTitle" text="{s:lb_title}" />
+										<Label class="LeaderboardSubtitle" text="{s:lb_subtitle}" />
+									</Panel>
+									<Button id="lb_track_next" class="LeaderboardPager"><Label class="LeaderboardPagerLabel" text="▶" /></Button>
+								</Panel>
+								<Panel class="LeaderboardTable">
+									<Panel class="LeaderboardRow LeaderboardColumns">
+										<Label class="LbRank" text="#" />
+										<Label class="LbName" text="PLAYER" />
+										<Label class="LbValue" text="{s:lb_column}" />
+									</Panel>
+									<Panel id="lb_row_0" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_1" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_2" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_3" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_4" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_5" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_6" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_7" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_8" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_9" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_10" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_11" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_12" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_13" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_14" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_15" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_16" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_17" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_18" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+									<Panel id="lb_row_19" class="LeaderboardRow Unused">
+										<Label class="LbRank" text="{s:rank}" />
+										<Label class="LbName" text="{s:name}" />
+										<Label class="LbValue" text="{s:value}" />
+									</Panel>
+								</Panel>
+							</Panel>
+						</Panel>
+						<Panel class="TuningFooter">
+							<Button id="leaderboards_back_button" class="UserMenuToggle TuningFooterButton">
 								<Label class="UserMenuToggleName" text="◀ Back" />
 							</Button>
 						</Panel>

@@ -22,6 +22,7 @@ import { PlaceOnPodium, TestGrandPrix } from "../race/podium/podium.js";
 import { GetSpeedHud } from "./layout.js";
 import { HideHubModal } from "./hub-modal/hub-modal.js";
 import { SetUserMenuOpen, SetUserMenuPage, UpdateSkinHud, UpdateToggleHud } from "./user-menu.js";
+import { SelectLeaderboardTab, StepLeaderboardsTrack } from "./leaderboards/index.js";
 import { COLOR_PRESETS, RacePhase } from "../constants/index.js";
 
 /** @typedef {import("../core/kart-registry.js").Kart} Kart */
@@ -92,6 +93,9 @@ const KART_BUTTONS = {
         SetUserMenuOpen(slot, kart, false);
         SendKartToTutorial(kart);
     },
+    // The leaderboards page's best times: previous/next track.
+    lb_track_prev: (slot, kart) => StepLeaderboardsTrack(slot, kart, -1),
+    lb_track_next: (slot, kart) => StepLeaderboardsTrack(slot, kart, 1),
 };
 
 /**
@@ -117,17 +121,19 @@ const TOGGLE_BUTTONS = {
 };
 
 /**
- * Buttons that open a developer page in place of the menu's columns
- * (SetUserMenuPage), and each page's Back button.
+ * Buttons that open a page in place of the menu's columns (SetUserMenuPage)
+ * — the leaderboards and the developer pages —, and each page's Back button.
  * @type {Record<string, import("./user-menu.js").UserMenuPage | undefined>}
  */
 const PAGE_BUTTONS = {
+    usermenu_leaderboards_button: "leaderboards",
     usermenu_camera_button: "camera",
     usermenu_physics_button: "physics",
     usermenu_triggers_button: "triggers",
     camtune_back_button: undefined,
     phytune_back_button: undefined,
     triggers_back_button: undefined,
+    leaderboards_back_button: undefined,
 };
 
 /**
@@ -164,8 +170,9 @@ const TEST_TRIGGER_BUTTONS = {
 };
 
 /**
- * Buttons handled by id prefix: the color swatches, the skins and the tuning pages'
- * controls. Each returns whether the id was one of its buttons.
+ * Buttons handled by id prefix: the color swatches, the skins, the
+ * leaderboards' tabs and the tuning pages' controls. Each returns whether
+ * the id was one of its buttons.
  * @type {[string, (slot: number, kart: Kart, buttonId: string) => boolean][]}
  */
 const PREFIX_BUTTONS = [
@@ -192,6 +199,7 @@ const PREFIX_BUTTONS = [
             return true;
         },
     ],
+    ["lb_tab_", (slot, kart, buttonId) => SelectLeaderboardTab(slot, kart, buttonId.slice("lb_tab_".length))], // hud/leaderboards/
     ["camtune_", HandleCameraTuningClick], // dev/camera-tuning.js
     ["phytune_", HandlePhysicsTuningClick], // dev/physics-tuning.js
 ];

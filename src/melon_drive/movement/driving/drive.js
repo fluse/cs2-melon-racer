@@ -43,6 +43,7 @@ import { UpdateSpectatorHat } from "../../dev/free-look.js";
 import { ApplyImpactDamage } from "../../health/damage/damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage, WallBounceBreaksAtImpact } from "../wall-bounce/wall-bounce.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
+import { CountStat } from "../../race/stats/stats.js";
 import { ApplyHealing } from "../../health/heal/index.js";
 import { CurrentWallRules, CurrentSideView, InSideViewDepthZone, InWater, InJumpRechargeZone, CurrentGravityZone } from "../../zones/registry.js";
 import { ChargeInRechargeZone } from "../../zones/jump-recharge/logic.js";
@@ -240,6 +241,9 @@ export function UpdateKart(slot, kart, dt) {
     const boost = AttackBoost(kart.health, attackHeld, dt);
     kart.health = boost.health;
     kart.attackBoosting = boost.boosting; // shows the boost trail, see fx/boost-trail/boost-trail.js
+    if (boost.boosting) {
+        CountStat(kart, "boostTime", dt);
+    }
     if (attackHeld) {
         LogAttackHeld(slot, kart, currentVelocity, boost.boosting);
     }

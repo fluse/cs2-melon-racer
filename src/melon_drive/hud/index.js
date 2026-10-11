@@ -1,8 +1,9 @@
 // The custom HUD (panorama/layout/custom_game/speedometer.xml). A panel
 // with its own rules has its own folder — speedometer/ (speed, jump and
 // health bars), track/ (time trial clock + checkpoint strip), scoreboard/
-// (Tab: Grand Prix points, best times), hub-modal/ ("Start Grand
-// Prix": the heats and who rides along) — the others are one file each: bounce-panel.js, user-menu.js.
+// (Tab: Grand Prix points, best times), leaderboards/ (the user menu's
+// page with every leaderboard), hub-modal/ ("Start Grand Prix": the heats
+// and who rides along) — the others are one file each: bounce-panel.js, user-menu.js.
 // layout.js finds the custom_hud_layout entity; inputs.js handles every
 // button click.
 export { GetSpeedHud, ResetHudForPlayer } from "./layout.js";

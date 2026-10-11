@@ -10,6 +10,7 @@ import { JumpTimingFactor, JumpMultiplier, WallTimingPress } from "../wall-bounc
 import { KartMaxSpeed } from "../momentum/logic.js";
 import { PhysicsFactor } from "../../dev/physics-tuning-logic.js";
 import { PlayPerfectSpark } from "../wall-bounce/wall-bounce.js";
+import { CountStat } from "../../race/stats/stats.js";
 import { JUMP_SPEED, GROUND_JUMP_BUFFER, WALL_JUMP_BUFFER, BOUNCE_RATINGS, WALL_JUMP_CHARGES } from "../../constants/index.js";
 import { LogJumpPress, LogWallJumpVerdict } from "../../dev/collision-debug.js";
 
@@ -260,6 +261,7 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
         kart.perfectBounceBoost = rated.rating === BOUNCE_RATINGS[0];
         if (kart.perfectBounceBoost) {
             PlayPerfectSpark(kart);
+            CountStat(kart, "perfectHits");
         }
     }
     kart.lastWallJump = { time: now, normal: wallContact.normal };

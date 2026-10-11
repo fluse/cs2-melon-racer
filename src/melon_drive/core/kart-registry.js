@@ -28,6 +28,7 @@ import { predictionDotSet } from "./trace.js";
  *   hudResendAt?: { health?: number, jump?: number }, // when they send their whole state again — see HUD_RESEND_SECONDS
  *   hubRacersResendAt?: number, hubRacersShown?: Record<string, string>, // the hub window's heats and racers: next full resend, and what it last sent — see UpdateHubLists
  *   scoreboardPick?: number, // track the time trial board was paged to while Tab is held (unset: the viewer's own) — see UpdateScoreboardInput
+ *   scoreboardStat?: string, // stat page (STAT_SLIDES key) the scoreboard was paged to while Tab is held (unset: the standings or a track's best times) — see UpdateScoreboardInput
  *   scoreboardNextUpdate?: number, scoreboardResendAt?: number, scoreboardShown?: Record<string, string>, // the scoreboard's next rebuild, next full resend, and what it last sent — see UpdateScoreboardHud
  *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
@@ -46,7 +47,10 @@ import { predictionDotSet } from "./trace.js";
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
- *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the developer page the user menu shows in place of its columns, if any — see SetUserMenuPage
+ *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the page (leaderboards, a developer page) the user menu shows in place of its columns, if any — see SetUserMenuPage
+ *   leaderboardTab?: string, // leaderboard the user menu's leaderboards page shows (unset: the best times) — see SelectLeaderboardTab
+ *   leaderboardTrack?: number, // track the leaderboards page's best times were paged to (unset: the player's own track, else the first) — see StepLeaderboardsTrack
+ *   leaderboardNextUpdate?: number, leaderboardResendAt?: number, leaderboardShown?: Record<string, string>, // the leaderboards page's next rebuild, next full resend, and what it last sent — see UpdateLeaderboardsHud
  *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
