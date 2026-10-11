@@ -1,6 +1,6 @@
 // Pure rules of the melon skins (kart/skin.js): which skin a player has,
 // inside the addon's parsed save data.
-import { MELON_SKINS, MELON_SKIN_DEFAULT, MELON_SKINS_PER_PAGE } from "../constants/index.js";
+import { MELON_SKINS, MELON_SKIN_DEFAULT, MELON_SKIN_LEVELS, MELON_SKINS_PER_PAGE } from "../constants/index.js";
 import { PlayerSetting, WithPlayerSetting } from "./player-settings-logic.js";
 
 /** Whether `skin` is one of MELON_SKINS. @param {unknown} skin */
@@ -49,4 +49,23 @@ export function StepSkinPage(page, direction) {
 /** The pager's indicator: "2 / 3". @param {number} page */
 export function SkinPageLabel(page) {
     return `${page + 1} / ${SkinPageCount()}`;
+}
+
+/** The level a skin needs (MELON_SKIN_LEVELS; 1 for one not listed). @param {string} skin */
+export function SkinUnlockLevel(skin) {
+    return MELON_SKIN_LEVELS[skin] ?? 1;
+}
+
+/** Whether a player at `level` may pick `skin`. @param {string} skin @param {number} level */
+export function IsSkinUnlocked(skin, level) {
+    return level >= SkinUnlockLevel(skin);
+}
+
+/**
+ * The skins a level-up from `fromLevel` to `toLevel` unlocks, in MELON_SKINS
+ * order.
+ * @param {number} fromLevel @param {number} toLevel
+ */
+export function SkinsUnlockedBetween(fromLevel, toLevel) {
+    return Object.keys(MELON_SKINS).filter((skin) => SkinUnlockLevel(skin) > fromLevel && SkinUnlockLevel(skin) <= toLevel);
 }

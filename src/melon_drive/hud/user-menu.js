@@ -6,8 +6,9 @@ import { UpdatePhysicsTuningHud } from "../dev/physics-tuning.js";
 import { IsPredictionOn } from "../fx/prediction/prediction.js";
 import { GetMelonGlowColor, IsMelonGlowOn } from "../kart/look.js";
 import { IsStartInTutorialOn } from "../kart/join-spot.js";
-import { GetMelonSkin, GetSkinPage } from "../kart/skin.js";
-import { SkinPageCount, SkinPageLabel } from "../kart/skin-logic.js";
+import { GetMelonSkin, GetSkinPage, IsMelonSkinUnlocked } from "../kart/skin.js";
+import { SkinPageCount, SkinPageLabel, SkinUnlockLevel } from "../kart/skin-logic.js";
+import { GetKartLevel } from "../race/level/level.js";
 import { COLOR_PRESETS, MELON_SKINS } from "../constants/index.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { CanRestartTimeTrial } from "../race/time-trial/time-trial.js";
@@ -127,7 +128,8 @@ export function UpdateToggleHud(slot, kart, buttonId) {
 
 /**
  * The skin grid (usermenu_skin_<key>, one per MELON_SKINS): the player's
- * current skin gets SkinSelected; of its pages (usermenu_skinpage_<page>,
+ * current skin gets SkinSelected, one still locked SkinLocked with the level
+ * it needs ("LV 12", skin_lock); of its pages (usermenu_skinpage_<page>,
  * MELON_SKINS_PER_PAGE each) only the player's one shows, and the pager next
  * to the MELON title (usermenu_skinpager: "1 / 2", ◀ ▶) only with more than
  * one page (Paging).
@@ -139,8 +141,11 @@ export function UpdateSkinHud(slot, kart) {
         return;
     }
     const skin = GetMelonSkin(kart);
+    kart.skinHudLevel = GetKartLevel(kart);
     for (const key of Object.keys(MELON_SKINS)) {
         hud.SetHasClassForPlayer(slot, `usermenu_skin_${key}`, "SkinSelected", key === skin);
+        hud.SetHasClassForPlayer(slot, `usermenu_skin_${key}`, "SkinLocked", !IsMelonSkinUnlocked(kart, key));
+        hud.SetDialogVariableStringForPlayer(slot, `usermenu_skin_${key}`, "skin_lock", `LV ${SkinUnlockLevel(key)}`);
     }
     const page = GetSkinPage(kart);
     const pages = SkinPageCount();
@@ -186,6 +191,9 @@ export function UpdateUserMenu(slot, kart) {
         // a heat, the hub) with the menu up, and so can the player's heat.
         GetSpeedHud()?.SetHasClassForPlayer(slot, "usermenu_restart_row", "Hidden", !CanRestartTimeTrial(kart));
         UpdateHubButtonHud(slot, kart);
+        if (kart.skinHudLevel !== GetKartLevel(kart)) {
+            UpdateSkinHud(slot, kart); // a level-up with the menu open unlocks skins
+        }
         if (kart.userMenuPage === "leaderboards") {
             UpdateLeaderboardsHud(slot, kart); // the totals keep growing while it's open
         } else if (kart.userMenuPage === undefined) {

@@ -9,8 +9,11 @@
 - Friction Areas
 - Magnete
 
+
 # Route Ideen
 - Flipper Tisch, auf dem man als erstes ins ziel gebounced werden muss.
+- takeshi’s castle Türen.
+
 
 # Obstacles
 - Flipper Ball Bounce

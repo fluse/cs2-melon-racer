@@ -8,9 +8,11 @@
 // rigidly on the top one ("head"):
 //   swing   one full swing there and back (SWING_SECONDS), looping
 //   idle    the rest pose, upright (one frame)
-// Use it as a prop_dynamic with Idle Animation "swing", Idle Animation Loop
-// Mode "Loop". The paddle swings across its broad face, along Y (stand it
-// across the track: the melons come at its face). Collision: the base and
+// Use it as a prop_dynamic; the script (src/melon_drive/world/bouncer/) finds
+// it by model and starts its "swing" loop at a random point, so several
+// don't swing in step — leave Starting/Idle Animation empty. The paddle
+// swings across its broad face, along Y here — X in Hammer, ModelDoc turns
+// an .smd 90 degrees (stand it across the track: the melons come at its face). Collision: the base and
 // coil on the root, the paddle on "head", so it swings along. Writes
 //   models/melon_racer/bouncer/bouncer.smd           render mesh + skeleton (bind pose)
 //   models/melon_racer/bouncer/bouncer_{swing,idle}.smd   the animations
@@ -20,6 +22,7 @@
 // The foam uses the inflatable vinyl's roughness (make-inflatable.mjs — run
 // that first). Compile the .vmdl with resourcecompiler (see the end of the
 // output). Origin on the floor under the spring.
+import { BOUNCER_SWING_SECONDS } from "../../src/melon_drive/world/bouncer/constants.js";
 import { BindFrame, Mesh, ObjText, SmdAnimationText, SmdText, SolidPng, VmatText, VmdlText, WriteAddonFile } from "../lib/model.mjs";
 
 // --- shape (units) ---
@@ -43,7 +46,7 @@ const CAP_LENGTH = 12; // the lime top edge (part of the paddle's length, same c
 // --- swing animation ---
 const SPRING_BONES = 4; // segments the coil bends in
 const FPS = 30;
-const SWING_SECONDS = 2.4; // one full swing there and back
+const SWING_SECONDS = BOUNCER_SWING_SECONDS; // one full swing there and back (shared with the script, which starts each bouncer at a random point of it)
 const SWING_DEGREES = 38; // how far the paddle leans out to each side
 const SPRING_SHARE = 0.4; // the share of the lean the coil bends; the paddle tilts the rest on top
 const HEAD_LAG = 0.06; // the paddle follows the coil's bend this share of a swing late: a soft, springy swing
@@ -297,8 +300,8 @@ const vmdl = VmdlText({
 WriteAddonFile(`${MODEL_DIR}/${NAME}.smd`, SmdText(BONES, triangles));
 WriteAddonFile(`${MODEL_DIR}/${NAME}_swing.smd`, SmdAnimationText(BONES, swingFrames));
 WriteAddonFile(`${MODEL_DIR}/${NAME}_idle.smd`, SmdAnimationText(BONES, [BindFrame(BONES)]));
-WriteAddonFile(`${MODEL_DIR}/${NAME}_physics.obj`, ObjText(physics, NAME, GENERATOR));
-WriteAddonFile(`${MODEL_DIR}/${NAME}_physics_paddle.obj`, ObjText(paddlePhysics, NAME, GENERATOR));
+WriteAddonFile(`${MODEL_DIR}/${NAME}_physics.obj`, ObjText(physics, NAME, GENERATOR, { smd: true }));
+WriteAddonFile(`${MODEL_DIR}/${NAME}_physics_paddle.obj`, ObjText(paddlePhysics, NAME, GENERATOR, { smd: true }));
 WriteAddonFile(`${MODEL_DIR}/${NAME}.vmdl`, vmdl);
 
 const rough = `${MATERIAL_DIR}/${NAME}_spring_rough.png`;

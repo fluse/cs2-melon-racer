@@ -22,11 +22,13 @@ import {
     BOUNCE_RATINGS,
     PERFECT_SPARK_TEMPLATE_NAME,
     PERFECT_SPARK_LIFETIME,
+    XP_PERFECT_HIT,
 } from "../../constants/index.js";
 import { DamageKart } from "../../health/damage/damage.js";
 import { IsPadProtected } from "../../zones/jump-pad/jump-pad.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
 import { CountStat } from "../../race/stats/stats.js";
+import { GrantXp } from "../../race/level/level.js";
 
 /**
  * Whether the impact this tick was against a wall, and if so that wall's
@@ -165,6 +167,7 @@ export function ComputeWallBounce(kart, n, now) {
     if (kart.perfectBounceBoost) {
         PlayPerfectSpark(kart);
         CountStat(kart, "perfectHits");
+        GrantXp(kart, XP_PERFECT_HIT, "PERFECT wall bounce");
     }
     return { ...bounce, jumpFactor };
 }

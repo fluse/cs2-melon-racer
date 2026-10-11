@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ScoreboardView, BuildScoreboard, BuildStatBoard, ScoreboardPages, CurrentPage, StatSlideOf, StepPage, PageSwitcher } from "../../src/melon_drive/hud/scoreboard/logic.js";
+import { ScoreboardView, BuildScoreboard, BuildStatBoard, ScoreboardPages, CurrentPage, StepPage, PageSwitcher } from "../../src/melon_drive/hud/scoreboard/logic.js";
 import { NewGrandPrix, BeginGrandPrixHeat, RecordHeatFinish, HeatPoints } from "../../src/melon_drive/race/grand-prix/logic.js";
 import { FormatRaceTime } from "../../src/melon_drive/race/time-trial/logic.js";
 import { FormatStat } from "../../src/melon_drive/race/stats/logic.js";
@@ -84,7 +84,8 @@ test("time trial board: saved best times (players who left too), fastest first, 
         players: [A, C], self: C, bestTimes: { Anna: 31, Gone: 29, Ben: 31 }, maxRows: SCOREBOARD_ROWS,
     });
     assert.equal(board.grandPrixMode, false);
-    assert.equal(board.title, "TIME TRIAL");
+    assert.equal(board.title, "TRACK 1", "the route as the title");
+    assert.match(board.subtitle, /TIME TRIAL/);
     assert.deepEqual(board.rows.map((r) => [r.rank, r.name, r.best, r.self]), [
         ["1", "Gone", FormatRaceTime(29), false],
         ["2", "Anna", FormatRaceTime(31), false],
@@ -138,46 +139,38 @@ test("time trial paging: a picked track wins over the own one, never in a Grand 
     assert.equal(ScoreboardView({ ...base, grandPrix: gp, activeTrackId: 2, pickedTrackId: 3 }).boardTrackId, 2);
 });
 
-const STAT_PAGES = STAT_SLIDES.map((slide) => `stat:${slide.key}`);
-
-test("pages: every track's best times (or the standings), then every stat", () => {
-    assert.deepEqual(ScoreboardPages(false, [1, 2, 3]), ["track:1", "track:2", "track:3", ...STAT_PAGES]);
-    assert.deepEqual(ScoreboardPages(true, [1, 2, 3]), ["standings", ...STAT_PAGES], "a Grand Prix: one standings page");
-    assert.deepEqual(ScoreboardPages(false, []), ["track:", ...STAT_PAGES]);
+test("pages: every track's best times, or the standings as one page — no stats (they're on the leaderboards page)", () => {
+    assert.deepEqual(ScoreboardPages(false, [1, 2, 3]), ["track:1", "track:2", "track:3"]);
+    assert.deepEqual(ScoreboardPages(true, [1, 2, 3]), ["standings"], "a Grand Prix: one standings page");
+    assert.deepEqual(ScoreboardPages(false, []), ["track:"]);
 });
 
-test("current page: a picked stat, else the standings or the board's track", () => {
-    const stat = STAT_SLIDES[1].key;
-    assert.equal(CurrentPage(false, 2, undefined), "track:2");
-    assert.equal(CurrentPage(true, 2, undefined), "standings");
-    assert.equal(CurrentPage(false, 2, stat), `stat:${stat}`);
-    assert.equal(CurrentPage(true, 2, stat), `stat:${stat}`, "stats in a Grand Prix too");
-    assert.equal(CurrentPage(false, 2, "nonsense"), "track:2", "an unknown stat is ignored");
-    assert.equal(StatSlideOf(`stat:${stat}`), STAT_SLIDES[1]);
-    assert.equal(StatSlideOf("track:2"), undefined);
+test("current page: the standings or the board's track", () => {
+    assert.equal(CurrentPage(false, 2), "track:2");
+    assert.equal(CurrentPage(true, 2), "standings");
 });
 
-test("StepPage: next/previous, wrapping around — from the last route into the stats and back", () => {
+test("StepPage: next/previous through the routes, wrapping around", () => {
     const pages = ScoreboardPages(false, [1, 2]);
     assert.equal(StepPage(pages, "track:1", 1), "track:2");
-    assert.equal(StepPage(pages, "track:2", 1), STAT_PAGES[0]);
-    assert.equal(StepPage(pages, STAT_PAGES[STAT_PAGES.length - 1], 1), "track:1");
-    assert.equal(StepPage(pages, "track:1", -1), STAT_PAGES[STAT_PAGES.length - 1]);
+    assert.equal(StepPage(pages, "track:2", 1), "track:1");
+    assert.equal(StepPage(pages, "track:1", -1), "track:2");
     assert.equal(StepPage(pages, "track:9", 1), "track:1", "unknown: the first page");
 });
 
-test("paging hint: which route, which stat, or the standings", () => {
+test("paging hint: which route; nothing with one page (a single track, or the Grand Prix standings)", () => {
     const pages = ScoreboardPages(false, [1, 2, 3]);
     assert.match(PageSwitcher(pages, "track:2"), /A .*ROUTE 2 \/ 3.* D/);
-    assert.match(PageSwitcher(pages, STAT_PAGES[1]), new RegExp(`STATS 2 / ${STAT_PAGES.length}`));
-    assert.match(PageSwitcher(ScoreboardPages(true, [1]), "standings"), /STANDINGS/);
+    assert.equal(PageSwitcher(ScoreboardPages(true, [1]), "standings"), "");
     assert.equal(PageSwitcher(["track:1"], "track:1"), "", "one page: nothing to page");
 });
 
-test("time trial board: route name in the subtitle", () => {
+test("time trial board: the route's name as the big title, TIME TRIAL under it", () => {
     const args = { grandPrix: undefined, grandPrixMode: false, players: [A], self: A, bestTimes: {}, maxRows: SCOREBOARD_ROWS, routeNames: { 2: "Bridge" } };
-    assert.match(BuildScoreboard({ ...args, boardTrackId: 2 }).subtitle, /^BRIDGE/);
-    assert.match(BuildScoreboard({ ...args, boardTrackId: 1 }).subtitle, /^TRACK 1/, "no name: the track number");
+    assert.equal(BuildScoreboard({ ...args, boardTrackId: 2 }).title, "BRIDGE");
+    assert.match(BuildScoreboard({ ...args, boardTrackId: 2 }).subtitle, /^TIME TRIAL/);
+    assert.equal(BuildScoreboard({ ...args, boardTrackId: 1 }).title, "TRACK 1", "no name: the track number");
+    assert.equal(BuildScoreboard({ ...args, boardTrackId: undefined }).subtitle, "NO TRACKS");
 });
 
 test("stat board: highest first, saved totals of absent players too, no rank for nothing yet", () => {

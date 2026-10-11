@@ -129,8 +129,8 @@ const triangles = [...MeshSmdTriangles(pedestal, NAME, ROOT_BONE), ...MeshSmdTri
 WriteAddonFile(mesh, SmdText(BONES, triangles));
 WriteAddonFile(animations[0].file, SmdAnimationText(BONES, spinFrames));
 WriteAddonFile(animations[1].file, SmdAnimationText(BONES, [BindFrame(BONES)]));
-WriteAddonFile(`${MODEL_DIR}/${NAME}_physics.obj`, ObjText(pedestalPhysics, NAME, GENERATOR));
-WriteAddonFile(`${MODEL_DIR}/${NAME}_physics_arm.obj`, ObjText(hammerPhysics, NAME, GENERATOR));
+WriteAddonFile(`${MODEL_DIR}/${NAME}_physics.obj`, ObjText(pedestalPhysics, NAME, GENERATOR, { smd: true }));
+WriteAddonFile(`${MODEL_DIR}/${NAME}_physics_arm.obj`, ObjText(hammerPhysics, NAME, GENERATOR, { smd: true }));
 WriteAddonFile(`${MODEL_DIR}/${NAME}.vmdl`, VmdlText({
     name: NAME,
     mesh,

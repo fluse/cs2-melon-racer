@@ -10,8 +10,8 @@ import { SAVE_DATA_STATS_KEY, STATS_SAVE_SECONDS } from "../../constants/index.j
 // server (UpdateStats, every tick for every player with a melon), crashes
 // (health/breaking/), finishes (race/time-trial/), boost time
 // (movement/driving/drive.js), PERFECT wall hits (movement/wall-bounce/,
-// movement/jump/) and time trial restarts (race/checkpoints/) — and shown as the scoreboard's stat pages
-// (hud/scoreboard/). Rules: race/stats/logic.js.
+// movement/jump/) and time trial restarts (race/checkpoints/) — and shown on the user menu's leaderboards
+// page and in its profile (hud/leaderboards/, hud/profile/). Rules: race/stats/logic.js.
 
 // Read from the save data once, then kept in memory and written back every
 // STATS_SAVE_SECONDS while something changed (SetSaveData writes the file).

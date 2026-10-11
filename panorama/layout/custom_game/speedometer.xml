@@ -239,6 +239,49 @@
 		     see UpdateDnf in race-flow.js). -->
 		<Label id="dnf_warning" class="DnfWarning Hidden" text="NO CHECKPOINT · OUT IN {s:dnf}" />
 
+		<!-- Level up (race/level/, UpdateLevelUpHud in hud/level-up-panel.js), top center
+		     for LEVEL_UP_HUD_SECONDS — not mid-heat: a racer sees it once they've finished.
+		     The skins it unlocked below (levelup_skins, hidden without). -->
+		<Panel id="levelup_panel" class="LevelUpPanel Hidden">
+			<Label class="LevelUpTitle" text="LEVEL UP" />
+			<Label class="LevelUpLevel" text="{s:levelup_level}" />
+			<Label id="levelup_skins" class="LevelUpSkins Hidden" text="{s:levelup_skins}" />
+		</Panel>
+
+		<!-- XP notifier (UpdateXpGainHud in hud/xp-gain-panel.js), top right for
+		     XP_GAIN_HUD_SECONDS after XP were earned: "+40 XP", the level, the XP bar
+		     (XP_BAR_SEGMENTS, 20) with the fill from before green (xpgain_old_<i>)
+		     and the part just gained gold (xpgain_new_<i>), the XP into the level. -->
+		<Panel id="xpgain_panel" class="XpGainPanel Hidden" hittest="false">
+			<Panel class="XpGainTop">
+				<Label class="XpGainAmount" text="{s:xpgain_amount}" />
+				<Label class="XpGainLevel" text="{s:xpgain_level}" />
+			</Panel>
+			<Panel class="XpGainBar">
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_0" class="XpGainOld" /><Panel id="xpgain_new_0" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_1" class="XpGainOld" /><Panel id="xpgain_new_1" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_2" class="XpGainOld" /><Panel id="xpgain_new_2" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_3" class="XpGainOld" /><Panel id="xpgain_new_3" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_4" class="XpGainOld" /><Panel id="xpgain_new_4" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_5" class="XpGainOld" /><Panel id="xpgain_new_5" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_6" class="XpGainOld" /><Panel id="xpgain_new_6" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_7" class="XpGainOld" /><Panel id="xpgain_new_7" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_8" class="XpGainOld" /><Panel id="xpgain_new_8" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_9" class="XpGainOld" /><Panel id="xpgain_new_9" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_10" class="XpGainOld" /><Panel id="xpgain_new_10" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_11" class="XpGainOld" /><Panel id="xpgain_new_11" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_12" class="XpGainOld" /><Panel id="xpgain_new_12" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_13" class="XpGainOld" /><Panel id="xpgain_new_13" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_14" class="XpGainOld" /><Panel id="xpgain_new_14" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_15" class="XpGainOld" /><Panel id="xpgain_new_15" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_16" class="XpGainOld" /><Panel id="xpgain_new_16" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_17" class="XpGainOld" /><Panel id="xpgain_new_17" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_18" class="XpGainOld" /><Panel id="xpgain_new_18" class="XpGainNew" /></Panel>
+			<Panel class="XpGainSegment"><Panel id="xpgain_old_19" class="XpGainOld" /><Panel id="xpgain_new_19" class="XpGainNew" /></Panel>
+			</Panel>
+			<Label class="XpGainXp" text="{s:xpgain_xp}" />
+		</Panel>
+
 		<!-- Countdown between heats (BREAK_SECONDS … 0, see SetBreakCountdown in
 		     race-flow.js), under the finish image and just like the start
 		     countdown (same spot, look and animations): each number falls in
@@ -485,52 +528,92 @@
 							<Panel id="usermenu_skinpage_0" class="UserMenuSkinPage">
 								<Panel class="UserMenuSkinRow">
 									<Button id="usermenu_skin_default" class="SkinButton">
-										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_default.png" />
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_default.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
 										<Label class="SkinName" text="Melon" />
-									</Button>
-									<Button id="usermenu_skin_gold" class="SkinButton">
-										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_gold.png" />
-										<Label class="SkinName" text="Gold" />
-									</Button>
-									<Button id="usermenu_skin_football" class="SkinButton">
-										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_football.png" />
-										<Label class="SkinName" text="Football" />
-									</Button>
-								</Panel>
-								<Panel class="UserMenuSkinRow">
-									<Button id="usermenu_skin_golf" class="SkinButton">
-										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_golf.png" />
-										<Label class="SkinName" text="Golf" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
 									</Button>
 									<Button id="usermenu_skin_honey" class="SkinButton">
-										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_honey.png" />
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_honey.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
 										<Label class="SkinName" text="Honey Melon" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
 									</Button>
-									<Button id="usermenu_skin_camo" class="SkinButton">
-										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_camo.png" />
-										<Label class="SkinName" text="Camo" />
+									<Button id="usermenu_skin_strawberry" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_strawberry.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Strawberry" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
 									</Button>
 								</Panel>
 								<Panel class="UserMenuSkinRow">
-									<Button id="usermenu_skin_strawberry" class="SkinButton">
-										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_strawberry.png" />
-										<Label class="SkinName" text="Strawberry" />
+									<Button id="usermenu_skin_camo" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_camo.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Camo" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
+									</Button>
+									<Button id="usermenu_skin_football" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_football.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Football" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
+									</Button>
+									<Button id="usermenu_skin_golf" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_golf.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Golf" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
+									</Button>
+								</Panel>
+								<Panel class="UserMenuSkinRow">
+									<Button id="usermenu_skin_pineapple" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_pineapple.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Pineapple" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
+									</Button>
+									<Button id="usermenu_skin_zebra" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_zebra.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Zebra" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
 									</Button>
 									<Button id="usermenu_skin_pumpkin" class="SkinButton">
-										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_pumpkin.png" />
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_pumpkin.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
 										<Label class="SkinName" text="Pumpkin" />
-									</Button>
-									<Button id="usermenu_skin_pineapple" class="SkinButton">
-										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_pineapple.png" />
-										<Label class="SkinName" text="Pineapple" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
 									</Button>
 								</Panel>
 							</Panel>
 							<Panel id="usermenu_skinpage_1" class="UserMenuSkinPage Hidden">
 								<Panel class="UserMenuSkinRow">
-									<Button id="usermenu_skin_zebra" class="SkinButton">
-										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_zebra.png" />
-										<Label class="SkinName" text="Zebra" />
+									<Button id="usermenu_skin_gold" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_gold.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Gold" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
 									</Button>
 									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
 									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
@@ -591,26 +674,53 @@
 						<!-- Third column: the player's profile, then developer aids and test previews. -->
 						<Panel class="UserMenuSettings">
 							<!-- PROFILE (hud/profile/): your melon big — one image per MELON_SKINS key, usermenu_profile_skin_<key>,
-							     all but your skin Hidden —, your name and skin, and one tile per STAT_SLIDES key
+							     all but your skin Hidden —, your name, level and skin, the XP to the next level, and one tile per STAT_SLIDES key
 							     (usermenu_profile_stat_<key>: all-time value and rank, like the leaderboards). -->
 							<Label class="UserMenuColumnTitle" text="PROFILE" />
 							<Panel id="usermenu_profile" class="UserMenuProfile">
 								<Panel class="ProfileHero">
 									<Panel class="ProfileMelon">
 										<Image id="usermenu_profile_skin_default" class="ProfileMelonImage" src="file://{images}/custom_game/skins/skin_default.png" />
-										<Image id="usermenu_profile_skin_gold" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_gold.png" />
+										<Image id="usermenu_profile_skin_honey" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_honey.png" />
+										<Image id="usermenu_profile_skin_strawberry" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_strawberry.png" />
+										<Image id="usermenu_profile_skin_camo" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_camo.png" />
 										<Image id="usermenu_profile_skin_football" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_football.png" />
 										<Image id="usermenu_profile_skin_golf" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_golf.png" />
-										<Image id="usermenu_profile_skin_honey" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_honey.png" />
-										<Image id="usermenu_profile_skin_camo" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_camo.png" />
-										<Image id="usermenu_profile_skin_strawberry" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_strawberry.png" />
-										<Image id="usermenu_profile_skin_pumpkin" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_pumpkin.png" />
 										<Image id="usermenu_profile_skin_pineapple" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_pineapple.png" />
 										<Image id="usermenu_profile_skin_zebra" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_zebra.png" />
+										<Image id="usermenu_profile_skin_pumpkin" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_pumpkin.png" />
+										<Image id="usermenu_profile_skin_gold" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_gold.png" />
 									</Panel>
 									<Panel class="ProfileIdentity">
 										<Label class="ProfileName" text="{s:profile_name}" />
-										<Label class="ProfileSkin" text="{s:profile_skin}" />
+										<Panel class="ProfileLevelRow">
+											<Label class="ProfileLevel" text="{s:profile_level}" />
+											<Label class="ProfileSkin" text="{s:profile_skin}" />
+										</Panel>
+										<!-- XP towards the next level: XP_BAR_SEGMENTS (20) segments, the filled ones On. -->
+										<Panel class="ProfileXpBar">
+											<Panel id="usermenu_profile_xp_0" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_1" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_2" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_3" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_4" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_5" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_6" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_7" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_8" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_9" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_10" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_11" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_12" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_13" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_14" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_15" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_16" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_17" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_18" class="ProfileXpSegment" />
+											<Panel id="usermenu_profile_xp_19" class="ProfileXpSegment" />
+										</Panel>
+										<Label class="ProfileXp" text="{s:profile_xp}" />
 									</Panel>
 								</Panel>
 								<Panel class="ProfileStatRow">
@@ -1132,6 +1242,12 @@
 							<!-- The heal zone's effect on your melon, health refilled (TestHeal). -->
 							<Button id="usermenu_testheal_button" class="UserMenuToggle">
 								<Label class="UserMenuToggleName" text="Test Heal" />
+								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
+							</Button>
+							<!-- The XP notifier as if XP_GAIN_TEST_AMOUNT XP were earned — only
+							     shown, nothing given (TestXpGain). -->
+							<Button id="usermenu_testxp_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Test XP Gain" />
 								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
 							</Button>
 						</Panel>

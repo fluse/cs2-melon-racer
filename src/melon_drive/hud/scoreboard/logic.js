@@ -1,11 +1,11 @@
 // Pure rules of the scoreboard (hud/scoreboard/scoreboard.js): what it shows for one
-// viewer — the Grand Prix standings, the best times on a track, or one of the
-// players' all-time stats — as ready-to-send strings, and the pages A/D step
-// through. No cs_script import (test/hud/scoreboard.test.mjs).
+// viewer — the Grand Prix standings or the best times on a track — as
+// ready-to-send strings, and the pages A/D step through. Also the stat
+// boards of the user menu's leaderboards and profile (BuildStatBoard), which
+// share its rows and ranks. No cs_script import (test/hud/scoreboard.test.mjs).
 import { SortedStandings, Wins, OrdinalPlace } from "../../race/grand-prix/logic.js";
 import { FormatRaceTime } from "../../race/time-trial/logic.js";
 import { FormatStat } from "../../race/stats/logic.js";
-import { STAT_SLIDES } from "../../constants/index.js";
 
 /**
  * @typedef {{ rank: string, name: string, points: string, heat: string, best: string, self: boolean }} ScoreRow
@@ -36,30 +36,20 @@ export function ScoreboardView({ grandPrix, activeTrackId, kartTrackId, trackOrd
 /**
  * The pages A/D step through with Tab held, in order: the Grand Prix
  * standings (one page) or every track's best times (one per track, race
- * order), then every stat (STAT_SLIDES). Page ids: "standings",
- * "track:<id>" ("track:" without any track), "stat:<key>".
+ * order). The players' stats are on the user menu's leaderboards page, not
+ * here. Page ids: "standings", "track:<id>" ("track:" without any track).
  * @param {boolean} grandPrixMode @param {number[]} trackOrder
  */
 export function ScoreboardPages(grandPrixMode, trackOrder) {
-    const main = grandPrixMode ? ["standings"] : trackOrder.length > 0 ? trackOrder.map((id) => `track:${id}`) : ["track:"];
-    return [...main, ...STAT_SLIDES.map((slide) => `stat:${slide.key}`)];
+    return grandPrixMode ? ["standings"] : trackOrder.length > 0 ? trackOrder.map((id) => `track:${id}`) : ["track:"];
 }
 
 /**
- * The page a viewer is on: a stat they paged to, else the standings or
- * the board's track (ScoreboardView).
- * @param {boolean} grandPrixMode @param {number | undefined} boardTrackId @param {string | undefined} pickedStat
+ * The page a viewer is on: the standings or the board's track (ScoreboardView).
+ * @param {boolean} grandPrixMode @param {number | undefined} boardTrackId
  */
-export function CurrentPage(grandPrixMode, boardTrackId, pickedStat) {
-    if (pickedStat !== undefined && STAT_SLIDES.some((slide) => slide.key === pickedStat)) {
-        return `stat:${pickedStat}`;
-    }
+export function CurrentPage(grandPrixMode, boardTrackId) {
     return grandPrixMode ? "standings" : `track:${boardTrackId ?? ""}`;
-}
-
-/** The STAT_SLIDES entry a page shows, if it's a stat page. @param {string} page */
-export function StatSlideOf(page) {
-    return STAT_SLIDES.find((slide) => `stat:${slide.key}` === page);
 }
 
 /**
@@ -76,19 +66,15 @@ export function StepPage(pages, current, direction) {
 }
 
 /**
- * The paging hint under the subtitle: which page of its kind this is
- * ("ROUTE 2 / 3", "STATS 1 / 5", "STANDINGS") between the A and D arrows;
- * empty with nothing to page to.
+ * The paging hint under the subtitle: which route this is ("ROUTE 2 / 3")
+ * between the A and D arrows; empty with nothing to page to.
  * @param {string[]} pages @param {string} current
  */
 export function PageSwitcher(pages, current) {
     if (pages.length <= 1) {
         return "";
     }
-    const kind = current.split(":")[0];
-    const same = pages.filter((page) => page.split(":")[0] === kind);
-    const label = kind === "standings" ? "STANDINGS" : `${kind === "stat" ? "STATS" : "ROUTE"} ${same.indexOf(current) + 1} / ${same.length}`;
-    return `◀  A      ${label}      D  ▶`;
+    return `◀  A      ROUTE ${pages.indexOf(current) + 1} / ${pages.length}      D  ▶`;
 }
 
 /**
@@ -188,10 +174,11 @@ export function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, player
     const entries = [...names].map((name) => ({ name, best: bestTimes[name] })).sort(ByBestTime);
     const ranks = SharedRanks(entries, (a, b) => a.best === b.best);
     const route = boardTrackId !== undefined ? (routeNames[boardTrackId] ?? `Track ${boardTrackId}`).toUpperCase() : undefined;
+    // The route is the title, big: which track's times these are matters most.
     return {
         grandPrixMode: false,
-        title: "TIME TRIAL",
-        subtitle: route !== undefined ? `${route}  ·  BEST TIMES` : "NO TRACKS",
+        title: route ?? "TIME TRIAL",
+        subtitle: route !== undefined ? "TIME TRIAL  ·  BEST TIMES" : "NO TRACKS",
         bestHeader,
         switcher: "", // the paging hint: PageSwitcher
         rows: KeepSelf(
@@ -209,7 +196,7 @@ export function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, player
 }
 
 /**
- * A stat page: every player with a total — saved ones of players who
+ * A stat board (the user menu's leaderboards and profile): every player with a total — saved ones of players who
  * aren't on the map included — and everyone on the map without one, the
  * highest first; nobody gets a rank for nothing yet.
  * @param {{

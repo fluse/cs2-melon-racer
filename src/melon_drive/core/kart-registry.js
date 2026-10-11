@@ -28,7 +28,6 @@ import { predictionDotSet } from "./trace.js";
  *   hudResendAt?: { health?: number, jump?: number }, // when they send their whole state again — see HUD_RESEND_SECONDS
  *   hubRacersResendAt?: number, hubRacersShown?: Record<string, string>, // the hub window's heats and racers: next full resend, and what it last sent — see UpdateHubLists
  *   scoreboardPick?: number, // track the time trial board was paged to while Tab is held (unset: the viewer's own) — see UpdateScoreboardInput
- *   scoreboardStat?: string, // stat page (STAT_SLIDES key) the scoreboard was paged to while Tab is held (unset: the standings or a track's best times) — see UpdateScoreboardInput
  *   scoreboardNextUpdate?: number, scoreboardResendAt?: number, scoreboardShown?: Record<string, string>, // the scoreboard's next rebuild, next full resend, and what it last sent — see UpdateScoreboardHud
  *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
@@ -51,6 +50,11 @@ import { predictionDotSet } from "./trace.js";
  *   leaderboardTab?: string, // leaderboard the user menu's leaderboards page shows (unset: the best times) — see SelectLeaderboardTab
  *   leaderboardTrack?: number, // track the leaderboards page's best times were paged to (unset: the player's own track, else the first) — see StepLeaderboardsTrack
  *   leaderboardNextUpdate?: number, leaderboardResendAt?: number, leaderboardShown?: Record<string, string>, // the leaderboards page's next rebuild, next full resend, and what it last sent — see UpdateLeaderboardsHud
+ *   levelUp?: { level: number, skins: string[], until: number | undefined }, // a level-up waiting for (or on) the HUD: the new level, the skins it unlocked, until when it shows (undefined: not yet, e.g. mid-heat) — see GrantXp, UpdateLevelUpHud
+ *   levelUpShown?: string, levelUpResendAt?: number, // what the level-up panel last showed, and its next full resend — see UpdateLevelUpHud
+ *   xpGain?: { fromXp: number, toXp: number | undefined, amount: number, until: number }, // XP gained, on the XP notifier until `until`: the XP before, after (undefined: as they are now — set only by a preview), the amount — see ShowXpGain, UpdateXpGainHud
+ *   xpGainShown?: string, xpGainResendAt?: number, // what the XP notifier last showed, and its next full resend — see UpdateXpGainHud
+ *   skinHudLevel?: number, // the level the skin grid's locks were last drawn for — see UpdateSkinHud
  *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud
  *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view

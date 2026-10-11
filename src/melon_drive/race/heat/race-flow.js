@@ -24,6 +24,8 @@ import { BreakCountdownValue, BreakCountdownLabels, CountdownStep, CountdownNumb
 import { SetFreeLook } from "../../dev/free-look.js";
 import { grandPrix, StartGrandPrix, StartGrandPrixHeat, RecordGrandPrixFinish, EndGrandPrix } from "../grand-prix/grand-prix.js";
 import { PlaceOnPodium } from "../podium/podium.js";
+import { GrantXp, GrantGrandPrixXp } from "../level/level.js";
+import { HeatFinishXp } from "../level/logic.js";
 import { OrdinalPlace } from "../grand-prix/logic.js";
 
 // --- Race flow: hub -> countdown -> racing -> break --------------------
@@ -264,6 +266,9 @@ export function FinishKart(kart) {
     const result = activeTrackId !== undefined ? RecordGrandPrixFinish(kart, activeTrackId) : undefined;
     if (slot !== undefined) {
         GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "finish_place", "place", result ? `${OrdinalPlace(result.place)}  ·  +${result.points} PTS` : "");
+    }
+    if (result) {
+        GrantXp(kart, HeatFinishXp(result.place), `heat on track ${activeTrackId}, ${OrdinalPlace(result.place)}`);
     }
     // Shown the moment this racer crosses the line, not only once the whole
     // heat is over — stays up through BREAK until the next heat/the hub.
@@ -649,6 +654,7 @@ export function UpdateRaceFlow(now) {
             BeginHeat(nextTrackId);
         } else {
             EndGrandPrix(false);
+            GrantGrandPrixXp(grandPrix, racers);
             ReturnAllToHub(racers);
             // The top three go on from the hub spawn onto the podium.
             PlaceOnPodium(grandPrix, racers);

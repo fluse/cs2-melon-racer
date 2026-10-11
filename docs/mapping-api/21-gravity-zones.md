@@ -1,4 +1,4 @@
-[Mapping API](README.md) › **21. Gravity zones** · [← Ball spawner](20-ball-spawner.md)
+[Mapping API](README.md) › **21. Gravity zones** · [← Ball spawner](20-ball-spawner.md) · [Bouncers →](22-bouncers.md)
 
 # 21. Gravity zones
 
@@ -63,4 +63,4 @@ Pattern `^gravity_zone_(\d+(?:\.\d+)?)(?:_roll(\d+(?:\.\d+)?))?$`, both values i
   a texture or particles.
 
 ---
-[← Ball spawner](20-ball-spawner.md) · [Mapping API](README.md)
+[← Ball spawner](20-ball-spawner.md) · [Mapping API](README.md) · [Bouncers →](22-bouncers.md)

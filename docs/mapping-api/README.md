@@ -38,6 +38,7 @@ this folder, the script doesn't know about it.
 | 19 | [Ball pits](19-ball-pits.md) | Physics balls kept in their pit, melons drive in and out |
 | 20 | [Ball spawner](20-ball-spawner.md) | Balls dropping in at irregular intervals, removed after a while |
 | 21 | [Gravity zones](21-gravity-zones.md) | Lower (or higher) gravity, less speed lost while rolling |
+| 22 | [Bouncers](22-bouncers.md) | Foam paddles swinging on a spring, each started at a random point |
 
 ## All script inputs
 

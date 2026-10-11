@@ -78,7 +78,7 @@ export function FormatDuration(seconds) {
     return `${secs}s`;
 }
 
-/** A stat's value as the scoreboard shows it. @param {{ format: string }} slide @param {number} value */
+/** A stat's value as the leaderboards and the profile show it. @param {{ format: string }} slide @param {number} value */
 export function FormatStat(slide, value) {
     return slide.format === "duration" ? FormatDuration(value) : String(Math.round(value));
 }

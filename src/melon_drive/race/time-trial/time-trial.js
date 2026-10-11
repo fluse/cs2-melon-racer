@@ -1,8 +1,9 @@
 import { Instance } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { FormatRaceTime, ParseSaveData, GetBestTimes, RecordRunTime } from "./logic.js";
-import { SAVE_DATA_BEST_TIMES_KEY } from "../../constants/index.js";
+import { SAVE_DATA_BEST_TIMES_KEY, XP_TIME_TRIAL_FINISH, XP_NEW_BEST } from "../../constants/index.js";
 import { CountStat } from "../stats/stats.js";
+import { GrantXp } from "../level/level.js";
 
 // Time trial: every run over a track is timed, for every player on their
 // own — from crossing the start line (outside a heat) or GO (in a heat) to
@@ -75,6 +76,13 @@ export function FinishRun(kart, trackId) {
     }
     kart.lastRun = { trackId, time, newBest, at: now };
     CountStat(kart, "finishes");
+    // A heat's finish earns its XP by place (FinishKart in race/heat/race-flow.js).
+    if (!kart.racing) {
+        GrantXp(kart, XP_TIME_TRIAL_FINISH, `time trial finish, track ${trackId}`);
+    }
+    if (newBest) {
+        GrantXp(kart, XP_NEW_BEST, `new best, track ${trackId}`);
+    }
     Debug(`FinishRun: "${name}" ran track ${trackId} in ${FormatRaceTime(time)}${newBest ? " — new best" : ""}`);
 }
 

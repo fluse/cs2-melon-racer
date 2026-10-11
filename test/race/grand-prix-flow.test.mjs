@@ -19,7 +19,7 @@ const { HeatPoints } = await import("../../src/melon_drive/race/grand-prix/logic
 const { UpdateScoreboardHud, UpdateScoreboardInput } = await import("../../src/melon_drive/hud/scoreboard/scoreboard.js");
 const {
     MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, SPEED_HUD_ENTITY_NAME,
-    RacePhase, COUNTDOWN_SECONDS, BREAK_SECONDS, SCOREBOARD_ROWS, STAT_SLIDES,
+    RacePhase, COUNTDOWN_SECONDS, BREAK_SECONDS, SCOREBOARD_ROWS,
 } = await import("../../src/melon_drive/constants/index.js");
 
 const FIRST_TRACK = 1;
@@ -154,12 +154,12 @@ test("scoreboard: on a track outside a Grand Prix it's that track's time trial b
     gpModule.EndGrandPrix(true); // earlier tests here may have left one running
     a.trackId = FIRST_TRACK;
     UpdateScoreboardHud(0, a);
-    assert.equal(hud.Variable(0, "scoreboard", "title"), "TIME TRIAL");
+    assert.match(hud.Variable(0, "scoreboard", "subtitle"), /^TIME TRIAL/, "the route is the title, TIME TRIAL under it");
     assert.equal(hud.Has(0, "scoreboard", "TimeTrial"), true);
     assert.equal(hud.Variable(0, "scoreboard", "best_header"), `BEST T${FIRST_TRACK}`);
 });
 
-test("scoreboard: holding Tab, A/D page the time trial board through the tracks, then the stats", () => {
+test("scoreboard: holding Tab, A/D page the time trial board through the tracks", () => {
     const [a] = kartList;
     gpModule.EndGrandPrix(true);
     a.trackId = FIRST_TRACK;
@@ -179,23 +179,13 @@ test("scoreboard: holding Tab, A/D page the time trial board through the tracks,
     assert.equal(hud.Variable(0, "scoreboard", "best_header"), `BEST T${LAST_TRACK}`, "D: the next track, at once");
     assert.match(hud.Variable(0, "score_switch", "switcher"), /ROUTE 2 \/ 2/);
     Tick("RIGHT");
-    assert.equal(hud.Variable(0, "scoreboard", "title"), STAT_SLIDES[0].title, "after the last route: the first stat");
-    assert.equal(hud.Variable(0, "scoreboard", "best_header"), STAT_SLIDES[0].column);
-    assert.match(hud.Variable(0, "score_switch", "switcher"), new RegExp(`STATS 1 / ${STAT_SLIDES.length}`));
+    assert.equal(hud.Variable(0, "scoreboard", "best_header"), `BEST T${FIRST_TRACK}`, "after the last route: wraps around to the first");
     Tick("LEFT");
     assert.equal(hud.Variable(0, "scoreboard", "best_header"), `BEST T${LAST_TRACK}`, "A: the previous one");
-    for (let i = 0; i < STAT_SLIDES.length; i++) {
-        Tick("RIGHT");
-    }
-    assert.equal(hud.Variable(0, "scoreboard", "title"), STAT_SLIDES[STAT_SLIDES.length - 1].title, "the last stat");
     Tick("RIGHT");
-    assert.equal(hud.Variable(0, "scoreboard", "best_header"), `BEST T${FIRST_TRACK}`, "wraps around");
-    Tick("LEFT");
-    Tick("LEFT");
 
     Tick(undefined, false);
     assert.equal(a.scoreboardPick, undefined, "letting go of Tab forgets the pick");
-    assert.equal(a.scoreboardStat, undefined, "… and the stat page");
     a.scoreboardNextUpdate = undefined;
     Tick(undefined);
     assert.equal(hud.Variable(0, "scoreboard", "best_header"), `BEST T${FIRST_TRACK}`, "the next opening starts on the own track");
@@ -204,24 +194,19 @@ test("scoreboard: holding Tab, A/D page the time trial board through the tracks,
     assert.equal(a.scoreboardPick, undefined, "A/D without Tab do nothing to the board");
 });
 
-test("scoreboard: the Grand Prix board pages from the standings into the stats, never to a track", () => {
+test("scoreboard: the Grand Prix board is one page — A/D don't page it, never to a track", () => {
     const [a, b] = kartList;
     StartGrandPrixWith([a, b], 500);
     a.pawn.pressed = new Set(["SHOW_SCORES"]);
     a.pawn.justPressed = new Set([]);
     a.scoreboardNextUpdate = undefined;
     UpdateScoreboardHud(0, a);
-    assert.match(hud.Variable(0, "score_switch", "switcher"), /STANDINGS/);
+    assert.equal(hud.Has(0, "score_switch", "Unused"), true, "no paging hint");
     a.pawn.justPressed = new Set(["RIGHT"]);
     UpdateScoreboardInput(a);
     assert.equal(a.scoreboardPick, undefined);
-    assert.equal(a.scoreboardStat, STAT_SLIDES[0].key);
     UpdateScoreboardHud(0, a);
-    assert.equal(hud.Variable(0, "scoreboard", "title"), STAT_SLIDES[0].title);
-    assert.equal(hud.Has(0, "scoreboard", "TimeTrial"), true, "no PTS/HEAT columns on a stat page");
-    a.pawn.justPressed = new Set(["LEFT"]);
-    UpdateScoreboardInput(a);
-    assert.equal(a.scoreboardStat, undefined, "back to the standings");
+    assert.match(hud.Variable(0, "scoreboard", "title"), /GRAND PRIX/);
     a.pawn.pressed = new Set([]);
     UpdateScoreboardInput(a);
     TryAbortRace();

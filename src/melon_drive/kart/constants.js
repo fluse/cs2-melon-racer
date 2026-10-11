@@ -49,19 +49,20 @@ export const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
 // in the .vmap too (the default by melon_template, the others e.g. by a
 // prop in the hub), or the map doesn't ship it (test/map/map-skins.test.mjs).
 // The key is the button's: usermenu_skin_<key> in speedometer.xml, in this
-// order (pages of MELON_SKINS_PER_PAGE).
+// order (pages of MELON_SKINS_PER_PAGE) — sorted by MELON_SKIN_LEVELS, the
+// free ones first (test/race/level.test.mjs).
 /** @type {Record<string, string>} */
 export const MELON_SKINS = {
     default: "models/melon_racer/melon/melon.vmdl",
-    gold: "models/melon_racer/melon/melon_gold.vmdl",
+    honey: "models/melon_racer/melon/melon_honey.vmdl",
+    strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
+    camo: "models/melon_racer/melon/melon_camo.vmdl",
     football: "models/melon_racer/melon/melon_football.vmdl",
     golf: "models/melon_racer/melon/melon_golf.vmdl",
-    honey: "models/melon_racer/melon/melon_honey.vmdl",
-    camo: "models/melon_racer/melon/melon_camo.vmdl",
-    strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
-    pumpkin: "models/melon_racer/melon/melon_pumpkin.vmdl",
     pineapple: "models/melon_racer/melon/melon_pineapple.vmdl",
     zebra: "models/melon_racer/melon/melon_zebra.vmdl",
+    pumpkin: "models/melon_racer/melon/melon_pumpkin.vmdl",
+    gold: "models/melon_racer/melon/melon_gold.vmdl",
 };
 export const MELON_SKIN_DEFAULT = "default";
 // Every skin's name as the user menu shows it: under its button in the skin
@@ -70,15 +71,31 @@ export const MELON_SKIN_DEFAULT = "default";
 /** @type {Record<string, string>} */
 export const MELON_SKIN_NAMES = {
     default: "Melon",
-    gold: "Gold",
+    honey: "Honey Melon",
+    strawberry: "Strawberry",
+    camo: "Camo",
     football: "Football",
     golf: "Golf",
-    honey: "Honey Melon",
-    camo: "Camo",
-    strawberry: "Strawberry",
-    pumpkin: "Pumpkin",
     pineapple: "Pineapple",
     zebra: "Zebra",
+    pumpkin: "Pumpkin",
+    gold: "Gold",
+};
+// The level (race/level/) a player needs before they can pick a skin; a
+// skin not listed is free from the start. Locked ones show greyed out with
+// their level in the skin grid (kart/skin-logic.js: IsSkinUnlocked).
+/** @type {Record<string, number>} */
+export const MELON_SKIN_LEVELS = {
+    default: 1,
+    honey: 1,
+    strawberry: 1,
+    camo: 3,
+    football: 5,
+    golf: 7,
+    pineapple: 10,
+    zebra: 14,
+    pumpkin: 18,
+    gold: 25,
 };
 // Skins per page of the user menu's skin grid (3 x 3): with more, ◀ ▶ next to
 // the MELON title page through them, in MELON_SKINS order. One panel per page

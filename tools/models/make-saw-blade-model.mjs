@@ -174,7 +174,7 @@ const animations = [
 WriteAddonFile(mesh, SmdText(BONES, MeshSmdTriangles(render, NAME, BLADE_BONE)));
 WriteAddonFile(animations[0].file, SmdAnimationText(BONES, spinFrames));
 WriteAddonFile(animations[1].file, SmdAnimationText(BONES, [BindFrame(BONES)]));
-WriteAddonFile(physicsObj, ObjText(physics, NAME, GENERATOR));
+WriteAddonFile(physicsObj, ObjText(physics, NAME, GENERATOR, { smd: true }));
 WriteAddonFile(`${MODEL_DIR}/${NAME}.vmdl`, VmdlText({ name: NAME, mesh, physicsObj, materials, animations, surfaceProp: "metal" }));
 for (const [part, rgb, options] of [
     ["blade", BLADE_COLOR, { metalness: 0.85 }],

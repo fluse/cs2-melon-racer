@@ -1,13 +1,12 @@
 import { Instance, CSInputs } from "cs_script/point_script";
 import { karts } from "../../core/kart-registry.js";
 import { GetSpeedHud } from "../layout.js";
-import { ScoreboardView, BuildScoreboard, BuildStatBoard, ScoreboardPages, CurrentPage, StatSlideOf, StepPage, PageSwitcher } from "./logic.js";
+import { ScoreboardView, BuildScoreboard, ScoreboardPages, CurrentPage, StepPage, PageSwitcher } from "./logic.js";
 import { ROUTE_NAMES } from "../hub-modal/routes.js";
 import { grandPrix, PlayerKey } from "../../race/grand-prix/grand-prix.js";
 import { activeTrackId } from "../../race/heat/race-flow.js";
 import { GetTrackOrder } from "../../race/track-config.js";
 import { GetTrackBestTimes } from "../../race/time-trial/time-trial.js";
-import { GetStatTotals } from "../../race/stats/stats.js";
 import { SCOREBOARD_ROWS, SCOREBOARD_UPDATE_SECONDS, HUD_RESEND_SECONDS } from "../../constants/index.js";
 
 /**
@@ -57,19 +56,16 @@ export function UpdateScoreboardHud(slot, kart) {
 
     const { pages, page, grandPrixMode, boardTrackId } = ScoreboardPage(kart);
     const { players, self } = BoardPlayers(kart);
-    const slide = StatSlideOf(page);
-    const board = slide
-        ? BuildStatBoard({ slide, totals: GetStatTotals(slide.key), players, self, maxRows: SCOREBOARD_ROWS })
-        : BuildScoreboard({
-            grandPrix,
-            grandPrixMode,
-            boardTrackId,
-            players,
-            self,
-            bestTimes: boardTrackId !== undefined ? GetTrackBestTimes(boardTrackId) : {},
-            maxRows: SCOREBOARD_ROWS,
-            routeNames: ROUTE_NAMES,
-        });
+    const board = BuildScoreboard({
+        grandPrix,
+        grandPrixMode,
+        boardTrackId,
+        players,
+        self,
+        bestTimes: boardTrackId !== undefined ? GetTrackBestTimes(boardTrackId) : {},
+        maxRows: SCOREBOARD_ROWS,
+        routeNames: ROUTE_NAMES,
+    });
     const switcher = PageSwitcher(pages, page);
 
     SetClass("scoreboard", "TimeTrial", !board.grandPrixMode);
@@ -114,7 +110,7 @@ function ScoreboardPage(kart) {
     const { grandPrixMode, boardTrackId } = ScoreboardView({ grandPrix, activeTrackId, kartTrackId: kart.trackId, trackOrder, pickedTrackId: kart.scoreboardPick });
     return {
         pages: ScoreboardPages(grandPrixMode, trackOrder),
-        page: CurrentPage(grandPrixMode, boardTrackId, kart.scoreboardStat),
+        page: CurrentPage(grandPrixMode, boardTrackId),
         grandPrixMode,
         boardTrackId,
     };
@@ -122,9 +118,8 @@ function ScoreboardPage(kart) {
 
 /**
  * Paging the scoreboard: while it's open (Tab held, SHOW_SCORES), A shows
- * the previous page and D the next one, wrapping around — the Grand Prix
- * standings or every track's best times, then the players' stats
- * (ScoreboardPages). Every opening starts on the viewer's own board again
+ * the previous page and D the next one, wrapping around — every track's
+ * best times (ScoreboardPages; the Grand Prix standings are one page). Every opening starts on the viewer's own board again
  * (the pick is dropped when Tab is let go). Per tick, from core/think.js —
  * a tap is only seen on the tick it happens.
  * @param {import("../../core/kart-registry.js").Kart} kart
@@ -133,7 +128,6 @@ export function UpdateScoreboardInput(kart) {
     const pawn = kart.pawn;
     if (!pawn.IsInputPressed(CSInputs.SHOW_SCORES)) {
         kart.scoreboardPick = undefined;
-        kart.scoreboardStat = undefined;
         return;
     }
     const direction = (pawn.WasInputJustPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.WasInputJustPressed(CSInputs.LEFT) ? 1 : 0);
@@ -143,7 +137,6 @@ export function UpdateScoreboardInput(kart) {
     const { pages, page } = ScoreboardPage(kart);
     const next = StepPage(pages, page, direction);
     const [kind, id] = next.split(":");
-    kart.scoreboardStat = kind === "stat" ? id : undefined;
     if (kind === "track" && id !== "") {
         kart.scoreboardPick = Number(id);
     }

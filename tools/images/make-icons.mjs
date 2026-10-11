@@ -170,6 +170,13 @@ const ICONS = {
             return [32 + r * Math.cos(a), 13 + r * Math.sin(a)];
         })),
     ),
+    // Padlock with a keyhole — a skin still locked by level (the skin grid).
+    lock: union(
+        cut(rect(13, 29, 51, 59, 5), union(circle(32, 41, 4.5), rect(30, 41, 34, 51, 1))),
+        arc(32, 22, 12, 180, 360, 6),
+        line(20, 22, 20, 30, 3),
+        line(44, 22, 44, 30, 3),
+    ),
     // Bug — COLLISION DEBUG.
     debug: union(
         cut(ellipse(32, 40, 12, 15), line(32, 29, 32, 56, 1.3)),

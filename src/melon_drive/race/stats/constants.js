@@ -1,5 +1,6 @@
-// Player stats: all-time totals per player, saved to disk, shown as pages of
-// the scoreboard (A/D with Tab held). See "Player stats" in GAMEPLAY.md.
+// Player stats: all-time totals per player, saved to disk, shown as tabs of
+// the user menu's leaderboards page and in its profile. See "Player stats"
+// in GAMEPLAY.md.
 
 // Key of the stats inside the addon's save data (next to the best times,
 // SAVE_DATA_BEST_TIMES_KEY).
@@ -11,8 +12,8 @@ export const SAVE_DATA_STATS_KEY = "stats";
 // disconnects.
 export const STATS_SAVE_SECONDS = 30;
 
-// The scoreboard's stat pages, in paging order: `key` in the save data,
-// `title` of the page, `column` the value column's header, `format` how the
+// The stats, in the order the leaderboards and the profile show them: `key`
+// in the save data, `title` of the leaderboard, `column` the value column's header, `format` how the
 // value reads ("duration": seconds as 1h 05m / 4m 12s / 37s, "count").
 export const STAT_SLIDES = [
     { key: "playTime", title: "LONGEST ON THE SERVER", column: "TIME", format: "duration" },

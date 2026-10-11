@@ -521,7 +521,8 @@ three effect triggers on the clicking player's own melon (not while racing or
 broken): **"Test Break"** (breaks it where it is — effects, pieces, break
 camera, respawn at its respawn point), **"Test Perfect Bounce"** (a PERFECT
 bounce's spark, bounce panel and speedometer flash — no speed) and **"Test
-Heal"** (the heal zone's effect, health refilled); `dev/test-effects.js`. `TestCountdown`/
+Heal"** (the heal zone's effect, health refilled), plus **"Test XP Gain"**
+(the XP notifier, nothing given — see "Leveling"); `dev/test-effects.js`. `TestCountdown`/
 `TestFinish` in `race/heat/race-flow.js` (`test/hud/hud-buttons.test.mjs`).
 
 ## Grand Prix — places & points (decided, implemented)
@@ -585,16 +586,16 @@ can't tell whether Tab is held). What it shows, per viewer
 - **Time trial** — otherwise (or when the viewer is on a track): the best
   times on the viewer's track (else the last Grand Prix's last track, else
   the first one), fastest first, saved times of players who aren't on the
-  map included. The subtitle names the route.
-- **Stats** — one page per player stat (see "Player stats" below), the
-  highest total first, saved totals of players who aren't on the map
-  included; players with nothing yet get no rank.
+  map included. **The route's name is the big title** (decided), "TIME
+  TRIAL · BEST TIMES" under it.
+
+**No player stats here** (decided): they're on the user menu's
+leaderboards page and in its profile.
 
 **Paging** (decided): with Tab held, A and D page to the previous/next
-page, wrapping around — every track's best times in race order (or, on
-the Grand Prix board, its standings as one page), then the stat pages; the
-hint under the subtitle says where ("◀ A  ROUTE 2 / 3  D ▶", "STATS 1 / 5",
-"STANDINGS"). Letting go of Tab forgets it, so every opening starts on the
+track's best times in race order, wrapping around; the hint under the
+subtitle says where ("◀ A  ROUTE 2 / 3  D ▶"). The Grand Prix board is one
+page, without a hint. Letting go of Tab forgets it, so every opening starts on the
 viewer's own board. While Tab is held A/D don't strafe the melon.
 `ScoreboardPages`/`StepPage` in `hud/scoreboard/logic.js`,
 `UpdateScoreboardInput` in `hud/scoreboard/scoreboard.js`.
@@ -609,7 +610,7 @@ the last one. The viewer's row is tinted. Rebuilt every
 All-time totals per player, **saved** like the best times (decided): in
 the addon's save data under `SAVE_DATA_STATS_KEY`, keyed by player name
 (renaming starts from scratch), so they survive map restarts. Shown as the
-scoreboard's stat pages (`STAT_SLIDES`, in this order):
+user menu's leaderboard tabs and in its profile (`STAT_SLIDES`, in this order):
 
 - **Longest on the server** — time with a melon on the map (from the first
   spawn after the logo, spectators don't count), every tick.
@@ -642,7 +643,7 @@ ACTIONS column's measures, a button per board (the picked one gold), a
 divider, the board on the right.
 The boards: **Best Times** (one track; ◀ ▶ beside the title page through
 the tracks, the player's own track first), then one tab per player stat
-(`STAT_SLIDES`, same order and values as the scoreboard's stat pages). The
+(`STAT_SLIDES`, in that order). The
 board shows up to `LEADERBOARD_ROWS` (**20**, decided) players, one under
 the other (decided, not two columns), saved totals of players who aren't on the map
 included; the viewer's own row is outlined in gold and takes the last row
@@ -654,12 +655,60 @@ columns. A new stat needs its tab button (`lb_tab_<key>`) in
 `hud/leaderboards/logic.js` (rows and ranks from `hud/scoreboard/logic.js`),
 applied by `hud/leaderboards/leaderboards.js` (`test/hud/leaderboards.test.mjs`).
 
+## Leveling (decided, implemented)
+
+Every player earns **XP**, and the XP make a **level** that unlocks melon
+skins. Saved per player name in the addon's save data (`SAVE_DATA_XP_KEY`,
+next to the best times and stats; renaming starts from scratch), written
+every `XP_SAVE_SECONDS` while something changed and on disconnect. **No XP
+for anything before leveling existed** (decided): everyone starts at level 1.
+
+- **What earns XP — a Grand Prix clearly more than time trials** (decided):
+  a time trial's finish `XP_TIME_TRIAL_FINISH` (15), a new best time
+  `XP_NEW_BEST` (25, in a heat too), a heat's finish `XP_HEAT_FINISH` (40)
+  plus 40/25/15 for 1st/2nd/3rd (`XP_HEAT_PLACE_BONUS`), a Grand Prix run
+  to its end (not cancelled) `XP_GRAND_PRIX_FINISH` (50) for everyone still
+  in it plus 150/100/75 for its top three (`XP_GRAND_PRIX_PLACE_BONUS`), a
+  PERFECT wall bounce or wall jump `XP_PERFECT_HIT` (3), and
+  `XP_PER_MINUTE_PLAYED` (1) a minute with a melon on the map. Crashes and
+  restarts earn nothing.
+- **Slow on purpose** (decided): from level L to L+1 takes `LEVEL_XP_BASE` +
+  `LEVEL_XP_STEP` × (L − 1) XP (150, 225, 300, …) — level 3 in about half an
+  hour, level 25 (the last skin) after some 20–30 hours of racing.
+- **Skins by level** (`MELON_SKIN_LEVELS`, `kart/constants.js`): **three free
+  from the start** (decided) — Melon, Honey Melon, Strawberry —, then Camo 3,
+  Football 5, Golf 7, Pineapple 10, Zebra 14, Pumpkin 18, Gold 25. A locked
+  skin shows in the grid dimmed under a padlock with "LV 12" in place of its
+  name; clicking it does nothing. A saved skin that's locked (the levels
+  were raised) drives as the default until it's reached again.
+- **Level up:** "LEVEL UP / LEVEL 8", and "NEW SKIN: CAMO" if it unlocked
+  any, top center for `LEVEL_UP_HUD_SECONDS` (`levelup_panel`) — **not in the
+  middle of a heat** (decided): a racer sees it once they've finished.
+- **XP notifier** (decided): every XP reward shows at once, top right, for
+  `XP_GAIN_HUD_SECONDS` (`xpgain_panel`): "+40 XP", the level ("LV 7"), the
+  XP bar — the fill from before green, the part just gained gold (all of it
+  after a level-up) — and "340 / 525 XP". Rewards within that time add up
+  into one. Also mid-heat; not for the XP per minute on the server.
+  `XpGainView` in `race/level/logic.js`, `ShowXpGain` in `race/level/level.js`,
+  shown by `hud/xp-gain-panel.js`. The DEVELOPER "Test Triggers" page's
+  **"Test XP Gain"** shows it as if `XP_GAIN_TEST_AMOUNT` were earned —
+  only shown, nothing given.
+- The profile (below) shows the level ("LV 7") and the XP towards the next
+  one, as a bar and "340 / 525 XP".
+- For testing: `melon_give_xp <amount>` in the console (sv_cheats 1 only)
+  gives every player on the map XP — no menu button, since anyone can open
+  the DEVELOPER pages.
+
+Constants: `race/level/constants.js`; rules: `race/level/logic.js` and
+`kart/skin-logic.js` (unlocks), applied by `race/level/level.js`, `kart/skin.js`
+and `hud/level-up-panel.js` (`test/race/level.test.mjs`).
+
 ## Profile (implemented)
 
 The top of the user menu's right column, above DEVELOPER, is the player's
 own **profile**: their melon big (the skin's preview at full size, framed
 like the picked skin in the grid — it changes with the skin at once), their
-name and skin name, and one tile per player stat (`STAT_SLIDES`, same order
+name, level and skin name, the XP towards the next level ("Leveling"), and one tile per player stat (`STAT_SLIDES`, same order
 and values as the leaderboards) with their all-time rank on it ("#3",
 saved players included, ties shared; no rank while the total is 0).
 Rebuilt every `PROFILE_UPDATE_SECONDS` while the menu shows its columns.
@@ -1134,11 +1183,12 @@ by `kart/look.js`.
 ## Melon skins (implemented)
 
 Each player picks a **skin** for their melon in the user menu (SETTINGS →
-MELON, decided): Melon (the default), Gold,
+MELON, decided): Melon (the default), Honey Melon, Strawberry, Camo,
 Football, Golf (dimples only in the normal map, so they show in the light
-and reflections), Honey Melon, Camo, Strawberry, Pumpkin (a carved face that glows from
-inside), Pineapple, Zebra — three per row, a preview and a name per button, the current one
-outlined. **Paged** (decided): `MELON_SKINS_PER_PAGE` (9, a 3 × 3 grid) per
+and reflections), Pineapple, Zebra, Pumpkin (a carved face that glows from
+inside), Gold — **sorted by the level that unlocks them** (decided, the free
+ones first; `test/race/level.test.mjs`), three per row, a preview and a name per button, the current one
+outlined; most are **locked until a level** ("Leveling"). **Paged** (decided): `MELON_SKINS_PER_PAGE` (9, a 3 × 3 grid) per
 page in `MELON_SKINS` order, ◀ ▶ right-aligned next to the MELON title with
 the page indicator between them ("1 / 2"), wrapping around — shown only with
 more than one page. The menu opens on the page with the player's skin, or
@@ -1370,6 +1420,20 @@ Physics balls dropping in at irregular intervals: the script copies the
 `world/ball-spawner/constants.js`; rules: `world/ball-spawner/logic.js`,
 applied by `world/ball-spawner/ball-spawner.js` (`test/world/ball-spawner.test.mjs`).
 Details for mappers: [Mapping API: ball spawner](docs/mapping-api/20-ball-spawner.md).
+
+## Bouncers (implemented)
+
+Foam paddles on a spring (`tools/models/make-bouncer-model.mjs`) swinging
+from side to side across the track. **Each one starts at a random point of
+its swing** (decided), so a row of them doesn't swing in step: the script
+finds every `prop_dynamic` with the bouncer model, holds it upright and
+starts its looping `swing` once, after a random delay of up to one swing
+(`BOUNCER_SWING_SECONDS`, shared with the generator). The map is searched
+again every `BOUNCER_SCAN_SECONDS`; a round restart starts them all anew. No
+name or Hammer logic. Constants: `world/bouncer/constants.js`; rules:
+`world/bouncer/logic.js`, applied by `world/bouncer/bouncer.js`
+(`test/world/bouncer.test.mjs`). Details for mappers:
+[Mapping API: bouncers](docs/mapping-api/22-bouncers.md).
 
 ## Open design questions (not yet decided — ask before assuming)
 

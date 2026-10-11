@@ -303,6 +303,18 @@ test("test break/bounce/heal: on the clicking player's own melon, menu closed â€
     assert.ok(!b.breaking);
 });
 
+test("test XP gain: the XP notifier for the clicking player only, nothing given", async () => {
+    const level = await import("../../src/melon_drive/race/level/level.js");
+    const xp = level.GetKartXp(a);
+    SetUserMenuOpen(0, a, true);
+    Click(0, "usermenu_testxp_button");
+    assert.equal(a.userMenuOpen, false);
+    assert.equal(a.xpGain?.amount, C.XP_GAIN_TEST_AMOUNT);
+    assert.equal(a.xpGain?.toXp, xp + C.XP_GAIN_TEST_AMOUNT);
+    assert.equal(level.GetKartXp(a), xp, "only shown");
+    assert.equal(b.xpGain, undefined);
+});
+
 test("every ON/OFF setting: a click flips it and its pill, a second click back", () => {
     for (const [buttonId, { variable, isOn }] of Object.entries(USER_MENU_TOGGLES)) {
         const before = isOn(a);
@@ -350,7 +362,7 @@ test("color buttons set only the glow of that player's melon, switch it on and m
 });
 
 test("skin buttons: put that skin's model on the clicker's melon, mark it, keep its paint â€” saved for the next join", () => {
-    const skin = Object.keys(C.MELON_SKINS).find((key) => key !== C.MELON_SKIN_DEFAULT);
+    const skin = Object.keys(C.MELON_SKINS).find((key) => key !== C.MELON_SKIN_DEFAULT && (C.MELON_SKIN_LEVELS[key] ?? 1) <= 1); // one free from the start
     assert.equal(a.melon.GetModelName(), C.MELON_SKINS[C.MELON_SKIN_DEFAULT], "a new melon gets its player's (default) skin");
     SetKartPaintColor(a, Object.values(COLOR_PRESETS)[0]); // a paint trigger
     Click(0, `usermenu_skin_${skin}`);
@@ -370,7 +382,7 @@ test("skin buttons: put that skin's model on the clicker's melon, mark it, keep 
 });
 
 test("skin buttons: a broken melon gets its new skin on the respawn, not while it's hidden", () => {
-    const skin = Object.keys(C.MELON_SKINS).find((key) => key !== C.MELON_SKIN_DEFAULT);
+    const skin = Object.keys(C.MELON_SKINS).find((key) => key !== C.MELON_SKIN_DEFAULT && (C.MELON_SKIN_LEVELS[key] ?? 1) <= 1); // one free from the start
     a.breaking = true;
     Click(0, `usermenu_skin_${skin}`);
     assert.equal(a.skin, skin);

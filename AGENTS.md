@@ -62,14 +62,15 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #   race/      track-config.js (tracks from trigger names), checkpoints/ (progress, start_/checkpoint_/finish_ inputs),
                                           #              time-trial/ (run clock + saved best times), heat/ (hub/countdown/racing/break flow, hub inputs),
                                           #              grand-prix/ (places + points per heat, standings over the heats), podium/ (top 3 held on the hub podium),
-                                          #              stats/ (saved all-time player stats: time on the server, crashes, finishes, boost time, PERFECT hits)
+                                          #              stats/ (saved all-time player stats: time on the server, crashes, finishes, boost time, PERFECT hits),
+                                          #              level/ (saved XP per player, levels, skins unlocked by level, the level-up message's timing)
                                           #   camera/    follow/ (chase camera, the only SetFollowConfig), wall-clip/ (eased pull-in at walls), break-zoom/, lift-zoom/, podium-zoom/, zone-zoom/,
                                           #              side-view/ (fixed side camera, CONTROLLED mode)
                                           #   hud/       layout.js (the custom_hud_layout), one folder per panel with its own rules: speedometer/ (km/h, health bar, jump dots),
-                                          #              track/ (time trial + checkpoint strip), scoreboard/ (Tab: Grand Prix standings / best times / player stats,
+                                          #              track/ (time trial + checkpoint strip), scoreboard/ (Tab: Grand Prix standings / best times per track,
                                           #              in place of CS2's own), leaderboards/ (the user menu's page: one leaderboard per tab, top 20),
                                           #              profile/ (top of the user menu's right column: own melon big, own stats + ranks),
-                                          #              hub-modal/ ("Start Grand Prix": heat cards + who rides along; routes.js is generated); one file per panel without: bounce-panel.js, user-menu.js;
+                                          #              hub-modal/ ("Start Grand Prix": heat cards + who rides along; routes.js is generated); one file per panel without: bounce-panel.js, level-up-panel.js, xp-gain-panel.js (the XP notifier, top right), user-menu.js;
                                           #              inputs.js (every button click: one table per kind of button, HandleHudClick dispatches)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
                                           #              boost-trail/, prediction/ (the guide line)
@@ -81,6 +82,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              spike-spring/ (prop_dynamic "spike_spring…": rise/sink on the script's clock, breaks melons on its spikes),
                                           #              ball-pit/ (ball_pit_enter/leave: balls that leave the trigger steered back or dropped back in),
                                           #              ball-spawner/ (template_ball copied at spawn_ball at random intervals, removed after a lifetime, capped)
+                                          #              bouncer/ (prop_dynamic with the bouncer model: "swing" loop started once, after a random delay within one swing)
 src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
 test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one folder per src/melon_drive/ domain (movement/, race/, …): unit tests
                                           #   for the pure files, engine-side tests against the fake engine (filed under the domain they're mainly about)
@@ -104,7 +106,7 @@ tools/models/make-ball-model.mjs          # a ball-pit ball as models/melon_race
                                           #   a sphere primitive for collision, light (mass_override) — color each prop_physics by its render color
 tools/models/make-bouncer-model.mjs       # a foam swinger on a spring as models/melon_racer/bouncer/bouncer.vmdl: a tall flat pink ribbed foam paddle,
                                           #   lime top edge, upright on a chrome coil skinned to a bone chain; looping "swing" (side to side, the coil bending
-                                          #   along) + "idle"; a prop_dynamic, Idle Animation "swing", loop — an obstacle in the air; collision: base + coil
+                                          #   along) + "idle"; a prop_dynamic, animations left empty — world/bouncer/ starts the swing at a random point (SWING_SECONDS imported from there) — an obstacle in the air; collision: base + coil
                                           #   static, the paddle on the "head" bone (VmdlText physicsObj as [{ file, bone }]); materials/melon_racer/bouncer/
 tools/models/make-buffer-stop-model.mjs   # a buffer stop (Prellbock) as models/melon_racer/buffer_stop/buffer_stop.vmdl: magenta beam with a white chevron,
                                           #   two buffers, bent grey legs on crossbars (696 triangles); a track obstacle, coarser _physics.obj collision; materials/melon_racer/buffer_stop/
@@ -281,7 +283,7 @@ instead; if it looks older than the d.ts, ask the user to save it again.
   `Msg`, `DebugScreenText`, `DebugLine`, `DebugSphere`, `DebugBox`.
 - **Persistence**: `SetSaveData(string)` / `GetSaveData()` — synchronous
   read/write to disk, scoped to the addon. Holds the time trial's best
-  times (`race/time-trial/`), the player stats (`race/stats/`) and
+  times (`race/time-trial/`), the player stats (`race/stats/`), the XP (`race/level/`) and
   per-player settings (`kart/`), each under its own key.
 - **Scheduling**: `SetThink(fn)` + `SetNextThink(time)` (tick-driven, time
   in `GetGameTime()` units), `Delay(seconds)` (returns a `Promise`),

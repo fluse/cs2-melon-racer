@@ -24,7 +24,7 @@ import { Instance } from "cs_script/point_script";
 //   hud/       one file per HUD panel, button clicks
 //   fx/        particles, boost trail, guide line
 //   dev/       debug views
-//   world/     map entities kept running on their own (movers, spike springs, ball pits, ball spawner)
+//   world/     map entities kept running on their own (movers, spike springs, ball pits, ball spawner, bouncers)
 // Tunables: each folder's constants.js, all re-exported by constants/index.js.
 
 import { Debug } from "./core/debug.js";
@@ -37,7 +37,7 @@ import { phase, activeTrackId, phaseEndTime, RestoreRaceFlowSnapshot, RegisterRa
 import { RegisterHudInputs } from "./hud/index.js";
 import { RegisterMovementInputs } from "./movement/index.js";
 import { RegisterAttackDebug } from "./dev/index.js";
-import { movers, RestoreMovers, RegisterMoverInputs, RegisterSpikeSpringInputs, RegisterBallPitInputs, RegisterBallSpawnerInputs, spawnedBalls, RestoreSpawnedBalls } from "./world/index.js";
+import { movers, RestoreMovers, RegisterMoverInputs, RegisterSpikeSpringInputs, RegisterBallPitInputs, RegisterBallSpawnerInputs, spawnedBalls, RestoreSpawnedBalls, RegisterBouncerInputs, bouncers, RestoreBouncers } from "./world/index.js";
 
 Instance.SetThink(Think);
 Instance.SetNextThink(Instance.GetGameTime());
@@ -51,7 +51,7 @@ Instance.SetNextThink(Instance.GetGameTime());
 // reloading mid-heat during dev iteration doesn't strand locked racers in a
 // phase that's forgotten it's supposed to unlock/advance them.
 Instance.OnScriptReload({
-    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers, grandPrix, spawnedBalls }),
+    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers, grandPrix, spawnedBalls, bouncers }),
     after: (memory) => {
         if (memory?.karts) {
             for (const [slot, kart] of memory.karts) {
@@ -62,6 +62,7 @@ Instance.OnScriptReload({
             SetModeratorSlot(memory.moderatorSlot);
             RestoreMovers(memory.movers);
             RestoreSpawnedBalls(memory.spawnedBalls);
+            RestoreBouncers(memory.bouncers);
             Debug(`OnScriptReload: restored ${karts.size} kart(s), phase=${phase}, activeTrackId=${activeTrackId}, moderatorSlot=${moderatorSlot}`);
         }
     },
@@ -78,3 +79,4 @@ RegisterMoverInputs(); // OnActivate/OnRoundStart: start the func_movelinear mov
 RegisterSpikeSpringInputs(); // OnRoundStart: look the spike springs up again
 RegisterBallPitInputs(); // ball_pit_enter/ball_pit_leave
 RegisterBallSpawnerInputs(); // OnRoundStart: the spawned balls are gone
+RegisterBouncerInputs(); // OnRoundStart: start the bouncers again, at new random points

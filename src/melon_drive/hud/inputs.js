@@ -15,7 +15,7 @@ import { IsCollisionDebugOn, SetCollisionDebug } from "../dev/collision-debug.js
 import { IsFreeLookOn, SetFreeLook } from "../dev/free-look.js";
 import { HandleCameraTuningClick } from "../dev/camera-tuning.js";
 import { HandlePhysicsTuningClick } from "../dev/physics-tuning.js";
-import { TestBreak, TestHeal, TestPerfectBounce } from "../dev/test-effects.js";
+import { TestBreak, TestHeal, TestPerfectBounce, TestXpGain } from "../dev/test-effects.js";
 import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, TestCountdown, TestFinish, TestIntro } from "../race/heat/race-flow.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { PlaceOnPodium, TestGrandPrix } from "../race/podium/podium.js";
@@ -172,11 +172,12 @@ const TEST_TRIGGER_BUTTONS = {
     usermenu_testcountdown_button: (slot, kart) => TestCountdown(kart),
     usermenu_testfinish_button: (slot, kart) => TestFinish(kart),
     usermenu_testintro_button: (slot, kart) => TestIntro(kart),
-    // A break, a PERFECT bounce's feedback or the heal effect on the melon
-    // (dev/test-effects.js).
+    // A break, a PERFECT bounce's feedback or the heal effect on the melon,
+    // the XP notifier (dev/test-effects.js).
     usermenu_testbreak_button: (slot, kart) => TestBreak(slot, kart),
     usermenu_testbounce_button: (slot, kart) => TestPerfectBounce(kart),
     usermenu_testheal_button: (slot, kart) => TestHeal(kart),
+    usermenu_testxp_button: (slot, kart) => TestXpGain(kart),
 };
 
 /**

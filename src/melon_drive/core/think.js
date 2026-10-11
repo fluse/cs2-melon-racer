@@ -4,15 +4,16 @@ import { HEARTBEAT_INTERVAL } from "../constants/index.js";
 import { karts, EnsureModerator, DropKart } from "./kart-registry.js";
 import { SetUpPlayerKart, EnsurePlayerKarts, HoldPawn } from "../kart/spawn.js";
 import { GetHubSpawnPoint } from "../kart/spawn-points.js";
-import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud, UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, UpdateScoreboardHud, UpdateScoreboardInput, ApplyHubModalState } from "../hud/index.js";
+import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud, UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, UpdateScoreboardHud, UpdateScoreboardInput, ApplyHubModalState, UpdateLevelUpHud, UpdateXpGainHud } from "../hud/index.js";
 import { UpdateKart } from "../movement/index.js";
 import { HandleMelonLost } from "../health/index.js";
 import { phase, UpdateRaceFlow } from "../race/heat/race-flow.js";
 import { UpdateStats } from "../race/stats/stats.js";
+import { UpdateLevel } from "../race/level/level.js";
 import { UpdatePrediction, HidePrediction } from "../fx/prediction/prediction.js";
 import { UpdateLiftCamera, UpdatePodiumCamera, UpdateZoneCamera, UpdateSideViewCamera, UpdateFollowCamera } from "../camera/index.js";
 import { UpdateBoostTrail, StopBoostTrail } from "../fx/boost-trail/boost-trail.js";
-import { UpdateSpikeSprings, UpdateBallPits, UpdateBallSpawner } from "../world/index.js";
+import { UpdateSpikeSprings, UpdateBallPits, UpdateBallSpawner, UpdateBouncers } from "../world/index.js";
 
 let lastHeartbeatTime = 0;
 // Real elapsed time since the last Think, used for the movement math below —
@@ -87,6 +88,8 @@ export function Think() {
             UpdateCheckpointHud(slot, kart);
             UpdateScoreboardInput(kart);
             UpdateScoreboardHud(slot, kart);
+            UpdateLevelUpHud(slot, kart, now);
+            UpdateXpGainHud(slot, kart, now);
             if (kart.inHub) {
                 ApplyHubModalState(slot, phase);
             }
@@ -121,6 +124,11 @@ export function Think() {
         Debug(`Think: UpdateStats threw: ${err}`);
     }
     try {
+        UpdateLevel(now, Math.min(dt, 1)); // XP for time on the server, the same way
+    } catch (err) {
+        Debug(`Think: UpdateLevel threw: ${err}`);
+    }
+    try {
         UpdateSpikeSprings(now);
     } catch (err) {
         Debug(`Think: UpdateSpikeSprings threw: ${err}`);
@@ -134,6 +142,11 @@ export function Think() {
         UpdateBallSpawner(now);
     } catch (err) {
         Debug(`Think: UpdateBallSpawner threw: ${err}`);
+    }
+    try {
+        UpdateBouncers(now);
+    } catch (err) {
+        Debug(`Think: UpdateBouncers threw: ${err}`);
     }
     // Re-think as soon as possible (every engine tick) rather than on a fixed
     // interval — WasInputJustPressed only reports a button edge for the

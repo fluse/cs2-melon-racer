@@ -81,7 +81,6 @@ function TraceSphere(config) {
  *   hudResendAt?: { health?: number, jump?: number }, // when they send their whole state again — see HUD_RESEND_SECONDS
  *   hubRacersResendAt?: number, hubRacersShown?: Record<string, string>, // the hub window's heats and racers: next full resend, and what it last sent — see UpdateHubLists
  *   scoreboardPick?: number, // track the time trial board was paged to while Tab is held (unset: the viewer's own) — see UpdateScoreboardInput
- *   scoreboardStat?: string, // stat page (STAT_SLIDES key) the scoreboard was paged to while Tab is held (unset: the standings or a track's best times) — see UpdateScoreboardInput
  *   scoreboardNextUpdate?: number, scoreboardResendAt?: number, scoreboardShown?: Record<string, string>, // the scoreboard's next rebuild, next full resend, and what it last sent — see UpdateScoreboardHud
  *   lastJumpPressTime?: number, lastIdleJumpPressTime?: number, wallTimingPressTime?: number, wallTimingLockedUntil?: number, // jump presses (the last one that did nothing: no ground/wall jump) and wall-bounce timing, see RegisterWallTimingPress
  *   floorNormalZ?: number, // this tick's floor trace normal z (undefined: nothing below) — flat landings cost more, see ImpactDamage
@@ -104,6 +103,11 @@ function TraceSphere(config) {
  *   leaderboardTab?: string, // leaderboard the user menu's leaderboards page shows (unset: the best times) — see SelectLeaderboardTab
  *   leaderboardTrack?: number, // track the leaderboards page's best times were paged to (unset: the player's own track, else the first) — see StepLeaderboardsTrack
  *   leaderboardNextUpdate?: number, leaderboardResendAt?: number, leaderboardShown?: Record<string, string>, // the leaderboards page's next rebuild, next full resend, and what it last sent — see UpdateLeaderboardsHud
+ *   levelUp?: { level: number, skins: string[], until: number | undefined }, // a level-up waiting for (or on) the HUD: the new level, the skins it unlocked, until when it shows (undefined: not yet, e.g. mid-heat) — see GrantXp, UpdateLevelUpHud
+ *   levelUpShown?: string, levelUpResendAt?: number, // what the level-up panel last showed, and its next full resend — see UpdateLevelUpHud
+ *   xpGain?: { fromXp: number, toXp: number | undefined, amount: number, until: number }, // XP gained, on the XP notifier until `until`: the XP before, after (undefined: as they are now — set only by a preview), the amount — see ShowXpGain, UpdateXpGainHud
+ *   xpGainShown?: string, xpGainResendAt?: number, // what the XP notifier last showed, and its next full resend — see UpdateXpGainHud
+ *   skinHudLevel?: number, // the level the skin grid's locks were last drawn for — see UpdateSkinHud
  *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud
  *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
@@ -1082,8 +1086,9 @@ const PODIUM_CONFETTI_NAME = "particle_podium_confetti";
 const PODIUM_CONFETTI_INTERVAL = 2; // seconds between bursts
 const PODIUM_CONFETTI_RESTART_GAP = 0.1; // seconds between a burst's Stop and its Start
 
-// Player stats: all-time totals per player, saved to disk, shown as pages of
-// the scoreboard (A/D with Tab held). See "Player stats" in GAMEPLAY.md.
+// Player stats: all-time totals per player, saved to disk, shown as tabs of
+// the user menu's leaderboards page and in its profile. See "Player stats"
+// in GAMEPLAY.md.
 
 // Key of the stats inside the addon's save data (next to the best times,
 // SAVE_DATA_BEST_TIMES_KEY).
@@ -1095,8 +1100,8 @@ const SAVE_DATA_STATS_KEY = "stats";
 // disconnects.
 const STATS_SAVE_SECONDS = 30;
 
-// The scoreboard's stat pages, in paging order: `key` in the save data,
-// `title` of the page, `column` the value column's header, `format` how the
+// The stats, in the order the leaderboards and the profile show them: `key`
+// in the save data, `title` of the leaderboard, `column` the value column's header, `format` how the
 // value reads ("duration": seconds as 1h 05m / 4m 12s / 37s, "count").
 const STAT_SLIDES = [
     { key: "playTime", title: "LONGEST ON THE SERVER", column: "TIME", format: "duration" },
@@ -1106,6 +1111,61 @@ const STAT_SLIDES = [
     { key: "perfectHits", title: "MOST PERFECT WALL HITS", column: "PERFECT", format: "count" },
     { key: "trialRestarts", title: "MOST TRIAL RESTARTS", column: "RESTARTS", format: "count" },
 ];
+
+// Leveling: XP for racing, a level from the XP, skins unlocked by level
+// (MELON_SKIN_LEVELS in kart/constants.js). See "Leveling" in GAMEPLAY.md.
+
+// Key of every player's XP inside the addon's save data (next to the best
+// times and the stats): { [playerName]: xp }.
+const SAVE_DATA_XP_KEY = "xp";
+
+// The XP are kept in memory and written to the save data at most this often
+// (seconds) while something changed — time on the server earns XP every
+// tick. Also written when a player disconnects.
+const XP_SAVE_SECONDS = 30;
+
+// --- What earns XP. A Grand Prix earns clearly more than time trials. ---
+
+// Every minute with a melon on the map (spread over the ticks).
+const XP_PER_MINUTE_PLAYED = 1;
+// A time trial's finish of the last lap (outside a heat).
+const XP_TIME_TRIAL_FINISH = 15;
+// A new best time on a track (time trial or heat), on top of the finish.
+const XP_NEW_BEST = 25;
+// A wall bounce or wall jump rated PERFECT.
+const XP_PERFECT_HIT = 3;
+// Finishing a heat of a Grand Prix, plus a bonus for 1st, 2nd, 3rd.
+const XP_HEAT_FINISH = 40;
+const XP_HEAT_PLACE_BONUS = [40, 25, 15];
+// A Grand Prix run to its end (not cancelled), for everyone still in it —
+// plus a bonus for 1st, 2nd, 3rd overall.
+const XP_GRAND_PRIX_FINISH = 50;
+const XP_GRAND_PRIX_PLACE_BONUS = [150, 100, 75];
+
+// --- Levels: from level L to L+1 takes LEVEL_XP_BASE + LEVEL_XP_STEP * (L - 1)
+// XP — 150, 225, 300, … : level 3 in about half an hour, level 25 (the last
+// skin) after some 20–30 hours of racing. ---
+const LEVEL_XP_BASE = 150;
+const LEVEL_XP_STEP = 75;
+
+// The level-up message (LEVEL UP · new skins) shows this long (seconds) —
+// not in the middle of a heat: a racer sees it once they've finished.
+const LEVEL_UP_HUD_SECONDS = 5;
+// The XP notifier (top right: "+40 XP", the level, the bar with the part just
+// gained) shows this long (seconds) after XP were earned — more XP within it
+// add up and show it this long again. Not for the XP every minute on the
+// server (that would never go away). Also mid-heat.
+const XP_GAIN_HUD_SECONDS = 3.5;
+// XP the user menu's "Test XP Gain" pretends to give (a new best's) — only
+// shown, not given.
+const XP_GAIN_TEST_AMOUNT = 25;
+// Segments of the profile's XP bar (usermenu_profile_xp_<i> in speedometer.xml)
+// and of the XP notifier's (xpgain_old_<i>/xpgain_new_<i>).
+const XP_BAR_SEGMENTS = 20;
+
+// Console command (sv_cheats 1 only) giving every player on the map XP for
+// testing: `melon_give_xp 500`.
+const XP_CHEAT_COMMAND = "melon_give_xp";
 
 // Teleporters and the lift applied to every trigger/destination teleport target.
 
@@ -1192,19 +1252,20 @@ const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
 // in the .vmap too (the default by melon_template, the others e.g. by a
 // prop in the hub), or the map doesn't ship it (test/map/map-skins.test.mjs).
 // The key is the button's: usermenu_skin_<key> in speedometer.xml, in this
-// order (pages of MELON_SKINS_PER_PAGE).
+// order (pages of MELON_SKINS_PER_PAGE) — sorted by MELON_SKIN_LEVELS, the
+// free ones first (test/race/level.test.mjs).
 /** @type {Record<string, string>} */
 const MELON_SKINS = {
     default: "models/melon_racer/melon/melon.vmdl",
-    gold: "models/melon_racer/melon/melon_gold.vmdl",
+    honey: "models/melon_racer/melon/melon_honey.vmdl",
+    strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
+    camo: "models/melon_racer/melon/melon_camo.vmdl",
     football: "models/melon_racer/melon/melon_football.vmdl",
     golf: "models/melon_racer/melon/melon_golf.vmdl",
-    honey: "models/melon_racer/melon/melon_honey.vmdl",
-    camo: "models/melon_racer/melon/melon_camo.vmdl",
-    strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
-    pumpkin: "models/melon_racer/melon/melon_pumpkin.vmdl",
     pineapple: "models/melon_racer/melon/melon_pineapple.vmdl",
     zebra: "models/melon_racer/melon/melon_zebra.vmdl",
+    pumpkin: "models/melon_racer/melon/melon_pumpkin.vmdl",
+    gold: "models/melon_racer/melon/melon_gold.vmdl",
 };
 const MELON_SKIN_DEFAULT = "default";
 // Every skin's name as the user menu shows it: under its button in the skin
@@ -1213,15 +1274,31 @@ const MELON_SKIN_DEFAULT = "default";
 /** @type {Record<string, string>} */
 const MELON_SKIN_NAMES = {
     default: "Melon",
-    gold: "Gold",
+    honey: "Honey Melon",
+    strawberry: "Strawberry",
+    camo: "Camo",
     football: "Football",
     golf: "Golf",
-    honey: "Honey Melon",
-    camo: "Camo",
-    strawberry: "Strawberry",
-    pumpkin: "Pumpkin",
     pineapple: "Pineapple",
     zebra: "Zebra",
+    pumpkin: "Pumpkin",
+    gold: "Gold",
+};
+// The level (race/level/) a player needs before they can pick a skin; a
+// skin not listed is free from the start. Locked ones show greyed out with
+// their level in the skin grid (kart/skin-logic.js: IsSkinUnlocked).
+/** @type {Record<string, number>} */
+const MELON_SKIN_LEVELS = {
+    default: 1,
+    honey: 1,
+    strawberry: 1,
+    camo: 3,
+    football: 5,
+    golf: 7,
+    pineapple: 10,
+    zebra: 14,
+    pumpkin: 18,
+    gold: 25,
 };
 // Skins per page of the user menu's skin grid (3 x 3): with more, ◀ ▶ next to
 // the MELON title page through them, in MELON_SKINS order. One panel per page
@@ -1660,6 +1737,28 @@ const BALL_SPAWNER_MIN_INTERVAL = 0.5;
 const BALL_SPAWNER_MAX_INTERVAL = 4;
 // Up to this far off the spawn point each way (so balls don't spawn inside each other).
 const BALL_SPAWNER_SPREAD = 8;
+
+// Bouncers: every prop_dynamic with the foam bouncer model swings on its own
+// — the script starts its "swing" loop once, after a random delay of up to
+// one swing, so the bouncers of a map don't all swing in step. Found by
+// model, not by name: no name, logic_auto or outputs in Hammer needed.
+// Rule: world/bouncer/logic.js, applied by world/bouncer/bouncer.js.
+// The swing's length is shared with the model's generator,
+// tools/models/make-bouncer-model.mjs (it imports it from here): change it,
+// re-run it and recompile the model.
+
+// The class the script looks for bouncers in, and the model that makes one.
+const BOUNCER_CLASS = "prop_dynamic";
+const BOUNCER_MODEL = "models/melon_racer/bouncer/bouncer.vmdl";
+// The model's animations: the looping swing, and the rest pose (upright)
+// it's held in until its swing starts.
+const BOUNCER_SWING_ANIMATION = "swing";
+const BOUNCER_IDLE_ANIMATION = "idle";
+// One full swing there and back, seconds — also the longest start delay.
+const BOUNCER_SWING_SECONDS = 2.4;
+// How often the map is searched for bouncers again, so one that spawned
+// after the script's first look (or after a round restart) isn't missed.
+const BOUNCER_SCAN_SECONDS = 2;
 
 // All tunable numbers and static/Hammer-naming-convention data for
 // melon_drive, one file per system they configure. Import from here, not
@@ -3277,13 +3376,13 @@ function WithStartsInTutorial(saveData, playerName, on) {
 // kart/join-spot-logic.js.
 
 /** The name per-player settings are saved under. @param {import("../core/kart-registry.js").Kart | { pawn: any }} kart */
-function PlayerName$3(kart) {
+function PlayerName$4(kart) {
     return kart.pawn?.GetPlayerController()?.GetPlayerName() ?? "";
 }
 
 /** Whether this kart's player starts in the tutorial when joining. @param {import("../core/kart-registry.js").Kart} kart */
 function IsStartInTutorialOn(kart) {
-    return StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$3(kart));
+    return StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$4(kart));
 }
 
 /**
@@ -3292,9 +3391,9 @@ function IsStartInTutorialOn(kart) {
  */
 function SetStartInTutorial(kart, on) {
     // Re-read so the best times and everyone else's settings survive.
-    const data = WithStartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$3(kart), on);
+    const data = WithStartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$4(kart), on);
     Instance.SetSaveData(JSON.stringify(data));
-    Debug(`SetStartInTutorial: "${PlayerName$3(kart)}" starts ${on ? "in the tutorial" : "in the hub"} on join`);
+    Debug(`SetStartInTutorial: "${PlayerName$4(kart)}" starts ${on ? "in the tutorial" : "in the hub"} on join`);
 }
 
 /**
@@ -3304,7 +3403,7 @@ function SetStartInTutorial(kart, on) {
  * @param {any} pawn
  */
 function GetJoinSpawnPoint(pawn) {
-    if (StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$3({ pawn }))) {
+    if (StartsInTutorial(ParseSaveData(Instance.GetSaveData()), PlayerName$4({ pawn }))) {
         return GetIntroSpawnPoint();
     }
     return GetHubSpawnPoint() ?? GetIntroSpawnPoint();
@@ -3353,6 +3452,173 @@ function ResetHudForPlayer(slot) {
     }
     hud.SetInputCaptureEnabled(slot, false);
     hud.ResetForPlayer(slot);
+}
+
+// Pure Grand Prix rules — no cs_script import, so they're unit-testable in
+// Node (see test/race/grand-prix.test.mjs). race/grand-prix/grand-prix.js
+// holds the running Grand Prix and feeds it from the heat flow.
+
+/**
+ * One racer's tally. `key` tells players apart within a Grand Prix (player
+ * slot + name, see PlayerKey in grand-prix.js); `places`/`times` are per
+ * track id.
+ * @typedef {{ key: string, name: string, points: number, places: Record<string, number>, times: Record<string, number> }} Standing
+ */
+
+/**
+ * @typedef {{
+ *   trackIds: number[], // tracks raced so far, in order — the last one is the current/last heat
+ *   totalTracks: number, // how many heats this Grand Prix has
+ *   finishers: Record<string, number>, // finishers so far per track id
+ *   standings: Record<string, Standing>,
+ *   over: boolean, // back in the hub
+ *   cancelled: boolean, // ended early (moderator abort, everyone left)
+ * }} GrandPrix
+ */
+
+/**
+ * A fresh Grand Prix for `racers`, everyone on 0 points.
+ * @param {{ key: string, name: string }[]} racers @param {number} totalTracks
+ * @returns {GrandPrix}
+ */
+function NewGrandPrix(racers, totalTracks) {
+    /** @type {Record<string, Standing>} */
+    const standings = {};
+    for (const { key, name } of racers) {
+        standings[key] = { key, name, points: 0, places: {}, times: {} };
+    }
+    return { trackIds: [], totalTracks, finishers: {}, standings, over: false, cancelled: false };
+}
+
+/** Points for finishing a heat in `place` (1 = first). @param {number} place */
+function HeatPoints(place) {
+    return HEAT_POINTS[place - 1] ?? HEAT_POINTS_FINISHER;
+}
+
+/** A heat on `trackId` begins. @param {GrandPrix} gp @param {number} trackId */
+function BeginGrandPrixHeat(gp, trackId) {
+    if (gp.trackIds[gp.trackIds.length - 1] !== trackId) {
+        gp.trackIds.push(trackId);
+    }
+    gp.finishers[trackId] ??= 0;
+}
+
+/**
+ * A racer crossed the finish of their last lap on `trackId`: the next free
+ * place there, and its points. A racer who already has a place there keeps
+ * it (nothing is counted twice).
+ * @param {GrandPrix} gp @param {number} trackId @param {{ key: string, name: string }} racer @param {number | undefined} time
+ * @returns {{ place: number, points: number }}
+ */
+function RecordHeatFinish(gp, trackId, racer, time) {
+    const standing = (gp.standings[racer.key] ??= { key: racer.key, name: racer.name, points: 0, places: {}, times: {} });
+    const existing = standing.places[trackId];
+    if (existing !== undefined) {
+        return { place: existing, points: HeatPoints(existing) };
+    }
+    const place = (gp.finishers[trackId] ?? 0) + 1;
+    gp.finishers[trackId] = place;
+    const points = HeatPoints(place);
+    standing.places[trackId] = place;
+    standing.points += points;
+    if (time !== undefined) {
+        standing.times[trackId] = time;
+    }
+    return { place, points };
+}
+
+/** How many heats `standing` won. @param {Standing} standing */
+function Wins(standing) {
+    return Object.values(standing.places).filter((place) => place === 1).length;
+}
+
+/**
+ * The standings, leader first: most points, then most heat wins, then the
+ * lowest total time over the heats run, then by name.
+ * @param {GrandPrix} gp
+ * @returns {Standing[]}
+ */
+function SortedStandings(gp) {
+    const total = (/** @type {Standing} */ s) => Object.values(s.times).reduce((sum, t) => sum + t, 0);
+    return Object.values(gp.standings).sort(
+        (a, b) => b.points - a.points || Wins(b) - Wins(a) || total(a) - total(b) || a.name.localeCompare(b.name)
+    );
+}
+
+/** "1ST", "2ND", "3RD", "4TH", … "11TH", "21ST". @param {number} place */
+function OrdinalPlace(place) {
+    const tens = place % 100;
+    const suffix = tens >= 11 && tens <= 13 ? "TH" : ["TH", "ST", "ND", "RD"][place % 10] ?? "TH";
+    return `${place}${suffix}`;
+}
+
+// The running Grand Prix (or the last one, until the next starts — the
+// scoreboard shows its final standings in the hub). race/heat/race-flow.js
+// starts it with the hub's "Start Grand Prix", opens a heat per track and records
+// every finish; the rules are in logic.js.
+
+/** @type {import("./logic.js").GrandPrix | undefined} */
+let grandPrix = undefined;
+
+/**
+ * Tells players apart within a Grand Prix: slot plus name, so a player who
+ * leaves keeps their row, and someone joining into the same slot later
+ * doesn't take it over.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function PlayerKey(kart) {
+    const controller = kart.pawn.GetPlayerController();
+    return `${controller?.GetPlayerSlot() ?? "?"}:${controller?.GetPlayerName() ?? ""}`;
+}
+
+/** @param {import("../../core/kart-registry.js").Kart} kart */
+function Racer(kart) {
+    return { key: PlayerKey(kart), name: kart.pawn.GetPlayerController()?.GetPlayerName() ?? "" };
+}
+
+/**
+ * A new Grand Prix over `totalTracks` tracks for `racers` — replaces the
+ * previous one's standings.
+ * @param {import("../../core/kart-registry.js").Kart[]} racers @param {number} totalTracks
+ */
+function StartGrandPrix(racers, totalTracks) {
+    grandPrix = NewGrandPrix(racers.map(Racer), totalTracks);
+    Debug(`StartGrandPrix: ${racers.length} racer(s), ${totalTracks} track(s)`);
+}
+
+/** @param {number} trackId */
+function StartGrandPrixHeat(trackId) {
+    if (grandPrix && !grandPrix.over) {
+        BeginGrandPrixHeat(grandPrix, trackId);
+    }
+}
+
+/**
+ * A racer finished the heat on `trackId`: their place and points, or
+ * undefined without a running Grand Prix.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} trackId
+ */
+function RecordGrandPrixFinish(kart, trackId) {
+    if (!grandPrix || grandPrix.over) {
+        return undefined;
+    }
+    const time = kart.lastRun?.trackId === trackId ? kart.lastRun.time : undefined;
+    const result = RecordHeatFinish(grandPrix, trackId, Racer(kart), time);
+    Debug(`RecordGrandPrixFinish: "${Racer(kart).name}" ${OrdinalPlace(result.place)} on track ${trackId}, +${result.points}`);
+    return result;
+}
+
+/** The group is back in the hub — the standings stay for the scoreboard. @param {boolean} cancelled */
+function EndGrandPrix(cancelled) {
+    if (grandPrix && !grandPrix.over) {
+        grandPrix.over = true;
+        grandPrix.cancelled = cancelled;
+    }
+}
+
+/** Restores the Grand Prix from an OnScriptReload snapshot (see index.js). @param {import("./logic.js").GrandPrix | undefined} snapshot */
+function RestoreGrandPrix(snapshot) {
+    grandPrix = snapshot ?? grandPrix;
 }
 
 // Pure rules of the melon skins (kart/skin.js): which skin a player has,
@@ -3406,22 +3672,296 @@ function SkinPageLabel(page) {
     return `${page + 1} / ${SkinPageCount()}`;
 }
 
+/** The level a skin needs (MELON_SKIN_LEVELS; 1 for one not listed). @param {string} skin */
+function SkinUnlockLevel(skin) {
+    return MELON_SKIN_LEVELS[skin] ?? 1;
+}
+
+/** Whether a player at `level` may pick `skin`. @param {string} skin @param {number} level */
+function IsSkinUnlocked(skin, level) {
+    return level >= SkinUnlockLevel(skin);
+}
+
+/**
+ * The skins a level-up from `fromLevel` to `toLevel` unlocks, in MELON_SKINS
+ * order.
+ * @param {number} fromLevel @param {number} toLevel
+ */
+function SkinsUnlockedBetween(fromLevel, toLevel) {
+    return Object.keys(MELON_SKINS).filter((skin) => SkinUnlockLevel(skin) > fromLevel && SkinUnlockLevel(skin) <= toLevel);
+}
+
+// Pure rules of the leveling (race/level/level.js): the XP in the save data,
+// the level and progress they make, what a heat or a Grand Prix earns, and
+// the level-up message. No cs_script import (test/race/level.test.mjs).
+
+/** @typedef {Record<string, number>} XpTotals every player's XP by name */
+
+/**
+ * The XP in parsed save data — anything that isn't a non-negative number is
+ * dropped.
+ * @param {Record<string, unknown>} saveData @returns {XpTotals}
+ */
+function GetXpTotals(saveData) {
+    const raw = saveData[SAVE_DATA_XP_KEY];
+    /** @type {XpTotals} */
+    const totals = {};
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+        return totals;
+    }
+    for (const [name, xp] of Object.entries(raw)) {
+        if (typeof xp === "number" && Number.isFinite(xp) && xp >= 0) {
+            totals[name] = xp;
+        }
+    }
+    return totals;
+}
+
+/**
+ * Adds `amount` XP to a player, in place. Ignores an empty name and anything
+ * that isn't a positive amount.
+ * @param {XpTotals} totals @param {string} name @param {number} amount
+ * @returns {boolean} whether anything changed
+ */
+function AddXp(totals, name, amount) {
+    if (name === "" || !(amount > 0)) {
+        return false;
+    }
+    totals[name] = (totals[name] ?? 0) + amount;
+    return true;
+}
+
+/** XP it takes from `level` to the next one. @param {number} level */
+function XpToNextLevel(level) {
+    return LEVEL_XP_BASE + LEVEL_XP_STEP * (level - 1);
+}
+
+/**
+ * Where `xp` XP stand: the level (from 1), the XP into it and the XP the
+ * next level needs.
+ * @param {number} xp
+ */
+function LevelProgress(xp) {
+    let level = 1;
+    let rest = Math.max(xp, 0);
+    while (rest >= XpToNextLevel(level)) {
+        rest -= XpToNextLevel(level);
+        level++;
+    }
+    return { level, into: rest, needed: XpToNextLevel(level) };
+}
+
+/** The level `xp` XP make. @param {number} xp */
+function LevelOf(xp) {
+    return LevelProgress(xp).level;
+}
+
+/** XP for finishing a heat in `place` (1 = first). @param {number} place */
+function HeatFinishXp(place) {
+    return XP_HEAT_FINISH + (XP_HEAT_PLACE_BONUS[place - 1] ?? 0);
+}
+
+/** XP for a Grand Prix run to its end, at `place` in its standings (1 = winner). @param {number} place */
+function GrandPrixXp(place) {
+    return XP_GRAND_PRIX_FINISH + (XP_GRAND_PRIX_PLACE_BONUS[place - 1] ?? 0);
+}
+
+/**
+ * How many of `segments` of an XP bar are filled.
+ * @param {{ into: number, needed: number }} progress @param {number} segments
+ */
+function XpBarFill(progress, segments) {
+    return Math.min(segments, Math.floor((progress.into / progress.needed) * segments));
+}
+
+/**
+ * The XP notifier: what was gained ("+40 XP"), the level now ("LV 7"), the XP
+ * into it ("340 / 525 XP"), and the bar — the segments filled before the
+ * gain (oldFill; none if the gain reached a new level) and after it
+ * (newFill), so the part just gained can be lit apart.
+ * @param {number} fromXp the player's XP before @param {number} toXp …and now
+ * @param {number} amount XP gained @param {number} segments
+ */
+function XpGainView(fromXp, toXp, amount, segments) {
+    const from = LevelProgress(fromXp);
+    const to = LevelProgress(toXp);
+    return {
+        amount: `+${Math.max(1, Math.round(amount))} XP`,
+        level: `LV ${to.level}`,
+        xp: `${Math.floor(to.into)} / ${to.needed} XP`,
+        oldFill: from.level === to.level ? XpBarFill(from, segments) : 0,
+        newFill: XpBarFill(to, segments),
+    };
+}
+
+/**
+ * The level-up message: "LEVEL 8", and the skins it unlocked, "NEW SKIN:
+ * CAMO" / "NEW SKINS: CAMO, FOOTBALL" (empty without).
+ * @param {{ level: number, skins: string[] }} levelUp
+ */
+function LevelUpText({ level, skins }) {
+    const names = skins.map((skin) => (MELON_SKIN_NAMES[skin] ?? skin).toUpperCase());
+    return {
+        level: `LEVEL ${level}`,
+        skins: names.length === 0 ? "" : `${names.length === 1 ? "NEW SKIN" : "NEW SKINS"}: ${names.join(", ")}`,
+    };
+}
+
+// Leveling: every player's XP, kept per player name in the addon's save data
+// like the stats (renaming starts from scratch). Earned where it happens —
+// time on the server (UpdateLevel, every tick), time trial finishes and new
+// bests (race/time-trial/), heat places (race/heat/race-flow.js), a Grand
+// Prix run to its end (GrantGrandPrixXp), PERFECT wall hits
+// (movement/wall-bounce/, movement/jump/). A level-up is left on the kart
+// (kart.levelUp) for the HUD (hud/level-up-panel.js), every XP gain with a
+// reason (all but the time on the server) in kart.xpGain for the XP notifier
+// (hud/xp-gain-panel.js). The level unlocks
+// skins (kart/skin.js). Rules: race/level/logic.js.
+
+// Read from the save data once, then kept in memory and written back every
+// XP_SAVE_SECONDS while something changed (SetSaveData writes the file).
+/** @type {import("./logic.js").XpTotals | undefined} */
+let totals = undefined;
+let dirty$1 = false;
+let nextSaveTime$1 = 0;
+
+function Totals() {
+    totals ??= GetXpTotals(ParseSaveData(Instance.GetSaveData()));
+    return totals;
+}
+
+/** @param {import("../../core/kart-registry.js").Kart} kart */
+function PlayerName$3(kart) {
+    return kart.pawn?.GetPlayerController()?.GetPlayerName() ?? "";
+}
+
+/** This kart's player's XP. @param {import("../../core/kart-registry.js").Kart} kart */
+function GetKartXp(kart) {
+    return Totals()[PlayerName$3(kart)] ?? 0;
+}
+
+/** This kart's player's level. @param {import("../../core/kart-registry.js").Kart} kart */
+function GetKartLevel(kart) {
+    return LevelOf(GetKartXp(kart));
+}
+
+/**
+ * Gives a player XP. A level-up (with the skins it unlocks) is left in
+ * kart.levelUp for the HUD — added to one that's still waiting. With a
+ * reason the XP notifier shows it, added to a gain still showing.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} amount
+ * @param {string} [reason] for the console; without one (the time on the server) no notifier
+ */
+function GrantXp(kart, amount, reason) {
+    const name = PlayerName$3(kart);
+    const xpBefore = Totals()[name] ?? 0;
+    const before = LevelOf(xpBefore);
+    if (!AddXp(Totals(), name, amount)) {
+        return;
+    }
+    dirty$1 = true;
+    const after = LevelOf(Totals()[name]);
+    if (reason !== undefined) {
+        Debug(`GrantXp: "${name}" +${Math.round(amount)} XP (${reason})`);
+        ShowXpGain(kart, xpBefore, amount);
+    }
+    if (after > before) {
+        const skins = SkinsUnlockedBetween(before, after);
+        kart.levelUp = { level: after, skins: [...(kart.levelUp?.skins ?? []), ...skins], until: undefined };
+        Debug(`GrantXp: "${name}" reached level ${after}${skins.length ? `, unlocked ${skins.join(", ")}` : ""}`);
+    }
+}
+
+/**
+ * Puts an XP gain on the XP notifier (hud/xp-gain-panel.js): added to the one
+ * still showing (its bar keeps the fill from before the first), shown
+ * XP_GAIN_HUD_SECONDS from now. `toXp` only for a preview (nothing given):
+ * otherwise the notifier shows the player's XP as they are.
+ * @param {import("../../core/kart-registry.js").Kart} kart @param {number} fromXp @param {number} amount @param {number} [toXp]
+ */
+function ShowXpGain(kart, fromXp, amount, toXp) {
+    const now = Instance.GetGameTime();
+    const showing = kart.xpGain && now < kart.xpGain.until && kart.xpGain.toXp === undefined && toXp === undefined ? kart.xpGain : undefined;
+    kart.xpGain = {
+        fromXp: showing?.fromXp ?? fromXp,
+        toXp,
+        amount: (showing?.amount ?? 0) + amount,
+        until: now + XP_GAIN_HUD_SECONDS,
+    };
+}
+
+/**
+ * A Grand Prix ran to its end: XP for everyone still in it (`racers`), by
+ * their place in its standings.
+ * @param {import("../grand-prix/logic.js").GrandPrix | undefined} gp
+ * @param {import("../../core/kart-registry.js").Kart[]} racers
+ */
+function GrantGrandPrixXp(gp, racers) {
+    if (!gp || gp.cancelled) {
+        return;
+    }
+    const order = SortedStandings(gp).map((standing) => standing.key);
+    for (const kart of racers) {
+        const place = order.indexOf(PlayerKey(kart)) + 1;
+        if (place > 0) {
+            GrantXp(kart, GrandPrixXp(place), `Grand Prix, place ${place}`);
+        }
+    }
+}
+
+/** Writes the XP to the save data if anything changed since the last time. */
+function SaveXp() {
+    if (!dirty$1 || !totals) {
+        return;
+    }
+    // Re-read so keys other systems keep in the save data survive.
+    const data = ParseSaveData(Instance.GetSaveData());
+    data[SAVE_DATA_XP_KEY] = totals;
+    Instance.SetSaveData(JSON.stringify(data));
+    dirty$1 = false;
+}
+
+/**
+ * Per tick, from core/think.js: XP for time on the server for every player
+ * with a melon, and the periodic save.
+ * @param {number} now @param {number} dt
+ */
+function UpdateLevel(now, dt) {
+    for (const kart of karts.values()) {
+        GrantXp(kart, (dt / 60) * XP_PER_MINUTE_PLAYED);
+    }
+    if (now >= nextSaveTime$1) {
+        nextSaveTime$1 = now + XP_SAVE_SECONDS;
+        SaveXp();
+    }
+}
+
 // The melon's skin: each player picks one in the user menu (the MELON
 // group's skin row), kept per player name in the addon's save data like
 // "Start in Tutorial" (kart/join-spot.js). A skin is a whole model
 // (MELON_SKINS), put on the melon by ApplyMelonSkin — called from
 // ShowMelonPaint (kart/look.js), so every spawn and respawn gets it. Paint
 // still sets the melon's color, but the skins don't take it (their material
-// ignores the tint); the outline glow shows it either way.
+// ignores the tint); the outline glow shows it either way. Most skins are
+// locked until the player's level (race/level/) reaches MELON_SKIN_LEVELS.
 
 /** @typedef {import("../core/kart-registry.js").Kart} Kart */
 
-/** This kart's skin: picked this session, else saved for its player. @param {Kart} kart */
+/**
+ * This kart's skin: picked this session, else saved for its player — the
+ * default while that one is locked for them (MELON_SKIN_LEVELS raised since).
+ * @param {Kart} kart
+ */
 function GetMelonSkin(kart) {
     if (kart.skin === undefined) {
-        kart.skin = SavedSkin(ParseSaveData(Instance.GetSaveData()), PlayerName$3(kart));
+        kart.skin = SavedSkin(ParseSaveData(Instance.GetSaveData()), PlayerName$4(kart));
     }
-    return kart.skin;
+    return IsSkinUnlocked(kart.skin, GetKartLevel(kart)) ? kart.skin : MELON_SKIN_DEFAULT;
+}
+
+/** Whether this kart's player may pick `skin` yet. @param {Kart} kart @param {string} skin */
+function IsMelonSkinUnlocked(kart, skin) {
+    return IsSkinUnlocked(skin, GetKartLevel(kart));
 }
 
 /** Puts this kart's skin model on its melon, if it doesn't have it already. @param {Kart} kart */
@@ -3433,18 +3973,23 @@ function ApplyMelonSkin(kart) {
 }
 
 /**
- * Picks this kart's skin and saves it for its player. Returns whether it's
- * a skin (MELON_SKINS) — the caller shows the melon again (ShowMelonPaint).
+ * Picks this kart's skin and saves it for its player — nothing for one still
+ * locked. Returns whether it's a skin (MELON_SKINS) — the caller shows the
+ * melon again (ShowMelonPaint).
  * @param {Kart} kart @param {string} skin
  */
 function SetMelonSkin(kart, skin) {
     if (!IsSkin(skin)) {
         return false;
     }
+    if (!IsMelonSkinUnlocked(kart, skin)) {
+        Debug(`SetMelonSkin: "${PlayerName$4(kart)}" needs a higher level for the ${skin} skin`);
+        return true;
+    }
     kart.skin = skin;
     // Re-read so the best times and everyone else's settings survive.
-    Instance.SetSaveData(JSON.stringify(WithSkin(ParseSaveData(Instance.GetSaveData()), PlayerName$3(kart), skin)));
-    Debug(`SetMelonSkin: "${PlayerName$3(kart)}" drives the ${skin} skin`);
+    Instance.SetSaveData(JSON.stringify(WithSkin(ParseSaveData(Instance.GetSaveData()), PlayerName$4(kart), skin)));
+    Debug(`SetMelonSkin: "${PlayerName$4(kart)}" drives the ${skin} skin`);
     return true;
 }
 
@@ -3554,7 +4099,7 @@ function SetMelonGlow(kart, on) {
  */
 function GetMelonGlowColor(kart) {
     if (kart.glowColor === undefined) {
-        kart.glowColor = SavedGlowColor(ParseSaveData(Instance.GetSaveData()), PlayerName$3(kart)) ?? null;
+        kart.glowColor = SavedGlowColor(ParseSaveData(Instance.GetSaveData()), PlayerName$4(kart)) ?? null;
     }
     return kart.glowColor ?? undefined;
 }
@@ -3572,8 +4117,8 @@ function SetMelonGlowColor(kart, key) {
     kart.glowColor = key;
     kart.melonGlow = true;
     // Re-read so the best times and everyone else's settings survive.
-    Instance.SetSaveData(JSON.stringify(WithGlowColor(ParseSaveData(Instance.GetSaveData()), PlayerName$3(kart), key)));
-    Debug(`SetMelonGlowColor: "${PlayerName$3(kart)}" glows ${key}`);
+    Instance.SetSaveData(JSON.stringify(WithGlowColor(ParseSaveData(Instance.GetSaveData()), PlayerName$4(kart), key)));
+    Debug(`SetMelonGlowColor: "${PlayerName$4(kart)}" glows ${key}`);
     if (!kart.breaking) {
         ShowMelonPaint(kart); // a broken melon gets it back on respawn
     }
@@ -5234,7 +5779,7 @@ function FormatDuration(seconds) {
     return `${secs}s`;
 }
 
-/** A stat's value as the scoreboard shows it. @param {{ format: string }} slide @param {number} value */
+/** A stat's value as the leaderboards and the profile show it. @param {{ format: string }} slide @param {number} value */
 function FormatStat(slide, value) {
     return slide.format === "duration" ? FormatDuration(value) : String(Math.round(value));
 }
@@ -5245,8 +5790,8 @@ function FormatStat(slide, value) {
 // server (UpdateStats, every tick for every player with a melon), crashes
 // (health/breaking/), finishes (race/time-trial/), boost time
 // (movement/driving/drive.js), PERFECT wall hits (movement/wall-bounce/,
-// movement/jump/) and time trial restarts (race/checkpoints/) — and shown as the scoreboard's stat pages
-// (hud/scoreboard/). Rules: race/stats/logic.js.
+// movement/jump/) and time trial restarts (race/checkpoints/) — and shown on the user menu's leaderboards
+// page and in its profile (hud/leaderboards/, hud/profile/). Rules: race/stats/logic.js.
 
 // Read from the save data once, then kept in memory and written back every
 // STATS_SAVE_SECONDS while something changed (SetSaveData writes the file).
@@ -5630,6 +6175,7 @@ function ComputeWallBounce(kart, n, now) {
     if (kart.perfectBounceBoost) {
         PlayPerfectSpark(kart);
         CountStat(kart, "perfectHits");
+        GrantXp(kart, XP_PERFECT_HIT, "PERFECT wall bounce");
     }
     return { ...bounce, jumpFactor };
 }
@@ -6164,6 +6710,7 @@ function TryWallJump(slot, kart, now, grounded, v, rules) {
         if (kart.perfectBounceBoost) {
             PlayPerfectSpark(kart);
             CountStat(kart, "perfectHits");
+            GrantXp(kart, XP_PERFECT_HIT, "PERFECT wall jump");
         }
     }
     kart.lastWallJump = { time: now, normal: wallContact.normal };
@@ -6323,6 +6870,80 @@ function UpdateBounceHud(slot, kart) {
     }
 }
 
+/**
+ * The level-up message (levelup_panel in speedometer.xml, top center): "LEVEL
+ * UP", the new level and the skins it unlocked (levelup_skins, hidden
+ * without), for LEVEL_UP_HUD_SECONDS after GrantXp left one in
+ * kart.levelUp. Not in the middle of a heat — a racer gets it once
+ * they've finished (or left it). Sent on change, and again every
+ * HUD_RESEND_SECONDS.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {number} now
+ */
+function UpdateLevelUpHud(slot, kart, now) {
+    const levelUp = kart.levelUp;
+    if (levelUp && levelUp.until === undefined && !(kart.racing && !kart.finished)) {
+        levelUp.until = now + LEVEL_UP_HUD_SECONDS;
+    }
+    if (levelUp?.until !== undefined && now >= levelUp.until) {
+        kart.levelUp = undefined;
+    }
+    const showing = kart.levelUp?.until !== undefined ? kart.levelUp : undefined;
+    const text = showing ? LevelUpText(showing) : undefined;
+    const key = text ? `${text.level}|${text.skins}` : "";
+    if (key === kart.levelUpShown && now < (kart.levelUpResendAt ?? 0)) {
+        return;
+    }
+    kart.levelUpShown = key;
+    kart.levelUpResendAt = now + HUD_RESEND_SECONDS;
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    if (text) {
+        hud.SetDialogVariableStringForPlayer(slot, "levelup_panel", "levelup_level", text.level);
+        hud.SetDialogVariableStringForPlayer(slot, "levelup_panel", "levelup_skins", text.skins);
+    }
+    hud.SetHasClassForPlayer(slot, "levelup_skins", "Hidden", !text?.skins);
+    hud.SetHasClassForPlayer(slot, "levelup_panel", "Hidden", !text);
+}
+
+/**
+ * The XP notifier (xpgain_panel in speedometer.xml, top right): for
+ * XP_GAIN_HUD_SECONDS after XP were earned (kart.xpGain, see ShowXpGain) the
+ * XP gained ("+40 XP"), the level and the XP into it, and the bar — the
+ * fill from before green (xpgain_old_<i>), the part just gained gold
+ * (xpgain_new_<i>). Also mid-heat. Sent on change, and again every
+ * HUD_RESEND_SECONDS.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {number} now
+ */
+function UpdateXpGainHud(slot, kart, now) {
+    if (kart.xpGain && now >= kart.xpGain.until) {
+        kart.xpGain = undefined;
+    }
+    const gain = kart.xpGain;
+    const view = gain ? XpGainView(gain.fromXp, gain.toXp ?? GetKartXp(kart), gain.amount, XP_BAR_SEGMENTS) : undefined;
+    const key = view ? `${view.amount}|${view.level}|${view.xp}|${view.oldFill}|${view.newFill}` : "";
+    if (key === kart.xpGainShown && now < (kart.xpGainResendAt ?? 0)) {
+        return;
+    }
+    kart.xpGainShown = key;
+    kart.xpGainResendAt = now + HUD_RESEND_SECONDS;
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    if (view) {
+        hud.SetDialogVariableStringForPlayer(slot, "xpgain_panel", "xpgain_amount", view.amount);
+        hud.SetDialogVariableStringForPlayer(slot, "xpgain_panel", "xpgain_level", view.level);
+        hud.SetDialogVariableStringForPlayer(slot, "xpgain_panel", "xpgain_xp", view.xp);
+        for (let i = 0; i < XP_BAR_SEGMENTS; i++) {
+            hud.SetHasClassForPlayer(slot, `xpgain_old_${i}`, "On", i < view.oldFill);
+            hud.SetHasClassForPlayer(slot, `xpgain_new_${i}`, "On", i >= view.oldFill && i < view.newFill);
+        }
+    }
+    hud.SetHasClassForPlayer(slot, "xpgain_panel", "Hidden", !view);
+}
+
 // Per-track config comes straight from Hammer instead of a hand-maintained
 // lookup: each track has one trigger_multiple named "start_<trackId>" or
 // "start_<trackId>_laps<lapsToWin>" (e.g. "start_1_laps3"; without _laps
@@ -6475,6 +7096,13 @@ function FinishRun(kart, trackId) {
     }
     kart.lastRun = { trackId, time, newBest, at: now };
     CountStat(kart, "finishes");
+    // A heat's finish earns its XP by place (FinishKart in race/heat/race-flow.js).
+    if (!kart.racing) {
+        GrantXp(kart, XP_TIME_TRIAL_FINISH, `time trial finish, track ${trackId}`);
+    }
+    if (newBest) {
+        GrantXp(kart, XP_NEW_BEST, `new best, track ${trackId}`);
+    }
     Debug(`FinishRun: "${name}" ran track ${trackId} in ${FormatRaceTime(time)}${newBest ? " — new best" : ""}`);
 }
 
@@ -6622,108 +7250,11 @@ function UpdateCheckpointStrip(hud, slot, total, reached, done) {
     hud.SetHasClassForPlayer(slot, "cp_finish", "Reached", strip.finish === "reached");
 }
 
-// Pure Grand Prix rules — no cs_script import, so they're unit-testable in
-// Node (see test/race/grand-prix.test.mjs). race/grand-prix/grand-prix.js
-// holds the running Grand Prix and feeds it from the heat flow.
-
-/**
- * One racer's tally. `key` tells players apart within a Grand Prix (player
- * slot + name, see PlayerKey in grand-prix.js); `places`/`times` are per
- * track id.
- * @typedef {{ key: string, name: string, points: number, places: Record<string, number>, times: Record<string, number> }} Standing
- */
-
-/**
- * @typedef {{
- *   trackIds: number[], // tracks raced so far, in order — the last one is the current/last heat
- *   totalTracks: number, // how many heats this Grand Prix has
- *   finishers: Record<string, number>, // finishers so far per track id
- *   standings: Record<string, Standing>,
- *   over: boolean, // back in the hub
- *   cancelled: boolean, // ended early (moderator abort, everyone left)
- * }} GrandPrix
- */
-
-/**
- * A fresh Grand Prix for `racers`, everyone on 0 points.
- * @param {{ key: string, name: string }[]} racers @param {number} totalTracks
- * @returns {GrandPrix}
- */
-function NewGrandPrix(racers, totalTracks) {
-    /** @type {Record<string, Standing>} */
-    const standings = {};
-    for (const { key, name } of racers) {
-        standings[key] = { key, name, points: 0, places: {}, times: {} };
-    }
-    return { trackIds: [], totalTracks, finishers: {}, standings, over: false, cancelled: false };
-}
-
-/** Points for finishing a heat in `place` (1 = first). @param {number} place */
-function HeatPoints(place) {
-    return HEAT_POINTS[place - 1] ?? HEAT_POINTS_FINISHER;
-}
-
-/** A heat on `trackId` begins. @param {GrandPrix} gp @param {number} trackId */
-function BeginGrandPrixHeat(gp, trackId) {
-    if (gp.trackIds[gp.trackIds.length - 1] !== trackId) {
-        gp.trackIds.push(trackId);
-    }
-    gp.finishers[trackId] ??= 0;
-}
-
-/**
- * A racer crossed the finish of their last lap on `trackId`: the next free
- * place there, and its points. A racer who already has a place there keeps
- * it (nothing is counted twice).
- * @param {GrandPrix} gp @param {number} trackId @param {{ key: string, name: string }} racer @param {number | undefined} time
- * @returns {{ place: number, points: number }}
- */
-function RecordHeatFinish(gp, trackId, racer, time) {
-    const standing = (gp.standings[racer.key] ??= { key: racer.key, name: racer.name, points: 0, places: {}, times: {} });
-    const existing = standing.places[trackId];
-    if (existing !== undefined) {
-        return { place: existing, points: HeatPoints(existing) };
-    }
-    const place = (gp.finishers[trackId] ?? 0) + 1;
-    gp.finishers[trackId] = place;
-    const points = HeatPoints(place);
-    standing.places[trackId] = place;
-    standing.points += points;
-    if (time !== undefined) {
-        standing.times[trackId] = time;
-    }
-    return { place, points };
-}
-
-/** How many heats `standing` won. @param {Standing} standing */
-function Wins(standing) {
-    return Object.values(standing.places).filter((place) => place === 1).length;
-}
-
-/**
- * The standings, leader first: most points, then most heat wins, then the
- * lowest total time over the heats run, then by name.
- * @param {GrandPrix} gp
- * @returns {Standing[]}
- */
-function SortedStandings(gp) {
-    const total = (/** @type {Standing} */ s) => Object.values(s.times).reduce((sum, t) => sum + t, 0);
-    return Object.values(gp.standings).sort(
-        (a, b) => b.points - a.points || Wins(b) - Wins(a) || total(a) - total(b) || a.name.localeCompare(b.name)
-    );
-}
-
-/** "1ST", "2ND", "3RD", "4TH", … "11TH", "21ST". @param {number} place */
-function OrdinalPlace(place) {
-    const tens = place % 100;
-    const suffix = tens >= 11 && tens <= 13 ? "TH" : ["TH", "ST", "ND", "RD"][place % 10] ?? "TH";
-    return `${place}${suffix}`;
-}
-
 // Pure rules of the scoreboard (hud/scoreboard/scoreboard.js): what it shows for one
-// viewer — the Grand Prix standings, the best times on a track, or one of the
-// players' all-time stats — as ready-to-send strings, and the pages A/D step
-// through. No cs_script import (test/hud/scoreboard.test.mjs).
+// viewer — the Grand Prix standings or the best times on a track — as
+// ready-to-send strings, and the pages A/D step through. Also the stat
+// boards of the user menu's leaderboards and profile (BuildStatBoard), which
+// share its rows and ranks. No cs_script import (test/hud/scoreboard.test.mjs).
 
 /**
  * @typedef {{ rank: string, name: string, points: string, heat: string, best: string, self: boolean }} ScoreRow
@@ -6754,30 +7285,20 @@ function ScoreboardView({ grandPrix, activeTrackId, kartTrackId, trackOrder, pic
 /**
  * The pages A/D step through with Tab held, in order: the Grand Prix
  * standings (one page) or every track's best times (one per track, race
- * order), then every stat (STAT_SLIDES). Page ids: "standings",
- * "track:<id>" ("track:" without any track), "stat:<key>".
+ * order). The players' stats are on the user menu's leaderboards page, not
+ * here. Page ids: "standings", "track:<id>" ("track:" without any track).
  * @param {boolean} grandPrixMode @param {number[]} trackOrder
  */
 function ScoreboardPages(grandPrixMode, trackOrder) {
-    const main = grandPrixMode ? ["standings"] : trackOrder.length > 0 ? trackOrder.map((id) => `track:${id}`) : ["track:"];
-    return [...main, ...STAT_SLIDES.map((slide) => `stat:${slide.key}`)];
+    return grandPrixMode ? ["standings"] : trackOrder.length > 0 ? trackOrder.map((id) => `track:${id}`) : ["track:"];
 }
 
 /**
- * The page a viewer is on: a stat they paged to, else the standings or
- * the board's track (ScoreboardView).
- * @param {boolean} grandPrixMode @param {number | undefined} boardTrackId @param {string | undefined} pickedStat
+ * The page a viewer is on: the standings or the board's track (ScoreboardView).
+ * @param {boolean} grandPrixMode @param {number | undefined} boardTrackId
  */
-function CurrentPage(grandPrixMode, boardTrackId, pickedStat) {
-    if (pickedStat !== undefined && STAT_SLIDES.some((slide) => slide.key === pickedStat)) {
-        return `stat:${pickedStat}`;
-    }
+function CurrentPage(grandPrixMode, boardTrackId) {
     return grandPrixMode ? "standings" : `track:${boardTrackId ?? ""}`;
-}
-
-/** The STAT_SLIDES entry a page shows, if it's a stat page. @param {string} page */
-function StatSlideOf(page) {
-    return STAT_SLIDES.find((slide) => `stat:${slide.key}` === page);
 }
 
 /**
@@ -6794,19 +7315,15 @@ function StepPage(pages, current, direction) {
 }
 
 /**
- * The paging hint under the subtitle: which page of its kind this is
- * ("ROUTE 2 / 3", "STATS 1 / 5", "STANDINGS") between the A and D arrows;
- * empty with nothing to page to.
+ * The paging hint under the subtitle: which route this is ("ROUTE 2 / 3")
+ * between the A and D arrows; empty with nothing to page to.
  * @param {string[]} pages @param {string} current
  */
 function PageSwitcher(pages, current) {
     if (pages.length <= 1) {
         return "";
     }
-    const kind = current.split(":")[0];
-    const same = pages.filter((page) => page.split(":")[0] === kind);
-    const label = kind === "standings" ? "STANDINGS" : `${kind === "stat" ? "STATS" : "ROUTE"} ${same.indexOf(current) + 1} / ${same.length}`;
-    return `◀  A      ${label}      D  ▶`;
+    return `◀  A      ROUTE ${pages.indexOf(current) + 1} / ${pages.length}      D  ▶`;
 }
 
 /**
@@ -6906,10 +7423,11 @@ function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self
     const entries = [...names].map((name) => ({ name, best: bestTimes[name] })).sort(ByBestTime);
     const ranks = SharedRanks(entries, (a, b) => a.best === b.best);
     const route = boardTrackId !== undefined ? (routeNames[boardTrackId] ?? `Track ${boardTrackId}`).toUpperCase() : undefined;
+    // The route is the title, big: which track's times these are matters most.
     return {
         grandPrixMode: false,
-        title: "TIME TRIAL",
-        subtitle: route !== undefined ? `${route}  ·  BEST TIMES` : "NO TRACKS",
+        title: route ?? "TIME TRIAL",
+        subtitle: route !== undefined ? "TIME TRIAL  ·  BEST TIMES" : "NO TRACKS",
         bestHeader,
         switcher: "", // the paging hint: PageSwitcher
         rows: KeepSelf(
@@ -6927,7 +7445,7 @@ function BuildScoreboard({ grandPrix, grandPrixMode, boardTrackId, players, self
 }
 
 /**
- * A stat page: every player with a total — saved ones of players who
+ * A stat board (the user menu's leaderboards and profile): every player with a total — saved ones of players who
  * aren't on the map included — and everyone on the map without one, the
  * highest first; nobody gets a rank for nothing yet.
  * @param {{
@@ -6974,75 +7492,6 @@ const ROUTE_NAMES = {
     2: "Bridge",
     3: "Side Slice"
 };
-
-// The running Grand Prix (or the last one, until the next starts — the
-// scoreboard shows its final standings in the hub). race/heat/race-flow.js
-// starts it with the hub's "Start Grand Prix", opens a heat per track and records
-// every finish; the rules are in logic.js.
-
-/** @type {import("./logic.js").GrandPrix | undefined} */
-let grandPrix = undefined;
-
-/**
- * Tells players apart within a Grand Prix: slot plus name, so a player who
- * leaves keeps their row, and someone joining into the same slot later
- * doesn't take it over.
- * @param {import("../../core/kart-registry.js").Kart} kart
- */
-function PlayerKey(kart) {
-    const controller = kart.pawn.GetPlayerController();
-    return `${controller?.GetPlayerSlot() ?? "?"}:${controller?.GetPlayerName() ?? ""}`;
-}
-
-/** @param {import("../../core/kart-registry.js").Kart} kart */
-function Racer(kart) {
-    return { key: PlayerKey(kart), name: kart.pawn.GetPlayerController()?.GetPlayerName() ?? "" };
-}
-
-/**
- * A new Grand Prix over `totalTracks` tracks for `racers` — replaces the
- * previous one's standings.
- * @param {import("../../core/kart-registry.js").Kart[]} racers @param {number} totalTracks
- */
-function StartGrandPrix(racers, totalTracks) {
-    grandPrix = NewGrandPrix(racers.map(Racer), totalTracks);
-    Debug(`StartGrandPrix: ${racers.length} racer(s), ${totalTracks} track(s)`);
-}
-
-/** @param {number} trackId */
-function StartGrandPrixHeat(trackId) {
-    if (grandPrix && !grandPrix.over) {
-        BeginGrandPrixHeat(grandPrix, trackId);
-    }
-}
-
-/**
- * A racer finished the heat on `trackId`: their place and points, or
- * undefined without a running Grand Prix.
- * @param {import("../../core/kart-registry.js").Kart} kart @param {number} trackId
- */
-function RecordGrandPrixFinish(kart, trackId) {
-    if (!grandPrix || grandPrix.over) {
-        return undefined;
-    }
-    const time = kart.lastRun?.trackId === trackId ? kart.lastRun.time : undefined;
-    const result = RecordHeatFinish(grandPrix, trackId, Racer(kart), time);
-    Debug(`RecordGrandPrixFinish: "${Racer(kart).name}" ${OrdinalPlace(result.place)} on track ${trackId}, +${result.points}`);
-    return result;
-}
-
-/** The group is back in the hub — the standings stay for the scoreboard. @param {boolean} cancelled */
-function EndGrandPrix(cancelled) {
-    if (grandPrix && !grandPrix.over) {
-        grandPrix.over = true;
-        grandPrix.cancelled = cancelled;
-    }
-}
-
-/** Restores the Grand Prix from an OnScriptReload snapshot (see index.js). @param {import("./logic.js").GrandPrix | undefined} snapshot */
-function RestoreGrandPrix(snapshot) {
-    grandPrix = snapshot ?? grandPrix;
-}
 
 // Pure rules of the hub's "Start Grand Prix" window
 // (hud/hub-modal/hub-modal.js): the heats it starts and who's listed as
@@ -7642,6 +8091,9 @@ function FinishKart(kart) {
     if (slot !== undefined) {
         GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "finish_place", "place", result ? `${OrdinalPlace(result.place)}  ·  +${result.points} PTS` : "");
     }
+    if (result) {
+        GrantXp(kart, HeatFinishXp(result.place), `heat on track ${activeTrackId}, ${OrdinalPlace(result.place)}`);
+    }
     // Shown the moment this racer crosses the line, not only once the whole
     // heat is over — stays up through BREAK until the next heat/the hub.
     SetFinishImageVisible(slot, true);
@@ -8026,6 +8478,7 @@ function UpdateRaceFlow(now) {
             BeginHeat(nextTrackId);
         } else {
             EndGrandPrix(false);
+            GrantGrandPrixXp(grandPrix, racers);
             ReturnAllToHub(racers);
             // The top three go on from the hub spawn onto the podium.
             PlaceOnPodium(grandPrix, racers);
@@ -8083,19 +8536,16 @@ function UpdateScoreboardHud(slot, kart) {
 
     const { pages, page, grandPrixMode, boardTrackId } = ScoreboardPage(kart);
     const { players, self } = BoardPlayers(kart);
-    const slide = StatSlideOf(page);
-    const board = slide
-        ? BuildStatBoard({ slide, totals: GetStatTotals(slide.key), players, self, maxRows: SCOREBOARD_ROWS })
-        : BuildScoreboard({
-            grandPrix,
-            grandPrixMode,
-            boardTrackId,
-            players,
-            self,
-            bestTimes: boardTrackId !== undefined ? GetTrackBestTimes(boardTrackId) : {},
-            maxRows: SCOREBOARD_ROWS,
-            routeNames: ROUTE_NAMES,
-        });
+    const board = BuildScoreboard({
+        grandPrix,
+        grandPrixMode,
+        boardTrackId,
+        players,
+        self,
+        bestTimes: boardTrackId !== undefined ? GetTrackBestTimes(boardTrackId) : {},
+        maxRows: SCOREBOARD_ROWS,
+        routeNames: ROUTE_NAMES,
+    });
     const switcher = PageSwitcher(pages, page);
 
     SetClass("scoreboard", "TimeTrial", !board.grandPrixMode);
@@ -8140,7 +8590,7 @@ function ScoreboardPage(kart) {
     const { grandPrixMode, boardTrackId } = ScoreboardView({ grandPrix, activeTrackId, kartTrackId: kart.trackId, trackOrder, pickedTrackId: kart.scoreboardPick });
     return {
         pages: ScoreboardPages(grandPrixMode, trackOrder),
-        page: CurrentPage(grandPrixMode, boardTrackId, kart.scoreboardStat),
+        page: CurrentPage(grandPrixMode, boardTrackId),
         grandPrixMode,
         boardTrackId,
     };
@@ -8148,9 +8598,8 @@ function ScoreboardPage(kart) {
 
 /**
  * Paging the scoreboard: while it's open (Tab held, SHOW_SCORES), A shows
- * the previous page and D the next one, wrapping around — the Grand Prix
- * standings or every track's best times, then the players' stats
- * (ScoreboardPages). Every opening starts on the viewer's own board again
+ * the previous page and D the next one, wrapping around — every track's
+ * best times (ScoreboardPages; the Grand Prix standings are one page). Every opening starts on the viewer's own board again
  * (the pick is dropped when Tab is let go). Per tick, from core/think.js —
  * a tap is only seen on the tick it happens.
  * @param {import("../../core/kart-registry.js").Kart} kart
@@ -8159,7 +8608,6 @@ function UpdateScoreboardInput(kart) {
     const pawn = kart.pawn;
     if (!pawn.IsInputPressed(CSInputs.SHOW_SCORES)) {
         kart.scoreboardPick = undefined;
-        kart.scoreboardStat = undefined;
         return;
     }
     const direction = (pawn.WasInputJustPressed(CSInputs.RIGHT) ? 1 : 0) - (pawn.WasInputJustPressed(CSInputs.LEFT) ? 1 : 0);
@@ -8169,7 +8617,6 @@ function UpdateScoreboardInput(kart) {
     const { pages, page } = ScoreboardPage(kart);
     const next = StepPage(pages, page, direction);
     const [kind, id] = next.split(":");
-    kart.scoreboardStat = kind === "stat" ? id : undefined;
     if (kind === "track" && id !== "") {
         kart.scoreboardPick = Number(id);
     }
@@ -9342,32 +9789,39 @@ function StepLeaderboardsTrack(slot, kart, direction) {
 // The user menu's leaderboards page: one leaderboard at a time, picked by tab (see leaderboards.js).
 
 // Pure rules of the user menu's profile (hud/profile/profile.js): the
-// player's name, skin and every stat (STAT_SLIDES) with their rank, as
+// player's name, skin, level and XP, and every stat (STAT_SLIDES) with their rank, as
 // ready-to-send strings. Values and ranks come from the scoreboard's rules,
 // so they read the same as on the leaderboards. No cs_script import
 // (test/hud/profile.test.mjs).
 
 /**
  * @typedef {{ key: string, value: string, rank: string }} ProfileStat
- * @typedef {{ name: string, skin: string, stats: ProfileStat[] }} Profile
+ * @typedef {{ name: string, skin: string, level: string, xp: string, xpFill: number, stats: ProfileStat[] }} Profile
  */
 
 /**
  * The profile one player sees of themselves. A stat's rank ("#3") is among
  * everyone with a total — saved ones of players who aren't on the map
- * included —, ties sharing one; empty while their total is still 0.
+ * included —, ties sharing one; empty while their total is still 0. The
+ * level with the XP into it ("340 / 525 XP") and how many of the XP bar's
+ * XP_BAR_SEGMENTS are filled.
  * @param {{
  *   self: { key: string, name: string },
  *   players: { key: string, name: string }[], // everyone on the map now
  *   skin: string, // a MELON_SKINS key
+ *   xp: number, // the player's XP (race/level/)
  *   statTotals: Record<string, Record<string, number>>, // per STAT_SLIDES key, every player's total by name
  * }} input
  * @returns {Profile}
  */
-function BuildProfile({ self, players, skin, statTotals }) {
+function BuildProfile({ self, players, skin, xp, statTotals }) {
+    const progress = LevelProgress(xp);
     return {
         name: self.name,
         skin: (MELON_SKIN_NAMES[skin] ?? MELON_SKIN_NAMES[MELON_SKIN_DEFAULT]).toUpperCase(),
+        level: `LV ${progress.level}`,
+        xp: `${Math.floor(progress.into)} / ${progress.needed} XP`,
+        xpFill: XpBarFill(progress, XP_BAR_SEGMENTS),
         stats: STAT_SLIDES.map((slide) => {
             const totals = statTotals[slide.key] ?? {};
             const board = BuildStatBoard({ slide, totals, players, self, maxRows: Infinity });
@@ -9387,7 +9841,8 @@ const PANEL = "usermenu_profile";
  * The user menu's profile (usermenu_profile in speedometer.xml, top of the
  * right column): the player's own melon big — one image per skin,
  * "usermenu_profile_skin_<key>", all but theirs Hidden —, their name and
- * skin name, and one tile per stat ("usermenu_profile_stat_<key>": value and
+ * skin name, their level and XP with a bar ("usermenu_profile_xp_<i>", the
+ * filled ones On), and one tile per stat ("usermenu_profile_stat_<key>": value and
  * rank). Rebuilt every PROFILE_UPDATE_SECONDS while the menu shows its
  * columns (UpdateUserMenu), each value sent only when it changes, plus
  * everything again every HUD_RESEND_SECONDS. Rules: hud/profile/logic.js.
@@ -9433,12 +9888,17 @@ function UpdateProfileHud(slot, kart) {
     for (const slide of STAT_SLIDES) {
         statTotals[slide.key] = GetStatTotals(slide.key);
     }
-    const profile = BuildProfile({ self, players, skin, statTotals });
+    const profile = BuildProfile({ self, players, skin, xp: GetKartXp(kart), statTotals });
     for (const key of Object.keys(MELON_SKINS)) {
         SetClass(`usermenu_profile_skin_${key}`, "Hidden", key !== skin);
     }
     SetText(PANEL, "profile_name", profile.name);
     SetText(PANEL, "profile_skin", profile.skin);
+    SetText(PANEL, "profile_level", profile.level);
+    SetText(PANEL, "profile_xp", profile.xp);
+    for (let i = 0; i < XP_BAR_SEGMENTS; i++) {
+        SetClass(`usermenu_profile_xp_${i}`, "On", i < profile.xpFill);
+    }
     for (const stat of profile.stats) {
         const id = `usermenu_profile_stat_${stat.key}`;
         SetText(id, "value", stat.value);
@@ -9571,7 +10031,8 @@ function UpdateToggleHud(slot, kart, buttonId) {
 
 /**
  * The skin grid (usermenu_skin_<key>, one per MELON_SKINS): the player's
- * current skin gets SkinSelected; of its pages (usermenu_skinpage_<page>,
+ * current skin gets SkinSelected, one still locked SkinLocked with the level
+ * it needs ("LV 12", skin_lock); of its pages (usermenu_skinpage_<page>,
  * MELON_SKINS_PER_PAGE each) only the player's one shows, and the pager next
  * to the MELON title (usermenu_skinpager: "1 / 2", ◀ ▶) only with more than
  * one page (Paging).
@@ -9583,8 +10044,11 @@ function UpdateSkinHud(slot, kart) {
         return;
     }
     const skin = GetMelonSkin(kart);
+    kart.skinHudLevel = GetKartLevel(kart);
     for (const key of Object.keys(MELON_SKINS)) {
         hud.SetHasClassForPlayer(slot, `usermenu_skin_${key}`, "SkinSelected", key === skin);
+        hud.SetHasClassForPlayer(slot, `usermenu_skin_${key}`, "SkinLocked", !IsMelonSkinUnlocked(kart, key));
+        hud.SetDialogVariableStringForPlayer(slot, `usermenu_skin_${key}`, "skin_lock", `LV ${SkinUnlockLevel(key)}`);
     }
     const page = GetSkinPage(kart);
     const pages = SkinPageCount();
@@ -9630,6 +10094,9 @@ function UpdateUserMenu(slot, kart) {
         // a heat, the hub) with the menu up, and so can the player's heat.
         GetSpeedHud()?.SetHasClassForPlayer(slot, "usermenu_restart_row", "Hidden", !CanRestartTimeTrial(kart));
         UpdateHubButtonHud(slot, kart);
+        if (kart.skinHudLevel !== GetKartLevel(kart)) {
+            UpdateSkinHud(slot, kart); // a level-up with the menu open unlocks skins
+        }
         if (kart.userMenuPage === "leaderboards") {
             UpdateLeaderboardsHud(slot, kart); // the totals keep growing while it's open
         } else if (kart.userMenuPage === undefined) {
@@ -9639,7 +10106,8 @@ function UpdateUserMenu(slot, kart) {
 }
 
 // The user menu's test triggers for effects (DEVELOPER → "Test Triggers"):
-// a break, a PERFECT wall bounce's feedback and the heal effect, on the
+// a break, a PERFECT wall bounce's feedback, the heal effect and the XP
+// notifier, on the
 // clicking player's own melon, without crashing, hitting a wall at 45° or
 // finding a heal zone. Each uses the same code the real thing runs. Not
 // while racing (a heat's melon isn't for testing) or with the melon broken.
@@ -9702,6 +10170,18 @@ function TestHeal(kart) {
     }
     PlayHealEffect(kart);
     RestoreFullHealth(kart);
+    return true;
+}
+
+/**
+ * "Test XP Gain": the XP notifier as if XP_GAIN_TEST_AMOUNT XP were earned
+ * — only shown, nothing given (anyone can open the DEVELOPER pages). Also
+ * while racing or broken: it's only the HUD. Returns true.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function TestXpGain(kart) {
+    const xp = GetKartXp(kart);
+    ShowXpGain(kart, xp, XP_GAIN_TEST_AMOUNT, xp + XP_GAIN_TEST_AMOUNT);
     return true;
 }
 
@@ -9857,11 +10337,12 @@ const TEST_TRIGGER_BUTTONS = {
     usermenu_testcountdown_button: (slot, kart) => TestCountdown(kart),
     usermenu_testfinish_button: (slot, kart) => TestFinish(kart),
     usermenu_testintro_button: (slot, kart) => TestIntro(kart),
-    // A break, a PERFECT bounce's feedback or the heal effect on the melon
-    // (dev/test-effects.js).
+    // A break, a PERFECT bounce's feedback or the heal effect on the melon,
+    // the XP notifier (dev/test-effects.js).
     usermenu_testbreak_button: (slot, kart) => TestBreak(slot, kart),
     usermenu_testbounce_button: (slot, kart) => TestPerfectBounce(kart),
     usermenu_testheal_button: (slot, kart) => TestHeal(kart),
+    usermenu_testxp_button: (slot, kart) => TestXpGain(kart),
 };
 
 /**
@@ -9968,8 +10449,9 @@ function RegisterHudInputs() {
 // with its own rules has its own folder — speedometer/ (speed, jump and
 // health bars), track/ (time trial clock + checkpoint strip), scoreboard/
 // (Tab: Grand Prix points, best times), leaderboards/ (the user menu's
-// page with every leaderboard), hub-modal/ ("Start Grand Prix": the heats
-// and who rides along) — the others are one file each: bounce-panel.js, user-menu.js.
+// page with every leaderboard), profile/ (the user menu's own melon and
+// stats), hub-modal/ ("Start Grand Prix": the heats
+// and who rides along) — the others are one file each: bounce-panel.js, level-up-panel.js, user-menu.js.
 // layout.js finds the custom_hud_layout entity; inputs.js handles every
 // button click.
 
@@ -11148,13 +11630,13 @@ function IsOverSpikeSpring(offset, angles) {
  * @type {Map<Entity, { config: import("./logic.js").SpikeSpringConfig, phase: import("./logic.js").SpikeSpringPhase | undefined }>}
  */
 const spikeSprings = new Map();
-let nextScanTime = -Infinity;
+let nextScanTime$1 = -Infinity;
 let lastError = "";
 
 /** Forgets the springs, so the next update looks them up again (after a round restart). */
 function ResetSpikeSprings() {
     spikeSprings.clear();
-    nextScanTime = -Infinity;
+    nextScanTime$1 = -Infinity;
 }
 
 /** Adds springs not known yet, and says in the console when the set changed. */
@@ -11176,8 +11658,8 @@ function ScanSpikeSprings() {
 /** Every tick: animations in step with the clock, melons on out spikes broken. @param {number} now */
 function UpdateSpikeSprings(now) {
     try {
-        if (now >= nextScanTime) {
-            nextScanTime = now + SPIKE_SPRING_SCAN_SECONDS;
+        if (now >= nextScanTime$1) {
+            nextScanTime$1 = now + SPIKE_SPRING_SCAN_SECONDS;
             ScanSpikeSprings();
         }
         for (const [spring, state] of spikeSprings) {
@@ -11437,10 +11919,107 @@ function RegisterBallSpawnerInputs() {
     Instance.OnRoundStart(ResetBallSpawner);
 }
 
+// Bouncers (BOUNCER_* in world/bouncer/constants.js). Pure rules, no
+// cs_script import; world/bouncer/bouncer.js applies them
+// (test/world/bouncer.test.mjs).
+
+/** Lower case, "/" for "\", no compiled "_c" suffix. @param {string} model */
+function NormalizeModel(model) {
+    return model.toLowerCase().replace(/\\/g, "/").replace(/_c$/, "");
+}
+
+/** Whether an entity with this model is a bouncer. @param {string} model */
+function IsBouncerModel(model) {
+    return NormalizeModel(model).endsWith(BOUNCER_MODEL);
+}
+
+/**
+ * Seconds a bouncer waits before its swing starts, from a random number in
+ * [0, 1): anywhere within one swing, so every phase is equally likely.
+ * @param {number} random
+ */
+function BouncerStartDelay(random) {
+    return Math.min(Math.max(random, 0), 1) * BOUNCER_SWING_SECONDS;
+}
+
+/**
+ * The inputs that start a bouncer: held upright at once (a swing Hammer
+ * started already is stopped), then the swing loop after `delay` — the
+ * swing starts from upright, so there's no jump.
+ * @param {number} delay
+ * @returns {{ input: string, value: string, delay: number }[]}
+ */
+function BouncerStartInputs(delay) {
+    return [
+        { input: "SetIdleAnimationLooping", value: BOUNCER_IDLE_ANIMATION, delay: 0 },
+        { input: "SetAnimationLooping", value: BOUNCER_IDLE_ANIMATION, delay: 0 },
+        { input: "SetIdleAnimationLooping", value: BOUNCER_SWING_ANIMATION, delay },
+        { input: "SetAnimationLooping", value: BOUNCER_SWING_ANIMATION, delay },
+    ];
+}
+
+// Starting the map's bouncers (see world/bouncer/constants.js): each one's
+// swing is started once, after its own random delay. The map is searched for
+// bouncers every BOUNCER_SCAN_SECONDS, so one that spawned after the
+// script's first look (or was respawned by a round restart) still starts.
+
+/** @typedef {import("cs_script/point_script").Entity} Entity */
+
+/** bouncer entity -> the delay its swing was started with. @type {Map<Entity, number>} */
+const bouncers = new Map();
+let nextScanTime = -Infinity;
+
+/** Forgets the bouncers, so the next update starts them again (after a round restart). */
+function ResetBouncers() {
+    bouncers.clear();
+    nextScanTime = -Infinity;
+}
+
+/** After a hot reload: the bouncers already swinging are left alone. @param {Map<Entity, number> | undefined} previous */
+function RestoreBouncers(previous) {
+    for (const [bouncer, delay] of [...(previous ?? [])]) {
+        bouncers.set(bouncer, delay);
+    }
+}
+
+/** Every tick: now and then, starts bouncers not started yet. @param {number} now */
+function UpdateBouncers(now) {
+    if (now < nextScanTime) {
+        return;
+    }
+    nextScanTime = now + BOUNCER_SCAN_SECONDS;
+    for (const bouncer of [...bouncers.keys()]) {
+        if (!bouncer.IsValid()) {
+            bouncers.delete(bouncer);
+        }
+    }
+    let added = 0;
+    for (const entity of Instance.FindEntitiesByClass(BOUNCER_CLASS)) {
+        if (bouncers.has(entity) || !("GetModelName" in entity) || !IsBouncerModel(/** @type {any} */ (entity).GetModelName())) {
+            continue;
+        }
+        const delay = BouncerStartDelay(Math.random());
+        for (const { input, value, delay: after } of BouncerStartInputs(delay)) {
+            Instance.EntFireAtTarget({ target: entity, input, value, delay: after });
+        }
+        bouncers.set(entity, delay);
+        added++;
+    }
+    if (added) {
+        Instance.Msg(`[melon_drive] bouncers: ${bouncers.size} swinging, ${added} new`);
+    }
+}
+
+/** A round restart respawns the bouncers: start them again. */
+function RegisterBouncerInputs() {
+    Instance.OnRoundStart(ResetBouncers);
+}
+
 // Map entities the script keeps running on their own, not tied to a kart:
 // mover/ (func_movelinears going back and forth), spike-spring/ (spike traps
 // popping out of the floor on a clock), ball-pit/ (balls kept in their pit),
-// ball-spawner/ (balls dropping in at a spawn point, removed after a while).
+// ball-spawner/ (balls dropping in at a spawn point, removed after a while),
+// bouncer/ (foam bouncers swinging, each started at a random point).
 
 let lastHeartbeatTime = 0;
 // Real elapsed time since the last Think, used for the movement math below —
@@ -11515,6 +12094,8 @@ function Think() {
             UpdateCheckpointHud(slot, kart);
             UpdateScoreboardInput(kart);
             UpdateScoreboardHud(slot, kart);
+            UpdateLevelUpHud(slot, kart, now);
+            UpdateXpGainHud(slot, kart, now);
             if (kart.inHub) {
                 ApplyHubModalState(slot, phase);
             }
@@ -11549,6 +12130,11 @@ function Think() {
         Debug(`Think: UpdateStats threw: ${err}`);
     }
     try {
+        UpdateLevel(now, Math.min(dt, 1)); // XP for time on the server, the same way
+    } catch (err) {
+        Debug(`Think: UpdateLevel threw: ${err}`);
+    }
+    try {
         UpdateSpikeSprings(now);
     } catch (err) {
         Debug(`Think: UpdateSpikeSprings threw: ${err}`);
@@ -11562,6 +12148,11 @@ function Think() {
         UpdateBallSpawner(now);
     } catch (err) {
         Debug(`Think: UpdateBallSpawner threw: ${err}`);
+    }
+    try {
+        UpdateBouncers(now);
+    } catch (err) {
+        Debug(`Think: UpdateBouncers threw: ${err}`);
     }
     // Re-think as soon as possible (every engine tick) rather than on a fixed
     // interval — WasInputJustPressed only reports a button edge for the
@@ -11615,6 +12206,7 @@ function RegisterKartInputs() {
         }
         ResetHudForPlayer(playerSlot);
         SaveStats(); // their time on the server so far, without waiting for the next periodic save
+        SaveXp(); // and their XP
         // Promotes the next-oldest remaining player (Map preserves insertion
         // order) so there's always a moderator whenever anyone's still on the
         // map — see EnsureModerator's comment for why this can't just wait for
@@ -11880,15 +12472,36 @@ function RegisterHeatInputs() {
     });
 }
 
+// For testing the leveling: `melon_give_xp <amount>` in the console (only
+// with sv_cheats 1) gives every player on the map that many XP. Not a menu
+// button — anyone can open the user menu's DEVELOPER pages, and the XP
+// unlock skins.
+function RegisterLevelInputs() {
+    Instance.RegisterCheatCommand(XP_CHEAT_COMMAND, (args) => {
+        const amount = Number(String(args).trim().split(/\s+/).pop());
+        if (!(amount > 0)) {
+            Debug(`${XP_CHEAT_COMMAND}: needs an amount, e.g. "${XP_CHEAT_COMMAND} 500"`);
+            return;
+        }
+        for (const kart of karts.values()) {
+            GrantXp(kart, amount, XP_CHEAT_COMMAND);
+        }
+    });
+}
+
+// Leveling: XP for racing, levels, skins unlocked by level (see level.js).
+
 // Racing: the tracks read from trigger names (track-config.js), checkpoint and
 // lap progress (checkpoints/), the time trial clock and best times
 // (time-trial/), the hub -> countdown -> racing -> break flow (heat/), and
 // the Grand Prix places and points over its heats (grand-prix/), and the
-// players' all-time stats (stats/).
+// players' all-time stats (stats/), and the XP and levels that unlock skins
+// (level/).
 
 function RegisterRaceInputs() {
     RegisterCheckpointAndFinishInputs();
     RegisterHeatInputs();
+    RegisterLevelInputs(); // melon_give_xp (sv_cheats)
 }
 
 // Developer aids only: the user menu's collision debug view (collision-debug.js),
@@ -11906,7 +12519,7 @@ Instance.SetNextThink(Instance.GetGameTime());
 // reloading mid-heat during dev iteration doesn't strand locked racers in a
 // phase that's forgotten it's supposed to unlock/advance them.
 Instance.OnScriptReload({
-    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers, grandPrix, spawnedBalls }),
+    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers, grandPrix, spawnedBalls, bouncers }),
     after: (memory) => {
         if (memory?.karts) {
             for (const [slot, kart] of memory.karts) {
@@ -11917,6 +12530,7 @@ Instance.OnScriptReload({
             SetModeratorSlot(memory.moderatorSlot);
             RestoreMovers(memory.movers);
             RestoreSpawnedBalls(memory.spawnedBalls);
+            RestoreBouncers(memory.bouncers);
             Debug(`OnScriptReload: restored ${karts.size} kart(s), phase=${phase}, activeTrackId=${activeTrackId}, moderatorSlot=${moderatorSlot}`);
         }
     },
@@ -11933,3 +12547,4 @@ RegisterMoverInputs(); // OnActivate/OnRoundStart: start the func_movelinear mov
 RegisterSpikeSpringInputs(); // OnRoundStart: look the spike springs up again
 RegisterBallPitInputs(); // ball_pit_enter/ball_pit_leave
 RegisterBallSpawnerInputs(); // OnRoundStart: the spawned balls are gone
+RegisterBouncerInputs(); // OnRoundStart: start the bouncers again, at new random points

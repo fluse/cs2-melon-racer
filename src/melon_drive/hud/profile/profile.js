@@ -3,8 +3,9 @@ import { GetSpeedHud } from "../layout.js";
 import { BoardPlayers } from "../scoreboard/scoreboard.js";
 import { GetMelonSkin } from "../../kart/skin.js";
 import { GetStatTotals } from "../../race/stats/stats.js";
+import { GetKartXp } from "../../race/level/level.js";
 import { BuildProfile } from "./logic.js";
-import { MELON_SKINS, PROFILE_UPDATE_SECONDS, STAT_SLIDES, HUD_RESEND_SECONDS } from "../../constants/index.js";
+import { MELON_SKINS, PROFILE_UPDATE_SECONDS, STAT_SLIDES, XP_BAR_SEGMENTS, HUD_RESEND_SECONDS } from "../../constants/index.js";
 
 const PANEL = "usermenu_profile";
 
@@ -12,7 +13,8 @@ const PANEL = "usermenu_profile";
  * The user menu's profile (usermenu_profile in speedometer.xml, top of the
  * right column): the player's own melon big — one image per skin,
  * "usermenu_profile_skin_<key>", all but theirs Hidden —, their name and
- * skin name, and one tile per stat ("usermenu_profile_stat_<key>": value and
+ * skin name, their level and XP with a bar ("usermenu_profile_xp_<i>", the
+ * filled ones On), and one tile per stat ("usermenu_profile_stat_<key>": value and
  * rank). Rebuilt every PROFILE_UPDATE_SECONDS while the menu shows its
  * columns (UpdateUserMenu), each value sent only when it changes, plus
  * everything again every HUD_RESEND_SECONDS. Rules: hud/profile/logic.js.
@@ -58,12 +60,17 @@ export function UpdateProfileHud(slot, kart) {
     for (const slide of STAT_SLIDES) {
         statTotals[slide.key] = GetStatTotals(slide.key);
     }
-    const profile = BuildProfile({ self, players, skin, statTotals });
+    const profile = BuildProfile({ self, players, skin, xp: GetKartXp(kart), statTotals });
     for (const key of Object.keys(MELON_SKINS)) {
         SetClass(`usermenu_profile_skin_${key}`, "Hidden", key !== skin);
     }
     SetText(PANEL, "profile_name", profile.name);
     SetText(PANEL, "profile_skin", profile.skin);
+    SetText(PANEL, "profile_level", profile.level);
+    SetText(PANEL, "profile_xp", profile.xp);
+    for (let i = 0; i < XP_BAR_SEGMENTS; i++) {
+        SetClass(`usermenu_profile_xp_${i}`, "On", i < profile.xpFill);
+    }
     for (const stat of profile.stats) {
         const id = `usermenu_profile_stat_${stat.key}`;
         SetText(id, "value", stat.value);

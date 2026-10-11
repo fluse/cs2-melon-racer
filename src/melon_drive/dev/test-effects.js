@@ -1,5 +1,6 @@
 // The user menu's test triggers for effects (DEVELOPER → "Test Triggers"):
-// a break, a PERFECT wall bounce's feedback and the heal effect, on the
+// a break, a PERFECT wall bounce's feedback, the heal effect and the XP
+// notifier, on the
 // clicking player's own melon, without crashing, hitting a wall at 45° or
 // finding a heal zone. Each uses the same code the real thing runs. Not
 // while racing (a heat's melon isn't for testing) or with the melon broken.
@@ -8,8 +9,9 @@ import { Debug } from "../core/debug.js";
 import { BreakMelon } from "../health/breaking/breaking.js";
 import { PlayHealEffect, RestoreFullHealth } from "../health/heal/index.js";
 import { PlayPerfectSpark } from "../movement/wall-bounce/wall-bounce.js";
+import { GetKartXp, ShowXpGain } from "../race/level/level.js";
 import { SetFreeLook } from "./free-look.js";
-import { WALL_BOUNCE_OPTIMAL_ANGLE } from "../constants/index.js";
+import { WALL_BOUNCE_OPTIMAL_ANGLE, XP_GAIN_TEST_AMOUNT } from "../constants/index.js";
 
 /**
  * Whether a test effect may play on this kart's melon now.
@@ -69,5 +71,17 @@ export function TestHeal(kart) {
     }
     PlayHealEffect(kart);
     RestoreFullHealth(kart);
+    return true;
+}
+
+/**
+ * "Test XP Gain": the XP notifier as if XP_GAIN_TEST_AMOUNT XP were earned
+ * — only shown, nothing given (anyone can open the DEVELOPER pages). Also
+ * while racing or broken: it's only the HUD. Returns true.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+export function TestXpGain(kart) {
+    const xp = GetKartXp(kart);
+    ShowXpGain(kart, xp, XP_GAIN_TEST_AMOUNT, xp + XP_GAIN_TEST_AMOUNT);
     return true;
 }
