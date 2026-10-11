@@ -1254,6 +1254,18 @@ back in over the middle after `BALL_PIT_DROP_SECONDS`. Constants:
 `world/ball-pit/ball-pit.js` (`test/world/ball-pit.test.mjs`). Details for
 mappers: [Mapping API: ball pits](docs/mapping-api/19-ball-pits.md).
 
+## Ball spawner (implemented)
+
+Physics balls dropping in at irregular intervals: the script copies the
+`point_template` `template_ball` at an `info_target` named `spawn_ball`
+(several: a random one each time) every `BALL_SPAWNER_MIN_INTERVAL`…
+`BALL_SPAWNER_MAX_INTERVAL` seconds, removes each ball after
+`BALL_SPAWNER_LIFETIME` (20 s), and keeps at most `BALL_SPAWNER_MAX_BALLS`
+(15) at once — when full, a due ball is skipped. No Hammer logic. Constants:
+`world/ball-spawner/constants.js`; rules: `world/ball-spawner/logic.js`,
+applied by `world/ball-spawner/ball-spawner.js` (`test/world/ball-spawner.test.mjs`).
+Details for mappers: [Mapping API: ball spawner](docs/mapping-api/20-ball-spawner.md).
+
 ## Open design questions (not yet decided — ask before assuming)
 
 - **Per-track progress**: should a free-roaming melon that switches tracks

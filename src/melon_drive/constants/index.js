@@ -41,3 +41,4 @@ export * from "../dev/constants.js";
 export * from "../world/mover/constants.js";
 export * from "../world/spike-spring/constants.js";
 export * from "../world/ball-pit/constants.js";
+export * from "../world/ball-spawner/constants.js";

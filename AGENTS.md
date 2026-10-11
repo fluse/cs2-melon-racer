@@ -31,7 +31,7 @@ docs/TRACK_CREATION.md                   # step-by-step Hammer guide for a new t
 docs/GAME_CI.md                          # the map's color palette (guide lines, heal, checkpoint, start gate) — use it for new materials/models/HUD
 docs/valve/scripting_api.html            # saved copy of Valve's cs_script API wiki page (the site blocks automated fetches)
 docs/mapping-api/*.md                    # Mapping API (map↔script contract): README.md = index of every input/name/pattern,
-                                          #   01-…19-*.md one page per topic, each with setup / name-variant / "Values" tables
+                                          #   01-…20-*.md one page per topic, each with setup / name-variant / "Values" tables
 maps/melon_racer.vmap                    # main map (binary DMX, Hammer-authoritative)
 maps/prefabs/*.vmap                      # prefabs placed in melon_racer.vmap (hub, routes, gates, jump pads); the start/checkpoint/finish gates and jump_pad are set up by a
                                           #   map variable per copy (docs/mapping-api/14-prefabs.md) — test/helpers/vmap.mjs reads prefabs, overrides resolved
@@ -76,7 +76,8 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              tuning-scale.js (+ -logic.js: the slider both pages share), test-effects.js (Test Break/Perfect Bounce/Heal), attack-debug.js
                                           #   world/     mover/ (func_movelinear "mover…" started and kept going back and forth),
                                           #              spike-spring/ (prop_dynamic "spike_spring…": rise/sink on the script's clock, breaks melons on its spikes),
-                                          #              ball-pit/ (ball_pit_enter/leave: balls that leave the trigger steered back or dropped back in)
+                                          #              ball-pit/ (ball_pit_enter/leave: balls that leave the trigger steered back or dropped back in),
+                                          #              ball-spawner/ (template_ball copied at spawn_ball at random intervals, removed after a lifetime, capped)
 src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
 test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one folder per src/melon_drive/ domain (movement/, race/, …): unit tests
                                           #   for the pure files, engine-side tests against the fake engine (filed under the domain they're mainly about)

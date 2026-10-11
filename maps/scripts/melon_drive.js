@@ -1540,6 +1540,25 @@ const BALL_PIT_DROP_SECONDS = 2;
 const BALL_PIT_DROP_HEIGHT = 40;
 const BALL_PIT_DROP_SPREAD = 16;
 
+// Ball spawner: physics balls dropping in at irregular intervals from the
+// point_template BALL_SPAWNER_TEMPLATE_NAME, at an info_target named
+// BALL_SPAWNER_SPAWN_NAME (with several, a random one each time). Each ball
+// is removed after BALL_SPAWNER_LIFETIME; at most BALL_SPAWNER_MAX_BALLS at
+// once. No spawn point in the map, no balls. Rules: world/ball-spawner/logic.js,
+// applied by world/ball-spawner/ball-spawner.js.
+
+const BALL_SPAWNER_TEMPLATE_NAME = "template_ball";
+const BALL_SPAWNER_SPAWN_NAME = "spawn_ball";
+// Balls alive at the same time, at most.
+const BALL_SPAWNER_MAX_BALLS = 15;
+// Seconds a ball lives before it's removed.
+const BALL_SPAWNER_LIFETIME = 20;
+// Seconds between two balls: random, evenly between these two.
+const BALL_SPAWNER_MIN_INTERVAL = 0.5;
+const BALL_SPAWNER_MAX_INTERVAL = 4;
+// Up to this far off the spawn point each way (so balls don't spawn inside each other).
+const BALL_SPAWNER_SPREAD = 8;
+
 // All tunable numbers and static/Hammer-naming-convention data for
 // melon_drive, one file per system they configure. Import from here, not
 // from the single files. Actual mutable runtime state (kart registry, race
@@ -3661,13 +3680,16 @@ function MakeUnbreakableByEngine(melon) {
 
 /**
  * Takes the player's own body out of the game: non-solid (NOCLIP — NONE
- * would leave its hitbox solid for the melon to crash into), invisible, and
- * standing still wherever it spawned — the map's player spawns sit away from
- * the tracks, so it's out of the way there. Safe to call repeatedly.
+ * would leave its hitbox solid for the melon to crash into — and no
+ * collision at all: a NOCLIP pawn still shoved physics props, balls and
+ * melons, flying through them in free look), invisible, and standing still
+ * wherever it spawned — the map's player spawns sit away from the tracks,
+ * so it's out of the way there. Safe to call repeatedly.
  * @param {any} pawn
  */
 function FreezePawn(pawn) {
     pawn.SetMoveType(CSMoveType.NOCLIP);
+    Instance.EntFireAtTarget({ target: pawn, input: "DisableCollision" });
     pawn.SetColor({ r: 255, g: 255, b: 255, a: 0 });
     pawn.Teleport({ velocity: { x: 0, y: 0, z: 0 } });
 }
@@ -10361,9 +10383,123 @@ function RegisterBallPitInputs() {
     Instance.OnScriptInput("ball_pit_leave", ({ caller, activator }) => BallLeftPit(activator, caller));
 }
 
+// Ball spawner (BALL_SPAWNER_* in world/ball-spawner/constants.js). Pure
+// rules, no cs_script import; world/ball-spawner/ball-spawner.js applies them
+// (test/world/ball-spawner.test.mjs).
+
+/** @typedef {{ x: number, y: number, z: number }} Vec */
+
+/**
+ * Seconds until the next ball: between BALL_SPAWNER_MIN_INTERVAL and
+ * BALL_SPAWNER_MAX_INTERVAL, so they come irregularly.
+ * @param {number} random 0..1
+ */
+function BallSpawnDelay(random) {
+    return BALL_SPAWNER_MIN_INTERVAL + random * (BALL_SPAWNER_MAX_INTERVAL - BALL_SPAWNER_MIN_INTERVAL);
+}
+
+/**
+ * Whether a ball spawns now: its time has come and fewer than
+ * BALL_SPAWNER_MAX_BALLS are alive.
+ * @param {number} now @param {number} nextSpawnTime @param {number} alive
+ */
+function ShouldSpawnBall(now, nextSpawnTime, alive) {
+    return now >= nextSpawnTime && alive < BALL_SPAWNER_MAX_BALLS;
+}
+
+/**
+ * Where a ball appears: the spawn point, up to BALL_SPAWNER_SPREAD off it
+ * each way horizontally.
+ * @param {Vec} point @param {number} randomX 0..1 @param {number} randomY 0..1
+ * @returns {Vec}
+ */
+function BallSpawnPosition(point, randomX, randomY) {
+    return {
+        x: point.x + (randomX * 2 - 1) * BALL_SPAWNER_SPREAD,
+        y: point.y + (randomY * 2 - 1) * BALL_SPAWNER_SPREAD,
+        z: point.z,
+    };
+}
+
+// Spawning balls (see world/ball-spawner/constants.js): every tick the balls
+// past their lifetime are removed, and when the next one is due — and fewer
+// than BALL_SPAWNER_MAX_BALLS are alive — a fresh copy of the ball template
+// is put at a spawn point. When it's full, the due ball is skipped and the
+// next one gets a new random delay, so they stay irregular.
+
+/** @typedef {import("cs_script/point_script").Entity} Entity */
+
+/** Every spawned ball still around, and when it's removed. @type {{ ball: Entity, removeAt: number }[]} */
+const spawnedBalls = [];
+let nextSpawnTime = -Infinity;
+let warned = false;
+
+/** Forgets the balls and the timer (a round restart removed them anyway). */
+function ResetBallSpawner() {
+    spawnedBalls.length = 0;
+    nextSpawnTime = -Infinity;
+}
+
+/** After a hot reload: the balls spawned before it, so they're still removed in time. @param {{ ball: Entity, removeAt: number }[] | undefined} balls */
+function RestoreSpawnedBalls(balls) {
+    for (const entry of balls ?? []) {
+        if (entry.ball.IsValid() && !spawnedBalls.includes(entry)) {
+            spawnedBalls.push(entry);
+        }
+    }
+}
+
+/** Every tick: old balls removed, a new one spawned when it's due. @param {number} now */
+function UpdateBallSpawner(now) {
+    for (let i = spawnedBalls.length - 1; i >= 0; i--) {
+        const { ball, removeAt } = spawnedBalls[i];
+        if (!ball.IsValid()) {
+            spawnedBalls.splice(i, 1);
+        } else if (now >= removeAt) {
+            ball.Remove();
+            spawnedBalls.splice(i, 1);
+        }
+    }
+    if (now < nextSpawnTime) {
+        return;
+    }
+    const spawn = ShouldSpawnBall(now, nextSpawnTime, spawnedBalls.length);
+    nextSpawnTime = now + BallSpawnDelay(Math.random());
+    if (spawn) {
+        SpawnBall(now);
+    }
+}
+
+/** A ball at a random spawn point (none in the map: nothing). @param {number} now */
+function SpawnBall(now) {
+    const points = Instance.FindEntitiesByName(BALL_SPAWNER_SPAWN_NAME);
+    if (points.length === 0) {
+        return;
+    }
+    const point = points[Math.floor(Math.random() * points.length)];
+    const position = BallSpawnPosition(point.GetAbsOrigin(), Math.random(), Math.random());
+    // Said in the console once, not every few seconds: a spawn point without a working template.
+    const spawned = SpawnFromTemplate(BALL_SPAWNER_TEMPLATE_NAME, position, undefined, { warn: !warned });
+    if (spawned.length === 0) {
+        warned = true;
+        return;
+    }
+    for (const ball of spawned) {
+        // ForceSpawn keeps the template's Hammer offset: put it right on the spawn point.
+        ball.Teleport({ position, velocity: { x: 0, y: 0, z: 0 } });
+        spawnedBalls.push({ ball, removeAt: now + BALL_SPAWNER_LIFETIME });
+    }
+}
+
+/** A round restart removes the spawned balls: start counting from zero. */
+function RegisterBallSpawnerInputs() {
+    Instance.OnRoundStart(ResetBallSpawner);
+}
+
 // Map entities the script keeps running on their own, not tied to a kart:
 // mover/ (func_movelinears going back and forth), spike-spring/ (spike traps
-// popping out of the floor on a clock), ball-pit/ (balls kept in their pit).
+// popping out of the floor on a clock), ball-pit/ (balls kept in their pit),
+// ball-spawner/ (balls dropping in at a spawn point, removed after a while).
 
 let lastHeartbeatTime = 0;
 // Real elapsed time since the last Think, used for the movement math below —
@@ -10475,6 +10611,11 @@ function Think() {
         UpdateBallPits(now);
     } catch (err) {
         Debug(`Think: UpdateBallPits threw: ${err}`);
+    }
+    try {
+        UpdateBallSpawner(now);
+    } catch (err) {
+        Debug(`Think: UpdateBallSpawner threw: ${err}`);
     }
     // Re-think as soon as possible (every engine tick) rather than on a fixed
     // interval — WasInputJustPressed only reports a button edge for the
@@ -10814,7 +10955,7 @@ Instance.SetNextThink(Instance.GetGameTime());
 // reloading mid-heat during dev iteration doesn't strand locked racers in a
 // phase that's forgotten it's supposed to unlock/advance them.
 Instance.OnScriptReload({
-    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers, grandPrix }),
+    before: () => ({ karts, phase, activeTrackId, phaseEndTime, moderatorSlot, movers, grandPrix, spawnedBalls }),
     after: (memory) => {
         if (memory?.karts) {
             for (const [slot, kart] of memory.karts) {
@@ -10824,6 +10965,7 @@ Instance.OnScriptReload({
             RestoreGrandPrix(memory.grandPrix);
             SetModeratorSlot(memory.moderatorSlot);
             RestoreMovers(memory.movers);
+            RestoreSpawnedBalls(memory.spawnedBalls);
             Debug(`OnScriptReload: restored ${karts.size} kart(s), phase=${phase}, activeTrackId=${activeTrackId}, moderatorSlot=${moderatorSlot}`);
         }
     },
@@ -10839,3 +10981,4 @@ RegisterAttackDebug();
 RegisterMoverInputs(); // OnActivate/OnRoundStart: start the func_movelinear movers
 RegisterSpikeSpringInputs(); // OnRoundStart: look the spike springs up again
 RegisterBallPitInputs(); // ball_pit_enter/ball_pit_leave
+RegisterBallSpawnerInputs(); // OnRoundStart: the spawned balls are gone

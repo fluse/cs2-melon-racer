@@ -1,4 +1,4 @@
-[Mapping API](README.md) › **19. Ball pits** · [← Spike springs](18-spike-springs.md)
+[Mapping API](README.md) › **19. Ball pits** · [← Spike springs](18-spike-springs.md) · [Ball spawner →](20-ball-spawner.md)
 
 # 19. Ball pits
 
@@ -35,4 +35,4 @@ inside the trigger are kept in too.
   pit's wall from outside is dropped back in after `BALL_PIT_DROP_SECONDS`.
 
 ---
-[← Spike springs](18-spike-springs.md) · [Mapping API](README.md)
+[← Spike springs](18-spike-springs.md) · [Ball spawner →](20-ball-spawner.md) · [Mapping API](README.md)

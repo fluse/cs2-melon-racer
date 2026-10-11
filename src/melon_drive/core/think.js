@@ -11,7 +11,7 @@ import { phase, UpdateRaceFlow } from "../race/heat/race-flow.js";
 import { UpdatePrediction, HidePrediction } from "../fx/prediction/prediction.js";
 import { UpdateLiftCamera, UpdatePodiumCamera, UpdateZoneCamera, UpdateSideViewCamera, UpdateFollowCamera } from "../camera/index.js";
 import { UpdateBoostTrail, StopBoostTrail } from "../fx/boost-trail/boost-trail.js";
-import { UpdateSpikeSprings, UpdateBallPits } from "../world/index.js";
+import { UpdateSpikeSprings, UpdateBallPits, UpdateBallSpawner } from "../world/index.js";
 
 let lastHeartbeatTime = 0;
 // Real elapsed time since the last Think, used for the movement math below —
@@ -123,6 +123,11 @@ export function Think() {
         UpdateBallPits(now);
     } catch (err) {
         Debug(`Think: UpdateBallPits threw: ${err}`);
+    }
+    try {
+        UpdateBallSpawner(now);
+    } catch (err) {
+        Debug(`Think: UpdateBallSpawner threw: ${err}`);
     }
     // Re-think as soon as possible (every engine tick) rather than on a fixed
     // interval — WasInputJustPressed only reports a button edge for the

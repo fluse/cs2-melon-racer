@@ -36,6 +36,7 @@ this folder, the script doesn't know about it.
 | 17 | [Jump recharge zones](17-jump-recharge-zones.md) | Wall jumps recharged at once, kept full inside |
 | 18 | [Spike springs](18-spike-springs.md) | Spike traps popping out of the floor on the script's clock |
 | 19 | [Ball pits](19-ball-pits.md) | Physics balls kept in their pit, melons drive in and out |
+| 20 | [Ball spawner](20-ball-spawner.md) | Balls dropping in at irregular intervals, removed after a while |
 
 ## All script inputs
 
@@ -104,6 +105,8 @@ names once, when the script first needs the track list.
 | `prediction_dot_template` | `point_template` | — | [Effect templates](03-effect-templates.md#prediction-dots) |
 | `template_spectator_hat` | `point_template` | — | [Effect templates](03-effect-templates.md#free-look-avatar) |
 | `particle_podium_confetti` | `info_particle_system` | — | [Hub](05-hub.md#confetti) |
+| `template_ball` | `point_template` | — | [Ball spawner](20-ball-spawner.md) |
+| `spawn_ball` | `info_target` | — | [Ball spawner](20-ball-spawner.md) |
 
 ## All name patterns
 
