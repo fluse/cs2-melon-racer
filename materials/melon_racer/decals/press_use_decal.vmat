@@ -1,5 +1,5 @@
 // "PRESS USE" lettering as a decal/overlay. Textures come from
-// rawDecals/PressUse.png via `node tools/make-decal.mjs` — re-run that after
+// rawDecals/PressUse.png via `node tools/materials/make-decal.mjs` - re-run that after
 // changing the image.
 
 Layer0

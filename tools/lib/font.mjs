@@ -1,7 +1,7 @@
 // Shared by the model generators that cut text out of a font
 // (make-logo-model.mjs, make-podium-model.mjs): a line of text as flat 2D
 // shapes ({ outer, holes }: outer counter-clockwise, holes clockwise, y up),
-// ready for Mesh.Extrude. Bungee (tools/fonts/, OFL) is the logo's font.
+// ready for Mesh.Extrude. Bungee (tools/lib/fonts/, OFL) is the logo's font.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import opentype from "opentype.js";

@@ -86,29 +86,46 @@ build.mjs, package.json                  # Rollup build wiring src/ -> maps/scri
 site/*.html, style.css, build.mjs        # GitHub Page: `npm run site` -> site/dist/ (gitignored): index.html (+ version, CHANGELOG.md),
                                           #   connect/ (steam://connect), mapping-api/ (every docs/mapping-api/*.md + TRACK_CREATION.md,
                                           #   via site/markdown.mjs — test/site/ checks every link/#anchor); .github/workflows/pages.yml deploys on push to main
-tools/make-icons.mjs                     # generates panorama/images/custom_game/icons/*.png (user menu icons, checkpoint strip flags) — edit shapes there, re-run with node
-tools/png.mjs                            # the PNG encoder make-icons.mjs uses
-tools/make-logo.mjs                      # renders the logo (melon slice + slanted MELON RACER banner, an SVG in the file) into
-                                          #   panorama/images/custom_game/logo_melon_racer.png (846x295: intro screen, user menu, GitHub page) —
-                                          #   then re-run make-decal.mjs for the map decal; font tools/fonts/Bungee-Regular.ttf (OFL), renderer @resvg/resvg-js (devDependency)
-tools/make-route-icons.mjs               # generates the hub window's route cards from the .vmap: an icon per track, picked by its name (ROUTE_ICONS)
-                                          #   (panorama/images/custom_game/routes/route_<trackId>.png) + route names (src/melon_drive/hud/hub-modal/routes.js,
-                                          #   from route_<name>.vmap) — re-run after adding/renaming a route (test/map/route-icons.test.mjs)
-tools/make-logo-model.mjs                # extrudes MELON RACER (Bungee, slanted like the logo, lime green outline ring around them) into mesh geometry,
+tools/                                    # generators, `node tools/<folder>/<file>.mjs`, one folder per kind of output; each writes its files relative to the addon root:
+                                          #   lib/ shared helpers (no output of their own), models/, materials/, images/ (panorama PNGs), media/ (GIFs); a new tool goes
+                                          #   into the fitting one, never loose in tools/
+tools/lib/font.mjs                        # shared by make-logo-model.mjs and make-podium-model.mjs: a line of text in a font (Bungee) as 2D shapes
+tools/lib/model.mjs                       # shared by the model generators: mesh builder (extrude, triangles), .obj/.vmdl/.dmx/.vmat writers
+tools/lib/png.mjs                         # the PNG encoder make-icons.mjs uses
+tools/models/make-ball-model.mjs          # a ball-pit ball as models/melon_racer/ball.vmdl (+ ball.obj): 320-triangle icosphere in inflatable.vmat,
+                                          #   a sphere primitive for collision, light (mass_override) — color each prop_physics by its render color
+tools/models/make-bouncer-model.mjs       # a foam bouncer on a spring as models/melon_racer/bouncer/bouncer.vmdl: pink ribbed foam arch, lime cap, chrome coil
+                                          #   skinned to a bone chain (SMD, the only animated model: idle + boing — squash, overshoot, wobble); a prop_dynamic,
+                                          #   SetAnimationNotLooping "boing" from a trigger; static collision; materials/melon_racer/bouncer/
+tools/models/make-buffer-stop-model.mjs   # a buffer stop (Prellbock) as models/melon_racer/buffer_stop/buffer_stop.vmdl: red beam with a white chevron,
+                                          #   two buffers, bent grey legs on crossbars (696 triangles); a track obstacle, coarser _physics.obj collision; materials/melon_racer/buffer_stop/
+tools/models/make-checkpoint-model.mjs    # the checkpoint gate's frame (glowing pillars, beam, floating diamond) as models/melon_racer/checkpoint_gate.vmdl
+                                          #   (+ _physics.obj collision, materials/melon_racer/checkpoint_gate/checkpoint_gate_{body,trim,glow}.vmat); same footprint as the prefab's old poles
+tools/models/make-logo-model.mjs          # extrudes MELON RACER (Bungee, slanted like the logo, lime green outline ring around them) into mesh geometry,
                                           #   models/melon_racer/logo_text.dmx for Hammer's File → Import (DmxText in model.mjs),
                                           #   + materials/melon_racer/logo/logo_text_{face,outline,holo}.vmat (holo = an opaque copy of holo_dashes for the letter fronts) (opentype.js + earcut + clipper-lib, devDependencies)
-tools/make-checkpoint-model.mjs          # the checkpoint gate's frame (glowing pillars, beam, floating diamond) as models/melon_racer/checkpoint_gate.vmdl
-                                          #   (+ _physics.obj collision, materials/melon_racer/checkpoint_gate/checkpoint_gate_{body,trim,glow}.vmat); same footprint as the prefab's old poles
-tools/make-podium-model.mjs              # the hub podium (steps 2-1-3 in the docs/GAME_CI.md colors, glowing Bungee place numbers) as mesh geometry,
+tools/models/make-podium-model.mjs        # the hub podium (steps 2-1-3 in the docs/GAME_CI.md colors, glowing Bungee place numbers) as mesh geometry,
                                           #   models/melon_racer/podium.dmx for Hammer's File → Import (DmxText in model.mjs), + materials/melon_racer/podium/podium_*.vmat; prints where the podium_spawn_<place> info_targets go
-tools/make-inflatable.mjs                # materials/melon_racer/surfaces/inflatable.vmat: the glossy vinyl of an inflatable pool mattress — no shapes, only
-                                          #   how it reflects (a roughness map); plain white, so it can be tinted (g_vColorTint or an entity render color)
-tools/make-ball-model.mjs                # a ball-pit ball as models/melon_racer/ball.vmdl (+ ball.obj): 320-triangle icosphere in inflatable.vmat,
-                                          #   a sphere primitive for collision, light (mass_override) — color each prop_physics by its render color
-tools/font.mjs                           # shared by make-logo-model.mjs and make-podium-model.mjs: a line of text in a font (Bungee) as 2D shapes
-tools/model.mjs                          # shared by the model generators: mesh builder (extrude, triangles), .obj/.vmdl/.dmx/.vmat writers
-tools/make-decal.mjs                     # generates materials/melon_racer/decals/<decal>_{color,trans}.png for every decal in its DECALS list
+tools/materials/make-decal.mjs            # generates materials/melon_racer/decals/<decal>_{color,trans}.png for every decal in its DECALS list
                                           #   (HUD logo, rawDecals/*.png|jpg — JPG via Windows System.Drawing; can key out a baked-in checkerboard, writes <name>_transparent.png)
+tools/materials/make-holo.mjs             # the gates' hologram textures (materials/melon_racer/holo/holo_*: color, trans, illum; the material scrolls them)
+                                          #   + the heal cross particle sprite (materials/melon_racer/particles/particle_heal_cross) — `node … <name>` writes only that one
+tools/materials/make-inflatable.mjs       # materials/melon_racer/surfaces/inflatable.vmat: the glossy vinyl of an inflatable pool mattress — no shapes, only
+                                          #   how it reflects (a roughness map); plain white, so it can be tinted (g_vColorTint or an entity render color)
+tools/materials/make-melon-skins.mjs      # the melon skins (gold, football, golf — dimples as a tangent-space normal map —, honey (the yellow honey melon's net), camo, strawberry (seeds in pits, calyx), pumpkin (ribs, a carved face glowing through a self-illum mask), pineapple (fruitlets on the Fibonacci spiral, bracts), zebra (warped stripes, fur); SKINS list): recolors melon_default_color.png (same UVs, same stripes) or paints
+                                          #   by place on the melon (`surface`: melon.dmx's triangles drawn into texture space, via test/helpers/vmap.mjs) into
+                                          #   materials/melon_racer/melon/melon_<skin>.vmat (+ textures; tint 0, paint doesn't change them) and
+                                          #   models/melon_racer/melon/melon_<skin>.vmdl (melon.vmdl, material remapped) — add a skin there, re-run, compile
+tools/images/make-icons.mjs               # generates panorama/images/custom_game/icons/*.png (user menu icons, checkpoint strip flags) — edit shapes there, re-run with node
+tools/images/make-logo.mjs                # renders the logo (melon slice + slanted MELON RACER banner, an SVG in the file) into
+                                          #   panorama/images/custom_game/logo_melon_racer.png (846x295: intro screen, user menu, GitHub page) —
+                                          #   then re-run make-decal.mjs for the map decal; font tools/lib/fonts/Bungee-Regular.ttf (OFL), renderer @resvg/resvg-js (devDependency)
+tools/images/make-route-icons.mjs         # generates the hub window's route cards from the .vmap: an icon per track, picked by its name (ROUTE_ICONS)
+                                          #   (panorama/images/custom_game/routes/route_<trackId>.png) + route names (src/melon_drive/hud/hub-modal/routes.js,
+                                          #   from route_<name>.vmap) — re-run after adding/renaming a route (test/map/route-icons.test.mjs)
+tools/media/make-gif.mjs                  # an OBS recording -> gameplay GIF (ffmpeg, two-pass palette) + a <name>_steam.gif under 2 MB; driven by the /gif skill
+tools/bin/                                # downloaded tools, gitignored: source2viewer/Source2Viewer-CLI.exe (ValveResourceFormat 20.0) decompiles game assets
+                                          #   (-i game/csgo/pak01_dir.vpk -f <path> -d -o <out> --game game/csgo/gameinfo.gi; .vmat fails on new shaders — read -b DATA instead)
 rawDecals/*.png                          # new source images for decals (make-decal.mjs input); once done, the tool moves
                                           #   them (+ their _transparent.png) to rawDecals/done/ and reads them from there
 particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3, hand-written): boost_trail + boost_trail_juice (two separate info_particle_systems in one template — a child system doesn't render);
@@ -120,20 +137,14 @@ particles/melon_racer/*.vpcf             # the addon's own particle effects (KV3
                                           #   flat lime rings shooting up and widening + fast rising lime sparks);
                                           #   jump_recharge_rings + jump_recharge_sparks (ambient, same way: the jump pad's two in health blue, on a jump recharge zone);
                                           #   heal_crosses (script-driven, the effect in particle_health_template: a burst of
-                                          #   rising "+" crosses in holo_heal's green/mint, sprite particle_heal_cross.vtex from tools/make-holo.mjs)
+                                          #   rising "+" crosses in holo_heal's green/mint, sprite particle_heal_cross.vtex from tools/materials/make-holo.mjs)
                                           #   Write the editor source format, not resourceinfo's compiled dump — see the comments in boost_trail.vpcf;
                                           #   compile with resourcecompiler.exe (-f) like Panorama
 models/melon_racer/melon/melon.vmdl      # the melon as our own copy: CS2's italy_food_melon decompiled (melon.dmx mesh, same sphere collision,
                                           #   prop_data and break pieces; its fixed mass 2.0 added by hand — the decompiler drops mass_override), material remapped to materials/melon_racer/melon/melon_default.vmat —
                                           #   the base for melon skins (no SetMaterialGroup in cs_script: one .vmdl per skin, swapped by SetModel)
-tools/make-melon-skins.mjs               # the melon skins (gold, football, golf — dimples as a tangent-space normal map —, honey (the yellow honey melon's net), camo, strawberry (seeds in pits, calyx), pumpkin (ribs, a carved face glowing through a self-illum mask), pineapple (fruitlets on the Fibonacci spiral, bracts), zebra (warped stripes, fur); SKINS list): recolors melon_default_color.png (same UVs, same stripes) or paints
-                                          #   by place on the melon (`surface`: melon.dmx's triangles drawn into texture space, via test/helpers/vmap.mjs) into
-                                          #   materials/melon_racer/melon/melon_<skin>.vmat (+ textures; tint 0, paint doesn't change them) and
-                                          #   models/melon_racer/melon/melon_<skin>.vmdl (melon.vmdl, material remapped) — add a skin there, re-run, compile
-tools/bin/                               # downloaded tools, gitignored: source2viewer/Source2Viewer-CLI.exe (ValveResourceFormat 20.0) decompiles game assets
-                                          #   (-i game/csgo/pak01_dir.vpk -f <path> -d -o <out> --game game/csgo/gameinfo.gi; .vmat fails on new shaders — read -b DATA instead)
 materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/, melon/ (melon skins),
-                                          #   logo/ (logo_text_*), podium/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
+                                          #   logo/ (logo_text_*), podium/, bouncer/, buffer_stop/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
                                           #   checkpoint_gate/ — a new material goes into the fitting one, never loose in materials/melon_racer/
 materials/melon_racer/decals/*_decal.vmat # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
 ```
@@ -413,6 +424,21 @@ examples — read these instead of guessing signatures:
   generated files directly. `point_script.d.ts`/`src/tsconfig.json` give
   editors type-checking against the real API; keep them in sync if Valve
   updates the demo addon's copies.
+- **Models stay cheap — watch the polygon count.** Every model a `tools/`
+  generator builds (or one brought in from outside) gets as few triangles
+  as it needs to read right at play distance: tessellation (sides around a
+  tube, rings along it, sphere subdivisions) is a named constant at the top
+  of the generator, set to the lowest value that still looks round, not
+  the smoothest. Props placed many times stay in the hundreds of triangles
+  (the ball-pit ball: 320); a single decorative set piece in the low
+  thousands at most (the foam bouncer: ~3.3k). Collision is a separate,
+  much coarser mesh or a primitive (sphere, capsule), never the render
+  mesh. Every generator prints its triangle count — check it, and say it
+  when handing over a model.
+- **Material/model sources are plain ASCII** (`.vmat`, `.vmdl`, `.obj`, `.smd`,
+  comments included): one non-ASCII character such as a "—" compiles "OK"
+  but renders as the error checkerboard. `WriteAddonFile` (`tools/lib/model.mjs`)
+  refuses them, `test/map/asset-ascii.test.mjs` checks every file.
 - **Pure logic goes in the feature's `logic.js` (or `<topic>-logic.js`),
   with tests.** Game rules that are just math/state transitions (no traces,
   entities, HUD calls) live in those files, which — like every

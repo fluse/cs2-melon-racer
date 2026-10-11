@@ -1,18 +1,18 @@
-// Renders the Melon Racer logo — `node tools/make-logo.mjs`: a watermelon
+// Renders the Melon Racer logo — `node tools/images/make-logo.mjs`: a watermelon
 // slice seen from the side (like the 🍉 emoji) behind a slanted red banner
 // reading MELON RACER, on transparent, into
 // panorama/images/custom_game/logo_melon_racer.png (846x295, the size the
 // intro screen's CSS and the GitHub page expect). That PNG is the source for
 // everything else: the user menu and intro screen show it, site/build.mjs
-// copies it, and tools/make-decal.mjs turns it into the map decal — re-run
+// copies it, and tools/materials/make-decal.mjs turns it into the map decal — re-run
 // that after this. The logo is the SVG below; the banner's font is Bungee
-// (tools/fonts/, SIL Open Font License), rendered with @resvg/resvg-js.
+// (tools/lib/fonts/, SIL Open Font License), rendered with @resvg/resvg-js.
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Resvg } from "@resvg/resvg-js";
 
-const OUT = new URL("../panorama/images/custom_game/logo_melon_racer.png", import.meta.url);
-const FONT = fileURLToPath(new URL("./fonts/Bungee-Regular.ttf", import.meta.url));
+const OUT = new URL("../../panorama/images/custom_game/logo_melon_racer.png", import.meta.url);
+const FONT = fileURLToPath(new URL("../lib/fonts/Bungee-Regular.ttf", import.meta.url));
 const WIDTH = 846;
 const HEIGHT = 295;
 

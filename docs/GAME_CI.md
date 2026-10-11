@@ -16,12 +16,16 @@ reuse a color for something with a different meaning.
 
 ## Where it's used
 
-- **Podium** (`tools/make-podium-model.mjs`): 1st place in checkpoint gold,
+- **Podium** (`tools/models/make-podium-model.mjs`): 1st place in checkpoint gold,
   2nd in heal cyan, 3rd in start magenta (top plate and glowing number);
   the band under each plate in guide green.
-- **Melon skins** (`tools/make-melon-skins.mjs`): gold is one plain,
+- **Melon skins** (`tools/materials/make-melon-skins.mjs`): gold is one plain,
   faintly glowing metal gold (`#FFC456`), not checkpoint gold; camo is off-palette on
   purpose.
+- **Foam bouncer** (`tools/models/make-bouncer-model.mjs`): pink foam, lime cap —
+  off-palette on purpose, a playground decoration, not a guide line.
+- **Buffer stop** (`tools/models/make-buffer-stop-model.mjs`): signal red beam, white
+  chevron, grey steel — off-palette on purpose, warning colors for an obstacle.
 
 ## Not on the palette yet
 
@@ -30,8 +34,8 @@ onto it when you're working on them anyway:
 
 | Where | Color now | Probably meant |
 |---|---|---|
-| Checkpoint gate model's glow strips (`tools/make-checkpoint-model.mjs`, `GLOW_COLOR`) | `#AAFF33` | Checkpoint gold or guide green |
-| 3D logo outline (`tools/make-logo-model.mjs`, `OUTLINE_COLOR`) | `#AAFF33` | Guide green |
-| Holo gate gradient (`tools/make-holo.mjs`, `GRADIENT`) | `#39FF14` → `#AA28FF` | — |
-| Heal holo gradient (`tools/make-holo.mjs`, `HEAL_GRADIENT`) | `#28FF6E` → `#6EFFD7` | Heal cyan |
+| Checkpoint gate model's glow strips (`tools/models/make-checkpoint-model.mjs`, `GLOW_COLOR`) | `#AAFF33` | Checkpoint gold or guide green |
+| 3D logo outline (`tools/models/make-logo-model.mjs`, `OUTLINE_COLOR`) | `#AAFF33` | Guide green |
+| Holo gate gradient (`tools/materials/make-holo.mjs`, `GRADIENT`) | `#39FF14` → `#AA28FF` | — |
+| Heal holo gradient (`tools/materials/make-holo.mjs`, `HEAL_GRADIENT`) | `#28FF6E` → `#6EFFD7` | Heal cyan |
 | HUD gold (`speedometer.css`, e.g. `.UserMenuButtonGold`) | `#FFD84D` | Checkpoint gold |

@@ -1,4 +1,4 @@
-// Generates the melon skins — `node tools/make-melon-skins.mjs`: a skin is
+// Generates the melon skins — `node tools/materials/make-melon-skins.mjs`: a skin is
 // one plain surface (gold) or painted by place on the melon's 3D surface
 // (football, golf, honey, camo — see WriteSurfacePng), so shapes and
 // noise run on across the texture's two discs without a seam; camo also
@@ -11,11 +11,11 @@
 // no longer be gold. The outline glow still shows the paint color.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DecodePng, EncodePng } from "./png.mjs";
-import { SolidPng, VmatText, WriteAddonFile } from "./model.mjs";
-import { ReadDmxElements } from "../test/helpers/vmap.mjs";
+import { DecodePng, EncodePng } from "../lib/png.mjs";
+import { SolidPng, VmatText, WriteAddonFile } from "../lib/model.mjs";
+import { ReadDmxElements } from "../../test/helpers/vmap.mjs";
 
-const GENERATOR = "tools/make-melon-skins.mjs";
+const GENERATOR = "tools/materials/make-melon-skins.mjs";
 const MAT_DIR = "materials/melon_racer/melon";
 const MODEL_DIR = "models/melon_racer/melon";
 const BASE_MATERIAL = `${MAT_DIR}/melon_default.vmat`;
@@ -29,8 +29,8 @@ const SIZE = 1024;
 // 3 = 9 samples averaged, smooth edges on hard shapes.
 const SUPERSAMPLE = 3;
 
-const source = DecodePng(readFileSync(new URL(`../${MAT_DIR}/melon_default_color.png`, import.meta.url)));
-const baseModel = readFileSync(new URL(`../${MODEL_DIR}/melon.vmdl`, import.meta.url), "utf8");
+const source = DecodePng(readFileSync(new URL(`../../${MAT_DIR}/melon_default_color.png`, import.meta.url)));
+const baseModel = readFileSync(new URL(`../../${MODEL_DIR}/melon.vmdl`, import.meta.url), "utf8");
 
 const clamp01 = v => Math.min(1, Math.max(0, v));
 const byte = v => Math.round(clamp01(v) * 255);
@@ -68,7 +68,7 @@ const LIGHT = rindLumas[Math.floor(rindLumas.length * 0.95)];
 // bands near the ends) instead of by place in the texture, whose two discs
 // warp shapes.
 const mesh = (() => {
-    const elements = ReadDmxElements(fileURLToPath(new URL(`../${MODEL_DIR}/melon.dmx`, import.meta.url)));
+    const elements = ReadDmxElements(fileURLToPath(new URL(`../../${MODEL_DIR}/melon.dmx`, import.meta.url)));
     const data = elements.find(e => e.type === "DmeVertexData").attrs;
     const all = data["position$0"];
     // The melon's center and long axis (the axis of its largest extent).
@@ -820,7 +820,7 @@ const PREVIEW_LIGHT = (() => { const l = [-0.45, -0.6, 0.66], n = Math.hypot(...
  *   bumps the preview shows too (golf dimples); glowPath: a self-illumination mask, lit there regardless of shading (pumpkin face)
  */
 function WritePreview(name, colorPath, { metal = false, normalPath, glowPath } = {}) {
-    const Load = path => DecodePng(readFileSync(new URL(`../${path}`, import.meta.url)));
+    const Load = path => DecodePng(readFileSync(new URL(`../../${path}`, import.meta.url)));
     // Averages the texels one preview pixel covers (about 0.48 / PREVIEW_SIZE
     // of the texture), so fine detail (the honey melon's net) doesn't flicker.
     const Lookup = image => (u, v) => {

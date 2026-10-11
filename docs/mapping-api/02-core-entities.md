@@ -50,7 +50,7 @@ by `SetModel`, and a map ships only the models its own entities use — so
 | Zebra | `models/melon_racer/melon/melon_zebra.vmdl` |
 | Camo | `models/melon_racer/melon/melon_camo.vmdl` |
 
-A new skin: add it to `SKINS` in `tools/make-melon-skins.mjs` (run it,
+A new skin: add it to `SKINS` in `tools/materials/make-melon-skins.mjs` (run it,
 compile), to `MELON_SKINS`, as a `usermenu_skin_<key>` button in
 `speedometer.xml`, and put its model in the map.
 

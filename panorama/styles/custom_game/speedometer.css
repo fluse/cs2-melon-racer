@@ -243,7 +243,7 @@
 
 /* Hub "start the Grand Prix" window (hud/hub-modal/) — shown while a kart
    stands in hub_start_trigger: kicker + title, the heats as route cards
-   (icons from tools/make-route-icons.mjs), who rides along as
+   (icons from tools/images/make-route-icons.mjs), who rides along as
    name chips, one big start button. .WaitingForOthers (a heat is running)
    swaps it all for a waiting message, or the moderator's abort button. */
 .HubModal {
@@ -1562,7 +1562,7 @@
 /* Melon Racer logo after picking a team, before the melon spawns — full
    screen, so the frozen first-person view behind it doesn't show. Fades out
    as the melon appears. Solid dark rind green (no alpha), behind the logo's
-   melon slice and red banner (tools/make-logo.mjs). */
+   melon slice and red banner (tools/images/make-logo.mjs). */
 .IntroLogo {
     width: 100%;
     height: 100%;

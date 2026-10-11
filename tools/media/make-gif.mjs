@@ -1,5 +1,5 @@
 // Turns a recorded video (OBS .mkv/.mp4, ...) into an animated GIF for the
-// Steam Workshop page / README — `node tools/make-gif.mjs [video] [options]`.
+// Steam Workshop page / README — `node tools/media/make-gif.mjs [video] [options]`.
 // Needs ffmpeg (`winget install Gyan.FFmpeg`); no npm dependencies.
 //
 // Without a video argument it takes the newest recording in ~/Videos/OBS.
@@ -22,7 +22,7 @@ import { homedir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ADDON_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const ADDON_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DEFAULT_OUT_DIR = join(ADDON_DIR, "docs", "gifs");
 const RECORDINGS_DIR = join(homedir(), "Videos", "OBS");
 const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".mov", ".webm", ".avi"];

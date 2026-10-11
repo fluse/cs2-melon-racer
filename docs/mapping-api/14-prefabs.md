@@ -31,7 +31,7 @@ A route prefab's **file name is the route's name** in the hub window's heat
 cards (`route_side_slice.vmap` → "SIDE SLICE"), and a keyword in it picks
 the card's icon (aqueduct, truss bridge, melon wedge; a checkered flag for any
 other — `ROUTE_ICONS` in the tool). Both are generated: after adding or
-renaming a route, run `node tools/make-route-icons.mjs` (`npm test` fails
+renaming a route, run `node tools/images/make-route-icons.mjs` (`npm test` fails
 on a track without them).
 
 A route prefab holds one whole track, so it's placed **once**: the track

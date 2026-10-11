@@ -374,7 +374,7 @@ moves along so the next checkpoint stays in view, with "…" at the cut-off
 ends. Below it "LAP 1/3", only on tracks with more than one lap. The
 checkpoint count (and the laps-to-win count used by the flow below) comes
 from that track's trigger names — see "Hub → race → next-track flow".
-Flag icons: `tools/make-icons.mjs` (`track-start`, `track-finish`); rule:
+Flag icons: `tools/images/make-icons.mjs` (`track-start`, `track-finish`); rule:
 `hud/track/logic.js` (`test/hud/checkpoint-strip.test.mjs`), applied
 in `hud/`.
 
@@ -432,7 +432,7 @@ run by `race/heat/`):
    `hud/hub-modal/logic.js` (`test/hud/hub-modal.test.mjs`). The icons
    (`panorama/images/custom_game/routes/route_<trackId>.png`) and route
    names (`hud/hub-modal/routes.js`, from the route prefab's file name) are
-   generated from the .vmap by `tools/make-route-icons.mjs` — re-run it after
+   generated from the .vmap by `tools/images/make-route-icons.mjs` — re-run it after
    adding or renaming a route (`test/map/route-icons.test.mjs` fails on a track
    without them). Clicking the button only starts
    a heat if the phase is still `HUB`. `hub_enter`/`hub_leave` are accepted
@@ -1050,7 +1050,7 @@ broken while the player picks one gets it on the respawn. **Paint and
 skins:** a paint trigger or swatch still sets the paint color, but the
 skins' materials don't take it (a red gold melon wouldn't be gold) — only
 the plain melon is tinted; the outline glow shows the paint color on every
-skin. The materials and models come from `tools/make-melon-skins.mjs`;
+skin. The materials and models come from `tools/materials/make-melon-skins.mjs`;
 each skin model has to be used somewhere in the map, or the map doesn't
 ship it ([Mapping API: melon skins](docs/mapping-api/02-core-entities.md#melon-skins)).
 Rules: `kart/skin-logic.js` (`test/kart/skin-logic.test.mjs`), applied by
@@ -1128,7 +1128,7 @@ zone plays the `particle_health_template` point_template's particle effect
 on the melon, riding along with it (`HEAL_PARTICLE_LIFETIME`; not for broken
 or race-locked melons). That effect is `particles/melon_racer/heal_crosses.vpcf`:
 a burst of glowing "+" crosses rising off the melon, the same crosses and
-green/mint as the `holo_heal` gate material (`tools/make-holo.mjs`), all
+green/mint as the `holo_heal` gate material (`tools/materials/make-holo.mjs`), all
 gone within the 2 s lifetime. All particle effects (break burst, PERFECT spark,
 heal) are spawned through `src/melon_drive/fx/particles.js`
 (`test/fx/particles.test.mjs`).

@@ -1,5 +1,5 @@
 // "ATTACK FOR BOOST" lettering as a decal/overlay. Textures come from
-// rawDecals/AttackForBoost.jpg via `node tools/make-decal.mjs` — re-run that after
+// rawDecals/AttackForBoost.jpg via `node tools/materials/make-decal.mjs` - re-run that after
 // changing the image.
 
 Layer0

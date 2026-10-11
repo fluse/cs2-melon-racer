@@ -1,4 +1,4 @@
-// Generates a ball-pit ball — `node tools/make-ball-model.mjs`: a light
+// Generates a ball-pit ball — `node tools/models/make-ball-model.mjs`: a light
 // physics ball in the inflatable vinyl (materials/melon_racer/surfaces/
 // inflatable.vmat from make-inflatable.mjs — run that first), white, so each
 // placed prop_physics gets its color from its render color. Writes
@@ -8,7 +8,7 @@
 //                                 collision (cheaper than any mesh), MASS_KG
 // Compile the .vmdl with resourcecompiler (see the end of the output).
 // Origin in the ball's center.
-import { WriteAddonFile } from "./model.mjs";
+import { WriteAddonFile } from "../lib/model.mjs";
 
 const RADIUS = 10; // units — a bit bigger than the melon (~7)
 const SUBDIVISIONS = 2; // 320 triangles: round at play distance, cheap with many balls
@@ -20,7 +20,7 @@ const UV_TILE = 64; // units one repeat of the vinyl's roughness covers
 const MODEL_DIR = "models/melon_racer";
 const NAME = "ball";
 const MATERIAL = "materials/melon_racer/surfaces/inflatable.vmat";
-const GENERATOR = "tools/make-ball-model.mjs";
+const GENERATOR = "tools/models/make-ball-model.mjs";
 
 // --- icosphere ---
 const t = (1 + Math.sqrt(5)) / 2;

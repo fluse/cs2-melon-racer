@@ -66,7 +66,7 @@ test("speedometer.xml has a heat card for every track id, each with its route im
         const card = modal[0].match(new RegExp(`<Panel id="hub_heat_${id}"[^>]*>([\\s\\S]*?)</Panel>\\s*<Label[^>]*\\{s:name\\}[\\s\\S]*?\\{s:info\\}`));
         assert.ok(card, `hub_heat_${id} with name and info`);
         assert.ok(card[1].includes(`routes/route_${id}.png`) && card[1].includes("{s:heat}"), `hub_heat_${id} shows route_${id}.png and the heat number`);
-        assert.ok(existsSync(new URL(`../../panorama/images/custom_game/routes/route_${id}.png`, import.meta.url)), `route_${id}.png exists (node tools/make-route-icons.mjs)`);
+        assert.ok(existsSync(new URL(`../../panorama/images/custom_game/routes/route_${id}.png`, import.meta.url)), `route_${id}.png exists (node tools/images/make-route-icons.mjs)`);
     }
     assert.ok(!layout.includes(`id="hub_heat_${MAX_TRACKS + 1}"`), "no card the script never fills");
 });

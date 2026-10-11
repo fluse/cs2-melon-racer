@@ -1,6 +1,6 @@
 // Turns source PNGs into the textures of the in-game decals in
 // materials/melon_racer/decals/ (one <name>.vmat each, see DECALS) —
-// `node tools/make-decal.mjs`. Re-run after changing a source image.
+// `node tools/materials/make-decal.mjs`. Re-run after changing a source image.
 // No dependencies, like make-icons.mjs.
 //
 // - optionally keys out a checkerboard "transparency" that was baked into
@@ -20,15 +20,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const OUT_DIR = new URL("../materials/melon_racer/decals/", import.meta.url);
+const OUT_DIR = new URL("../../materials/melon_racer/decals/", import.meta.url);
 // Raw decal images are dropped into rawDecals/; once their decal textures
 // are written they're moved to rawDecals/done/ (with their
 // _transparent.png), so rawDecals/ only holds what's still to do.
-const RAW_DIR = new URL("../rawDecals/", import.meta.url);
-const RAW_DONE_DIR = new URL("../rawDecals/done/", import.meta.url);
+const RAW_DIR = new URL("../../rawDecals/", import.meta.url);
+const RAW_DONE_DIR = new URL("../../rawDecals/done/", import.meta.url);
 // source: path relative to this file; raw: file name in rawDecals/ (or done/).
 const DECALS = [
-    { source: "../panorama/images/custom_game/logo_melon_racer.png", name: "logo_melon_racer_decal" },
+    { source: "../../panorama/images/custom_game/logo_melon_racer.png", name: "logo_melon_racer_decal" },
     // Exported with a gray checkerboard painted in instead of real alpha.
     { raw: "PressUse.png", name: "press_use_decal", keyCheckerboard: true },
     { raw: "Jump.png", name: "jump_decal", keyCheckerboard: true },

@@ -1,5 +1,5 @@
 // The hub window's route cards are generated from the map by
-// tools/make-route-icons.mjs (icon images + route names): every
+// tools/images/make-route-icons.mjs (icon images + route names): every
 // track in maps/melon_racer.vmap must have both, or the tool wasn't re-run
 // after adding a route.
 import { test } from "node:test";
@@ -16,7 +16,7 @@ const trackIds = ReadVmapEntities(vmapPath)
     .filter(Boolean)
     .map(Number);
 
-test("every track has a route name and an icon — else run node tools/make-route-icons.mjs", () => {
+test("every track has a route name and an icon — else run node tools/images/make-route-icons.mjs", () => {
     assert.ok(trackIds.length > 0, "sanity: found the tracks");
     const missing = trackIds
         .filter((id) => !ROUTE_NAMES[id] || !existsSync(new URL(`../../panorama/images/custom_game/routes/route_${id}.png`, import.meta.url)))

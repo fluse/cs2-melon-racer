@@ -1,14 +1,14 @@
 // Generates the user menu's icons (white on transparent, 64x64 PNGs) into
-// panorama/images/custom_game/icons/ — `node tools/make-icons.mjs`. Each
+// panorama/images/custom_game/icons/ — `node tools/images/make-icons.mjs`. Each
 // icon is a few signed-distance shapes (union = min, cut = max(a, -b)) on a
 // 64x64 grid, y down, rasterized with 4x4 supersampling. No dependencies,
 // so tweaking an icon is editing its shapes below and re-running this.
 import { writeFileSync, mkdirSync } from "node:fs";
-import { EncodePng } from "./png.mjs";
+import { EncodePng } from "../lib/png.mjs";
 
 const SIZE = 64;
 const SUPERSAMPLE = 4;
-const OUT_DIR = new URL("../panorama/images/custom_game/icons/", import.meta.url);
+const OUT_DIR = new URL("../../panorama/images/custom_game/icons/", import.meta.url);
 
 // --- shapes: each returns (x, y) => signed distance (negative inside) ---
 

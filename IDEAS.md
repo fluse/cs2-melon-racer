@@ -9,6 +9,13 @@
 - Friction Areas
 - Magnete
 
+# Route Ideen
+- Flipper Tisch, auf dem man als erstes ins ziel gebounced werden muss.
+
+# Obstacles
+- Bahnstopper
+- Flipper Ball Bounce
+
 # Scoreboard
 - In Game 3D
     - auf jeder Strecke ein eigenes Scoreboard mit den temporären Zeiten, die aller spieler, die die strecke gefahren sind und jeweils auch nur die beste zeit. Sortiert schnellste oben, langsamste unten.

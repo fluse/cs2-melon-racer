@@ -44,7 +44,7 @@ export const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
 // --- Skins: the melon's model, picked in the user menu (kart/skin.js). ---
 
 // Every skin is its own .vmdl — the same mesh, collision and break pieces
-// with another material (tools/make-melon-skins.mjs) — since cs_script can't
+// with another material (tools/materials/make-melon-skins.mjs) — since cs_script can't
 // switch material groups, only SetModel. Each one has to be used somewhere
 // in the .vmap too (the default by melon_template, the others e.g. by a
 // prop in the hub), or the map doesn't ship it (test/map/map-skins.test.mjs).

@@ -17,8 +17,8 @@ const usedModels = new Set(entities.map((e) => String(e.model ?? "").replaceAll(
 
 test("skins: every skin's model and menu preview exist", () => {
     for (const [skin, model] of Object.entries(MELON_SKINS)) {
-        assert.ok(existsSync(addon(model)), `${skin}: ${model} is missing — run node tools/make-melon-skins.mjs`);
-        assert.ok(existsSync(addon(`panorama/images/custom_game/skins/skin_${skin}.png`)), `${skin}: its preview is missing — run node tools/make-melon-skins.mjs`);
+        assert.ok(existsSync(addon(model)), `${skin}: ${model} is missing — run node tools/materials/make-melon-skins.mjs`);
+        assert.ok(existsSync(addon(`panorama/images/custom_game/skins/skin_${skin}.png`)), `${skin}: its preview is missing — run node tools/materials/make-melon-skins.mjs`);
     }
 });
 

@@ -1,5 +1,5 @@
 // Builds the checkpoint gate's frame as a 3D model for Hammer —
-// `node tools/make-checkpoint-model.mjs`: two dark pillars on light feet with
+// `node tools/models/make-checkpoint-model.mjs`: two dark pillars on light feet with
 // glowing lime strips down every side (so they read in a side-view zone too,
 // where the gate is seen edge-on), a beam across with a glowing strip front
 // and back, and a glowing diamond floating above its middle — the
@@ -16,7 +16,7 @@
 // _color.png. Compile the .vmdl files with resourcecompiler (see the end of
 // the output). Origin on the floor in the middle of the gate, the pillars on
 // either side along Y, the melon driving through along X.
-import { ChamferedRect, Mesh, ObjText, SolidPng, VmatText, VmdlText, WriteAddonFile } from "./model.mjs";
+import { ChamferedRect, Mesh, ObjText, SolidPng, VmatText, VmdlText, WriteAddonFile } from "../lib/model.mjs";
 
 // pillarY: pillar centers, ±; beamBottom: the beam's underside; detail: scales
 // every other measure (pillar and beam thickness, feet, strips, diamond).
@@ -32,7 +32,7 @@ const GLOW_BRIGHTNESS = 2;
 const MATERIAL_NAME = "checkpoint_gate";
 const MODEL_DIR = "models/melon_racer";
 const MATERIAL_DIR = "materials/melon_racer/checkpoint_gate";
-const GENERATOR = "tools/make-checkpoint-model.mjs";
+const GENERATOR = "tools/models/make-checkpoint-model.mjs";
 
 const Shape = outer => [{ outer, holes: [] }];
 

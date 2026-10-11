@@ -1,6 +1,6 @@
 // The hub's "Start Grand Prix" window (hud/hub-modal/hub-modal.js). Its
 // heat cards are "hub_heat_<trackId>" for every track id up to MAX_TRACKS,
-// each with its route's icon from tools/make-route-icons.mjs.
+// each with its route's icon from tools/images/make-route-icons.mjs.
 
 // This many rows in its racer list, "hub_racer_0" .. "hub_racer_{N-1}" in
 // speedometer.xml (add/remove them there when changing the count). With

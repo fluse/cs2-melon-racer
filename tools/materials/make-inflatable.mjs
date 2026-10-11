@@ -1,4 +1,4 @@
-// Generates the material of an inflatable pool mattress — `node tools/make-inflatable.mjs`:
+// Generates the material of an inflatable pool mattress — `node tools/materials/make-inflatable.mjs`:
 // no shapes of its own (tubes, seams come from the geometry), only how the
 // vinyl reflects: smooth, glossy, not metallic, with a faint, broad
 // unevenness in the gloss so highlights don't look perfectly CG. The color
@@ -8,8 +8,8 @@
 //   materials/melon_racer/surfaces/inflatable.vmat
 //   materials/melon_racer/surfaces/inflatable_{color,rough}.png
 // The roughness map tiles both ways.
-import { EncodePng } from "./png.mjs";
-import { VmatText, WriteAddonFile } from "./model.mjs";
+import { EncodePng } from "../lib/png.mjs";
+import { VmatText, WriteAddonFile } from "../lib/model.mjs";
 
 const SIZE = 512;
 // Glossy: the vinyl visibly reflects its surroundings (the area's baked
@@ -26,7 +26,7 @@ const WAVES = [
     { x: 2, y: 5, weight: 0.35, phase: 0.35 },
     { x: 7, y: 4, weight: 0.2, phase: 0.9 },
 ];
-const GENERATOR = "tools/make-inflatable.mjs";
+const GENERATOR = "tools/materials/make-inflatable.mjs";
 const DIR = "materials/melon_racer/surfaces";
 const NAME = "inflatable";
 

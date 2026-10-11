@@ -1,5 +1,5 @@
 // Arrow as a decal/overlay. Textures come from
-// rawDecals/Arrow.jpg via `node tools/make-decal.mjs` — re-run that after
+// rawDecals/Arrow.jpg via `node tools/materials/make-decal.mjs` - re-run that after
 // changing the image.
 
 Layer0

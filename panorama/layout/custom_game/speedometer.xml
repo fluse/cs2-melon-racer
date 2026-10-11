@@ -91,7 +91,7 @@
 		<!-- Hub "start the Grand Prix" window: shown while a kart is standing in
 		     hub_start_trigger (hud/hub-modal/). The heats it runs — a card per
 		     track, "hub_heat_<trackId>" up to MAX_TRACKS, with the route's
-		     icon from tools/make-route-icons.mjs — and who rides
+		     icon from tools/images/make-route-icons.mjs — and who rides
 		     along (HUB_RACER_ROWS chips, the viewer's own marked Self, "+N MORE"
 		     for the rest). While a heat runs (WaitingForOthers) only a waiting
 		     message, or for the moderator (IsModerator) the abort button. -->
@@ -354,7 +354,7 @@
 		     rows with an ON/OFF pill, grouped) on the right; add a new setting
 		     as another UserMenuToggle in its group. The logo is last in the
 		     wrapper so it draws over the card's top edge; icons come from
-		     tools/make-icons.mjs. -->
+		     tools/images/make-icons.mjs. -->
 		<Panel id="user_menu" class="UserMenu Hidden" hittest="false">
 			<!-- Full-screen holo scanlines behind the menu (see
 			     .UserMenuScanlines): 40 rows x 10 = 400 lines, then the
@@ -471,7 +471,7 @@
 								<Button id="usermenu_color_black" class="ColorSwatch ColorSwatchBlack" />
 							</Panel>
 							<!-- Skins: one button per MELON_SKINS key (kart/constants.js), three per row (fill a short last row with
-							     <Panel class="SkinButton SkinSlotEmpty" hittest="false" /> so its buttons keep their width), the current one SkinSelected (UpdateSkinHud). Previews from tools/make-melon-skins.mjs. Saved per player name (kart/skin.js). -->
+							     <Panel class="SkinButton SkinSlotEmpty" hittest="false" /> so its buttons keep their width), the current one SkinSelected (UpdateSkinHud). Previews from tools/materials/make-melon-skins.mjs. Saved per player name (kart/skin.js). -->
 							<Panel class="UserMenuSkinRow">
 								<Button id="usermenu_skin_default" class="SkinButton">
 									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_default.png" />

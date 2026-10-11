@@ -1,8 +1,8 @@
 // The melon's own skin: a copy of CS2's models/food/fruits/watermelon01a.vmat
 // (rebuilt from its compiled parameters, color texture decompiled with
 // Source2Viewer-CLI). The normal map is our own, 1024x1024: the rind's
-// stripes and grain (WriteRindNormal in tools/make-melon-skins.mjs); the
-// decompiled 256x256 one barely showed. New skins: tools/make-melon-skins.mjs.
+// stripes and grain (WriteRindNormal in tools/materials/make-melon-skins.mjs); the
+// decompiled 256x256 one barely showed. New skins: tools/materials/make-melon-skins.mjs.
 // Keep this file plain ASCII: a non-ASCII character in a comment here made
 // the material show the error checkerboard in Hammer and in-game, although
 // resourcecompiler reported no error.

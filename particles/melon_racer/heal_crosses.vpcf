@@ -5,7 +5,7 @@
 	// Heal: a burst of glowing "+" crosses popping up around the melon and
 	// rising off it — the crosses of the holo_heal gate texture, same shape
 	// (materials/melon_racer/particles/particle_heal_cross.vtex, from
-	// tools/make-holo.mjs) and the same green → mint colors.
+	// tools/materials/make-holo.mjs) and the same green → mint colors.
 	// Script-driven: the info_particle_system in particle_health_template
 	// (heal/effect.js) is spawned on the melon, parented to it, started on
 	// entering a heal zone and removed after HEAL_PARTICLE_LIFETIME (2 s) —

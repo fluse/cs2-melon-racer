@@ -1,5 +1,5 @@
 // Generates the tileable zigzag hologram texture used by
-// materials/melon_racer/holo/holo_zigzag.vmat — `node tools/make-holo.mjs`.
+// materials/melon_racer/holo/holo_zigzag.vmat — `node tools/materials/make-holo.mjs`.
 // The animation isn't in the texture: the material scrolls it
 // (g_vTexCoordScrollSpeed / g_vSelfIllumScrollSpeed), so the pattern only has
 // to tile seamlessly. No dependencies, like make-icons.mjs.
@@ -13,13 +13,13 @@
 // holo_heal_{color,trans,illum}.png for holo_heal.vmat and
 // holo_checkpoint_{color,trans,illum}.png for holo_checkpoint.vmat (see below).
 //
-// `node tools/make-holo.mjs <name>` (e.g. holo_dashes) writes only that
+// `node tools/materials/make-holo.mjs <name>` (e.g. holo_dashes) writes only that
 // texture set and leaves the others' PNGs untouched.
 import { writeFileSync, mkdirSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 
-const OUT_DIR = new URL("../materials/melon_racer/holo/", import.meta.url);
-const PARTICLE_DIR = new URL("../materials/melon_racer/particles/", import.meta.url); // the heal cross sprite
+const OUT_DIR = new URL("../../materials/melon_racer/holo/", import.meta.url);
+const PARTICLE_DIR = new URL("../../materials/melon_racer/particles/", import.meta.url); // the heal cross sprite
 const ONLY = process.argv[2];
 
 /** Writes <name>_{color,trans,illum}.png, unless another name was asked for. */
@@ -357,7 +357,7 @@ WriteSet(HEAL_NAME, SIZE, SIZE, healColor, healTrans, healIllum);
 // the same cross (CrossDistance, same size), alone and centered, white — the
 // particle's color tints it, so the particle picks the heal gradient's colors.
 // Opacity in alpha: bright outline, HEAL_FILL inside, glow outwards; the
-// renderer is additive. `node tools/make-holo.mjs particle_heal_cross`.
+// renderer is additive. `node tools/materials/make-holo.mjs particle_heal_cross`.
 
 const SPRITE_NAME = "particle_heal_cross";
 const SPRITE_SIZE = 128; // power of two; the cross (60 px) + glow fits with room to spare

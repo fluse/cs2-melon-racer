@@ -1,5 +1,5 @@
 // "JUMP" lettering as a decal/overlay. Textures come from
-// rawDecals/Jump.png via `node tools/make-decal.mjs` — re-run that after
+// rawDecals/Jump.png via `node tools/materials/make-decal.mjs` - re-run that after
 // changing the image.
 
 Layer0

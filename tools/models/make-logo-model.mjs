@@ -1,5 +1,5 @@
-// Builds the logo lettering as mesh geometry for Hammer — `node tools/make-logo-model.mjs`:
-// MELON RACER in Bungee (tools/fonts/, like the logo), slanted like the
+// Builds the logo lettering as mesh geometry for Hammer — `node tools/models/make-logo-model.mjs`:
+// MELON RACER in Bungee (tools/lib/fonts/, like the logo), slanted like the
 // logo's banner, extruded into solid letters (FACE_COLOR) standing in a lime
 // green outline — the letters grown by OUTLINE_WIDTH and merged, like the
 // logo's text stroke. The letters' fronts get an opaque copy of a holo
@@ -17,9 +17,9 @@
 // read correctly looking at its front (+X as imported).
 import { readFileSync } from "node:fs";
 import ClipperLib from "clipper-lib";
-import { BUNGEE, Clean, LoadFont, TextShapes } from "./font.mjs";
-import { Area, DmxText, Mesh, SolidPng, VmatText, WriteAddonFile } from "./model.mjs";
-import { DecodePng, EncodePng } from "./png.mjs";
+import { BUNGEE, Clean, LoadFont, TextShapes } from "../lib/font.mjs";
+import { Area, DmxText, Mesh, SolidPng, VmatText, WriteAddonFile } from "../lib/model.mjs";
+import { DecodePng, EncodePng } from "../lib/png.mjs";
 
 const TEXT = "MELON RACER";
 const CAP_HEIGHT = 64; // units, height of a capital letter
@@ -41,11 +41,11 @@ const LETTER_RAISE = 3; // units the letters stand out in front of the outline
 // and the thin dashes break up into sparkle from any distance.
 const UV_TILE = 256;
 // The holo material the letters' fronts copy ("" = plain FACE_COLOR fronts):
-// its textures are <name>_{color,trans,illum}.png next to it (tools/make-holo.mjs).
+// its textures are <name>_{color,trans,illum}.png next to it (tools/materials/make-holo.mjs).
 const HOLO_SOURCE = "materials/melon_racer/holo/holo_dashes.vmat";
 const FACE_COLOR = [0x1f, 0x24, 0x2b]; // the letters' body, and the holo's glass: dark, so the glowing dashes stand out
 // Swaps colors in the copied holo: every holo pixel is a mix of its gradient's
-// two colors (GRADIENT in tools/make-holo.mjs) and white (the dash cores), so
+// two colors (GRADIENT in tools/materials/make-holo.mjs) and white (the dash cores), so
 // mapping those three (white stays) recolors it exactly. Only the logo's copy.
 const HOLO_RECOLOR = [
     { from: [57, 255, 20], to: [57, 255, 20] }, // toxic green, kept
@@ -138,7 +138,7 @@ mesh.Extrude(outline, -DEPTH / 2, DEPTH / 2, "outline");
 const front = DEPTH / 2 + (outline.length ? LETTER_RAISE : 0);
 mesh.Extrude(letters, -DEPTH / 2, front, "face", "x", HOLO_SOURCE ? "holo" : "face");
 
-const GENERATOR = "tools/make-logo-model.mjs";
+const GENERATOR = "tools/models/make-logo-model.mjs";
 const materials = {
     face: `${MATERIAL_DIR}/${NAME}_face.vmat`,
     outline: `${MATERIAL_DIR}/${NAME}_outline.vmat`,
@@ -174,7 +174,7 @@ function WriteOpaqueHolo() {
     const Recolor = rgb => M.map(row => row[0] * rgb[0] + row[1] * rgb[1] + row[2] * rgb[2]);
 
     const base = HOLO_SOURCE.replace(/\.vmat$/, "");
-    const Load = suffix => DecodePng(readFileSync(new URL(`../${base}_${suffix}.png`, import.meta.url)));
+    const Load = suffix => DecodePng(readFileSync(new URL(`../../${base}_${suffix}.png`, import.meta.url)));
     const color = Load("color"), trans = Load("trans");
     const texture = `${MATERIAL_DIR}/${NAME}_holo_color.png`;
     WriteAddonFile(texture, EncodePng(color.width, color.height, (x, y) => {
@@ -183,7 +183,7 @@ function WriteOpaqueHolo() {
         const holo = Recolor([0, 1, 2].map(c => color.data[i * color.channels + c]));
         return [0, 1, 2].map(c => Math.round(Math.min(255, Math.max(0, FACE_COLOR[c] + (holo[c] - FACE_COLOR[c]) * a)))).concat(255);
     }));
-    const source = readFileSync(new URL(`../${HOLO_SOURCE}`, import.meta.url), "utf8");
+    const source = readFileSync(new URL(`../../${HOLO_SOURCE}`, import.meta.url), "utf8");
     // Line by line: the source has \r\n line endings (Hammer's), which trip up multiline regexes.
     const lines = source.split(/\r?\n/)
         .filter(l => !/^\s*(F_TRANSLUCENT|g_flOpacityScale|TextureTranslucency)\b|---- Translucent ----/.test(l))

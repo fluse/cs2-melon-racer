@@ -1,5 +1,5 @@
 // Builds the hub's winners' podium as mesh geometry for Hammer —
-// `node tools/make-podium-model.mjs`: three rubber steps side by side, the
+// `node tools/models/make-podium-model.mjs`: three rubber steps side by side, the
 // winner's in the middle and highest, 2nd on the viewer's left, 3rd on the
 // right. Each step has a top plate in its place's color with a glowing band
 // in the guide-line green under it, and its place number on the front in
@@ -15,8 +15,8 @@
 // (numbers) faces +X. Turned in Hammer, give the podium_spawn_<place>
 // info_targets the same yaw; the output lists their spots
 // (docs/mapping-api/05-hub.md).
-import { BUNGEE, LoadFont, TextShapes } from "./font.mjs";
-import { ChamferedRect, DmxText, Mesh, SolidPng, VmatText, WriteAddonFile } from "./model.mjs";
+import { BUNGEE, LoadFont, TextShapes } from "../lib/font.mjs";
+import { ChamferedRect, DmxText, Mesh, SolidPng, VmatText, WriteAddonFile } from "../lib/model.mjs";
 
 // y: the step's center (+Y is the viewer's right looking at the front).
 const STEP_WIDTH = 112; // units along Y, per step
@@ -47,7 +47,7 @@ const SPAWN_HEIGHT = 24; // podium_spawn_<place>: this far above the plate
 const NAME = "podium";
 const MODEL_DIR = "models/melon_racer";
 const MATERIAL_DIR = "materials/melon_racer/podium";
-const GENERATOR = "tools/make-podium-model.mjs";
+const GENERATOR = "tools/models/make-podium-model.mjs";
 
 const font = LoadFont(BUNGEE);
 const Shape = outer => [{ outer, holes: [] }];
