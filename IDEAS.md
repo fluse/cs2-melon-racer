@@ -15,6 +15,10 @@
 - Im Hub 
     - Am Route Gate ist eine Tafel die die All Time Best Times zeigt für diese Route.
 
+# Melon Skins
+- Coconut
+- Kiwi
+- paprica
 
 # MelonRacer Coop Edition
 - Schalter Rätsel
