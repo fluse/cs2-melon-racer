@@ -1,7 +1,7 @@
 // Pure rules of the per-player settings in the addon's parsed save data
 // (SAVE_DATA_PLAYER_SETTINGS_KEY): one object per player name, holding only
-// what isn't at its default. Used by kart/join-spot-logic.js and
-// kart/skin-logic.js.
+// what isn't at its default. Used by kart/join-spot-logic.js,
+// kart/skin-logic.js and kart/look-logic.js.
 import { SAVE_DATA_PLAYER_SETTINGS_KEY } from "../constants/index.js";
 
 /**

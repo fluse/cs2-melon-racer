@@ -47,15 +47,18 @@ import { predictionDotSet } from "./trace.js";
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
- *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the page (leaderboards, a developer page) the user menu shows in place of its columns, if any — see SetUserMenuPage
+ *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the page (leaderboards, a developer page) the user menu shows in place of its columns, if any — kept when it closes, so it reopens there (this session only) — see SetUserMenuPage
  *   leaderboardTab?: string, // leaderboard the user menu's leaderboards page shows (unset: the best times) — see SelectLeaderboardTab
  *   leaderboardTrack?: number, // track the leaderboards page's best times were paged to (unset: the player's own track, else the first) — see StepLeaderboardsTrack
  *   leaderboardNextUpdate?: number, leaderboardResendAt?: number, leaderboardShown?: Record<string, string>, // the leaderboards page's next rebuild, next full resend, and what it last sent — see UpdateLeaderboardsHud
+ *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud
  *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
  *   melonGlow?: boolean, // this player's melon has its outline glow (user menu toggle, on by default) — see kart/look.js
+ *   glowColor?: string | null, // the glow color this player picked (a COLOR_PRESETS key; null: none, the glow follows the paint; undefined: not read from the save data yet) — see GetMelonGlowColor
+ *   skinPage?: number, // the page of the user menu's skin grid this player paged to (unset: the one with their skin), this session only — see GetSkinPage
  *   skin?: string, // this player's melon skin (a MELON_SKINS key), read from the save data on first use — see kart/skin.js
  *   predictionLine?: boolean, // this player's prediction line is on (user menu toggle, off by default) — see fx/prediction/prediction.js
  *   predictionDots?: any[], // this kart's prediction-line dot entities, see fx/prediction/prediction.js

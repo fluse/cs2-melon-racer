@@ -464,10 +464,96 @@
 						<Panel class="UserMenuSettings">
 							<Label class="UserMenuColumnTitle" text="SETTINGS" />
 
-							<Panel class="UserMenuGroupHeader">
-								<Image class="UserMenuGroupIcon" src="file://{images}/custom_game/icons/palette.png" />
-								<Label class="UserMenuGroupLabel" text="MELON" />
+							<!-- MELON: the skins, paged — ◀ 1 / 2 ▶ right-aligned next to the title (usermenu_skinpager,
+							     shown with Paging: more than one page; UpdateSkinHud in hud/user-menu.js). -->
+							<Panel id="usermenu_skinpager" class="UserMenuSkinHeader">
+								<Panel class="UserMenuGroupHeader">
+									<Image class="UserMenuGroupIcon" src="file://{images}/custom_game/icons/palette.png" />
+									<Label class="UserMenuGroupLabel" text="MELON" />
+								</Panel>
+								<Panel class="SkinPager">
+									<Button id="usermenu_skinpage_prev" class="SkinPagerButton"><Label class="SkinPagerArrow" text="◀" /></Button>
+									<Label class="SkinPagerLabel" text="{s:skin_page}" />
+									<Button id="usermenu_skinpage_next" class="SkinPagerButton"><Label class="SkinPagerArrow" text="▶" /></Button>
+								</Panel>
 							</Panel>
+							<!-- Skins: one button per MELON_SKINS key (kart/constants.js), in its order, MELON_SKINS_PER_PAGE (9) per page
+							     (usermenu_skinpage_<page>, only the player's one shown), three per row. Every page has all three rows —
+							     fill the free places with <Panel class="SkinButton SkinSlotEmpty" hittest="false" /> so the menu keeps its
+							     height and the buttons their width. The current skin SkinSelected (UpdateSkinHud). Previews from
+							     tools/materials/make-melon-skins.mjs. Saved per player name (kart/skin.js). -->
+							<Panel id="usermenu_skinpage_0" class="UserMenuSkinPage">
+								<Panel class="UserMenuSkinRow">
+									<Button id="usermenu_skin_default" class="SkinButton">
+										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_default.png" />
+										<Label class="SkinName" text="Melon" />
+									</Button>
+									<Button id="usermenu_skin_gold" class="SkinButton">
+										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_gold.png" />
+										<Label class="SkinName" text="Gold" />
+									</Button>
+									<Button id="usermenu_skin_football" class="SkinButton">
+										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_football.png" />
+										<Label class="SkinName" text="Football" />
+									</Button>
+								</Panel>
+								<Panel class="UserMenuSkinRow">
+									<Button id="usermenu_skin_golf" class="SkinButton">
+										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_golf.png" />
+										<Label class="SkinName" text="Golf" />
+									</Button>
+									<Button id="usermenu_skin_honey" class="SkinButton">
+										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_honey.png" />
+										<Label class="SkinName" text="Honey Melon" />
+									</Button>
+									<Button id="usermenu_skin_camo" class="SkinButton">
+										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_camo.png" />
+										<Label class="SkinName" text="Camo" />
+									</Button>
+								</Panel>
+								<Panel class="UserMenuSkinRow">
+									<Button id="usermenu_skin_strawberry" class="SkinButton">
+										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_strawberry.png" />
+										<Label class="SkinName" text="Strawberry" />
+									</Button>
+									<Button id="usermenu_skin_pumpkin" class="SkinButton">
+										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_pumpkin.png" />
+										<Label class="SkinName" text="Pumpkin" />
+									</Button>
+									<Button id="usermenu_skin_pineapple" class="SkinButton">
+										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_pineapple.png" />
+										<Label class="SkinName" text="Pineapple" />
+									</Button>
+								</Panel>
+							</Panel>
+							<Panel id="usermenu_skinpage_1" class="UserMenuSkinPage Hidden">
+								<Panel class="UserMenuSkinRow">
+									<Button id="usermenu_skin_zebra" class="SkinButton">
+										<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_zebra.png" />
+										<Label class="SkinName" text="Zebra" />
+									</Button>
+									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
+									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
+								</Panel>
+								<Panel class="UserMenuSkinRow">
+									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
+									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
+									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
+								</Panel>
+								<Panel class="UserMenuSkinRow">
+									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
+									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
+									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
+								</Panel>
+							</Panel>
+							<!-- Outline glow around the player's own melon (kart/look.js). On by default. -->
+							<Button id="usermenu_glow_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Glow" />
+								<Label class="UserMenuTogglePill" text="{s:glow_state}" />
+							</Button>
+							<!-- The glow's color, one swatch per COLOR_PRESETS key (kart/constants.js), the picked one
+							     SwatchSelected (UpdateGlowColorHud). Only the glow, not the paint; switches the glow on.
+							     Without a pick the glow follows the paint (green until painted). Saved per player name. -->
 							<Panel class="UserMenuColorRow">
 								<Button id="usermenu_color_red" class="ColorSwatch ColorSwatchRed" />
 								<Button id="usermenu_color_orange" class="ColorSwatch ColorSwatchOrange" />
@@ -478,63 +564,6 @@
 								<Button id="usermenu_color_white" class="ColorSwatch ColorSwatchWhite" />
 								<Button id="usermenu_color_black" class="ColorSwatch ColorSwatchBlack" />
 							</Panel>
-							<!-- Skins: one button per MELON_SKINS key (kart/constants.js), three per row (fill a short last row with
-							     <Panel class="SkinButton SkinSlotEmpty" hittest="false" /> so its buttons keep their width), the current one SkinSelected (UpdateSkinHud). Previews from tools/materials/make-melon-skins.mjs. Saved per player name (kart/skin.js). -->
-							<Panel class="UserMenuSkinRow">
-								<Button id="usermenu_skin_default" class="SkinButton">
-									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_default.png" />
-									<Label class="SkinName" text="Melon" />
-								</Button>
-								<Button id="usermenu_skin_gold" class="SkinButton">
-									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_gold.png" />
-									<Label class="SkinName" text="Gold" />
-								</Button>
-								<Button id="usermenu_skin_football" class="SkinButton">
-									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_football.png" />
-									<Label class="SkinName" text="Football" />
-								</Button>
-							</Panel>
-							<Panel class="UserMenuSkinRow">
-								<Button id="usermenu_skin_golf" class="SkinButton">
-									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_golf.png" />
-									<Label class="SkinName" text="Golf" />
-								</Button>
-								<Button id="usermenu_skin_honey" class="SkinButton">
-									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_honey.png" />
-									<Label class="SkinName" text="Honey Melon" />
-								</Button>
-								<Button id="usermenu_skin_camo" class="SkinButton">
-									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_camo.png" />
-									<Label class="SkinName" text="Camo" />
-								</Button>
-							</Panel>
-							<Panel class="UserMenuSkinRow">
-								<Button id="usermenu_skin_strawberry" class="SkinButton">
-									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_strawberry.png" />
-									<Label class="SkinName" text="Strawberry" />
-								</Button>
-								<Button id="usermenu_skin_pumpkin" class="SkinButton">
-									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_pumpkin.png" />
-									<Label class="SkinName" text="Pumpkin" />
-								</Button>
-								<Button id="usermenu_skin_pineapple" class="SkinButton">
-									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_pineapple.png" />
-									<Label class="SkinName" text="Pineapple" />
-								</Button>
-							</Panel>
-							<Panel class="UserMenuSkinRow">
-								<Button id="usermenu_skin_zebra" class="SkinButton">
-									<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_zebra.png" />
-									<Label class="SkinName" text="Zebra" />
-								</Button>
-								<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
-								<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
-							</Panel>
-							<!-- Outline glow around the player's own melon, in its paint color, green until painted (kart/look.js). On by default. -->
-							<Button id="usermenu_glow_button" class="UserMenuToggle">
-								<Label class="UserMenuToggleName" text="Glow" />
-								<Label class="UserMenuTogglePill" text="{s:glow_state}" />
-							</Button>
 
 							<Panel class="UserMenuGroupHeader">
 								<Image class="UserMenuGroupIcon" src="file://{images}/custom_game/icons/tutorial.png" />
@@ -559,9 +588,82 @@
 
 						<Panel class="UserMenuDivider" />
 
-						<!-- Third column: developer aids and test previews. -->
+						<!-- Third column: the player's profile, then developer aids and test previews. -->
 						<Panel class="UserMenuSettings">
-							<Label class="UserMenuColumnTitle" text="DEVELOPER" />
+							<!-- PROFILE (hud/profile/): your melon big — one image per MELON_SKINS key, usermenu_profile_skin_<key>,
+							     all but your skin Hidden —, your name and skin, and one tile per STAT_SLIDES key
+							     (usermenu_profile_stat_<key>: all-time value and rank, like the leaderboards). -->
+							<Label class="UserMenuColumnTitle" text="PROFILE" />
+							<Panel id="usermenu_profile" class="UserMenuProfile">
+								<Panel class="ProfileHero">
+									<Panel class="ProfileMelon">
+										<Image id="usermenu_profile_skin_default" class="ProfileMelonImage" src="file://{images}/custom_game/skins/skin_default.png" />
+										<Image id="usermenu_profile_skin_gold" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_gold.png" />
+										<Image id="usermenu_profile_skin_football" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_football.png" />
+										<Image id="usermenu_profile_skin_golf" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_golf.png" />
+										<Image id="usermenu_profile_skin_honey" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_honey.png" />
+										<Image id="usermenu_profile_skin_camo" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_camo.png" />
+										<Image id="usermenu_profile_skin_strawberry" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_strawberry.png" />
+										<Image id="usermenu_profile_skin_pumpkin" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_pumpkin.png" />
+										<Image id="usermenu_profile_skin_pineapple" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_pineapple.png" />
+										<Image id="usermenu_profile_skin_zebra" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_zebra.png" />
+									</Panel>
+									<Panel class="ProfileIdentity">
+										<Label class="ProfileName" text="{s:profile_name}" />
+										<Label class="ProfileSkin" text="{s:profile_skin}" />
+									</Panel>
+								</Panel>
+								<Panel class="ProfileStatRow">
+									<Panel id="usermenu_profile_stat_playTime" class="ProfileStat">
+										<Label class="ProfileStatLabel" text="PLAY TIME" />
+										<Panel class="ProfileStatLine">
+											<Label class="ProfileStatValue" text="{s:value}" />
+											<Label class="ProfileStatRank" text="{s:rank}" />
+										</Panel>
+									</Panel>
+									<Panel id="usermenu_profile_stat_crashes" class="ProfileStat">
+										<Label class="ProfileStatLabel" text="CRASHES" />
+										<Panel class="ProfileStatLine">
+											<Label class="ProfileStatValue" text="{s:value}" />
+											<Label class="ProfileStatRank" text="{s:rank}" />
+										</Panel>
+									</Panel>
+								</Panel>
+								<Panel class="ProfileStatRow">
+									<Panel id="usermenu_profile_stat_finishes" class="ProfileStat">
+										<Label class="ProfileStatLabel" text="FINISHES" />
+										<Panel class="ProfileStatLine">
+											<Label class="ProfileStatValue" text="{s:value}" />
+											<Label class="ProfileStatRank" text="{s:rank}" />
+										</Panel>
+									</Panel>
+									<Panel id="usermenu_profile_stat_boostTime" class="ProfileStat">
+										<Label class="ProfileStatLabel" text="BOOST TIME" />
+										<Panel class="ProfileStatLine">
+											<Label class="ProfileStatValue" text="{s:value}" />
+											<Label class="ProfileStatRank" text="{s:rank}" />
+										</Panel>
+									</Panel>
+								</Panel>
+								<Panel class="ProfileStatRow">
+									<Panel id="usermenu_profile_stat_perfectHits" class="ProfileStat">
+										<Label class="ProfileStatLabel" text="PERFECT HITS" />
+										<Panel class="ProfileStatLine">
+											<Label class="ProfileStatValue" text="{s:value}" />
+											<Label class="ProfileStatRank" text="{s:rank}" />
+										</Panel>
+									</Panel>
+									<Panel id="usermenu_profile_stat_trialRestarts" class="ProfileStat">
+										<Label class="ProfileStatLabel" text="RESTARTS" />
+										<Panel class="ProfileStatLine">
+											<Label class="ProfileStatValue" text="{s:value}" />
+											<Label class="ProfileStatRank" text="{s:rank}" />
+										</Panel>
+									</Panel>
+								</Panel>
+							</Panel>
+
+							<Label class="UserMenuColumnTitle UserMenuColumnTitleLower" text="DEVELOPER" />
 							<!-- How ground/wall contact and jump presses are judged (dev/collision-debug.js); its drawing only shows in tools mode. -->
 							<Button id="usermenu_collisiondebug_button" class="UserMenuToggle">
 								<Label class="UserMenuToggleName" text="Collision Debug" />
@@ -1080,6 +1182,11 @@
 								<Button id="lb_tab_perfectHits" class="UserMenuActionButton UserMenuButtonPlain LeaderboardTab">
 									<Panel class="UserMenuButtonContent">
 										<Label class="UserMenuButtonLabel" text="Most Perfect Hits" />
+									</Panel>
+								</Button>
+								<Button id="lb_tab_trialRestarts" class="UserMenuActionButton UserMenuButtonPlain LeaderboardTab">
+									<Panel class="UserMenuButtonContent">
+										<Label class="UserMenuButtonLabel" text="Most Trial Restarts" />
 									</Panel>
 								</Button>
 							</Panel>

@@ -100,15 +100,18 @@ function TraceSphere(config) {
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
- *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the page (leaderboards, a developer page) the user menu shows in place of its columns, if any — see SetUserMenuPage
+ *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the page (leaderboards, a developer page) the user menu shows in place of its columns, if any — kept when it closes, so it reopens there (this session only) — see SetUserMenuPage
  *   leaderboardTab?: string, // leaderboard the user menu's leaderboards page shows (unset: the best times) — see SelectLeaderboardTab
  *   leaderboardTrack?: number, // track the leaderboards page's best times were paged to (unset: the player's own track, else the first) — see StepLeaderboardsTrack
  *   leaderboardNextUpdate?: number, leaderboardResendAt?: number, leaderboardShown?: Record<string, string>, // the leaderboards page's next rebuild, next full resend, and what it last sent — see UpdateLeaderboardsHud
+ *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud
  *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
  *   melonGlow?: boolean, // this player's melon has its outline glow (user menu toggle, on by default) — see kart/look.js
+ *   glowColor?: string | null, // the glow color this player picked (a COLOR_PRESETS key; null: none, the glow follows the paint; undefined: not read from the save data yet) — see GetMelonGlowColor
+ *   skinPage?: number, // the page of the user menu's skin grid this player paged to (unset: the one with their skin), this session only — see GetSkinPage
  *   skin?: string, // this player's melon skin (a MELON_SKINS key), read from the save data on first use — see kart/skin.js
  *   predictionLine?: boolean, // this player's prediction line is on (user menu toggle, off by default) — see fx/prediction/prediction.js
  *   predictionDots?: any[], // this kart's prediction-line dot entities, see fx/prediction/prediction.js
@@ -1101,6 +1104,7 @@ const STAT_SLIDES = [
     { key: "finishes", title: "MOST FINISHES", column: "FINISHES", format: "count" },
     { key: "boostTime", title: "LONGEST BOOST TIME", column: "BOOST", format: "duration" },
     { key: "perfectHits", title: "MOST PERFECT WALL HITS", column: "PERFECT", format: "count" },
+    { key: "trialRestarts", title: "MOST TRIAL RESTARTS", column: "RESTARTS", format: "count" },
 ];
 
 // Teleporters and the lift applied to every trigger/destination teleport target.
@@ -1187,7 +1191,8 @@ const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
 // switch material groups, only SetModel. Each one has to be used somewhere
 // in the .vmap too (the default by melon_template, the others e.g. by a
 // prop in the hub), or the map doesn't ship it (test/map/map-skins.test.mjs).
-// The key is the button's: usermenu_skin_<key> in speedometer.xml.
+// The key is the button's: usermenu_skin_<key> in speedometer.xml, in this
+// order (pages of MELON_SKINS_PER_PAGE).
 /** @type {Record<string, string>} */
 const MELON_SKINS = {
     default: "models/melon_racer/melon/melon.vmdl",
@@ -1195,13 +1200,33 @@ const MELON_SKINS = {
     football: "models/melon_racer/melon/melon_football.vmdl",
     golf: "models/melon_racer/melon/melon_golf.vmdl",
     honey: "models/melon_racer/melon/melon_honey.vmdl",
+    camo: "models/melon_racer/melon/melon_camo.vmdl",
     strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
     pumpkin: "models/melon_racer/melon/melon_pumpkin.vmdl",
     pineapple: "models/melon_racer/melon/melon_pineapple.vmdl",
     zebra: "models/melon_racer/melon/melon_zebra.vmdl",
-    camo: "models/melon_racer/melon/melon_camo.vmdl",
 };
 const MELON_SKIN_DEFAULT = "default";
+// Every skin's name as the user menu shows it: under its button in the skin
+// grid (static text in speedometer.xml) and in the profile (hud/profile/) —
+// test/hud/profile.test.mjs checks the two agree.
+/** @type {Record<string, string>} */
+const MELON_SKIN_NAMES = {
+    default: "Melon",
+    gold: "Gold",
+    football: "Football",
+    golf: "Golf",
+    honey: "Honey Melon",
+    camo: "Camo",
+    strawberry: "Strawberry",
+    pumpkin: "Pumpkin",
+    pineapple: "Pineapple",
+    zebra: "Zebra",
+};
+// Skins per page of the user menu's skin grid (3 x 3): with more, ◀ ▶ next to
+// the MELON title page through them, in MELON_SKINS order. One panel per page
+// in speedometer.xml, usermenu_skinpage_<page> (test/hud/skin-pages.test.mjs).
+const MELON_SKINS_PER_PAGE = 9;
 
 // The frozen pawn (CSMoveType.NOCLIP: non-solid, but WASD still flies it)
 // stays where it spawned — see HoldPawn in kart/spawn.js. It's only put back
@@ -1226,8 +1251,9 @@ const PAINT_TRIGGER_NAME_PATTERN = /^paint_trigger_(\d+)_(\d+)_(\d+)$/;
 const MELON_GLOW_ENABLED = true;
 const MELON_GLOW_UNPAINTED_COLOR = { r: 60, g: 255, b: 60, a: 255 };
 
-// Color swatches offered by the user menu's color picker (see the
-// "usermenu_color_<key>" buttonId handling in hud/inputs.js's OnCustomHudClicked)
+// Glow colors offered by the user menu's color swatches, under "Glow" (see
+// the "usermenu_color_<key>" buttonId handling in hud/inputs.js; they set
+// only the outline glow, not the paint — SetMelonGlowColor in kart/look.js)
 // — a fixed palette rather than a full picker since panorama's
 // CustomHudLayout only supports basic panels/buttons, not input widgets
 // like a color wheel.
@@ -1468,6 +1494,13 @@ const LEADERBOARD_ROWS = 20;
 // How often the open page is rebuilt (seconds): time on the server grows
 // every tick, but nobody needs it to the tick.
 const LEADERBOARD_UPDATE_SECONDS = 0.5;
+
+// The user menu's profile (top of its right column, see hud/profile/profile.js):
+// the player's melon big and their all-time stats.
+
+// How often the open profile is rebuilt (seconds): time on the server grows
+// every tick, but nobody needs it to the tick.
+const PROFILE_UPDATE_SECONDS = 0.5;
 
 // The hub's "Start Grand Prix" window (hud/hub-modal/hub-modal.js). Its
 // heat cards are "hub_heat_<trackId>" for every track id up to MAX_TRACKS,
@@ -3175,8 +3208,8 @@ function RecordRunTime(best, trackId, playerName, time) {
 
 // Pure rules of the per-player settings in the addon's parsed save data
 // (SAVE_DATA_PLAYER_SETTINGS_KEY): one object per player name, holding only
-// what isn't at its default. Used by kart/join-spot-logic.js and
-// kart/skin-logic.js.
+// what isn't at its default. Used by kart/join-spot-logic.js,
+// kart/skin-logic.js and kart/look-logic.js.
 
 /**
  * `playerName`'s stored value of `key` (undefined if not stored).
@@ -3351,6 +3384,28 @@ function WithSkin(saveData, playerName, skin) {
     return WithPlayerSetting(saveData, playerName, "skin", skin === MELON_SKIN_DEFAULT ? undefined : skin);
 }
 
+/** How many pages the user menu's skin grid has (MELON_SKINS_PER_PAGE each, at least one). */
+function SkinPageCount() {
+    return Math.max(1, Math.ceil(Object.keys(MELON_SKINS).length / MELON_SKINS_PER_PAGE));
+}
+
+/** The page (0-based) a skin is on, in MELON_SKINS order — the first for one that isn't a skin. @param {string} skin */
+function SkinPageOf(skin) {
+    const index = Object.keys(MELON_SKINS).indexOf(skin);
+    return index < 0 ? 0 : Math.floor(index / MELON_SKINS_PER_PAGE);
+}
+
+/** The page `direction` (-1 / +1) steps to from `page`, wrapping around. @param {number} page @param {number} direction */
+function StepSkinPage(page, direction) {
+    const count = SkinPageCount();
+    return (((page + direction) % count) + count) % count;
+}
+
+/** The pager's indicator: "2 / 3". @param {number} page */
+function SkinPageLabel(page) {
+    return `${page + 1} / ${SkinPageCount()}`;
+}
+
 // The melon's skin: each player picks one in the user menu (the MELON
 // group's skin row), kept per player name in the addon's save data like
 // "Start in Tutorial" (kart/join-spot.js). A skin is a whole model
@@ -3393,11 +3448,73 @@ function SetMelonSkin(kart, skin) {
     return true;
 }
 
+/**
+ * The page of the user menu's skin grid this player sees: the one they paged
+ * to (kept while connected), else the one with their skin.
+ * @param {Kart} kart
+ */
+function GetSkinPage(kart) {
+    const page = kart.skinPage ?? SkinPageOf(GetMelonSkin(kart));
+    return Math.min(page, SkinPageCount() - 1);
+}
+
+/** The skin grid's ◀ / ▶ (direction -1 / +1), wrapping around. @param {Kart} kart @param {number} direction */
+function StepMelonSkinPage(kart, direction) {
+    kart.skinPage = StepSkinPage(GetSkinPage(kart), direction);
+}
+
+// Pure rules of the melon's outline glow color (kart/look.js): a color
+// picked in the user menu (a COLOR_PRESETS key, saved per player name like
+// the skin), else the paint color once painted, else green. No cs_script
+// import (test/kart/look-logic.test.mjs).
+
+/** Whether `key` is one of COLOR_PRESETS. @param {unknown} key */
+function IsGlowColor(key) {
+    return typeof key === "string" && Object.prototype.hasOwnProperty.call(COLOR_PRESETS, key);
+}
+
+/**
+ * `playerName`'s glow color (a COLOR_PRESETS key) — undefined unless they
+ * picked one, also for a stored one that no longer exists.
+ * @param {Record<string, any>} saveData parsed, see ParseSaveData
+ * @param {string} playerName
+ */
+function SavedGlowColor(saveData, playerName) {
+    const key = PlayerSetting(saveData, playerName, "glowColor");
+    return IsGlowColor(key) ? key : undefined;
+}
+
+/**
+ * `saveData` with `playerName`'s glow color set (undefined: none, the glow
+ * follows the paint).
+ * @param {Record<string, any>} saveData parsed, see ParseSaveData
+ * @param {string} playerName @param {string | undefined} key
+ * @returns {Record<string, any>}
+ */
+function WithGlowColor(saveData, playerName, key) {
+    return WithPlayerSetting(saveData, playerName, "glowColor", key);
+}
+
+/**
+ * The color a melon's outline glows in: the picked glow color, else its
+ * paint color once painted, else MELON_GLOW_UNPAINTED_COLOR.
+ * @param {string | undefined} glowColor a COLOR_PRESETS key
+ * @param {boolean | undefined} painted @param {{ r: number, g: number, b: number, a: number }} paintColor
+ */
+function MelonGlowColor(glowColor, painted, paintColor) {
+    if (glowColor !== undefined && IsGlowColor(glowColor)) {
+        return COLOR_PRESETS[glowColor];
+    }
+    return painted ? paintColor : MELON_GLOW_UNPAINTED_COLOR;
+}
+
 // How a kart's melon looks while it's whole: its skin (kart/skin.js), its
-// paint color plus an outline glow in that same color — green
-// (MELON_GLOW_UNPAINTED_COLOR) until it's first painted (kart.painted) —
-// which each player can switch off for their own melon in the user menu
-// ("GLOW", kart.melonGlow). Every path that shows the melon (spawn, respawn
+// paint color (paint triggers) and an outline glow — in the glow color the
+// player picked in the user menu (its color swatches, saved per player
+// name), else in the paint color, green (MELON_GLOW_UNPAINTED_COLOR) until
+// it's first painted (kart.painted); rules in kart/look-logic.js. Each
+// player can switch the glow off for their own melon ("Glow",
+// kart.melonGlow). Every path that shows the melon (spawn, respawn
 // after a break, repaint, a new skin) goes through ShowMelonPaint;
 // a break turns the glow off with HideMelonGlow — the melon is hidden then,
 // and an outline of it floating at the crash site would give that away.
@@ -3407,7 +3524,7 @@ function ShowMelonPaint(kart) {
     ApplyMelonSkin(kart); // first: a new model could drop the color and glow set before
     kart.melon.SetColor(kart.paintColor);
     if (IsMelonGlowOn(kart)) {
-        kart.melon.Glow(kart.painted ? kart.paintColor : MELON_GLOW_UNPAINTED_COLOR);
+        kart.melon.Glow(MelonGlowColor(GetMelonGlowColor(kart), kart.painted, kart.paintColor));
     } else {
         kart.melon.Unglow();
     }
@@ -3431,10 +3548,44 @@ function SetMelonGlow(kart, on) {
 }
 
 /**
+ * This kart's glow color (a COLOR_PRESETS key; undefined: none picked, the
+ * glow follows the paint): picked this session, else saved for its player.
+ * @param {import("../core/kart-registry.js").Kart} kart
+ */
+function GetMelonGlowColor(kart) {
+    if (kart.glowColor === undefined) {
+        kart.glowColor = SavedGlowColor(ParseSaveData(Instance.GetSaveData()), PlayerName$3(kart)) ?? null;
+    }
+    return kart.glowColor ?? undefined;
+}
+
+/**
+ * The user menu's color swatches: this kart's melon glows in that color
+ * from now on (the paint stays), the glow switched on if it was off — saved
+ * for its player. Returns whether `key` is one of COLOR_PRESETS.
+ * @param {import("../core/kart-registry.js").Kart} kart @param {string} key
+ */
+function SetMelonGlowColor(kart, key) {
+    if (!IsGlowColor(key)) {
+        return false;
+    }
+    kart.glowColor = key;
+    kart.melonGlow = true;
+    // Re-read so the best times and everyone else's settings survive.
+    Instance.SetSaveData(JSON.stringify(WithGlowColor(ParseSaveData(Instance.GetSaveData()), PlayerName$3(kart), key)));
+    Debug(`SetMelonGlowColor: "${PlayerName$3(kart)}" glows ${key}`);
+    if (!kart.breaking) {
+        ShowMelonPaint(kart); // a broken melon gets it back on respawn
+    }
+    return true;
+}
+
+/**
  * Sets a kart's melon color and remembers it so it survives a break/respawn
  * (BreakMelon hides the melon entirely while broken, without losing track of
- * the color underneath — see ScheduleRespawnAfterBreak). Used by both the
- * melon_paint map trigger and the user menu's color swatches.
+ * the color underneath — see ScheduleRespawnAfterBreak). Used by the
+ * melon_paint map trigger; the user menu's swatches set the glow instead
+ * (SetMelonGlowColor).
  * @param {import("../core/kart-registry.js").Kart} kart @param {{ r: number, g: number, b: number, a: number }} color
  */
 function SetKartPaintColor(kart, color) {
@@ -5093,8 +5244,8 @@ function FormatStat(slide, value) {
 // starts from scratch). Counted here from wherever they happen — time on the
 // server (UpdateStats, every tick for every player with a melon), crashes
 // (health/breaking/), finishes (race/time-trial/), boost time
-// (movement/driving/drive.js) and PERFECT wall hits (movement/wall-bounce/,
-// movement/jump/) — and shown as the scoreboard's stat pages
+// (movement/driving/drive.js), PERFECT wall hits (movement/wall-bounce/,
+// movement/jump/) and time trial restarts (race/checkpoints/) — and shown as the scoreboard's stat pages
 // (hud/scoreboard/). Rules: race/stats/logic.js.
 
 // Read from the save data once, then kept in memory and written back every
@@ -8904,6 +9055,7 @@ function RestartTimeTrial(kart) {
     }
     CancelRun(kart);
     kart.lastRun = undefined;
+    CountStat(kart, "trialRestarts"); // the button or R — not crossing the start line again
     Debug(`RestartTimeTrial: back to the start of track ${trackId}`);
     return true;
 }
@@ -9189,6 +9341,124 @@ function StepLeaderboardsTrack(slot, kart, direction) {
 
 // The user menu's leaderboards page: one leaderboard at a time, picked by tab (see leaderboards.js).
 
+// Pure rules of the user menu's profile (hud/profile/profile.js): the
+// player's name, skin and every stat (STAT_SLIDES) with their rank, as
+// ready-to-send strings. Values and ranks come from the scoreboard's rules,
+// so they read the same as on the leaderboards. No cs_script import
+// (test/hud/profile.test.mjs).
+
+/**
+ * @typedef {{ key: string, value: string, rank: string }} ProfileStat
+ * @typedef {{ name: string, skin: string, stats: ProfileStat[] }} Profile
+ */
+
+/**
+ * The profile one player sees of themselves. A stat's rank ("#3") is among
+ * everyone with a total — saved ones of players who aren't on the map
+ * included —, ties sharing one; empty while their total is still 0.
+ * @param {{
+ *   self: { key: string, name: string },
+ *   players: { key: string, name: string }[], // everyone on the map now
+ *   skin: string, // a MELON_SKINS key
+ *   statTotals: Record<string, Record<string, number>>, // per STAT_SLIDES key, every player's total by name
+ * }} input
+ * @returns {Profile}
+ */
+function BuildProfile({ self, players, skin, statTotals }) {
+    return {
+        name: self.name,
+        skin: (MELON_SKIN_NAMES[skin] ?? MELON_SKIN_NAMES[MELON_SKIN_DEFAULT]).toUpperCase(),
+        stats: STAT_SLIDES.map((slide) => {
+            const totals = statTotals[slide.key] ?? {};
+            const board = BuildStatBoard({ slide, totals, players, self, maxRows: Infinity });
+            const row = board.rows.find((r) => r.self);
+            return {
+                key: slide.key,
+                value: FormatStat(slide, totals[self.name] ?? 0),
+                rank: row && (totals[self.name] ?? 0) > 0 ? `#${row.rank}` : "",
+            };
+        }),
+    };
+}
+
+const PANEL = "usermenu_profile";
+
+/**
+ * The user menu's profile (usermenu_profile in speedometer.xml, top of the
+ * right column): the player's own melon big — one image per skin,
+ * "usermenu_profile_skin_<key>", all but theirs Hidden —, their name and
+ * skin name, and one tile per stat ("usermenu_profile_stat_<key>": value and
+ * rank). Rebuilt every PROFILE_UPDATE_SECONDS while the menu shows its
+ * columns (UpdateUserMenu), each value sent only when it changes, plus
+ * everything again every HUD_RESEND_SECONDS. Rules: hud/profile/logic.js.
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function UpdateProfileHud(slot, kart) {
+    const now = Instance.GetGameTime();
+    if (kart.profileNextUpdate !== undefined && now < kart.profileNextUpdate) {
+        return;
+    }
+    kart.profileNextUpdate = now + PROFILE_UPDATE_SECONDS;
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    if (kart.profileResendAt === undefined || now >= kart.profileResendAt) {
+        kart.profileResendAt = now + HUD_RESEND_SECONDS;
+        kart.profileShown = {};
+    }
+    const shown = (kart.profileShown ??= {});
+    /** @param {string} panel @param {string} name @param {string} value */
+    const SetText = (panel, name, value) => {
+        const key = `${panel}/${name}`;
+        if (shown[key] !== value) {
+            shown[key] = value;
+            hud.SetDialogVariableStringForPlayer(slot, panel, name, value);
+        }
+    };
+    /** @param {string} panel @param {string} cls @param {boolean} on */
+    const SetClass = (panel, cls, on) => {
+        const key = `${panel}.${cls}`;
+        const value = on ? "1" : "";
+        if (shown[key] !== value) {
+            shown[key] = value;
+            hud.SetHasClassForPlayer(slot, panel, cls, on);
+        }
+    };
+
+    const skin = GetMelonSkin(kart);
+    const { players, self } = BoardPlayers(kart);
+    /** @type {Record<string, Record<string, number>>} */
+    const statTotals = {};
+    for (const slide of STAT_SLIDES) {
+        statTotals[slide.key] = GetStatTotals(slide.key);
+    }
+    const profile = BuildProfile({ self, players, skin, statTotals });
+    for (const key of Object.keys(MELON_SKINS)) {
+        SetClass(`usermenu_profile_skin_${key}`, "Hidden", key !== skin);
+    }
+    SetText(PANEL, "profile_name", profile.name);
+    SetText(PANEL, "profile_skin", profile.skin);
+    for (const stat of profile.stats) {
+        const id = `usermenu_profile_stat_${stat.key}`;
+        SetText(id, "value", stat.value);
+        SetText(id, "rank", stat.rank);
+    }
+}
+
+/**
+ * Fills the profile in right away, everything sent again — on opening the
+ * menu and after picking a skin.
+ * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function RefreshProfileHud(slot, kart) {
+    kart.profileNextUpdate = undefined;
+    kart.profileResendAt = undefined;
+    UpdateProfileHud(slot, kart);
+}
+
+// The user menu's profile: the player's melon big and their stats (see profile.js).
+
 // User menu: press USE anywhere (regardless of race phase) to open a small
 // panel with actions/settings that aren't tied to any single map trigger
 // (see the button tables in hud/inputs.js's OnCustomHudClicked).
@@ -9236,16 +9506,19 @@ function SetUserMenuOpen(slot, kart, open) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
-    // Always (re)opens on its columns, not on one of its pages.
-    SetUserMenuPage(slot, kart, undefined);
     if (open) {
+        // Reopens on the page it was closed on (kart.userMenuPage, kept in
+        // memory while the player is connected), refreshed like a fresh visit.
+        SetUserMenuPage(slot, kart, kart.userMenuPage);
         // Refreshed on every open: a layout or script reload in tools mode
         // wipes what was set when the kart spawned.
         for (const buttonId of Object.keys(USER_MENU_TOGGLES)) {
             UpdateToggleHud(slot, kart, buttonId);
         }
         UpdateSkinHud(slot, kart);
+        UpdateGlowColorHud(slot, kart);
         UpdateHubButtonHud(slot, kart);
+        RefreshProfileHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
 }
@@ -9297,8 +9570,11 @@ function UpdateToggleHud(slot, kart, buttonId) {
 }
 
 /**
- * The skin row (usermenu_skin_<key>, one per MELON_SKINS): the player's
- * current skin gets SkinSelected.
+ * The skin grid (usermenu_skin_<key>, one per MELON_SKINS): the player's
+ * current skin gets SkinSelected; of its pages (usermenu_skinpage_<page>,
+ * MELON_SKINS_PER_PAGE each) only the player's one shows, and the pager next
+ * to the MELON title (usermenu_skinpager: "1 / 2", ◀ ▶) only with more than
+ * one page (Paging).
  * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
  */
 function UpdateSkinHud(slot, kart) {
@@ -9309,6 +9585,30 @@ function UpdateSkinHud(slot, kart) {
     const skin = GetMelonSkin(kart);
     for (const key of Object.keys(MELON_SKINS)) {
         hud.SetHasClassForPlayer(slot, `usermenu_skin_${key}`, "SkinSelected", key === skin);
+    }
+    const page = GetSkinPage(kart);
+    const pages = SkinPageCount();
+    for (let i = 0; i < pages; i++) {
+        hud.SetHasClassForPlayer(slot, `usermenu_skinpage_${i}`, "Hidden", i !== page);
+    }
+    hud.SetHasClassForPlayer(slot, "usermenu_skinpager", "Paging", pages > 1);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_skinpager", "skin_page", SkinPageLabel(page));
+}
+
+/**
+ * The glow color swatches (usermenu_color_<key>, one per COLOR_PRESETS): the
+ * player's picked glow color gets SwatchSelected — none while the glow
+ * follows the paint.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+function UpdateGlowColorHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const picked = GetMelonGlowColor(kart);
+    for (const key of Object.keys(COLOR_PRESETS)) {
+        hud.SetHasClassForPlayer(slot, `usermenu_color_${key}`, "SwatchSelected", key === picked);
     }
 }
 
@@ -9332,6 +9632,8 @@ function UpdateUserMenu(slot, kart) {
         UpdateHubButtonHud(slot, kart);
         if (kart.userMenuPage === "leaderboards") {
             UpdateLeaderboardsHud(slot, kart); // the totals keep growing while it's open
+        } else if (kart.userMenuPage === undefined) {
+            UpdateProfileHud(slot, kart); // so do the profile's, on the columns
         }
     }
 }
@@ -9477,6 +9779,15 @@ const KART_BUTTONS = {
         SetUserMenuOpen(slot, kart, false);
         SendKartToTutorial(kart);
     },
+    // The skin grid's pager next to the MELON title: previous/next page.
+    usermenu_skinpage_prev: (slot, kart) => {
+        StepMelonSkinPage(kart, -1);
+        UpdateSkinHud(slot, kart);
+    },
+    usermenu_skinpage_next: (slot, kart) => {
+        StepMelonSkinPage(kart, 1);
+        UpdateSkinHud(slot, kart);
+    },
     // The leaderboards page's best times: previous/next track.
     lb_track_prev: (slot, kart) => StepLeaderboardsTrack(slot, kart, -1),
     lb_track_next: (slot, kart) => StepLeaderboardsTrack(slot, kart, 1),
@@ -9554,20 +9865,23 @@ const TEST_TRIGGER_BUTTONS = {
 };
 
 /**
- * Buttons handled by id prefix: the color swatches, the skins, the
+ * Buttons handled by id prefix: the glow color swatches, the skins, the
  * leaderboards' tabs and the tuning pages' controls. Each returns whether
  * the id was one of its buttons.
  * @type {[string, (slot: number, kart: Kart, buttonId: string) => boolean][]}
  */
 const PREFIX_BUTTONS = [
     [
+        // Only the outline glow's color (the paint comes from paint triggers),
+        // the glow switched on with it.
         "usermenu_color_",
         (slot, kart, buttonId) => {
-            const preset = COLOR_PRESETS[buttonId.slice("usermenu_color_".length)];
-            if (preset) {
-                SetKartPaintColor(kart, preset);
+            if (!SetMelonGlowColor(kart, buttonId.slice("usermenu_color_".length))) {
+                return false;
             }
-            return Boolean(preset);
+            UpdateGlowColorHud(slot, kart);
+            UpdateToggleHud(slot, kart, "usermenu_glow_button");
+            return true;
         },
     ],
     [
@@ -9580,6 +9894,7 @@ const PREFIX_BUTTONS = [
                 ShowMelonPaint(kart); // a broken melon gets it on respawn
             }
             UpdateSkinHud(slot, kart);
+            RefreshProfileHud(slot, kart); // the big melon in the profile
             return true;
         },
     ],

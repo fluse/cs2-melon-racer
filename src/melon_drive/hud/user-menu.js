@@ -4,14 +4,16 @@ import { IsFreeLookOn } from "../dev/free-look.js";
 import { UpdateCameraTuningHud } from "../dev/camera-tuning.js";
 import { UpdatePhysicsTuningHud } from "../dev/physics-tuning.js";
 import { IsPredictionOn } from "../fx/prediction/prediction.js";
-import { IsMelonGlowOn } from "../kart/look.js";
+import { GetMelonGlowColor, IsMelonGlowOn } from "../kart/look.js";
 import { IsStartInTutorialOn } from "../kart/join-spot.js";
-import { GetMelonSkin } from "../kart/skin.js";
-import { MELON_SKINS } from "../constants/index.js";
+import { GetMelonSkin, GetSkinPage } from "../kart/skin.js";
+import { SkinPageCount, SkinPageLabel } from "../kart/skin-logic.js";
+import { COLOR_PRESETS, MELON_SKINS } from "../constants/index.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { CanRestartTimeTrial } from "../race/time-trial/time-trial.js";
 import { GetSpeedHud, SyncInputCapture } from "./layout.js";
 import { RefreshLeaderboardsHud, UpdateLeaderboardsHud } from "./leaderboards/index.js";
+import { RefreshProfileHud, UpdateProfileHud } from "./profile/index.js";
 
 // User menu: press USE anywhere (regardless of race phase) to open a small
 // panel with actions/settings that aren't tied to any single map trigger
@@ -60,16 +62,19 @@ export function SetUserMenuOpen(slot, kart, open) {
         return;
     }
     hud.SetHasClassForPlayer(slot, "user_menu", "Hidden", !open);
-    // Always (re)opens on its columns, not on one of its pages.
-    SetUserMenuPage(slot, kart, undefined);
     if (open) {
+        // Reopens on the page it was closed on (kart.userMenuPage, kept in
+        // memory while the player is connected), refreshed like a fresh visit.
+        SetUserMenuPage(slot, kart, kart.userMenuPage);
         // Refreshed on every open: a layout or script reload in tools mode
         // wipes what was set when the kart spawned.
         for (const buttonId of Object.keys(USER_MENU_TOGGLES)) {
             UpdateToggleHud(slot, kart, buttonId);
         }
         UpdateSkinHud(slot, kart);
+        UpdateGlowColorHud(slot, kart);
         UpdateHubButtonHud(slot, kart);
+        RefreshProfileHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
 }
@@ -121,8 +126,11 @@ export function UpdateToggleHud(slot, kart, buttonId) {
 }
 
 /**
- * The skin row (usermenu_skin_<key>, one per MELON_SKINS): the player's
- * current skin gets SkinSelected.
+ * The skin grid (usermenu_skin_<key>, one per MELON_SKINS): the player's
+ * current skin gets SkinSelected; of its pages (usermenu_skinpage_<page>,
+ * MELON_SKINS_PER_PAGE each) only the player's one shows, and the pager next
+ * to the MELON title (usermenu_skinpager: "1 / 2", ◀ ▶) only with more than
+ * one page (Paging).
  * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
  */
 export function UpdateSkinHud(slot, kart) {
@@ -133,6 +141,30 @@ export function UpdateSkinHud(slot, kart) {
     const skin = GetMelonSkin(kart);
     for (const key of Object.keys(MELON_SKINS)) {
         hud.SetHasClassForPlayer(slot, `usermenu_skin_${key}`, "SkinSelected", key === skin);
+    }
+    const page = GetSkinPage(kart);
+    const pages = SkinPageCount();
+    for (let i = 0; i < pages; i++) {
+        hud.SetHasClassForPlayer(slot, `usermenu_skinpage_${i}`, "Hidden", i !== page);
+    }
+    hud.SetHasClassForPlayer(slot, "usermenu_skinpager", "Paging", pages > 1);
+    hud.SetDialogVariableStringForPlayer(slot, "usermenu_skinpager", "skin_page", SkinPageLabel(page));
+}
+
+/**
+ * The glow color swatches (usermenu_color_<key>, one per COLOR_PRESETS): the
+ * player's picked glow color gets SwatchSelected — none while the glow
+ * follows the paint.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+export function UpdateGlowColorHud(slot, kart) {
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const picked = GetMelonGlowColor(kart);
+    for (const key of Object.keys(COLOR_PRESETS)) {
+        hud.SetHasClassForPlayer(slot, `usermenu_color_${key}`, "SwatchSelected", key === picked);
     }
 }
 
@@ -156,6 +188,8 @@ export function UpdateUserMenu(slot, kart) {
         UpdateHubButtonHud(slot, kart);
         if (kart.userMenuPage === "leaderboards") {
             UpdateLeaderboardsHud(slot, kart); // the totals keep growing while it's open
+        } else if (kart.userMenuPage === undefined) {
+            UpdateProfileHud(slot, kart); // so do the profile's, on the columns
         }
     }
 }

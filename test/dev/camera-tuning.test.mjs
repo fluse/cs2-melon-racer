@@ -63,12 +63,17 @@ test("the camera button swaps the menu's columns for the camera page, Back swaps
     assert.ok(hud.Has(0, "usermenu_camera_page", "Hidden"));
 });
 
-test("the menu reopens on its columns", () => {
+test("the menu reopens on the page it was closed on", () => {
     SetUserMenuOpen(0, a, true);
     Click(0, "usermenu_camera_button");
     SetUserMenuOpen(0, a, false);
     SetUserMenuOpen(0, a, true);
-    assert.ok(!hud.Has(0, "usermenu_main_page", "Hidden"));
+    assert.ok(hud.Has(0, "usermenu_main_page", "Hidden"));
+    assert.ok(!hud.Has(0, "usermenu_camera_page", "Hidden"));
+    Click(0, "camtune_back_button");
+    SetUserMenuOpen(0, a, false);
+    SetUserMenuOpen(0, a, true);
+    assert.ok(!hud.Has(0, "usermenu_main_page", "Hidden"), "closed on the columns: reopens on them");
     assert.ok(hud.Has(0, "usermenu_camera_page", "Hidden"));
 });
 

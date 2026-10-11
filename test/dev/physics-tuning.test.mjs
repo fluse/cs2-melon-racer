@@ -92,7 +92,7 @@ beforeEach(() => {
     b = SetUpPlayerKart(world.add(new CSPlayerPawn({ slot: 1 })), GetHubSpawnPoint());
 });
 
-test("the physics button swaps the menu's columns for the physics page; Back and reopening swap them back", () => {
+test("the physics button swaps the menu's columns for the physics page; Back swaps them back, reopening keeps it", () => {
     SetUserMenuOpen(0, a, true);
     Click(0, "usermenu_physics_button");
     assert.ok(hud.Has(0, "usermenu_main_page", "Hidden"));
@@ -105,8 +105,8 @@ test("the physics button swaps the menu's columns for the physics page; Back and
     Click(0, "usermenu_physics_button");
     SetUserMenuOpen(0, a, false);
     SetUserMenuOpen(0, a, true);
-    assert.ok(!hud.Has(0, "usermenu_main_page", "Hidden"), "reopens on its columns");
-    assert.ok(hud.Has(0, "usermenu_physics_page", "Hidden"));
+    assert.ok(hud.Has(0, "usermenu_main_page", "Hidden"), "reopens on the page it was closed on");
+    assert.ok(!hud.Has(0, "usermenu_physics_page", "Hidden"));
 });
 
 test("− / + and the scale set the values for every melon, within the scale; others with the page open see it; Reset drops them", () => {

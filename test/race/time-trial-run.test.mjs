@@ -165,6 +165,9 @@ test("save data other systems keep survives a new best", () => {
 // The user menu's "Restart Time Trial" (RestartTimeTrial).
 const { RestartTimeTrial } = await import("../../src/melon_drive/race/checkpoints/checkpoints.js");
 const { CanRestartTimeTrial } = await import("../../src/melon_drive/race/time-trial/time-trial.js");
+const { GetStatTotals } = await import("../../src/melon_drive/race/stats/stats.js");
+/** This player's "Most Trial Restarts" total (0 without one). */
+const Restarts = () => GetStatTotals("trialRestarts")[kart.pawn.GetPlayerController().GetPlayerName()] ?? 0;
 
 test("restart: back to the start spawn, whole and still, clock at zero until the line", () => {
     const spawn = world.add(new Entity({ name: StartSpawnName(2), className: "info_target", origin: { x: 500, y: 600, z: 10 }, angles: { pitch: 0, yaw: 90, roll: 0 } }));
@@ -175,7 +178,9 @@ test("restart: back to the start spawn, whole and still, clock at zero until the
     kart.melon.Teleport({ position: { x: 9000, y: 9000, z: 0 }, velocity: { x: 300, y: 0, z: 0 } });
     assert.equal(CanRestartTimeTrial(kart), true);
 
+    const restarts = Restarts();
     assert.equal(RestartTimeTrial(kart), true);
+    assert.equal(Restarts(), restarts + 1, "counts towards Most Trial Restarts");
     const origin = spawn.GetAbsOrigin();
     assert.deepEqual(kart.melon.GetAbsOrigin(), { x: origin.x, y: origin.y, z: origin.z + SPAWN_UP_OFFSET });
     assert.deepEqual(kart.melon.GetAbsVelocity(), { x: 0, y: 0, z: 0 });
@@ -198,7 +203,9 @@ test("restart only while on the track in a time trial — not in a heat or off t
     kart.racing = true;
     BeginHeat(2);
     assert.equal(CanRestartTimeTrial(kart), false, "a heat");
+    const restarts = Restarts();
     assert.equal(RestartTimeTrial(kart), false);
+    assert.equal(Restarts(), restarts, "a refused restart doesn't count");
 
     ReturnAllToHub([kart]);
     assert.equal(CanRestartTimeTrial(kart), false, "back in the hub");

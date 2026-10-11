@@ -8,7 +8,7 @@ import { SAVE_DATA_STATS_KEY, STAT_SLIDES } from "../../src/melon_drive/constant
 const KEYS = STAT_SLIDES.map((slide) => slide.key);
 
 test("every stat the user asked for has a page", () => {
-    assert.deepEqual(KEYS, ["playTime", "crashes", "finishes", "boostTime", "perfectHits"]);
+    assert.deepEqual(KEYS, ["playTime", "crashes", "finishes", "boostTime", "perfectHits", "trialRestarts"]);
 });
 
 test("GetStats: known stats with non-negative numbers only", () => {

@@ -622,6 +622,8 @@ scoreboard's stat pages (`STAT_SLIDES`, in this order):
   up** (decided), not the longest single boost.
 - **Most PERFECT wall hits** — every wall bounce *and* wall jump rated
   PERFECT (the ones with the perfect spark). Not "Test Perfect Bounce".
+- **Most trial restarts** — every "Restart Time Trial", by the user menu's
+  button or R. Not crossing the start line again before checkpoint 1.
 
 Counted in memory and written to the save data every
 `STATS_SAVE_SECONDS` (30) while something changed, and when a player
@@ -645,12 +647,27 @@ board shows up to `LEADERBOARD_ROWS` (**20**, decided) players, one under
 the other (decided, not two columns), saved totals of players who aren't on the map
 included; the viewer's own row is outlined in gold and takes the last row
 if they're further down. The tab and track picked stay while the player is
-connected, so the page reopens on them. Rebuilt every
+connected, and the menu reopens on the page it was closed on. Rebuilt every
 `LEADERBOARD_UPDATE_SECONDS` while the page is open; "Back" returns to the
 columns. A new stat needs its tab button (`lb_tab_<key>`) in
 `speedometer.xml`. Constants: `hud/leaderboards/constants.js`; rules:
 `hud/leaderboards/logic.js` (rows and ranks from `hud/scoreboard/logic.js`),
 applied by `hud/leaderboards/leaderboards.js` (`test/hud/leaderboards.test.mjs`).
+
+## Profile (implemented)
+
+The top of the user menu's right column, above DEVELOPER, is the player's
+own **profile**: their melon big (the skin's preview at full size, framed
+like the picked skin in the grid — it changes with the skin at once), their
+name and skin name, and one tile per player stat (`STAT_SLIDES`, same order
+and values as the leaderboards) with their all-time rank on it ("#3",
+saved players included, ties shared; no rank while the total is 0).
+Rebuilt every `PROFILE_UPDATE_SECONDS` while the menu shows its columns.
+A new stat needs its tile (`usermenu_profile_stat_<key>`), a new skin its
+image (`usermenu_profile_skin_<key>`) and name (`MELON_SKIN_NAMES`) in
+`speedometer.xml`. Constants: `hud/profile/constants.js`; rules:
+`hud/profile/logic.js`, applied by `hud/profile/profile.js`
+(`test/hud/profile.test.mjs`).
 
 ## Moderator (decided, implemented)
 
@@ -922,8 +939,8 @@ their own melon only, each on one scale from `CAMERA_TUNING_MIN` to
 (`CAMERA_TUNING_STEP` 10, `CAMERA_TUNING_FINE_STEP` 1) and a
 clickable scale with a segment every `CAMERA_TUNING_SCALE_STEP` (10), filled up
 to the value. "Reset to Default" goes back to `CAMERA_DISTANCE`/
-`CAMERA_HEIGHT`, "Back" to the columns; the menu always reopens on its
-columns. Lift, podium and camera-zone zooms still add on top. Meant for
+`CAMERA_HEIGHT`, "Back" to the columns; the menu reopens on the page it
+was closed on (every page, per player, only while connected). Lift, podium and camera-zone zooms still add on top. Meant for
 trying out values in-game: not saved (gone on reconnect or a map restart),
 every change logged to the console (`[camera tuning] …`) to copy into
 `camera/follow/constants.js`. Constants: `dev/constants.js`; rules:
@@ -950,7 +967,7 @@ resulting value:
   Ground contact still reads right, since it's measured against that command.
 
 Not saved (gone on a map restart), every change logged with who made it
-(`[physics tuning] …`); the menu reopens on its columns. Constants: `dev/constants.js`; rules:
+(`[physics tuning] …`); the menu reopens on the page it was closed on. Constants: `dev/constants.js`; rules:
 `dev/physics-tuning-logic.js`, applied by `dev/physics-tuning.js` and
 `movement/` (`test/dev/physics-tuning.test.mjs`).
 
@@ -1096,12 +1113,18 @@ to the hub, only overwritten by touching another paint trigger. A freshly
 spawned melon (first join, or after a respawn where the old one was
 invalid) starts unpainted (the model's default color).
 
-Every whole melon also has an **outline glow** in its paint color — green
-(`MELON_GLOW_UNPAINTED_COLOR`) until it's first painted (the engine's
-`Glow()`, like CS2's teammate outline),
-switched off while it's broken so no outline floats at the crash site.
-Each player switches it on/off for **their own melon** in the user menu's
-"GLOW" section (below "COLOR"; `kart.melonGlow`, on by default). Everyone
+Every whole melon also has an **outline glow** (the engine's `Glow()`, like
+CS2's teammate outline), switched off while it's broken so no outline
+floats at the crash site. Each player switches it on/off for **their own
+melon** in the user menu (SETTINGS → MELON, "Glow" under the skins;
+`kart.melonGlow`, on by default). **The user menu's color swatches set only
+the glow's color** (decided), not the paint — they sit right under the
+"Glow" toggle, the picked one outlined in gold, and picking one switches
+the glow on. The pick is saved per player name like the skin
+(`SAVE_DATA_PLAYER_SETTINGS_KEY`). Without one the glow follows the paint:
+its paint color, green (`MELON_GLOW_UNPAINTED_COLOR`) until it's first
+painted. Paint triggers still paint the melon, a picked glow color stays.
+Rules: `kart/look-logic.js` (`test/kart/look-logic.test.mjs`). Everyone
 sees a melon's glow the same way — the engine's `Glow()` isn't per viewer,
 and the only per-viewer lever (the prop's "Glow Team") was ruled out: teams
 stay out of it (decided).
@@ -1111,21 +1134,28 @@ by `kart/look.js`.
 ## Melon skins (implemented)
 
 Each player picks a **skin** for their melon in the user menu (SETTINGS →
-MELON, the row under the colors, decided): Melon (the default), Gold,
+MELON, decided): Melon (the default), Gold,
 Football, Golf (dimples only in the normal map, so they show in the light
 and reflections), Honey Melon, Camo, Strawberry, Pumpkin (a carved face that glows from
 inside), Pineapple, Zebra — three per row, a preview and a name per button, the current one
-outlined. Saved per player name in the addon's save data like "Start in
+outlined. **Paged** (decided): `MELON_SKINS_PER_PAGE` (9, a 3 × 3 grid) per
+page in `MELON_SKINS` order, ◀ ▶ right-aligned next to the MELON title with
+the page indicator between them ("1 / 2"), wrapping around — shown only with
+more than one page. The menu opens on the page with the player's skin, or
+the one they paged to (kept while connected). Every page has all nine places
+(empty ones as placeholders), so the menu's height doesn't change; a new skin
+goes into the last page's panel in `speedometer.xml`, a new page's panel
+when that's full (`test/hud/skin-pages.test.mjs`). Saved per player name in the addon's save data like "Start in
 Tutorial" (`SAVE_DATA_PLAYER_SETTINGS_KEY`), so every later join gets it.
 A skin is a whole model (`MELON_SKINS`, `kart/constants.js`): the same
 mesh, collision and break pieces with another material, swapped by
 `SetModel` — cs_script can't switch material groups. It's put on in
 `ShowMelonPaint`, so every spawn and respawn carries it; a melon that's
 broken while the player picks one gets it on the respawn. **Paint and
-skins:** a paint trigger or swatch still sets the paint color, but the
+skins:** a paint trigger still sets the paint color, but the
 skins' materials don't take it (a red gold melon wouldn't be gold) — only
-the plain melon is tinted; the outline glow shows the paint color on every
-skin. The materials and models come from `tools/materials/make-melon-skins.mjs`;
+the plain melon is tinted; the outline glow (the picked glow color, else
+the paint color) shows on every skin. The materials and models come from `tools/materials/make-melon-skins.mjs`;
 each skin model has to be used somewhere in the map, or the map doesn't
 ship it ([Mapping API: melon skins](docs/mapping-api/02-core-entities.md#melon-skins)).
 Rules: `kart/skin-logic.js` (`test/kart/skin-logic.test.mjs`), applied by

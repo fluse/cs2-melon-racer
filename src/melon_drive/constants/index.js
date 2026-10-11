@@ -38,6 +38,7 @@ export * from "../hud/speedometer/constants.js";
 export * from "../hud/track/constants.js";
 export * from "../hud/scoreboard/constants.js";
 export * from "../hud/leaderboards/constants.js";
+export * from "../hud/profile/constants.js";
 export * from "../hud/hub-modal/constants.js";
 export * from "../core/constants.js";
 export * from "../dev/constants.js";

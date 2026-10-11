@@ -48,7 +48,8 @@ export const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
 // switch material groups, only SetModel. Each one has to be used somewhere
 // in the .vmap too (the default by melon_template, the others e.g. by a
 // prop in the hub), or the map doesn't ship it (test/map/map-skins.test.mjs).
-// The key is the button's: usermenu_skin_<key> in speedometer.xml.
+// The key is the button's: usermenu_skin_<key> in speedometer.xml, in this
+// order (pages of MELON_SKINS_PER_PAGE).
 /** @type {Record<string, string>} */
 export const MELON_SKINS = {
     default: "models/melon_racer/melon/melon.vmdl",
@@ -56,13 +57,33 @@ export const MELON_SKINS = {
     football: "models/melon_racer/melon/melon_football.vmdl",
     golf: "models/melon_racer/melon/melon_golf.vmdl",
     honey: "models/melon_racer/melon/melon_honey.vmdl",
+    camo: "models/melon_racer/melon/melon_camo.vmdl",
     strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
     pumpkin: "models/melon_racer/melon/melon_pumpkin.vmdl",
     pineapple: "models/melon_racer/melon/melon_pineapple.vmdl",
     zebra: "models/melon_racer/melon/melon_zebra.vmdl",
-    camo: "models/melon_racer/melon/melon_camo.vmdl",
 };
 export const MELON_SKIN_DEFAULT = "default";
+// Every skin's name as the user menu shows it: under its button in the skin
+// grid (static text in speedometer.xml) and in the profile (hud/profile/) —
+// test/hud/profile.test.mjs checks the two agree.
+/** @type {Record<string, string>} */
+export const MELON_SKIN_NAMES = {
+    default: "Melon",
+    gold: "Gold",
+    football: "Football",
+    golf: "Golf",
+    honey: "Honey Melon",
+    camo: "Camo",
+    strawberry: "Strawberry",
+    pumpkin: "Pumpkin",
+    pineapple: "Pineapple",
+    zebra: "Zebra",
+};
+// Skins per page of the user menu's skin grid (3 x 3): with more, ◀ ▶ next to
+// the MELON title page through them, in MELON_SKINS order. One panel per page
+// in speedometer.xml, usermenu_skinpage_<page> (test/hud/skin-pages.test.mjs).
+export const MELON_SKINS_PER_PAGE = 9;
 
 // The frozen pawn (CSMoveType.NOCLIP: non-solid, but WASD still flies it)
 // stays where it spawned — see HoldPawn in kart/spawn.js. It's only put back
@@ -87,8 +108,9 @@ export const PAINT_TRIGGER_NAME_PATTERN = /^paint_trigger_(\d+)_(\d+)_(\d+)$/;
 export const MELON_GLOW_ENABLED = true;
 export const MELON_GLOW_UNPAINTED_COLOR = { r: 60, g: 255, b: 60, a: 255 };
 
-// Color swatches offered by the user menu's color picker (see the
-// "usermenu_color_<key>" buttonId handling in hud/inputs.js's OnCustomHudClicked)
+// Glow colors offered by the user menu's color swatches, under "Glow" (see
+// the "usermenu_color_<key>" buttonId handling in hud/inputs.js; they set
+// only the outline glow, not the paint — SetMelonGlowColor in kart/look.js)
 // — a fixed palette rather than a full picker since panorama's
 // CustomHudLayout only supports basic panels/buttons, not input widgets
 // like a color wheel.

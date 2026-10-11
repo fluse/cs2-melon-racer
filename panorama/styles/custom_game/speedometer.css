@@ -1251,16 +1251,19 @@
     vertical-align: center;
 }
 
+/* Under the Glow toggle: its colors. */
 .UserMenuColorRow {
     width: 100%;
     flow-children: right;
+    margin-top: 6px;
     margin-bottom: 4px;
 }
 
-/* Plain flat swatches, not tied to melon_paint's r/g/b-in-the-name trigger
-   convention — usermenu_color_<key> in COLOR_PRESETS (constants.js) is the
-   source of truth for the actual applied color, these just need to look
-   like it. Keep new swatches' class colors in sync with COLOR_PRESETS. */
+/* The glow color swatches: plain flat ones, not tied to melon_paint's
+   r/g/b-in-the-name trigger convention — usermenu_color_<key> in
+   COLOR_PRESETS (constants.js) is the source of truth for the actual glow
+   color, these just need to look like it. Keep new swatches' class colors
+   in sync with COLOR_PRESETS. The picked one is outlined in gold. */
 .ColorSwatch {
     width: fill-parent-flow(1.0);
     height: 34px;
@@ -1278,6 +1281,10 @@
     &:hover {
         border-color: #ffffffdd;
     }
+
+    &.SwatchSelected {
+        border: 3px solid #ffd84d;
+    }
 }
 
 .ColorSwatchRed { background-color: #dc3c3c; }
@@ -1292,6 +1299,66 @@
 /* Skins: a preview and a name per skin; the current one is outlined
    (SkinSelected, set by UpdateSkinHud — no transition on it, see the HUD
    notes in AGENTS.md). */
+/* MELON's header: the usual group header, the pager (◀ 1 / 2 ▶) laid over
+   it right-aligned — no flow between them: a label filling the free width
+   inside a fill-parent-flow column pushed the pager out of sight. Its top
+   margin centers it on the title (the header's 16px top margin + half the
+   label, less half its own 22px). Only with more than one page of skins
+   (Paging, UpdateSkinHud). */
+.UserMenuSkinHeader {
+    width: 100%;
+}
+
+.SkinPager {
+    horizontal-align: right;
+    vertical-align: top;
+    margin-top: 13px;
+    flow-children: right;
+    visibility: collapse;
+}
+
+.UserMenuSkinHeader.Paging .SkinPager {
+    visibility: visible;
+}
+
+.SkinPagerButton {
+    width: 26px;
+    height: 22px;
+    vertical-align: center;
+    border: 1px solid #cfe8a855;
+    background-color: #00000000;
+
+    &:hover {
+        background-color: #cfe8a81a;
+    }
+}
+
+.SkinPagerArrow {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: 11px;
+    color: #cfe8a8;
+}
+
+.SkinPagerLabel {
+    vertical-align: center;
+    margin: 0px 10px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #cfe8a8;
+}
+
+/* One page of skins (usermenu_skinpage_<page>): only the player's shows. */
+.UserMenuSkinPage {
+    width: 100%;
+    flow-children: down;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
 .UserMenuSkinRow {
     width: 100%;
     flow-children: right;
@@ -1401,6 +1468,117 @@
 .UserMenuToggle.ToggleOn .UserMenuTogglePill {
     background-color: #3fae3f;
     color: #ffffff;
+}
+
+/* PROFILE, top of the right column (hud/profile/): your melon big next to
+   your name and skin, then one tile per stat, two per row. The title below
+   it (DEVELOPER) gets a gap like a new column section. */
+.UserMenuColumnTitleLower {
+    margin-top: 22px;
+}
+
+.UserMenuProfile {
+    width: 100%;
+    flow-children: down;
+}
+
+.ProfileHero {
+    width: 100%;
+    flow-children: right;
+    margin-top: 10px;
+    margin-bottom: 4px;
+}
+
+/* Framed like the picked skin in the grid. The skin images (96x96, shown
+   at their own size) lie on top of each other; all but yours Hidden. */
+.ProfileMelon {
+    width: 112px;
+    height: 112px;
+    border: 2px solid #7fd13b;
+    background-color: #7fd13b1f;
+}
+
+.ProfileMelonImage {
+    width: 96px;
+    height: 96px;
+    horizontal-align: center;
+    vertical-align: center;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.ProfileIdentity {
+    width: fill-parent-flow( 1.0 );
+    vertical-align: center;
+    margin-left: 16px;
+    flow-children: down;
+}
+
+.ProfileName {
+    width: 100%;
+    font-size: 22px;
+    font-weight: bold;
+    color: white;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ProfileSkin {
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #ffd84d;
+}
+
+.ProfileStatRow {
+    width: 100%;
+    flow-children: right;
+    margin-top: 6px;
+}
+
+/* Label small on top; value left, rank (gold, "#3") right below it. */
+.ProfileStat {
+    width: fill-parent-flow( 1.0 );
+    height: 46px;
+    margin-left: 6px;
+    padding: 5px 10px 0px 10px;
+    flow-children: down;
+    border: 1px solid #ffffff14;
+    background-color: #ffffff0a;
+
+    &:first-child {
+        margin-left: 0px;
+    }
+}
+
+.ProfileStatLabel {
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #cfe8a8aa;
+}
+
+.ProfileStatLine {
+    width: 100%;
+    margin-top: 2px;
+}
+
+.ProfileStatValue {
+    horizontal-align: left;
+    font-size: 17px;
+    font-weight: bold;
+    color: white;
+}
+
+.ProfileStatRank {
+    horizontal-align: right;
+    vertical-align: center;
+    font-size: 12px;
+    font-weight: bold;
+    color: #ffd84d;
 }
 
 /* The developer pages (camera, physics, test triggers) swap places with the

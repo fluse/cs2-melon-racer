@@ -3,7 +3,7 @@ import { Debug } from "../core/debug.js";
 import { ParseSaveData } from "../race/time-trial/logic.js";
 import { MELON_SKINS } from "../constants/index.js";
 import { PlayerName } from "./join-spot.js";
-import { IsSkin, SavedSkin, WithSkin } from "./skin-logic.js";
+import { IsSkin, SavedSkin, SkinPageCount, SkinPageOf, StepSkinPage, WithSkin } from "./skin-logic.js";
 
 // The melon's skin: each player picks one in the user menu (the MELON
 // group's skin row), kept per player name in the addon's save data like
@@ -45,4 +45,19 @@ export function SetMelonSkin(kart, skin) {
     Instance.SetSaveData(JSON.stringify(WithSkin(ParseSaveData(Instance.GetSaveData()), PlayerName(kart), skin)));
     Debug(`SetMelonSkin: "${PlayerName(kart)}" drives the ${skin} skin`);
     return true;
+}
+
+/**
+ * The page of the user menu's skin grid this player sees: the one they paged
+ * to (kept while connected), else the one with their skin.
+ * @param {Kart} kart
+ */
+export function GetSkinPage(kart) {
+    const page = kart.skinPage ?? SkinPageOf(GetMelonSkin(kart));
+    return Math.min(page, SkinPageCount() - 1);
+}
+
+/** The skin grid's ◀ / ▶ (direction -1 / +1), wrapping around. @param {Kart} kart @param {number} direction */
+export function StepMelonSkinPage(kart, direction) {
+    kart.skinPage = StepSkinPage(GetSkinPage(kart), direction);
 }

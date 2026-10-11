@@ -20,4 +20,5 @@ export const STAT_SLIDES = [
     { key: "finishes", title: "MOST FINISHES", column: "FINISHES", format: "count" },
     { key: "boostTime", title: "LONGEST BOOST TIME", column: "BOOST", format: "duration" },
     { key: "perfectHits", title: "MOST PERFECT WALL HITS", column: "PERFECT", format: "count" },
+    { key: "trialRestarts", title: "MOST TRIAL RESTARTS", column: "RESTARTS", format: "count" },
 ];

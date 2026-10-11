@@ -7,6 +7,7 @@ import { ApplyCheckpointTouch, ApplyLapCompletion, ApplyStartTouch, StartLineTra
 import { MAX_TRACKS, MAX_CHECKPOINTS_PER_TRACK, TELEPORT_UP_OFFSET, FINISH_RESTART_START_GUARD } from "../../constants/index.js";
 import { Lifted, LevelAngles, GetCheckpointSpawnPoint, GetStartSpawnPoint } from "../../kart/spawn-points.js";
 import { StartRun, FinishRun, CancelRun, CanRestartTimeTrial } from "../time-trial/time-trial.js";
+import { CountStat } from "../stats/stats.js";
 // Straight from teleport.js, not movement/index.js: that index pulls in the
 // whole physics tree, which imports race/heat/race-flow.js — a cycle through here.
 import { RespawnKartAtCheckpoint } from "../../kart/teleport.js";
@@ -225,6 +226,7 @@ export function RestartTimeTrial(kart) {
     }
     CancelRun(kart);
     kart.lastRun = undefined;
+    CountStat(kart, "trialRestarts"); // the button or R — not crossing the start line again
     Debug(`RestartTimeTrial: back to the start of track ${trackId}`);
     return true;
 }

@@ -13,6 +13,7 @@ const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
 const { GetHubSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
 const flow = await import("../../src/melon_drive/race/heat/race-flow.js");
 const { SetUserMenuOpen, SetUserMenuPage, USER_MENU_TOGGLES, USER_MENU_PAGES } = await import("../../src/melon_drive/hud/user-menu.js");
+const { SetKartPaintColor } = await import("../../src/melon_drive/kart/look.js");
 const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, SPEED_HUD_ENTITY_NAME, RacePhase, COLOR_PRESETS, MELON_MAX_HEALTH } = await import("../../src/melon_drive/constants/index.js");
 const C = await import("../../src/melon_drive/constants/index.js");
 await import("../../src/melon_drive/index.js"); // registers OnCustomHudClicked
@@ -260,7 +261,7 @@ test("free look without template_spectator_hat in the map: no avatar, free look 
     assert.deepEqual(a.spectatorHat, []);
 });
 
-test("test triggers button: its page in place of the columns, Back and reopening swap them back", () => {
+test("test triggers button: its page in place of the columns, Back swaps them back, reopening keeps it", () => {
     SetUserMenuOpen(0, a, true);
     Click(0, "usermenu_triggers_button");
     assert.ok(hud.Has(0, "usermenu_main_page", "Hidden"));
@@ -273,9 +274,9 @@ test("test triggers button: its page in place of the columns, Back and reopening
     Click(0, "usermenu_triggers_button");
     Click(0, "usermenu_testcountdown_button"); // a trigger closes the menu…
     assert.equal(a.userMenuOpen, false);
-    SetUserMenuOpen(0, a, true); // …and it reopens on its columns
-    assert.ok(!hud.Has(0, "usermenu_main_page", "Hidden"));
-    assert.ok(hud.Has(0, "usermenu_triggers_page", "Hidden"));
+    SetUserMenuOpen(0, a, true); // …and it reopens on that page
+    assert.ok(hud.Has(0, "usermenu_main_page", "Hidden"));
+    assert.ok(!hud.Has(0, "usermenu_triggers_page", "Hidden"));
 });
 
 test("test break/bounce/heal: on the clicking player's own melon, menu closed — never while racing", async () => {
@@ -329,21 +330,29 @@ test("SetUserMenuPage: one developer page at a time, undefined shows the columns
     assert.ok(pages.every((page) => hud.Has(0, USER_MENU_PAGES[page].panel, "Hidden")));
 });
 
-test("color buttons paint that player's melon in the preset; an unknown color does nothing", () => {
+test("color buttons set only the glow of that player's melon, switch it on and mark the swatch; an unknown color does nothing", () => {
     const [key, preset] = Object.entries(COLOR_PRESETS)[0];
+    const paint = { ...a.paintColor };
+    SetUserMenuOpen(0, a, true);
+    Click(0, "usermenu_glow_button"); // off first
+    assert.equal(a.melon.IsGlowing(), false);
     Click(0, `usermenu_color_${key}`);
-    assert.deepEqual(a.paintColor, preset);
-    assert.deepEqual(a.melon.color, preset);
-    assert.notDeepEqual(b.paintColor, preset);
+    assert.deepEqual(a.melon.glow, preset);
+    assert.equal(a.melon.IsGlowing(), true, "picking a color switches the glow on");
+    assert.equal(hud.Variable(0, "usermenu_glow_button", "glow_state"), "ON");
+    assert.deepEqual(a.paintColor, paint, "the paint stays");
+    assert.ok(hud.Has(0, `usermenu_color_${key}`, "SwatchSelected"));
+    assert.ok(!hud.Has(0, `usermenu_color_${Object.keys(COLOR_PRESETS)[1]}`, "SwatchSelected"));
+    assert.notDeepEqual(b.melon.glow, preset, "only the clicking player");
 
     Click(0, "usermenu_color_no_such_color");
-    assert.deepEqual(a.paintColor, preset);
+    assert.deepEqual(a.melon.glow, preset);
 });
 
 test("skin buttons: put that skin's model on the clicker's melon, mark it, keep its paint — saved for the next join", () => {
     const skin = Object.keys(C.MELON_SKINS).find((key) => key !== C.MELON_SKIN_DEFAULT);
     assert.equal(a.melon.GetModelName(), C.MELON_SKINS[C.MELON_SKIN_DEFAULT], "a new melon gets its player's (default) skin");
-    Click(0, `usermenu_color_${Object.keys(COLOR_PRESETS)[0]}`);
+    SetKartPaintColor(a, Object.values(COLOR_PRESETS)[0]); // a paint trigger
     Click(0, `usermenu_skin_${skin}`);
     assert.equal(a.melon.GetModelName(), C.MELON_SKINS[skin]);
     assert.deepEqual(a.melon.color, Object.values(COLOR_PRESETS)[0], "paint and glow set again after the new model");

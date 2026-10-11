@@ -49,8 +49,8 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #   domains have one subfolder per feature (see "Folder layout" below):
                                           #   core/      kart-registry.js (Kart type, karts map, moderator), think.js (per-tick driver), trace.js, debug.js
                                           #   kart/      spawn.js (melon spawn, frozen pawn, intro logo), spawn-points.js (+ spawn-points-logic.js), join-spot.js (+ -logic.js: tutorial or hub on join), teleport.js (checkpoint respawn,
-                                          #              generic teleport), look.js (paint color + outline glow), skin.js (+ skin-logic.js: the user menu's melon skins, SetModel),
-                                          #              player-settings-logic.js (per-player settings in the save data, for join-spot + skin), inputs.js (player reset/disconnect, melon_paint)
+                                          #              generic teleport), look.js (+ look-logic.js: paint color + outline glow, the user menu's glow colors), skin.js (+ skin-logic.js: the user menu's melon skins, SetModel),
+                                          #              player-settings-logic.js (per-player settings in the save data, for join-spot, skin + glow color), inputs.js (player reset/disconnect, melon_paint)
                                           #   movement/  driving/ (drive.js = UpdateKart, the per-tick order; steering), contact/ (floor/wall probes),
                                           #              jump/, wall-bounce/, attack-boost/, momentum/
                                           #   health/    damage/ (impacts, flat landings), breaking/ (break, effects at the crash site, respawn, melon_break),
@@ -68,6 +68,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #   hud/       layout.js (the custom_hud_layout), one folder per panel with its own rules: speedometer/ (km/h, health bar, jump dots),
                                           #              track/ (time trial + checkpoint strip), scoreboard/ (Tab: Grand Prix standings / best times / player stats,
                                           #              in place of CS2's own), leaderboards/ (the user menu's page: one leaderboard per tab, top 20),
+                                          #              profile/ (top of the user menu's right column: own melon big, own stats + ranks),
                                           #              hub-modal/ ("Start Grand Prix": heat cards + who rides along; routes.js is generated); one file per panel without: bounce-panel.js, user-menu.js;
                                           #              inputs.js (every button click: one table per kind of button, HandleHudClick dispatches)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),

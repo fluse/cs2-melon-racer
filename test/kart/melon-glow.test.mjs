@@ -1,13 +1,14 @@
 // The melon's outline glow (src/melon_drive/kart/look.js) against the fake
-// engine: on by default, green until painted and then in the paint color, switched per kart from the user
-// menu, and off while the melon is broken.
+// engine: on by default, green until painted and then in the paint color —
+// or in the glow color picked in the user menu —, switched per kart from the
+// user menu, and off while the melon is broken.
 import "../helpers/register-cs-script.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity } from "../helpers/cs-script-mock.mjs";
 
 const { SetKartPaintColor } = await import("../../src/melon_drive/kart/look.js");
-const { ShowMelonPaint, HideMelonGlow, IsMelonGlowOn, SetMelonGlow } = await import("../../src/melon_drive/kart/look.js");
+const { ShowMelonPaint, HideMelonGlow, IsMelonGlowOn, SetMelonGlow, SetMelonGlowColor } = await import("../../src/melon_drive/kart/look.js");
 const { MELON_GLOW_ENABLED, MELON_GLOW_UNPAINTED_COLOR, COLOR_PRESETS } = await import("../../src/melon_drive/constants/index.js");
 
 /** @param {boolean} [melonGlow] */
@@ -27,6 +28,18 @@ test("glow: on by default, green until painted, then in the chosen color", () =>
     assert.deepEqual(kart.melon.glow, COLOR_PRESETS.blue);
     SetKartPaintColor(kart, COLOR_PRESETS.white);
     assert.deepEqual(kart.melon.glow, COLOR_PRESETS.white, "white chosen on purpose glows white, not green");
+});
+
+test("glow color: a picked color beats the paint, which keeps painting the melon", () => {
+    const kart = Kart();
+    SetKartPaintColor(kart, COLOR_PRESETS.blue);
+    assert.equal(SetMelonGlowColor(kart, "purple"), true);
+    assert.deepEqual(kart.melon.glow, COLOR_PRESETS.purple);
+    assert.deepEqual(kart.melon.color, COLOR_PRESETS.blue, "the paint stays");
+    SetKartPaintColor(kart, COLOR_PRESETS.red); // a paint trigger later
+    assert.deepEqual(kart.melon.glow, COLOR_PRESETS.purple, "still the picked glow");
+    assert.deepEqual(kart.melon.color, COLOR_PRESETS.red);
+    assert.equal(SetMelonGlowColor(kart, "no_such_color"), false);
 });
 
 test("glow: switching it off/on only changes that kart's melon", () => {
