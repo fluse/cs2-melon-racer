@@ -1,5 +1,5 @@
 // Pure rules of the free-look drone (no engine calls) — see free-look.js.
-import { DRONE_RESPONSE, DRONE_GROUND_NORMAL_Z, DRONE_YAW_RATE, DRONE_MAX_TILT, DRONE_CRUISE_TILT, DRONE_TILT_RATE, DRONE_LASER_FORWARD, DRONE_LASER_UP, DRONE_LASER_LENGTH, DRONE_LASER_SEGMENT } from "./constants.js";
+import { DRONE_RESPONSE, DRONE_GROUND_NORMAL_Z, DRONE_LAND_SECONDS, DRONE_LAND_MAX_SPEED, DRONE_YAW_RATE, DRONE_MAX_TILT, DRONE_CRUISE_TILT, DRONE_TILT_RATE, DRONE_LASER_FORWARD, DRONE_LASER_UP, DRONE_LASER_LENGTH, DRONE_LASER_SEGMENT } from "./constants.js";
 
 /** @typedef {{ x: number, y: number, z: number }} Vec */
 
@@ -58,14 +58,36 @@ export function ClipVelocity(velocity, normal) {
 }
 
 /**
- * Whether the drone has landed: the trace down from it (DRONE_GROUND_DISTANCE
- * under its skids) hit floor — a normal pointing up at least
- * DRONE_GROUND_NORMAL_Z, not a wall or a ceiling's edge — and it isn't
- * `takingOff` (jump pressed on the ground, DRONE_TAKEOFF_SECONDS ago at most).
+ * Whether the drone is on the floor: the trace down from it
+ * (DRONE_GROUND_DISTANCE under its skids) hit floor — a normal pointing up
+ * at least DRONE_GROUND_NORMAL_Z, not a wall or a ceiling's edge — and it
+ * isn't `takingOff` (jump pressed on the ground, DRONE_TAKEOFF_SECONDS ago at
+ * most).
  * @param {{ didHit: boolean, normal: Vec } | undefined} floor @param {boolean} takingOff
  */
-export function IsDroneLanded(floor, takingOff) {
+export function IsDroneOnFloor(floor, takingOff) {
     return Boolean(floor?.didHit) && floor.normal.z >= DRONE_GROUND_NORMAL_Z && !takingOff;
+}
+
+/**
+ * How long the drone has stood still on the floor after `dt` more: on it
+ * (`onFloor`) and slower than DRONE_LAND_MAX_SPEED it counts up, anything
+ * else starts over at 0. Landed (IsDroneLanded) once it reaches
+ * DRONE_LAND_SECONDS — touching down alone doesn't park it.
+ * @param {number} seconds @param {boolean} onFloor @param {Vec} velocity @param {number} dt
+ */
+export function StepDroneStillSeconds(seconds, onFloor, velocity, dt) {
+    const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
+    return onFloor && speed < DRONE_LAND_MAX_SPEED ? seconds + dt : 0;
+}
+
+/**
+ * Whether the drone has landed: still on the floor for DRONE_LAND_SECONDS
+ * (StepDroneStillSeconds).
+ * @param {number} stillSeconds
+ */
+export function IsDroneLanded(stillSeconds) {
+    return stillSeconds >= DRONE_LAND_SECONDS;
 }
 
 /**

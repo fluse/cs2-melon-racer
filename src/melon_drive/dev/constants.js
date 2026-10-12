@@ -44,8 +44,10 @@ export const DRONE_RADIUS = 8;
 export const DRONE_BOTTOM = 2.5;
 export const DRONE_TOP = 2.7;
 // Touching down: with floor (a surface whose normal points up at least
-// DRONE_GROUND_NORMAL_Z) within DRONE_GROUND_DISTANCE under that box, the
-// drone has landed — its rotors run down to a stop ("spindown", then
+// DRONE_GROUND_NORMAL_Z) within DRONE_GROUND_DISTANCE under that box and
+// standing still there (slower than DRONE_LAND_MAX_SPEED) for
+// DRONE_LAND_SECONDS on end, the drone has landed — until then it still
+// flies, sliding along the floor — its rotors run down to a stop ("spindown", then
 // "landed"), and it's parked: every other input does nothing, only jump
 // takes off again — a hop up at DRONE_TAKEOFF_SPEED, not counted as
 // landed for DRONE_TAKEOFF_SECONDS so it gets clear of the floor, the rotors
@@ -53,6 +55,8 @@ export const DRONE_TOP = 2.7;
 // (tools/models/make-drone-model.mjs).
 export const DRONE_GROUND_DISTANCE = 2;
 export const DRONE_GROUND_NORMAL_Z = 0.7;
+export const DRONE_LAND_SECONDS = 0.5;
+export const DRONE_LAND_MAX_SPEED = 5; // units/s
 export const DRONE_TAKEOFF_SPEED = 180; // units/s up — with DRONE_RESPONSE ~60 units high
 export const DRONE_TAKEOFF_SECONDS = 0.3;
 // Which way it faces: in the air the pilot's view (yaw), turned towards it

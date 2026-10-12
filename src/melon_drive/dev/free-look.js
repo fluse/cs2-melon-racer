@@ -22,7 +22,7 @@ import { karts } from "../core/kart-registry.js";
 import { ApplyCameraFollow } from "../camera/index.js";
 import { SpawnFromTemplate } from "../fx/particles.js";
 import { TraceBox, TraceLine } from "../core/trace.js";
-import { DroneWishVelocity, StepDroneVelocity, IsDroneLanded, DroneRotorInputs, StepDroneYaw, ClipVelocity, DroneTargetTilt, StepDroneTilt, DroneLaserRay, ViewForward, LaserSegments, DRONE_LASER_SEGMENTS } from "./drone-logic.js";
+import { DroneWishVelocity, StepDroneVelocity, IsDroneOnFloor, StepDroneStillSeconds, IsDroneLanded, DroneRotorInputs, StepDroneYaw, ClipVelocity, DroneTargetTilt, StepDroneTilt, DroneLaserRay, ViewForward, LaserSegments, DRONE_LASER_SEGMENTS } from "./drone-logic.js";
 import {
     DRONE_TEMPLATE_NAME, DRONE_START_HEIGHT, DRONE_SPEED, DRONE_FAST_SPEED, DRONE_RADIUS, DRONE_BOTTOM, DRONE_TOP, DRONE_GROUND_DISTANCE, DRONE_TAKEOFF_SPEED, DRONE_TAKEOFF_SECONDS,
     DRONE_CAMERA_DISTANCE, DRONE_CAMERA_HEIGHT, DRONE_CAMERA_PIVOT, CAMERA_OFFSET_RETURN_STRENGTH,
@@ -119,7 +119,7 @@ function SpawnDrone(kart) {
         return false;
     }
     const laser = SpawnLaser(position);
-    kart.drone = { entities: [...entities, ...laser], parts, body, laser, position, velocity: { x: 0, y: 0, z: 0 }, tilt: { pitch: 0, roll: 0 }, yaw: angles.yaw, landed: false };
+    kart.drone = { entities: [...entities, ...laser], parts, body, laser, position, velocity: { x: 0, y: 0, z: 0 }, tilt: { pitch: 0, roll: 0 }, yaw: angles.yaw, landed: false, stillSeconds: 0 };
     const camera = kart.pawn.GetCustomCamera();
     camera.SetMode(CustomCameraMode.FOLLOW_POSITION);
     camera.SetFollowConfig({
@@ -233,21 +233,25 @@ export function UpdateDrone(kart, dt) {
             entity.Move({ position: drone.position, angles });
         }
     }
-    UpdateDroneRotors(kart, takingOff);
+    UpdateDroneRotors(kart, takingOff, dt);
     UpdateDroneLaser(kart, angles, view);
     SetDroneHintHud(kart, true);
 }
 
 /**
- * Touching down the rotors run down to a stop, taking off they run up
- * again (IsDroneLanded, DroneRotorInputs) — the floor looked for
+ * Standing still on the floor for DRONE_LAND_SECONDS the rotors run down to
+ * a stop, taking off they run up again (IsDroneOnFloor, StepDroneStillSeconds,
+ * IsDroneLanded, DroneRotorInputs) — the floor looked for
  * DRONE_GROUND_DISTANCE under the drone's skids.
- * @param {Kart} kart @param {boolean} takingOff jump pressed on the ground just now
+ * @param {Kart} kart @param {boolean} takingOff jump pressed on the ground just now @param {number} dt
  */
-function UpdateDroneRotors(kart, takingOff) {
+function UpdateDroneRotors(kart, takingOff, dt) {
     const drone = kart.drone;
     const below = { x: drone.position.x, y: drone.position.y, z: drone.position.z - DRONE_GROUND_DISTANCE };
-    const landed = IsDroneLanded(DroneTrace(kart, drone.position, below), takingOff);
+    const onFloor = IsDroneOnFloor(DroneTrace(kart, drone.position, below), takingOff);
+    // Landed it's parked (velocity held at 0), so it stays landed until jump takes off.
+    drone.stillSeconds = StepDroneStillSeconds(drone.stillSeconds ?? 0, onFloor, drone.velocity, dt);
+    const landed = IsDroneLanded(drone.stillSeconds);
     for (const [input, value] of DroneRotorInputs(landed, drone.landed)) {
         for (const entity of drone.parts) {
             if (entity.IsValid()) {

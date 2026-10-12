@@ -125,7 +125,7 @@ function TraceBox(config) {
  *   skinHudLevel?: number, // the level the skin grid's locks were last drawn for — see UpdateSkinHud
  *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud
  *   droneHintShown?: boolean, droneHintResendAt?: number, // drone mode: the "R → EXIT DRONE MODE" hint as last sent — see dev/free-look.js
- *   drone?: { entities: any[], parts: any[], body: any, laser: any[], position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number }, tilt: { pitch: number, roll: number }, yaw: number, landed: boolean, takeoffUntil?: number }, // free look: the drone this player flies, where, how fast, how far it leans, which way it faces, whether it sits on the floor (rotors still) — see dev/free-look.js
+ *   drone?: { entities: any[], parts: any[], body: any, laser: any[], position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number }, tilt: { pitch: number, roll: number }, yaw: number, landed: boolean, stillSeconds: number, takeoffUntil?: number }, // free look: the drone this player flies, where, how fast, how far it leans, which way it faces, how long it's stood still on the floor, whether it has landed there (rotors still) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
@@ -1695,8 +1695,10 @@ const DRONE_RADIUS = 8;
 const DRONE_BOTTOM = 2.5;
 const DRONE_TOP = 2.7;
 // Touching down: with floor (a surface whose normal points up at least
-// DRONE_GROUND_NORMAL_Z) within DRONE_GROUND_DISTANCE under that box, the
-// drone has landed — its rotors run down to a stop ("spindown", then
+// DRONE_GROUND_NORMAL_Z) within DRONE_GROUND_DISTANCE under that box and
+// standing still there (slower than DRONE_LAND_MAX_SPEED) for
+// DRONE_LAND_SECONDS on end, the drone has landed — until then it still
+// flies, sliding along the floor — its rotors run down to a stop ("spindown", then
 // "landed"), and it's parked: every other input does nothing, only jump
 // takes off again — a hop up at DRONE_TAKEOFF_SPEED, not counted as
 // landed for DRONE_TAKEOFF_SECONDS so it gets clear of the floor, the rotors
@@ -1704,6 +1706,8 @@ const DRONE_TOP = 2.7;
 // (tools/models/make-drone-model.mjs).
 const DRONE_GROUND_DISTANCE = 2;
 const DRONE_GROUND_NORMAL_Z = 0.7;
+const DRONE_LAND_SECONDS = 0.5;
+const DRONE_LAND_MAX_SPEED = 5; // units/s
 const DRONE_TAKEOFF_SPEED = 180; // units/s up — with DRONE_RESPONSE ~60 units high
 const DRONE_TAKEOFF_SECONDS = 0.3;
 // Which way it faces: in the air the pilot's view (yaw), turned towards it
@@ -4592,14 +4596,36 @@ function ClipVelocity(velocity, normal) {
 }
 
 /**
- * Whether the drone has landed: the trace down from it (DRONE_GROUND_DISTANCE
- * under its skids) hit floor — a normal pointing up at least
- * DRONE_GROUND_NORMAL_Z, not a wall or a ceiling's edge — and it isn't
- * `takingOff` (jump pressed on the ground, DRONE_TAKEOFF_SECONDS ago at most).
+ * Whether the drone is on the floor: the trace down from it
+ * (DRONE_GROUND_DISTANCE under its skids) hit floor — a normal pointing up
+ * at least DRONE_GROUND_NORMAL_Z, not a wall or a ceiling's edge — and it
+ * isn't `takingOff` (jump pressed on the ground, DRONE_TAKEOFF_SECONDS ago at
+ * most).
  * @param {{ didHit: boolean, normal: Vec } | undefined} floor @param {boolean} takingOff
  */
-function IsDroneLanded(floor, takingOff) {
+function IsDroneOnFloor(floor, takingOff) {
     return Boolean(floor?.didHit) && floor.normal.z >= DRONE_GROUND_NORMAL_Z && !takingOff;
+}
+
+/**
+ * How long the drone has stood still on the floor after `dt` more: on it
+ * (`onFloor`) and slower than DRONE_LAND_MAX_SPEED it counts up, anything
+ * else starts over at 0. Landed (IsDroneLanded) once it reaches
+ * DRONE_LAND_SECONDS — touching down alone doesn't park it.
+ * @param {number} seconds @param {boolean} onFloor @param {Vec} velocity @param {number} dt
+ */
+function StepDroneStillSeconds(seconds, onFloor, velocity, dt) {
+    const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
+    return onFloor && speed < DRONE_LAND_MAX_SPEED ? seconds + dt : 0;
+}
+
+/**
+ * Whether the drone has landed: still on the floor for DRONE_LAND_SECONDS
+ * (StepDroneStillSeconds).
+ * @param {number} stillSeconds
+ */
+function IsDroneLanded(stillSeconds) {
+    return stillSeconds >= DRONE_LAND_SECONDS;
 }
 
 /**
@@ -4822,7 +4848,7 @@ function SpawnDrone(kart) {
         return false;
     }
     const laser = SpawnLaser(position);
-    kart.drone = { entities: [...entities, ...laser], parts, body, laser, position, velocity: { x: 0, y: 0, z: 0 }, tilt: { pitch: 0, roll: 0 }, yaw: angles.yaw, landed: false };
+    kart.drone = { entities: [...entities, ...laser], parts, body, laser, position, velocity: { x: 0, y: 0, z: 0 }, tilt: { pitch: 0, roll: 0 }, yaw: angles.yaw, landed: false, stillSeconds: 0 };
     const camera = kart.pawn.GetCustomCamera();
     camera.SetMode(CustomCameraMode.FOLLOW_POSITION);
     camera.SetFollowConfig({
@@ -4936,21 +4962,25 @@ function UpdateDrone(kart, dt) {
             entity.Move({ position: drone.position, angles });
         }
     }
-    UpdateDroneRotors(kart, takingOff);
+    UpdateDroneRotors(kart, takingOff, dt);
     UpdateDroneLaser(kart, angles, view);
     SetDroneHintHud(kart, true);
 }
 
 /**
- * Touching down the rotors run down to a stop, taking off they run up
- * again (IsDroneLanded, DroneRotorInputs) — the floor looked for
+ * Standing still on the floor for DRONE_LAND_SECONDS the rotors run down to
+ * a stop, taking off they run up again (IsDroneOnFloor, StepDroneStillSeconds,
+ * IsDroneLanded, DroneRotorInputs) — the floor looked for
  * DRONE_GROUND_DISTANCE under the drone's skids.
- * @param {Kart} kart @param {boolean} takingOff jump pressed on the ground just now
+ * @param {Kart} kart @param {boolean} takingOff jump pressed on the ground just now @param {number} dt
  */
-function UpdateDroneRotors(kart, takingOff) {
+function UpdateDroneRotors(kart, takingOff, dt) {
     const drone = kart.drone;
     const below = { x: drone.position.x, y: drone.position.y, z: drone.position.z - DRONE_GROUND_DISTANCE };
-    const landed = IsDroneLanded(DroneTrace(kart, drone.position, below), takingOff);
+    const onFloor = IsDroneOnFloor(DroneTrace(kart, drone.position, below), takingOff);
+    // Landed it's parked (velocity held at 0), so it stays landed until jump takes off.
+    drone.stillSeconds = StepDroneStillSeconds(drone.stillSeconds ?? 0, onFloor, drone.velocity, dt);
+    const landed = IsDroneLanded(drone.stillSeconds);
     for (const [input, value] of DroneRotorInputs(landed, drone.landed)) {
         for (const entity of drone.parts) {
             if (entity.IsValid()) {

@@ -1058,8 +1058,10 @@ Switching it on or off closes the menu.
   `DRONE_TOP` up) along every move, so it lands on its skids, sliding along walls, floors and ceilings — but
   flies **through melons**, players and other drones (the model has no
   collision at all).
-- **Landing:** touching down on a floor (within `DRONE_GROUND_DISTANCE`
-  under its skids) its rotors run down to a stop (the model's `spindown`,
+- **Landing:** on a floor (within `DRONE_GROUND_DISTANCE` under its
+  skids) and **standing still there for `DRONE_LAND_SECONDS` (1.5 s)**
+  (decided; slower than `DRONE_LAND_MAX_SPEED`, moving starts it over) — until
+  then it still flies, sliding along the floor — its rotors run down to a stop (the model's `spindown`,
   then `landed`: still, the recording light blinking on); taking off (jump,
   on the ground) they run up again (`spinup`, then `spin`).
   Landed it also **doesn't turn on the spot** (decided): looking around
@@ -1068,7 +1070,7 @@ Switching it on or off closes the menu.
   **parked** (decided): W/A/S/D, duck and attack do nothing, only **jump**
   takes off again — a hop up at `DRONE_TAKEOFF_SPEED`, not counted as
   landed for `DRONE_TAKEOFF_SECONDS`, then every control works again.
-  `IsDroneLanded`/`DroneRotorInputs` in `dev/drone-logic.js`.
+  `IsDroneOnFloor`/`StepDroneStillSeconds`/`IsDroneLanded`/`DroneRotorInputs` in `dev/drone-logic.js`.
 - **The others see the drone** — who's flying around — and its **laser
   pointer** (decided): a red beam from the camera's blinking recording
   light along where the pilot looks, to the first wall, at most
@@ -1561,6 +1563,38 @@ name or Hammer logic. Constants: `world/bouncer/constants.js`; rules:
 `world/bouncer/logic.js`, applied by `world/bouncer/bouncer.js`
 (`test/world/bouncer.test.mjs`). Details for mappers:
 [Mapping API: bouncers](docs/mapping-api/22-bouncers.md).
+
+## Shopping carts (implemented)
+
+A shopping cart on casters (`tools/models/make-shopping-cart-model.mjs`), a
+physics prop: **a melon can sit in its basket, another bumps into it and
+pushes both**. **Plain physics, no script** (decided: the scripted rolling —
+friction given back, kept upright — glitched in-game): how far it goes is
+the engine's friction. A melon in it rides along, pushed by the basket's
+walls; those aren't walls for bounces and wall jumps (a prop). 3 kg against
+the melon's 2. No name or Hammer logic.
+Details for mappers: [Mapping API: shopping carts](docs/mapping-api/23-shopping-carts.md).
+
+## Catapults (implemented)
+
+A wooden catapult on wheels (`tools/models/make-catapult-model.mjs`): **a
+melon jumps into its bucket, and jump fires** (decided) — the arm swings up
+and throws it the way the catapult faces (`CATAPULT_LAUNCH_FORWARD`/`_UP`,
+or `catapult_<forward>_<up>` in the base's name). **Aimed by bumping**
+(decided): the base is a physics prop that rolls and turns when melons push
+it: the script gives back what friction took and keeps it upright
+(`world/catapult/roll.js`, `CATAPULT_ROLL_*`). Two props: the base and the animated arm
+(`idle`, `fire`, `fired`, `reload`), found by their models; the script keeps
+the arm on its base. **The animation only shows the throw** — the melon is
+held in the bucket by the script (no driving), carried along the arm's
+swing and let go at `CATAPULT_RELEASE_ANGLE` with the throw plus the base's
+own speed; the flight takes no damage until shortly after landing, like a
+jump pad launch (`kart.padFlight`). Respawn, hub, tutorial or a heat
+starting take a melon out. Constants: `world/catapult/constants.js` (the
+arm's geometry and timing shared with the generator); rules:
+`world/catapult/logic.js`, applied by `world/catapult/catapult.js` and
+`movement/driving/drive.js` (`test/world/catapult.test.mjs`). Details for
+mappers: [Mapping API: catapults](docs/mapping-api/24-catapults.md).
 
 ## Open design questions (not yet decided — ask before assuming)
 

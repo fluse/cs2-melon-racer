@@ -5,7 +5,7 @@ import "../helpers/register-cs-script.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
-import { DroneWishVelocity, StepDroneVelocity, IsDroneLanded, DroneRotorInputs, StepDroneYaw, ClipVelocity, DroneTargetTilt, StepDroneTilt, DroneLaserRay, LaserSegments, DRONE_LASER_SEGMENTS } from "../../src/melon_drive/dev/drone-logic.js";
+import { DroneWishVelocity, StepDroneVelocity, IsDroneOnFloor, StepDroneStillSeconds, IsDroneLanded, DroneRotorInputs, StepDroneYaw, ClipVelocity, DroneTargetTilt, StepDroneTilt, DroneLaserRay, LaserSegments, DRONE_LASER_SEGMENTS } from "../../src/melon_drive/dev/drone-logic.js";
 
 const { karts } = await import("../../src/melon_drive/core/kart-registry.js");
 const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
@@ -116,12 +116,25 @@ test("a wall stops the drone and it slides along; a melon in the way doesn't", (
     assert.equal(kart.drone.velocity.x, 0, "nothing left into the wall");
 });
 
-test("landed: floor under it — not a wall, not nothing, not while taking off", () => {
+test("on the floor: floor under it — not a wall, not nothing, not while taking off", () => {
     const floor = { didHit: true, normal: { x: 0, y: 0, z: 1 } };
-    assert.equal(IsDroneLanded(floor, false), true);
-    assert.equal(IsDroneLanded(floor, true), false, "taking off");
-    assert.equal(IsDroneLanded({ didHit: true, normal: { x: 1, y: 0, z: C.DRONE_GROUND_NORMAL_Z - 0.1 } }, false), false, "too steep");
-    assert.equal(IsDroneLanded(undefined, false), false);
+    assert.equal(IsDroneOnFloor(floor, false), true);
+    assert.equal(IsDroneOnFloor(floor, true), false, "taking off");
+    assert.equal(IsDroneOnFloor({ didHit: true, normal: { x: 1, y: 0, z: C.DRONE_GROUND_NORMAL_Z - 0.1 } }, false), false, "too steep");
+    assert.equal(IsDroneOnFloor(undefined, false), false);
+});
+
+test("landed: only after DRONE_LAND_SECONDS still on the floor — moving or leaving it starts over", () => {
+    const still = { x: 0, y: 0, z: 0 };
+    const dt = C.DRONE_LAND_SECONDS / 4;
+    let seconds = 0;
+    for (let i = 0; i < 3; i++) {
+        seconds = StepDroneStillSeconds(seconds, true, still, dt);
+    }
+    assert.equal(IsDroneLanded(seconds), false, "touching down alone doesn't land it");
+    assert.equal(StepDroneStillSeconds(seconds, true, { x: C.DRONE_LAND_MAX_SPEED, y: 0, z: 0 }, dt), 0, "sliding along the floor");
+    assert.equal(StepDroneStillSeconds(seconds, false, still, dt), 0, "off the floor");
+    assert.equal(IsDroneLanded(StepDroneStillSeconds(seconds, true, still, dt)), true);
 });
 
 test("rotors: run down to a stop on touching down, up again on taking off, nothing in between", () => {
@@ -142,7 +155,9 @@ test("landed, looking around doesn't turn the drone; taking off it turns back to
     world.traceBox = (c) => c.end.z < c.start.z && c.end.x === c.start.x && c.end.y === c.start.y
         ? { didHit: true, fraction: 0.25, end: { ...c.start, z: c.start.z - 0.5 }, normal: { x: 0, y: 0, z: 1 }, startedInSolid: false }
         : { didHit: false, fraction: 1, end: c.end, normal: { x: 0, y: 0, z: 0 }, startedInSolid: false };
-    UpdateDrone(kart, 0.1);
+    for (let t = 0; t <= C.DRONE_LAND_SECONDS + 0.1; t += 0.1) {
+        UpdateDrone(kart, 0.1);
+    }
     const yaw = kart.drone.body.GetAbsAngles().yaw;
     kart.pawn.eyeAngles = { pitch: 0, yaw: yaw + 120, roll: 0 };
     UpdateDrone(kart, 0.1);
@@ -157,7 +172,7 @@ test("landed, looking around doesn't turn the drone; taking off it turns back to
     assert.ok(close(kart.drone.body.GetAbsAngles().yaw, yaw + 120), "in the air: facing the view again");
 });
 
-test("touching down the drone's rotors run down once; jump takes off and runs them up", () => {
+test("standing still on the floor the drone's rotors run down once; jump takes off and runs them up", () => {
     const body = kart.drone.body;
     const Fired = (input) => world.fired.filter((f) => f.target === body && f.input === input).map((f) => f.value);
     world.traceBox = (c) => c.end.z < c.start.z && c.end.x === c.start.x && c.end.y === c.start.y
@@ -165,6 +180,11 @@ test("touching down the drone's rotors run down once; jump takes off and runs th
         : { didHit: false, fraction: 1, end: c.end, normal: { x: 0, y: 0, z: 0 }, startedInSolid: false };
     UpdateDrone(kart, 0.1);
     UpdateDrone(kart, 0.1);
+    assert.equal(kart.drone.landed, false, "touching down: still flying until it has stood still a while");
+    assert.deepEqual(Fired("SetAnimationNotLooping"), []);
+    for (let t = 0; t <= C.DRONE_LAND_SECONDS; t += 0.1) {
+        UpdateDrone(kart, 0.1);
+    }
     assert.equal(kart.drone.landed, true);
     assert.deepEqual(Fired("SetAnimationNotLooping"), ["spindown"], "once, not every tick");
     const parkedAt = { ...kart.drone.position };
