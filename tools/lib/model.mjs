@@ -143,8 +143,11 @@ export class Mesh {
      * A round tube along `centers` (3D points), smooth all around: `radius` a
      * number or radius(i) per point, `sides` around; with `caps` both ends
      * closed flat. Bends without twisting (each ring's frame follows the last).
+     * `slopedNormals`: where the radius changes along the tube, the normals
+     * tilt with the surface (a rounded end, a pinched seam, a lathed profile
+     * on a straight line of centers) instead of pointing straight out.
      */
-    Tube(centers, radius, sides, part, caps = true) {
+    Tube(centers, radius, sides, part, caps = true, { slopedNormals = false } = {}) {
         const R = typeof radius === "function" ? radius : () => radius;
         const n = centers.length;
         const tangents = centers.map((_, i) => V3.Unit(V3.Sub(centers[Math.min(i + 1, n - 1)], centers[Math.max(i - 1, 0)])));
@@ -156,11 +159,14 @@ export class Mesh {
             const side = V3.Cross(t, normal);
             if (i > 0) along += Math.hypot(...V3.Sub(c, centers[i - 1]));
             const r = R(i);
+            const prev = Math.max(i - 1, 0), next = Math.min(i + 1, n - 1);
+            const slope = slopedNormals ? (R(next) - R(prev)) / Math.hypot(...V3.Sub(centers[next], centers[prev])) : 0;
             const ring = [];
             for (let k = 0; k <= sides; k++) { // k = sides repeats k = 0 with u = 1, for the UV seam
                 const phi = (2 * Math.PI * k) / sides;
                 const radial = V3.Add(V3.Scale(normal, Math.cos(phi)), V3.Scale(side, Math.sin(phi)));
-                ring.push(this.#Corner(V3.Add(c, V3.Scale(radial, r)), radial, [(k / sides) * ((2 * Math.PI * r) / this.uvTile), along / this.uvTile]));
+                const shade = slope ? V3.Unit(V3.Sub(radial, V3.Scale(t, slope))) : radial;
+                ring.push(this.#Corner(V3.Add(c, V3.Scale(radial, r)), shade, [(k / sides) * ((2 * Math.PI * r) / this.uvTile), along / this.uvTile]));
             }
             return { c, t, ring };
         });
@@ -177,6 +183,39 @@ export class Mesh {
             const center = this.#Corner(c, out, [0, 0]);
             const flat = ring.map(([v, vt]) => this.#Corner(this.v[v - 1], out, this.vt[vt - 1]));
             for (let k = 0; k < sides; k++) this.#SmoothTri(center, flat[k], flat[k + 1], part);
+        }
+    }
+
+    /**
+     * A smooth surface through `grid` (rows of 3D points, all the same
+     * length; row i + 1 runs next to row i), normals from the neighbouring
+     * points — a canopy, a flag. With `away` (a 3D point) it faces away from
+     * that point, `flip` turns it around (the other side of a two-sided
+     * surface: the same grid again, flipped). UVs run 0..1 across the columns
+     * and down the rows, times `uvScale`. With `wrap` the columns go all the
+     * way round (each row's last point is its first again): smooth over that
+     * seam too.
+     */
+    Surface(grid, part, { away, flip = false, uvScale = [1, 1], wrap = false } = {}) {
+        const rows = grid.length, cols = grid[0].length;
+        const Next = j => (wrap && j === cols - 1 ? 1 : Math.min(j + 1, cols - 1));
+        const Prev = j => (wrap && j === 0 ? cols - 2 : Math.max(j - 1, 0));
+        const corners = grid.map((row, i) => row.map((p, j) => {
+            const du = V3.Sub(row[Next(j)], row[Prev(j)]);
+            const dv = V3.Sub(grid[Math.min(i + 1, rows - 1)][j], grid[Math.max(i - 1, 0)][j]);
+            let n = V3.Cross(du, dv);
+            if (Math.hypot(...n) < 1e-9) n = away ? V3.Sub(p, away) : [0, 0, 1];
+            n = V3.Unit(n);
+            if (away && V3.Dot(n, V3.Sub(p, away)) < 0) n = V3.Scale(n, -1);
+            if (flip) n = V3.Scale(n, -1);
+            return this.#Corner(p, n, [(j / (cols - 1)) * uvScale[0], (i / (rows - 1)) * uvScale[1]]);
+        }));
+        for (let i = 0; i + 1 < rows; i++) {
+            for (let j = 0; j + 1 < cols; j++) {
+                const a = corners[i][j], b = corners[i][j + 1], c = corners[i + 1][j + 1], d = corners[i + 1][j];
+                this.#SmoothTri(a, b, c, part);
+                this.#SmoothTri(a, c, d, part);
+            }
         }
     }
 
@@ -276,6 +315,18 @@ export function ChamferedRect(cu, cv, w, h, chamfer) {
     const u0 = cu - w / 2, u1 = cu + w / 2, v0 = cv - h / 2, v1 = cv + h / 2, c = chamfer;
     if (c <= 0) return [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
     return [[u0 + c, v0], [u1 - c, v0], [u1, v0 + c], [u1, v1 - c], [u1 - c, v1], [u0 + c, v1], [u0, v1 - c], [u0, v0 + c]];
+}
+
+/** A seeded random 0..1 (mulberry32): the same numbers on every run, so a generator's output doesn't change. */
+export function SeededRandom(seed) {
+    let a = seed >>> 0;
+    return () => {
+        a = (a + 0x6d2b79f5) >>> 0;
+        let t = a;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
 }
 
 /**
@@ -390,9 +441,13 @@ const AnimFile = ({ name, file, looping }) => `					{
  * meshes, each moving with its bone — model space, bind pose), each
  * `<name>_<part>` material remapped to materials[part]; with `animations`
  * ([{ name, file (an .smd from SmdAnimationText), looping }]) also an
- * animation list — the first one is listed first.
+ * animation list — the first one is listed first. For a physics prop that
+ * moves: `hulls` ([{ file, surfaceProp }], each one convex piece — a
+ * dynamic body can't use a concave mesh, Valve's own carts are built the
+ * same way) in place of `physicsObj`, and `body` ({ mass, linearDamping,
+ * angularDamping }) for its mass (kg) and damping.
  */
-export function VmdlText({ name, mesh, physicsObj, materials, animations = [], surfaceProp = "default" }) {
+export function VmdlText({ name, mesh, physicsObj, materials, animations = [], surfaceProp = "default", hulls = [], body }) {
     const remaps = Object.entries(materials).flatMap(([part, vmat]) => [
         `\t\t\t\t\t\t\t{ from = "${name}_${part}.vmat" to = "${vmat}" },`,
         `\t\t\t\t\t\t\t{ from = "${name}_${part}" to = "${vmat}" },`,
@@ -425,6 +480,38 @@ export function VmdlText({ name, mesh, physicsObj, materials, animations = [], s
 							exception_list = [  ]
 						}
 					},`).join("")}
+				]
+			},` : "";
+    const hullList = hulls.length ? `
+			{
+				_class = "PhysicsShapeList"
+				children =
+				[${hulls.map(({ file, surfaceProp: prop = surfaceProp }, i) => `
+					{
+						_class = "PhysicsHullFile"
+						filename = "${file}"
+						parent_bone = ""
+						surface_prop = "${prop}"
+						collision_tags = "solid"
+						name = "${name}_hull_${i}"
+					},`).join("")}
+				]
+			},` : "";
+    const bodyMarkup = body ? `
+			{
+				_class = "PhysicsBodyMarkupList"
+				children =
+				[
+					{
+						_class = "PhysicsBodyMarkup"
+						target_body = ""
+						mass_override = ${body.mass.toFixed(3)}
+						inertia_scale = 1.0
+						linear_damping = ${body.linearDamping.toFixed(2)}
+						angular_damping = ${body.angularDamping.toFixed(2)}
+						use_mass_center_override = false
+						mass_center_override = [ 0.0, 0.0, 0.0 ]
+					},
 				]
 			},` : "";
     const animationList = animations.length ? `
@@ -479,7 +566,7 @@ ${remaps}
 						}
 					},
 				]
-			},${animationList}${physicsList}
+			},${animationList}${physicsList}${hullList}${bodyMarkup}
 		]
 		model_archetype = ""
 		primary_associated_entity = ""

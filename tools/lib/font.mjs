@@ -1,9 +1,11 @@
 // Shared by the model generators that cut text out of a font
-// (make-logo-model.mjs, make-podium-model.mjs): a line of text as flat 2D
+// (make-logo-model.mjs, make-podium-model.mjs, ...): a line of text as flat 2D
 // shapes ({ outer, holes }: outer counter-clockwise, holes clockwise, y up),
-// ready for Mesh.Extrude. Bungee (tools/lib/fonts/, OFL) is the logo's font.
+// ready for Mesh.Extrude, and GrowShapes to grow or shrink them. Bungee
+// (tools/lib/fonts/, OFL) is the logo's font.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import ClipperLib from "clipper-lib";
 import opentype from "opentype.js";
 import { Area } from "./model.mjs";
 
@@ -110,4 +112,35 @@ export function TextShapes(font, text, capHeight, { letterSpacing = 0, curveStep
         pen += glyph.advanceWidth * scale + letterSpacing;
     }
     return shapes;
+}
+
+/**
+ * `shapes` grown by `delta` units (shrunk where it's negative), round
+ * corners, overlaps merged — an outline around text, or a smaller layer of it
+ * for a puffed-up look. Corners within `tolerance` of the true arc.
+ */
+export function GrowShapes(shapes, delta, tolerance = 0.25) {
+    const S = 1000; // Clipper works on integers
+    const paths = shapes.flatMap(s => [s.outer, ...s.holes]).map(c => c.map(([x, y]) => ({ X: Math.round(x * S), Y: Math.round(y * S) })));
+    const offset = new ClipperLib.ClipperOffset(2, tolerance * S);
+    offset.AddPaths(paths, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+    const tree = new ClipperLib.PolyTree();
+    offset.Execute(tree, delta * S);
+    const out = [];
+    const ToPts = node => Clean(node.Contour().map(p => [p.X / S, p.Y / S]));
+    const Walk = node => {
+        for (const outer of node.Childs()) {
+            const c = ToPts(outer);
+            if (c.length < 3) continue;
+            const shape = { outer: Area(c) > 0 ? c : [...c].reverse(), holes: [] };
+            for (const hole of outer.Childs()) {
+                const h = ToPts(hole);
+                if (h.length >= 3) shape.holes.push(Area(h) < 0 ? h : [...h].reverse());
+                Walk(hole); // islands inside a hole
+            }
+            out.push(shape);
+        }
+    };
+    Walk(tree);
+    return out;
 }

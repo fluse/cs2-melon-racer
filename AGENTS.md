@@ -99,18 +99,27 @@ site/*.html, style.css, build.mjs        # GitHub Page: `npm run site` -> site/d
 tools/                                    # generators, `node tools/<folder>/<file>.mjs`, one folder per kind of output; each writes its files relative to the addon root:
                                           #   lib/ shared helpers (no output of their own), models/, materials/, images/ (panorama PNGs), media/ (GIFs); a new tool goes
                                           #   into the fitting one, never loose in tools/
-tools/lib/font.mjs                        # shared by make-logo-model.mjs and make-podium-model.mjs: a line of text in a font (Bungee) as 2D shapes
-tools/lib/model.mjs                       # shared by the model generators: mesh builder (extrude, triangles), Mesh.Tube/Cone, Helix, V3 vector math, 2D outlines (Shape, Circle,
-                                          #   RadialOutline for teeth/stars, Slot, ChamferedRect), .obj/.smd/.vmdl/.dmx/.vmat writers (SmdText + SmdAnimationText + VmdlText's
+tools/lib/font.mjs                        # shared by the text-cutting model generators (logo, podiums, signs): a line of text in a font (Bungee) as 2D shapes, GrowShapes (clipper offset)
+tools/lib/model.mjs                       # shared by the model generators: mesh builder (extrude, triangles), Mesh.Tube/Cone, Mesh.Surface (a smooth grid: canopy, flag), Helix, V3 vector math, 2D outlines (Shape, Circle,
+                                          #   RadialOutline for teeth/stars, Slot, ChamferedRect), SeededRandom (same output every run), .obj/.smd/.vmdl/.dmx/.vmat writers (SmdText + SmdAnimationText + VmdlText's
                                           #   animations for skinned, animated models) — reuse them before writing a generator-local helper
 tools/lib/png.mjs                         # the PNG encoder make-icons.mjs uses
 tools/models/make-ball-model.mjs          # a ball-pit ball as models/melon_racer/ball.vmdl (+ ball.obj): 320-triangle icosphere in inflatable.vmat,
+tools/lib/inflatable.mjs                  # shared by the inflatable hub decoration (gate, pavilion, tree, hedge, inflatable podium): SegmentedTube (pinched seams,
+                                          #   a strap around each), SquashedRing/InflatableFoot, InflatableBlock + BlockOutline (a soft superellipsoid box), Pillow (a lathed ellipsoid with a pinched seam: tree crowns, hedge foliage), GuyRope + RopeLoop, Blower, PolylinePath;
+                                          #   the faceted ones (rocks, mountain): PolytopePlanes + Polytope (a convex polytope from seeded planes), Panel (a face puffed between pinched seams),
+                                          #   PanelPuff/PuffLift, PolytopeCollision, SidePoint
                                           #   a sphere primitive for collision, light (mass_override) — color each prop_physics by its render color
 tools/models/make-bouncer-model.mjs       # a foam swinger on a spring as models/melon_racer/bouncer/bouncer.vmdl: a tall flat pink ribbed foam paddle,
                                           #   lime top edge, upright on a chrome coil skinned to a bone chain; looping "swing" (side to side, the coil bending
                                           #   along) + "idle"; a prop_dynamic, animations left empty — world/bouncer/ starts the swing at a random point (SWING_SECONDS imported from there) — an obstacle in the air; collision: base + coil
                                           #   static, the paddle on the "head" bone (VmdlText physicsObj as [{ file, bone }]); materials/melon_racer/bouncer/
 tools/models/make-buffer-stop-model.mjs   # a buffer stop (Prellbock) as models/melon_racer/buffer_stop/buffer_stop.vmdl: magenta beam with a white chevron,
+tools/models/make-boutique-model.mjs      # the hub's Melon Boutique, a kit in models/melon_racer/boutique/: the booth (origin: floor, middle of its open front, facing +X, 534 wide, 459 deep) —
+                                          #   boutique_frame (inflatable tube loop on four legs, feet, blower; 3.5k), _wall (inflatable back wall), _awning + _awning_stripes (striped,
+                                          #   scalloped, each tinted on its own), _sign (MELON BOUTIQUE, both sides) — and the display: boutique_tier_<16..128> (stage-look step blocks
+                                          #   128 x 64 to stack into the level ladder), boutique_ring (a swim ring a melon sits in, its origin 9.4 above), boutique_plate_<skin> (name + level
+                                          #   from MELON_SKIN_NAMES/_LEVELS, re-run for a new skin); the melons are prop_dynamics placed by hand; materials/melon_racer/boutique/
                                           #   two buffers, bent grey legs on crossbars (696 triangles); a track obstacle, coarser _physics.obj collision; materials/melon_racer/buffer_stop/
 tools/models/make-checkpoint-model.mjs    # the checkpoint gate's frame (glowing pillars, beam, floating diamond) as models/melon_racer/checkpoint_gate.vmdl
                                           #   (+ _physics.obj collision, materials/melon_racer/checkpoint_gate/checkpoint_gate_{body,trim,glow}.vmat); same footprint as the prefab's old poles
@@ -119,10 +128,78 @@ tools/models/make-drone-model.mjs         # the free-look drone as models/melon_
                                           #   about a melon in size (SPAN 16 across), four rotors in guard rings, each on its own bone, looping "spin" (diagonal pairs the other way), "spindown" -> "landed" on touching down, "spinup" taking off, + "idle";
                                           #   no collision (the script traces it against the world); in the point_template template_drone; materials/melon_racer/drone/
 tools/models/make-laser-model.mjs         # one segment of the drone's laser as models/melon_racer/laser/laser.vmdl: a thin glowing red rod
+tools/models/make-half-pipe-model.mjs     # a half-pipe slide as mesh geometry, models/melon_racer/half_pipe.dmx for Hammer's File → Import (DmxText in model.mjs): a U-shaped
+                                          #   sky blue shell (RADIUS 64, ARC_HALF_ANGLE up each side) down along +X: the slide (LENGTH 1024, DROP 256, smootherstep), a curve over
+                                          #   the edge, a STEEP_DROP 1000 drop at STEEP_ANGLE 58 (over 60 it'd count as a wall), a wide bottom curve up into a KICK_ANGLE 15 kicker;
+                                          #   rounded white lips, graphite legs (2.9k triangles); materials/melon_racer/half_pipe/ — the top 30 degrees of each side count as walls (bounces)
+tools/models/make-bridge-model.mjs        # a cable-stayed bridge after Cologne's Severinsbruecke as a race track, mesh geometry, models/melon_racer/bridge.dmx for Hammer's File → Import
+                                          #   (DmxText in model.mjs): a straight steel deck LENGTH 6000 along +X, the road DECK_HEIGHT 800 up, ROAD_WIDTH 512 between parapets (40, the walls
+                                          #   melons bounce off) with a railing to 96 (over a ground jump), asphalt with white markings; an A-pylon (PYLON_TOP 2000) whose legs stand on a
+                                          #   pier in the river, 12 stay cables in two inclined planes from its head to brackets outside the deck (205+ over the road), a second river pier
+                                          #   with cutwaters, twin columns on land (1.6k triangles); origin on the floor (river bed) under the road's start, the river along Y;
+                                          #   materials/melon_racer/bridge/ — needs a melon_respawn trigger below and a func_water under FOUNDATION_TOP
+tools/models/make-heal-tent-model.mjs     # the hub's first-aid tent, models/melon_racer/heal_tent/heal_tent_<piece>.vmdl, all at one origin (floor, middle; the tunnel along X):
+                                          #   _frame (two inflatable arches in the gates' style, feet, guy ropes, blower; solid), _canvas (white canvas down to the floor, green pharmacy
+                                          #   crosses on both walls and the roof, a HEAL sign under each arch; walls + roof solid), _floor (a 1-high mat with a glowing cross: the
+                                          #   heal_zone_full trigger goes over it), _cross (an inflatable green cross on a mast on the roof, its own bone: looping "spin", a prop_dynamic;
+                                          #   skinned .smd turned back like the pavilion flag); ~5k triangles in all; materials/melon_racer/heal_tent/
+tools/models/make-hub-gate-model.mjs      # the hub's route gate, one model for every route: an inflatable event arch as models/melon_racer/hub_gate/hub_gate.vmdl (2.7k triangles)
+                                          #   (a fat tube bent into a U in the white surfaces/inflatable.vmat, tinted by the prop's render color, pinched seams with dark straps, squashed rings on base plates as feet, guy ropes to stakes,
+                                          #   a blower with its duct at the right foot; the inflatable vinyl's roughness; collision hub_gate_physics.obj: tube, feet, blower), and
+                                          #   a name sign per route prefab (not the tutorial), hub_gate_name_<route>.vmdl (2.4-3.2k, no collision): curved dark boards on brackets
+                                          #   front and back with the name in white Bungee, bent along the arch — same origin, placed onto the gate; materials/melon_racer/hub_gate/
+                                          #   — re-run after adding or renaming a route
+tools/models/make-pavilion-model.mjs      # the hub's Grand Prix pavilion: an inflatable spider tent in the gates' style (lib/inflatable.mjs) — four legs curving in to a crown,
+                                          #   a white canvas canopy under them with arched openings and dark hem piping, a checkered flag on top (waving: skinned .smd, looping "wave"), pennant bunting, a "GRAND PRIX"
+                                          #   sign over the +X entrance (both sides), a glowing light ring inside (9.1k triangles placed). Split into
+                                          #   models/melon_racer/pavilion/pavilion_<piece>.vmdl so each is tinted on its own (render color: vinyl, canvas, pennants, letters,
+                                          #   light ring; never the dark parts), repeated ones built once: leg (4x), canopy (4x), bunting (3x), sign, crown, flag, light,
+                                          #   blower — all at the pavilion's origin, only turned in 90 degree steps; leg + blower solid; materials/melon_racer/pavilion/
+tools/models/make-tree-model.mjs          # inflatable trees for the hub's decoration, three variants (VARIANTS: round, slim _2, wide _3; ~3.5k triangles each), in the gates' style (lib/inflatable.mjs, the white tinted vinyl):
+                                          #   models/melon_racer/tree/tree_trunk<suffix>.vmdl (swaying segmented trunk, straps, branches, foot ring on a plate, three guy ropes,
+                                          #   a valve; solid: trunk + foot) and tree_crown<suffix>.vmdl (puffy pillows with a pinched seam, not solid) — same origin, tinted on their own
+tools/models/make-tree-bed-model.mjs      # the beds the trees stand in, around a tree's origin (136 across, every variant's stakes inside), hard parts, flat-shaded: models/melon_racer/tree/
+                                          #   tree_bed_wall (low wall of 12 curved stone blocks, 10 high; 528 triangles), tree_bed_fence (picket fence on the wall; 944) / tree_bed_fence_ground
+                                          #   (the same on the floor), tree_bed_mulch / tree_bed_grass (the fill, a low mound; 216) — mixed freely, all solid; stone + wood tinted per prop
+tools/models/make-hedge-model.mjs         # inflatable hedges for the hub, three variants (VARIANTS: box, bushy _2, topiary _3; 128 long along +X from the origin, chain them like the park walls),
+                                          #   two models each, tinted on their own, same origin: hedge_foliage<suffix> (box chambers or the trees' crown pillows, held up off the ground,
+                                          #   a valve; solid: a box from the ground up + the topiary balls) and hedge_branches<suffix> (a row of plants: trunks flared at the foot,
+                                          #   branches up into the foliage, twigs, the topiaries' stems, a dark ground strip; no collision); ~2-3k triangles a hedge;
+                                          #   models/melon_racer/hedge/, materials/melon_racer/hedge/
+tools/models/make-park-model.mjs          # hard park furniture for the hub (not inflatable), models/melon_racer/park/park_<piece>.vmdl: wall / wall_64 (stone blocks in a running bond, mortar joints,
+                                          #   cap stones; 128 / 64 long along +X from the origin, chain them; 39 high: 652 / 360 triangles), wall_tall / wall_tall_64 (82 high; 1352 / 696),
+                                          #   wall_pillar / wall_pillar_tall (ends + corners, a stone ball on top; 60 / 104 high; 540 / 820),
+                                          #   fence (picket fence, 128 long, its post at the start; 420) + fence_post (the far end; 60), bench (wooden slats on cast-iron frames, faces +Y; ~1.2k);
+                                          #   collision a box or two each; stone + paint tinted per prop; materials/melon_racer/park/
+tools/models/make-mountain-model.mjs      # an inflatable mountain kit for the backdrop (scenery, coarse convex collision), the rocks' faceted panels, models/melon_racer/mountain/mountain_<piece>.vmdl:
+                                          #   peak + peak_2 (panels on a jagged cone; ~0.85-1k triangles), shoulder, ridge, foothill (~1-1.2k) — overlap and turn them to build a mountain;
+                                          #   peak, peak_2, ridge with a snow cap, <piece>_snow.vmdl (same origin, tinted on its own; ~0.6-0.8k): the panels above the snow line, scalloped lower edge
+tools/models/make-rock-model.mjs          # inflatable rocks for the map borders, four variants (VARIANTS: boulder, spire _2, slab _3, small _4; ~400-530 triangles each): a convex polytope
+                                          #   cut by seeded random planes, each face a vinyl panel puffed out between pinched seams on its edges, sunk into the floor, a valve, two tie-downs;
+                                          #   models/melon_racer/rock/rock<suffix>.vmdl, tinted per prop, collision the polytope (convex); a jump reaches their tops — back a border with a clip brush
+tools/models/make-inflatable-podium-model.mjs # an inflatable winners' podium, the solid podium's footprint and heights (its podium_spawn_<place> fit): per place
+                                          #   inflatable_podium_body_<n> (soft block sunk into the floor, corner piping, seam band, grab loops, valve; solid), _top_<n> (cushion with piping;
+                                          #   solid), _number_<n> (puffed Bungee digit on a round badge), + _base (ground mat, D-rings, stakes) and _blower —
+                                          #   models/melon_racer/inflatable_podium/, all at one origin, each tinted on its own (10.4k triangles in all)
+tools/models/make-stage-model.mjs         # the round stage under the pavilion: a deck (radius 272, 16 high; panel joints, a checkered ring, a dark inlay ring), low steps round
+                                          #   it (4 x 4 units: melons roll up) with an LED strip on every riser and dark anti-slip edges, and a platform reaching out at each
+                                          #   opening (+-X, +-Y) with front steps, LEDs and two bollards with glowing caps —
+                                          #   models/melon_racer/stage/stage_{deck,steps,step_lights,thrust,thrust_lights}.vmdl, the repeated ones built once (a quarter, the +X
+                                          #   platform; 4x by yaw), all at one origin, each tinted on its own (9k triangles placed; flat markings are single faces); deck, steps, platforms, bollards solid;
+                                          #   + stage_platform(_lights).vmdl, its own origin: the backdrop platform (448 x 832, steps across its front) the hub's podium, rocks and trees stand on
                                           #   DRONE_LASER_SEGMENT long (imported from src/melon_drive/dev/constants.js), no collision; in template_drone_laser
 tools/models/make-logo-model.mjs          # extrudes MELON RACER (Bungee, slanted like the logo, lime green outline ring around them) into mesh geometry,
                                           #   models/melon_racer/logo_text.dmx for Hammer's File → Import (DmxText in model.mjs),
                                           #   + materials/melon_racer/logo/logo_text_{face,outline,holo}.vmat (holo = an opaque copy of holo_dashes for the letter fronts) (opentype.js + earcut + clipper-lib, devDependencies)
+tools/models/make-drone-display-model.mjs # the hub's drone show: models/melon_racer/drone_display/drone_display_table.vmdl (a round table, a landing pad with an H on top,
+                                          #   an LED ring; 616 triangles) to put a prop_dynamic drone on (Default Animation "landed", 34.5 above its origin), and _sign.vmdl
+                                          #   (a graphite board between two posts, both sides: drone icon, DRONE MODE, EXPLORE THE WORLD FROM ABOVE, E > ACTIONS > DRONE MODE
+                                          #   as flat Bungee faces; 2.7k); in the stage's look, collision simple boxes/cylinders; materials/melon_racer/drone_display/
+tools/models/make-floor-spotlight-model.mjs # an event floor spotlight for the hub (e.g. round the pavilion): models/melon_racer/floor_spotlight/floor_spotlight.vmdl (graphite yoke and head
+                                          #   tilted TILT 15 degrees towards +X, cooling fins, glowing warm white lens, a light grey base tinted per prop; 820 triangles, solid) and
+                                          #   floor_spotlight_beam.vmdl (same origin: two open cones out of the lens, 1536 long, in an additive two-sided csgo_effects material like
+                                          #   Valve's materials/effects/smoke/lightshaft_*: fresnel edges, depth feather, fading along U; 64 triangles, no collision) — the beam
+                                          #   lights nothing: a light_spot at the lens (the output says where); materials/melon_racer/floor_spotlight/
 tools/models/make-podium-model.mjs        # the hub podium (steps 2-1-3 in the docs/GAME_CI.md colors, glowing Bungee place numbers) as mesh geometry,
                                           #   models/melon_racer/podium.dmx for Hammer's File → Import (DmxText in model.mjs), + materials/melon_racer/podium/podium_*.vmat; prints where the podium_spawn_<place> info_targets go
 tools/models/make-saw-blade-model.mjs     # a circular saw blade as models/melon_racer/saw_blade/saw_blade.vmdl (DIAMETER 36, scaled in the script — never non-uniformly in Hammer): 24 hooked teeth with wider carbide tips,

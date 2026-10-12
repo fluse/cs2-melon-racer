@@ -21,11 +21,11 @@ this folder, the script doesn't know about it.
 | 2 | [Core entities](02-core-entities.md) | Required entities (`point_script`s, HUD, melon template, hub) and spawn points |
 | 3 | [Effect templates](03-effect-templates.md) | Break burst, chunks, perfect spark, heal effect, boost trail, prediction dots |
 | 4 | [Tracks](04-tracks.md) | Start line, checkpoints, respawn spots, finish line, laps |
-| 5 | [Hub](05-hub.md) | Hub start area, `hub_teleport`, podium |
+| 5 | [Hub](05-hub.md) | Hub start area, `hub_teleport`, route gates, Grand Prix pavilion, podium |
 | 6 | [Paint triggers](06-paint-triggers.md) | Recolor the melon |
 | 7 | [Teleporters](07-teleporters.md) | Generic teleports, respawn teleporters |
 | 8 | [Kill & respawn triggers](08-kill-triggers.md) | Break the melon on the spot, or send it back to its checkpoint |
-| 9 | [Heal zones](09-heal-zones.md) | Heal over time, full-heal zones |
+| 9 | [Heal zones](09-heal-zones.md) | Heal over time, full-heal zones, first-aid tent |
 | 10 | [Lift zones](10-lift-zones.md) | Climb shafts by bouncing between walls |
 | 11 | [Camera zones](11-camera-zones.md) | Zoom out/in, front view, close-up, side view (2D) |
 | 12 | [Jump pads](12-jump-pads.md) | Timed launch pads, no damage |

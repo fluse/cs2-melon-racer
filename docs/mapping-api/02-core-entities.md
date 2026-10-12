@@ -52,7 +52,9 @@ by `SetModel`, and a map ships only the models its own entities use — so
 
 A new skin: add it to `SKINS` in `tools/materials/make-melon-skins.mjs` (run it,
 compile), to `MELON_SKINS`, as a `usermenu_skin_<key>` button in
-`speedometer.xml`, and put its model in the map.
+`speedometer.xml`, and put its model in the map. For the hub's Melon Boutique, re-run
+`tools/models/make-boutique-model.mjs` for its name plate (`boutique_plate_<key>`) and set a
+`prop_dynamic` of the skin on a `boutique_ring`, its origin 9.4 above the ring's.
 
 ---
 [← Conventions](01-conventions.md) · [Mapping API](README.md) · [Effect templates →](03-effect-templates.md)
