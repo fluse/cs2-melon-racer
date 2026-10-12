@@ -1083,7 +1083,8 @@ motion off) — no damage, but a running time trial's clock keeps going.
 While flying, the bottom left corner shows a keycap R **EXIT DRONE MODE**
 (`drone_hint`, the same key hints as spectating); R does it, like USE → "Exit Drone Mode".
 While it's parked (landed), a keycap SPACE **JUMP TO START** shows above it
-(`drone_hint_takeoff`). The speed panel shows the **drone's** speed (all of
+(`drone_hint_takeoff`), in the air a keycap CTRL **DESCEND**
+(`drone_hint_descend`). The speed panel shows the **drone's** speed (all of
 it, climbing and diving included; `Boosted` while attack has it above
 `DRONE_SPEED`), not the frozen melon's (`UpdateSpeedHud`). Switching off removes the drone and puts the chase
 camera back on the melon. A heat starting, a new pawn, the respawn button

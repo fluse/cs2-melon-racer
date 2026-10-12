@@ -370,6 +370,7 @@ test("drone mode: SPACE → JUMP TO START only while parked; the speed panel sho
     UpdateSpeedHud(0, a);
     a.pawn.pressed.clear();
     assert.equal(hud.Has(0, "drone_hint_takeoff", "Hidden"), true, "flying: no takeoff hint");
+    assert.equal(hud.Has(0, "drone_hint_descend", "Hidden"), false, "flying: CTRL → DESCEND");
     const v = a.drone.velocity;
     assert.ok(Math.hypot(v.x, v.y, v.z) > 0);
     assert.equal(hud.Variable(0, "speed_panel", "speed"), String(Math.round(Math.hypot(v.x, v.y, v.z) * C.UNITS_TO_KMH)), "the drone's speed, not the frozen melon's");
@@ -383,6 +384,7 @@ test("drone mode: SPACE → JUMP TO START only while parked; the speed panel sho
     }
     assert.equal(a.drone.landed, true);
     assert.equal(hud.Has(0, "drone_hint_takeoff", "Hidden"), false, "parked: SPACE → JUMP TO START");
+    assert.equal(hud.Has(0, "drone_hint_descend", "Hidden"), true, "parked: no descend hint");
     a.pawn.justPressed.add("JUMP");
     UpdateDrone(a, 0.1);
     a.pawn.justPressed.clear();

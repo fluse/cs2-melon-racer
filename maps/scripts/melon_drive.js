@@ -4866,7 +4866,8 @@ function SpawnDrone(kart) {
  * The hint in the bottom left corner, "R → EXIT DRONE MODE" (#drone_hint): shown
  * while flying — sent on change and again every HUD_RESEND_SECONDS —,
  * hidden at once when drone mode ends. Above it "SPACE → JUMP TO START"
- * (#drone_hint_takeoff) while the drone is parked.
+ * (#drone_hint_takeoff) while the drone is parked, "CTRL → DESCEND"
+ * (#drone_hint_descend) while it's in the air.
  * @param {Kart} kart @param {boolean} on @param {boolean} [parked]
  */
 function SetDroneHintHud(kart, on, parked = false) {
@@ -4881,6 +4882,7 @@ function SetDroneHintHud(kart, on, parked = false) {
     if (slot !== undefined) {
         GetSpeedHud()?.SetHasClassForPlayer(slot, "drone_hint", "Hidden", !on);
         GetSpeedHud()?.SetHasClassForPlayer(slot, "drone_hint_takeoff", "Hidden", !(on && parked));
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "drone_hint_descend", "Hidden", !(on && !parked));
     }
 }
 
