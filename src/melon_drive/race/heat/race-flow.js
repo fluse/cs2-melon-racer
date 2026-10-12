@@ -348,6 +348,7 @@ export function BeginHeat(trackId) {
         kart.progressWatch = undefined; // the DNF clock starts at GO
         HideDnfWarning(kart);
         kart.podium = undefined; // off the podium into the next Grand Prix
+        kart.catapult = undefined; // out of a catapult's bucket too
         EndTestPreview(kart); // the real countdown takes over its HUD
         // Its own lined-up spot, not the start line's center — a respawn
         // before reaching checkpoint 1 (break, or the user menu's respawn
@@ -486,6 +487,7 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.progressWatch = undefined;
         HideDnfWarning(kart);
         kart.podium = undefined; // the hub/tutorial button takes a melon down from the podium too
+        kart.catapult = undefined; // and out of a catapult's bucket
         EndTestPreview(kart); // the melon is let go just above
         // kart.inHub (and the hub modal) is deliberately left to the
         // hub_start_trigger's own hub_enter/hub_leave inputs: the teleport

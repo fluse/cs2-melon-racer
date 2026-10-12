@@ -103,6 +103,7 @@ function TraceBox(config) {
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
  *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
  *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
+ *   catapult?: { base: any, seatedTime: number }, // sitting in a catapult's bucket (its base), since when — see world/catapult/
  *   testPreview?: { kind: "countdown" | "finish" | "intro" | "call", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro/Grand Prix Call playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   finishTime?: number, timedOut?: boolean, // racing: when it finished this heat; finished by the finish window running out instead (no place) — see FinishKart/TimeOutKart in race/heat/race-flow.js
@@ -1896,6 +1897,92 @@ const BALLOON_DRAG = 1.2;
 // How often the map is searched for new balls (a spawned one falls freely
 // until it's found).
 const BALLOON_SCAN_SECONDS = 0.2;
+
+// Catapults: a wooden catapult on wheels (tools/models/make-catapult-model.mjs)
+// a melon jumps into: it's held in the bucket, jump fires — the arm swings
+// up and throws it the way the catapult faces. Bumping the catapult rolls
+// and turns it (world/catapult/roll.js), so other melons aim it. Two
+// props: the base (a prop_physics) and the throwing arm (a prop_dynamic,
+// animated), found by their models; the script keeps the arm on its base.
+// The animation only shows the throw — the melon is carried along the arm's
+// arc and launched by the script. Rules: world/catapult/logic.js, applied
+// by world/catapult/catapult.js.
+// The arm's geometry and timing are shared with the model's generator (it
+// imports them from here): change them, re-run it and recompile the models.
+
+// The models that make a prop a catapult's base and arm (compared without "_c", any case).
+const CATAPULT_BASE_MODEL = "models/melon_racer/catapult/catapult_base.vmdl";
+const CATAPULT_ARM_MODEL = "models/melon_racer/catapult/catapult_arm.vmdl";
+// The classes searched for them.
+const CATAPULT_BASE_CLASSES = ["prop_physics", "prop_physics_multiplayer", "prop_physics_override"];
+const CATAPULT_ARM_CLASS = "prop_dynamic";
+// An arm belongs to the base whose origin is at most this far from its own
+// (place both at one spot in Hammer, same angles).
+const CATAPULT_PAIR_DISTANCE = 24;
+// How often the map is searched for (new) catapults.
+const CATAPULT_SCAN_SECONDS = 1;
+// The base's name may set the throw: catapult_<forward>_<up> (units/s along
+// the way it faces, and up); else CATAPULT_LAUNCH_FORWARD/_UP.
+const CATAPULT_NAME_PATTERN = /^catapult_(\d+(?:\.\d+)?)_(\d+(?:\.\d+)?)$/;
+// The throw (units/s): forward along the catapult's facing, and up — with
+// GRAVITY 800 about 1.75 s in the air, some 1900 units far.
+const CATAPULT_LAUNCH_FORWARD = 1100;
+const CATAPULT_LAUNCH_UP = 700;
+
+// --- The arm (model space: +X the way it throws, the handle-less back at -X) ---
+// Its pivot (x, z), and from there to the middle of the bucket's floor.
+const CATAPULT_PIVOT = { x: 4, z: 22 };
+const CATAPULT_ARM_LENGTH = 36;
+// The melon's center sits this far above the bucket's floor.
+const CATAPULT_SEAT_LIFT = 8; // a little over its radius: not pressed into the bucket floor's collision
+// Arm angles (degrees up from pointing back, -X): at rest (cocked), where
+// the throw lets go of the melon, where the arm stops against the crossbar.
+const CATAPULT_REST_ANGLE = 12;
+const CATAPULT_RELEASE_ANGLE = 55;
+const CATAPULT_FIRE_ANGLE = 100;
+// The throw's swing (speeding up all the way), how long the arm stays up,
+// and the slow wind back down (the model's "fire", "fired" and "reload").
+const CATAPULT_FIRE_SECONDS = 0.3;
+const CATAPULT_FIRED_SECONDS = 0.6;
+const CATAPULT_RELOAD_SECONDS = 1.6;
+
+// --- Getting in ---
+// A melon sits in it once its center is inside the bucket: measured in the
+// catapult's own frame from the seat (the melon's place in the bucket at
+// rest), at most CATAPULT_SEAT_HALF_WIDTH to either side and forward or back
+// (the bucket is 18 across inside), and from CATAPULT_SEAT_BELOW under the
+// seat to CATAPULT_SEAT_ABOVE over it — not just near it: coming at it from
+// behind, over the winch, used to pull a melon in.
+const CATAPULT_SEAT_HALF_WIDTH = 8;
+const CATAPULT_SEAT_BELOW = 3;
+const CATAPULT_SEAT_ABOVE = 9;
+// For this long after getting in, jump doesn't fire (the press that jumped
+// it in mustn't throw it out again).
+const CATAPULT_SEAT_SETTLE_SECONDS = 0.25;
+
+// --- Rolling (world/catapult/roll.js): physics alone would slide the base to
+// a stop on its wheels at once, so the script gives back what friction took
+// and keeps it upright ---
+// Rolling resistance (units/s²): what a rolling catapult still loses — low, so
+// a bump sends it a long way (from 300 units/s it rolls about 6 s).
+const CATAPULT_ROLL_DECEL = 50;
+// A loss of speed faster than this (units/s²) isn't friction but a hit — a
+// wall, a melon, another catapult — and stays as physics made it.
+const CATAPULT_ROLL_MAX_DECEL = 1500;
+// Below this speed (units/s) the script leaves it alone: friction stops it.
+const CATAPULT_ROLL_STOP_SPEED = 8;
+// Moved less than this share of the way it was sent last tick, it's stuck
+// (pressed against a wall, a melon, another catapult): nothing is given back, or
+// it would grind against what holds it, shaking.
+const CATAPULT_ROLL_BLOCKED_SHARE = 0.5;
+// Tipping slower than this (degrees/s, pitch and roll) and rolling as physics
+// made it, the script doesn't touch the base at all that tick.
+const CATAPULT_ROLL_STEADY_TILT_SPEED = 1;
+// It tips at most this far (degrees) — on a ramp it follows the slope, it
+// never falls over.
+const CATAPULT_ROLL_MAX_TILT = 25;
+// How fast a wobble (its pitch and roll turning) dies away (per second).
+const CATAPULT_ROLL_TILT_DAMPING = 8;
 
 // All tunable numbers and static/Hammer-naming-convention data for
 // melon_drive, one file per system they configure. Import from here, not
@@ -6212,6 +6299,7 @@ function RespawnKartAtCheckpoint(kart) {
     FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
     kart.lastWallContact = undefined; // that wall is somewhere else now
     kart.podium = undefined; // the respawn button (or a break) takes it down from the podium
+    kart.catapult = undefined; // and out of a catapult's bucket
     RestoreFullHealth(kart);
     // Cleared, not measured against zero: this is our own intentional
     // velocity reset, not a physical impact to react to.
@@ -6238,6 +6326,7 @@ function TeleportKartTo(kart, position, angles, velocity) {
     FacePlayerView(kart.pawn, angles.yaw);
     kart.lastWallContact = undefined; // that wall is somewhere else now
     kart.podium = undefined; // not held over a spot it's been teleported away from
+    kart.catapult = undefined; // nor in a catapult's bucket
     kart.lastVelocity = undefined;
     kart.prevLastVelocity = undefined;
     kart.prevOrigin = undefined;
@@ -9042,6 +9131,7 @@ function BeginHeat(trackId) {
         kart.progressWatch = undefined; // the DNF clock starts at GO
         HideDnfWarning(kart);
         kart.podium = undefined; // off the podium into the next Grand Prix
+        kart.catapult = undefined; // out of a catapult's bucket too
         EndTestPreview(kart); // the real countdown takes over its HUD
         // Its own lined-up spot, not the start line's center — a respawn
         // before reaching checkpoint 1 (break, or the user menu's respawn
@@ -9180,6 +9270,7 @@ function SendKartsOutOfRace(returning, spawn, label) {
         kart.progressWatch = undefined;
         HideDnfWarning(kart);
         kart.podium = undefined; // the hub/tutorial button takes a melon down from the podium too
+        kart.catapult = undefined; // and out of a catapult's bucket
         EndTestPreview(kart); // the melon is let go just above
         // kart.inHub (and the hub modal) is deliberately left to the
         // hub_start_trigger's own hub_enter/hub_leave inputs: the teleport
@@ -11835,6 +11926,539 @@ function RegisterAttackDebug() {
     });
 }
 
+// Rolling a catapult's base (CATAPULT_ROLL_* in world/catapult/constants.js).
+// Pure rules, no cs_script import; world/catapult/roll.js applies them
+// (test/world/catapult-roll.test.mjs).
+
+/** @typedef {{ x: number, y: number, z: number }} Vec */
+/** @typedef {{ pitch: number, yaw: number, roll: number }} Angles */
+
+/**
+ * The velocity to give the base for the next tick, from the one physics left
+ * it with (`velocity`) and the one it had after the script's last tick
+ * (`last`, null on its first): where it lost horizontal speed to friction
+ * (at most CATAPULT_ROLL_MAX_DECEL), it keeps going in its new
+ * direction with only CATAPULT_ROLL_DECEL taken off. A hit (a faster
+ * loss), a push (a gain), the base about to stop or one that's stuck (it moved
+ * less than CATAPULT_ROLL_BLOCKED_SHARE of `last` since then: `travelled`,
+ * its horizontal distance, null when unknown) stay as physics made them —
+ * the very same object back; up and down are physics' too.
+ * @param {Vec} velocity @param {Vec | null} last @param {number} dt
+ * @param {number | null} [travelled]
+ * @returns {Vec}
+ */
+function RollingVelocity(velocity, last, dt, travelled = null) {
+    if (!last) {
+        return velocity;
+    }
+    const speed = Math.hypot(velocity.x, velocity.y);
+    const lastSpeed = Math.hypot(last.x, last.y);
+    const loss = lastSpeed - speed;
+    if (lastSpeed < CATAPULT_ROLL_STOP_SPEED || speed <= 0 || loss <= 0 || loss > CATAPULT_ROLL_MAX_DECEL * dt) {
+        return velocity;
+    }
+    if (travelled !== null && travelled < lastSpeed * dt * CATAPULT_ROLL_BLOCKED_SHARE) {
+        return velocity;
+    }
+    const scale = Math.max(0, lastSpeed - CATAPULT_ROLL_DECEL * dt) / speed;
+    return { x: velocity.x * scale, y: velocity.y * scale, z: velocity.z };
+}
+
+/**
+ * Its angles held within CATAPULT_ROLL_MAX_TILT of upright (pitch and roll;
+ * yaw stays), or null when they're within it already.
+ * @param {Angles} angles @returns {Angles | null}
+ */
+function UprightAngles(angles) {
+    const Clamp = (/** @type {number} */ a) => Math.max(-CATAPULT_ROLL_MAX_TILT, Math.min(CATAPULT_ROLL_MAX_TILT, Wrap(a)));
+    const pitch = Clamp(angles.pitch), roll = Clamp(angles.roll);
+    if (pitch === Wrap(angles.pitch) && roll === Wrap(angles.roll)) {
+        return null;
+    }
+    return { pitch, yaw: angles.yaw, roll };
+}
+
+/** An angle in -180..180. @param {number} a */
+function Wrap(a) {
+    return ((((a + 180) % 360) + 360) % 360) - 180;
+}
+
+/**
+ * Its turning for the next tick: tipping (x, y) dies away at
+ * CATAPULT_ROLL_TILT_DAMPING — or stops at once when it was just put back
+ * upright (`held`), so it doesn't tip straight back past the limit and get
+ * put back every tick, shaking —, turning round (z) stays as it is.
+ * @param {Vec} angularVelocity @param {number} dt @param {boolean} [held]
+ * @returns {Vec}
+ */
+function SteadyAngularVelocity(angularVelocity, dt, held = false) {
+    const keep = held ? 0 : Math.exp(-CATAPULT_ROLL_TILT_DAMPING * dt);
+    return { x: angularVelocity.x * keep, y: angularVelocity.y * keep, z: angularVelocity.z };
+}
+
+/** Whether it's hardly tipping (pitch and roll turning below CATAPULT_ROLL_STEADY_TILT_SPEED). @param {Vec} angularVelocity */
+function IsSteady(angularVelocity) {
+    return Math.abs(angularVelocity.x) < CATAPULT_ROLL_STEADY_TILT_SPEED && Math.abs(angularVelocity.y) < CATAPULT_ROLL_STEADY_TILT_SPEED;
+}
+
+// Rolling a catapult's base (see world/catapult/constants.js): it rolls on
+// when bumped (RollingVelocity) and stays upright (UprightAngles,
+// SteadyAngularVelocity); called from world/catapult/catapult.js.
+
+/** @typedef {import("cs_script/point_script").Entity} Entity */
+/** @typedef {{ velocity: { x: number, y: number, z: number }, origin: { x: number, y: number, z: number } }} RollTick what the base was sent with last tick, and where it was */
+
+/**
+ * One tick of a catapult's base: friction given back, kept
+ * upright — and left to physics entirely while there's nothing to change
+ * (resting, rolling as physics made it, not tipping), so the script doesn't
+ * fight its contacts. Returns the tick to pass next time (null after a stall
+ * or a reload: start over from what physics has).
+ * @param {Entity} base @param {RollTick | null} last @param {number} dt @returns {RollTick | null}
+ */
+function RollBase(base, last, dt) {
+    if (dt <= 0 || dt > 0.5) {
+        return null;
+    }
+    const origin = base.GetAbsOrigin();
+    const physics = base.GetAbsVelocity();
+    const travelled = last ? Math.hypot(origin.x - last.origin.x, origin.y - last.origin.y) : null;
+    const velocity = RollingVelocity(physics, last?.velocity ?? null, dt, travelled);
+    const upright = UprightAngles(base.GetAbsAngles());
+    const spin = base.GetAbsAngularVelocity();
+    if (velocity === physics && !upright && IsSteady(spin)) {
+        return { velocity: physics, origin };
+    }
+    const angularVelocity = SteadyAngularVelocity(spin, dt, upright !== null);
+    base.Move(upright ? { velocity, angularVelocity, angles: upright } : { velocity, angularVelocity });
+    return { velocity, origin };
+}
+
+// Spike springs (SPIKE_SPRING_* in world/spike-spring/constants.js). Pure
+// rules, no cs_script import; world/spike-spring/spike-spring.js applies them
+// (test/world/spike-spring.test.mjs).
+
+/** @typedef {{ down: number, up: number, offset: number }} SpikeSpringConfig */
+/** @typedef {"down" | "rise" | "up" | "sink"} SpikeSpringPhase */
+
+/**
+ * A spike spring's config from its entity name, or undefined if the name
+ * doesn't make it one.
+ * @param {string} name
+ * @returns {SpikeSpringConfig | undefined} seconds down and up, clock offset
+ */
+function ParseSpikeSpringName(name) {
+    if (!SPIKE_SPRING_NAME_PATTERN.test(name)) {
+        return undefined;
+    }
+    const parts = name.split("_").slice(2); // after "spike" and "spring"
+    const IsNumber = (/** @type {string | undefined} */ part) => part !== undefined && /^\d+(?:\.\d+)?$/.test(part);
+    const at = parts.findIndex((part, i) => IsNumber(part) && IsNumber(parts[i + 1]));
+    const offset = parts.map((part) => /^offset(\d+(?:\.\d+)?)$/.exec(part)).find(Boolean);
+    return {
+        down: at < 0 ? SPIKE_SPRING_DOWN_SECONDS : Number(parts[at]),
+        up: at < 0 ? SPIKE_SPRING_UP_SECONDS : Number(parts[at + 1]),
+        offset: offset ? Number(offset[1]) : 0,
+    };
+}
+
+/** One full round: down, rise, up, sink. @param {SpikeSpringConfig} config */
+const SpikeSpringPeriod = (config) => config.down + SPIKE_SPRING_RISE_SECONDS + config.up + SPIKE_SPRING_SINK_SECONDS;
+
+/**
+ * Where a spike spring is in its round at game time `time` — every one runs
+ * on the same clock (shifted by its offset), so springs with the same
+ * timing go up together — and whether its spikes hurt: from the pop out of
+ * the floor until partway into the sink.
+ * @param {number} time
+ * @param {SpikeSpringConfig} config
+ * @returns {{ phase: SpikeSpringPhase, lethal: boolean }}
+ */
+function SpikeSpringState(time, config) {
+    const period = SpikeSpringPeriod(config);
+    let t = (((time + config.offset) % period) + period) % period;
+    if (t < config.down) return { phase: "down", lethal: false };
+    t -= config.down;
+    if (t < SPIKE_SPRING_RISE_SECONDS) return { phase: "rise", lethal: t >= SPIKE_SPRING_POP_SECONDS };
+    t -= SPIKE_SPRING_RISE_SECONDS;
+    if (t < config.up) return { phase: "up", lethal: true };
+    t -= config.up;
+    return { phase: "sink", lethal: t < SPIKE_SPRING_SINK_SECONDS * SPIKE_SPRING_SINK_LETHAL_SHARE };
+}
+
+/**
+ * The prop_dynamic inputs to fire when a spike spring goes from `previous`
+ * to `phase` ([input, animation] pairs). Rise and sink play once, the idle
+ * animation set with them holds the end pose afterwards; any other jump (the
+ * first update, a hot reload, a skipped phase) puts it straight in the pose.
+ * @param {SpikeSpringPhase | undefined} previous
+ * @param {SpikeSpringPhase} phase
+ * @returns {[string, string][]}
+ */
+function SpikeSpringInputs(previous, phase) {
+    if (previous === phase) return [];
+    if (phase === "rise" && previous === "down") return [["SetAnimationNotLooping", "rise"], ["SetIdleAnimationLooping", "up"]];
+    if (phase === "sink" && previous === "up") return [["SetAnimationNotLooping", "sink"], ["SetIdleAnimationLooping", "down"]];
+    if ((phase === "up" && previous === "rise") || (phase === "down" && previous === "sink")) return [];
+    const pose = phase === "rise" || phase === "up" ? "up" : "down";
+    return [["SetAnimationLooping", pose], ["SetIdleAnimationLooping", pose]];
+}
+
+/**
+ * A spring's own axes from its angles (degrees, Source's pitch/yaw/roll):
+ * forward (x), left (y) and up (z, the way the spikes come out).
+ * @param {{ pitch: number, yaw: number, roll: number }} angles
+ */
+function SpikeSpringAxes({ pitch, yaw, roll }) {
+    const r = Math.PI / 180;
+    const sp = Math.sin(pitch * r), cp = Math.cos(pitch * r);
+    const sy = Math.sin(yaw * r), cy = Math.cos(yaw * r);
+    const sr = Math.sin(roll * r), cr = Math.cos(roll * r);
+    return {
+        forward: [cp * cy, cp * sy, -sp],
+        left: [sr * sp * cy - cr * sy, sr * sp * sy + cr * cy, sr * cp],
+        up: [cr * sp * cy + sr * sy, cr * sp * sy - sr * cy, cr * cp],
+    };
+}
+
+/**
+ * Whether a melon center `offset` from a spike spring's origin is on it, in
+ * the spring's own frame (any rotation — floor, wall, ceiling): inside its
+ * square, and between SPIKE_SPRING_DEPTH behind its surface and
+ * SPIKE_SPRING_HEIGHT out of it.
+ * @param {{ x: number, y: number, z: number }} offset
+ * @param {{ pitch: number, yaw: number, roll: number }} angles
+ */
+function IsOverSpikeSpring(offset, angles) {
+    const { forward, left, up } = SpikeSpringAxes(angles);
+    const d = [offset.x, offset.y, offset.z];
+    const Along = (/** @type {number[]} */ axis) => d[0] * axis[0] + d[1] * axis[1] + d[2] * axis[2];
+    const height = Along(up);
+    if (height < -SPIKE_SPRING_DEPTH || height > SPIKE_SPRING_HEIGHT) return false;
+    return Math.abs(Along(forward)) <= SPIKE_SPRING_HALF_SIZE && Math.abs(Along(left)) <= SPIKE_SPRING_HALF_SIZE;
+}
+
+// Catapults (CATAPULT_* in world/catapult/constants.js). Pure rules, no
+// cs_script import; world/catapult/catapult.js applies them
+// (test/world/catapult.test.mjs). The arm's swing here is the same as the
+// model's animations (tools/models/make-catapult-model.mjs uses ArmAngle).
+
+/** @typedef {{ x: number, y: number, z: number }} Vec */
+/** @typedef {{ pitch: number, yaw: number, roll: number }} Angles */
+/** @typedef {"ready" | "loaded" | "firing" | "fired" | "reloading"} CatapultPhase */
+
+const Normalized = (/** @type {string} */ model) => model.toLowerCase().replace(/\\/g, "/").replace(/_c$/, "");
+/** Whether a prop with this model is a catapult's base. @param {string} model */
+const IsCatapultBaseModel = (model) => Normalized(model).endsWith(CATAPULT_BASE_MODEL);
+/** Whether a prop with this model is a catapult's arm. @param {string} model */
+const IsCatapultArmModel = (model) => Normalized(model).endsWith(CATAPULT_ARM_MODEL);
+
+/** The throw a base's name sets (catapult_<forward>_<up>), else the defaults. @param {string} name */
+function CatapultLaunchFromName(name) {
+    const match = CATAPULT_NAME_PATTERN.exec(name.trim());
+    return {
+        forward: match ? Number(match[1]) : CATAPULT_LAUNCH_FORWARD,
+        up: match ? Number(match[2]) : CATAPULT_LAUNCH_UP,
+    };
+}
+
+/** How long into the throw the arm passes CATAPULT_RELEASE_ANGLE (it speeds up: angle grows with time squared). */
+const RELEASE_SECONDS = CATAPULT_FIRE_SECONDS
+    * Math.sqrt((CATAPULT_RELEASE_ANGLE - CATAPULT_REST_ANGLE) / (CATAPULT_FIRE_ANGLE - CATAPULT_REST_ANGLE));
+
+/**
+ * The arm's angle (degrees up from pointing back) `t` seconds into a phase:
+ * at rest when ready or loaded, swinging up ever faster while firing, up
+ * when fired, easing back down while reloading.
+ * @param {CatapultPhase} phase @param {number} t
+ */
+function ArmAngle(phase, t) {
+    if (phase === "firing") {
+        const k = Math.min(1, Math.max(0, t / CATAPULT_FIRE_SECONDS));
+        return CATAPULT_REST_ANGLE + (CATAPULT_FIRE_ANGLE - CATAPULT_REST_ANGLE) * k * k;
+    }
+    if (phase === "fired") {
+        return CATAPULT_FIRE_ANGLE;
+    }
+    if (phase === "reloading") {
+        const k = Math.min(1, Math.max(0, t / CATAPULT_RELOAD_SECONDS));
+        const eased = k * k * (3 - 2 * k);
+        return CATAPULT_FIRE_ANGLE + (CATAPULT_REST_ANGLE - CATAPULT_FIRE_ANGLE) * eased;
+    }
+    return CATAPULT_REST_ANGLE;
+}
+
+/**
+ * The phase after `phase` has run `t` seconds: firing → fired → reloading →
+ * ready by the clock (ready and loaded wait for the script); and how long
+ * the new one has already run. @param {CatapultPhase} phase @param {number} t
+ * @returns {{ phase: CatapultPhase, t: number }}
+ */
+function NextPhase(phase, t) {
+    if (phase === "firing" && t >= CATAPULT_FIRE_SECONDS) return NextPhase("fired", t - CATAPULT_FIRE_SECONDS);
+    if (phase === "fired" && t >= CATAPULT_FIRED_SECONDS) return NextPhase("reloading", t - CATAPULT_FIRED_SECONDS);
+    if (phase === "reloading" && t >= CATAPULT_RELOAD_SECONDS) return { phase: "ready", t: t - CATAPULT_RELOAD_SECONDS };
+    return { phase, t };
+}
+
+/**
+ * The melon's seat in model space (x forward, z up; y 0) with the arm at
+ * `angle`: at the arm's end, CATAPULT_SEAT_LIFT above the bucket's floor.
+ * @param {number} angle degrees @returns {Vec}
+ */
+function SeatOffset(angle) {
+    const a = (angle * Math.PI) / 180;
+    const along = { x: -Math.cos(a), z: Math.sin(a) }; // the arm, from the pivot out
+    const up = { x: Math.sin(a), z: Math.cos(a) }; // the bucket's open side
+    return {
+        x: CATAPULT_PIVOT.x + along.x * CATAPULT_ARM_LENGTH + up.x * CATAPULT_SEAT_LIFT,
+        y: 0,
+        z: CATAPULT_PIVOT.z + along.z * CATAPULT_ARM_LENGTH + up.z * CATAPULT_SEAT_LIFT,
+    };
+}
+
+/** A model-space offset turned and moved into the world by the base's origin and angles. @param {Vec} origin @param {Angles} angles @param {Vec} offset @returns {Vec} */
+function ToWorld(origin, angles, offset) {
+    const { forward, left, up } = SpikeSpringAxes(angles);
+    return {
+        x: origin.x + forward[0] * offset.x + left[0] * offset.y + up[0] * offset.z,
+        y: origin.y + forward[1] * offset.x + left[1] * offset.y + up[1] * offset.z,
+        z: origin.z + forward[2] * offset.x + left[2] * offset.y + up[2] * offset.z,
+    };
+}
+
+/** A world point in the base's own frame (x forward, y left, z up from its origin): ToWorld undone. @param {Vec} origin @param {Angles} angles @param {Vec} point @returns {Vec} */
+function ToLocal(origin, angles, point) {
+    const { forward, left, up } = SpikeSpringAxes(angles);
+    const d = [point.x - origin.x, point.y - origin.y, point.z - origin.z];
+    const Dot = (/** @type {number[]} */ a) => a[0] * d[0] + a[1] * d[1] + a[2] * d[2];
+    return { x: Dot(forward), y: Dot(left), z: Dot(up) };
+}
+
+/**
+ * Whether a melon's center (`local`, in the base's frame) is in the bucket at
+ * rest: within CATAPULT_SEAT_HALF_WIDTH of the seat forward/back and to the
+ * sides, from CATAPULT_SEAT_BELOW under it to CATAPULT_SEAT_ABOVE over it.
+ * @param {Vec} local
+ */
+function IsInBucket(local) {
+    const seat = SeatOffset(CATAPULT_REST_ANGLE);
+    const dz = local.z - seat.z;
+    return Math.abs(local.x - seat.x) <= CATAPULT_SEAT_HALF_WIDTH && Math.abs(local.y - seat.y) <= CATAPULT_SEAT_HALF_WIDTH
+        && dz >= -CATAPULT_SEAT_BELOW && dz <= CATAPULT_SEAT_ABOVE;
+}
+
+/**
+ * The thrown melon's velocity: `launch.forward` along the way the catapult
+ * faces (its yaw — a tilted base doesn't throw into the ground), `launch.up`
+ * up, plus the base's own velocity (thrown from a rolling catapult).
+ * @param {Angles} angles @param {{ forward: number, up: number }} launch @param {Vec} baseVelocity @returns {Vec}
+ */
+function LaunchVelocity(angles, launch, baseVelocity) {
+    const yaw = (angles.yaw * Math.PI) / 180;
+    return {
+        x: Math.cos(yaw) * launch.forward + baseVelocity.x,
+        y: Math.sin(yaw) * launch.forward + baseVelocity.y,
+        z: launch.up + Math.max(0, baseVelocity.z),
+    };
+}
+
+/** The melon's distance to a point. @param {Vec} a @param {Vec} b */
+const Distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+
+/**
+ * The inputs that show a phase change on the arm (a prop_dynamic): the throw
+ * once then held up, the wind-down once then at rest; the rest pose when it's
+ * first paired (`previous` undefined).
+ * @param {CatapultPhase | undefined} previous @param {CatapultPhase} phase
+ * @returns {[string, string][]}
+ */
+function ArmInputs(previous, phase) {
+    if (previous === phase) return [];
+    if (phase === "firing") return [["SetAnimationNotLooping", "fire"], ["SetIdleAnimationLooping", "fired"]];
+    if (phase === "reloading") return [["SetAnimationNotLooping", "reload"], ["SetIdleAnimationLooping", "idle"]];
+    if (previous === undefined) {
+        const pose = phase === "fired" ? "fired" : "idle";
+        return [["SetAnimationLooping", pose], ["SetIdleAnimationLooping", pose]];
+    }
+    return [];
+}
+
+// Catapults (see world/catapult/constants.js): each base (a prop_physics) is
+// paired with the arm (a prop_dynamic) standing at it; the script keeps the
+// arm on its base, plays its animations, rolls the base when it's bumped
+// (world/catapult/roll.js), seats a melon that comes
+// into the bucket and — on its jump — carries it along the arm's swing and
+// throws it (HoldInCatapult, from UpdateKart).
+
+/** @typedef {import("cs_script/point_script").Entity} Entity */
+/** @typedef {import("../../core/kart-registry.js").Kart} Kart */
+/**
+ * @typedef {{
+ *   arm?: Entity, // its throwing arm, once paired
+ *   phase: import("./logic.js").CatapultPhase, phaseTime: number, // what it's doing, since when
+ *   rider?: Kart, // the melon in its bucket (loaded, firing)
+ *   lastRoll: import("./roll.js").RollTick | null, // the base's last tick of rolling (RollBase)
+ * }} Catapult
+ */
+
+/** Every catapult base found. @type {Map<Entity, Catapult>} */
+const catapults = new Map();
+let nextScanTime$3 = -Infinity;
+
+/** Forgets every catapult, to be found again on the next tick. */
+function ResetCatapults() {
+    catapults.clear();
+    nextScanTime$3 = -Infinity;
+}
+
+/** Sends an arm the inputs for a phase change. @param {Catapult} catapult @param {import("./logic.js").CatapultPhase | undefined} previous */
+function Animate(catapult, previous) {
+    if (!catapult.arm?.IsValid()) return;
+    for (const [input, value] of ArmInputs(previous, catapult.phase)) {
+        Instance.EntFireAtTarget({ target: catapult.arm, input, value });
+    }
+}
+
+/** Adds the bases not known yet and pairs every arm without a base with the nearest one. */
+function ScanCatapults() {
+    let found = 0;
+    for (const className of CATAPULT_BASE_CLASSES) {
+        for (const entity of Instance.FindEntitiesByClass(className)) {
+            if (!catapults.has(entity) && IsCatapultBaseModel(/** @type {any} */ (entity).GetModelName?.() ?? "")) {
+                catapults.set(entity, { phase: "ready", phaseTime: 0, lastRoll: null });
+                found++;
+            }
+        }
+    }
+    const paired = new Set([...catapults.values()].map(c => c.arm).filter(Boolean));
+    for (const arm of Instance.FindEntitiesByClass(CATAPULT_ARM_CLASS)) {
+        if (paired.has(arm) || !IsCatapultArmModel(/** @type {any} */ (arm).GetModelName?.() ?? "")) continue;
+        const at = arm.GetAbsOrigin();
+        let best, bestDistance = CATAPULT_PAIR_DISTANCE;
+        for (const [base, catapult] of catapults) {
+            const d = Distance(base.GetAbsOrigin(), at);
+            if (!catapult.arm?.IsValid() && d <= bestDistance) {
+                best = catapult;
+                bestDistance = d;
+            }
+        }
+        if (best) {
+            best.arm = arm;
+            Animate(best, undefined);
+        } else {
+            Instance.Msg(`[melon_drive] catapults: an arm at ${at.x.toFixed(0)} ${at.y.toFixed(0)} ${at.z.toFixed(0)} has no catapult base within ${CATAPULT_PAIR_DISTANCE}\n`);
+        }
+    }
+    if (found) {
+        const armless = [...catapults.values()].filter(c => !c.arm).length;
+        Instance.Msg(`[melon_drive] catapults: ${found} new, ${catapults.size} in all${armless ? `, ${armless} without an arm` : ""}\n`);
+    }
+}
+
+/** Whether a kart can get into a catapult now. @param {Kart} kart */
+function CanSit(kart) {
+    return !kart.catapult && !kart.locked && !kart.breaking && !kart.freeLook && !kart.watching && !kart.podium
+        && kart.padFlight === undefined && kart.melon.IsValid();
+}
+
+/** Every tick: new catapults, arms on their bases, rolling, the clock of each throw, melons getting in. @param {number} now @param {number} dt */
+function UpdateCatapults(now, dt) {
+    if (now >= nextScanTime$3) {
+        nextScanTime$3 = now + CATAPULT_SCAN_SECONDS;
+        ScanCatapults();
+    }
+    for (const [base, catapult] of catapults) {
+        if (!base.IsValid()) {
+            if (catapult.rider?.catapult?.base === base) catapult.rider.catapult = undefined;
+            catapults.delete(base);
+            continue;
+        }
+        // Rolling and upright.
+        catapult.lastRoll = RollBase(base, catapult.lastRoll, dt);
+        const origin = base.GetAbsOrigin(), angles = base.GetAbsAngles();
+        if (catapult.arm?.IsValid()) {
+            catapult.arm.Move({ position: origin, angles });
+        }
+        // Its rider got out another way (respawn, hub, a break): the bucket's free.
+        if (catapult.rider && catapult.rider.catapult?.base !== base) {
+            catapult.rider = undefined;
+            if (catapult.phase === "loaded") catapult.phase = "ready";
+        }
+        const previous = catapult.phase;
+        const next = NextPhase(catapult.phase, now - catapult.phaseTime);
+        if (next.phase !== catapult.phase) {
+            catapult.phase = next.phase;
+            catapult.phaseTime = now - next.t;
+            Animate(catapult, previous);
+        }
+        // Getting in: a melon inside the bucket of a ready catapult.
+        if (catapult.phase === "ready") {
+            for (const [slot, kart] of karts) {
+                if (CanSit(kart) && IsInBucket(ToLocal(origin, angles, kart.melon.GetAbsOrigin()))) {
+                    kart.catapult = { base, seatedTime: now };
+                    catapult.rider = kart;
+                    catapult.phase = "loaded";
+                    catapult.phaseTime = now;
+                    Debug(`catapult: slot ${slot} got in`);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+/**
+ * From UpdateKart, while the melon sits in a catapult: holds it in the
+ * bucket (carried along the arm's swing while it throws), fires on a jump
+ * press, and throws it when the arm passes the release angle — the throw
+ * protected from damage like a jump pad launch (kart.padFlight).
+ * @param {number} slot @param {Kart} kart @param {number} now
+ * @returns {boolean} whether this tick is taken care of — held, or just thrown
+ * (the throw's velocity mustn't get the driving's friction on top)
+ */
+function HoldInCatapult(slot, kart, now) {
+    const base = kart.catapult?.base;
+    const catapult = base && catapults.get(base);
+    if (!catapult || !base.IsValid() || catapult.rider !== kart) {
+        kart.catapult = undefined;
+        return false;
+    }
+    if (catapult.phase === "loaded" && now - kart.catapult.seatedTime >= CATAPULT_SEAT_SETTLE_SECONDS
+        && kart.pawn.WasInputJustPressed(CSInputs.JUMP)) {
+        catapult.phase = "firing";
+        catapult.phaseTime = now;
+        Animate(catapult, "loaded");
+        Debug(`catapult: slot ${slot} fired`);
+    }
+    const origin = base.GetAbsOrigin(), angles = base.GetAbsAngles(), baseVelocity = base.GetAbsVelocity();
+    const t = now - catapult.phaseTime;
+    if (catapult.phase === "firing" && t >= RELEASE_SECONDS) {
+        const velocity = LaunchVelocity(angles, CatapultLaunchFromName(base.GetEntityName()), baseVelocity);
+        kart.melon.Move({ position: ToWorld(origin, angles, SeatOffset(ArmAngle("firing", RELEASE_SECONDS))), velocity });
+        kart.catapult = undefined;
+        catapult.rider = undefined;
+        kart.padFlight = { launchTime: now }; // no damage until shortly after landing, like a jump pad launch
+        kart.lastJumpTime = now; // a jump: the next ground jump needs a landing first
+        kart.lastVelocity = undefined; // our own throw, not an impact
+        kart.settled = false;
+        kart.speedCap = Math.max(kart.speedCap ?? KartMaxSpeed(kart), Math.hypot(velocity.x, velocity.y));
+        Debug(`catapult: slot ${slot} thrown (${Math.hypot(velocity.x, velocity.y).toFixed(0)} u/s forward, ${velocity.z.toFixed(0)} up)`);
+        return true;
+    }
+    // In the bucket: there, moving with the catapult, no driving.
+    kart.melon.Move({
+        position: ToWorld(origin, angles, SeatOffset(ArmAngle(catapult.phase, t))),
+        velocity: baseVelocity,
+        angularVelocity: { x: 0, y: 0, z: 0 },
+    });
+    kart.lastVelocity = undefined;
+    kart.settled = false;
+    kart.attackBoosting = false;
+    kart.momentum = undefined;
+    return true;
+}
+
 // Engine side of ground/wall contact: the floor and wall probes (line
 // traces — see UpdateGrounded for why not TraceSphere). The rules are in
 // ./logic.js; what the probes saw goes to dev/collision-debug.js for the
@@ -12077,6 +12701,10 @@ function UpdateKart(slot, kart, dt) {
     }
 
     const now = Instance.GetGameTime();
+    // In a catapult's bucket (world/catapult/): held there, thrown on jump.
+    if (kart.catapult && HoldInCatapult(slot, kart, now)) {
+        return;
+    }
     // A jump pad launch's damage protection ends a moment after landing.
     UpdatePadFlight(kart, now);
     // Heal zones (heal_enter/heal_leave) — before this tick's damage, so a
@@ -12677,110 +13305,6 @@ function RegisterMoverInputs() {
     Instance.OnRoundStart(StartMovers);
 }
 
-// Spike springs (SPIKE_SPRING_* in world/spike-spring/constants.js). Pure
-// rules, no cs_script import; world/spike-spring/spike-spring.js applies them
-// (test/world/spike-spring.test.mjs).
-
-/** @typedef {{ down: number, up: number, offset: number }} SpikeSpringConfig */
-/** @typedef {"down" | "rise" | "up" | "sink"} SpikeSpringPhase */
-
-/**
- * A spike spring's config from its entity name, or undefined if the name
- * doesn't make it one.
- * @param {string} name
- * @returns {SpikeSpringConfig | undefined} seconds down and up, clock offset
- */
-function ParseSpikeSpringName(name) {
-    if (!SPIKE_SPRING_NAME_PATTERN.test(name)) {
-        return undefined;
-    }
-    const parts = name.split("_").slice(2); // after "spike" and "spring"
-    const IsNumber = (/** @type {string | undefined} */ part) => part !== undefined && /^\d+(?:\.\d+)?$/.test(part);
-    const at = parts.findIndex((part, i) => IsNumber(part) && IsNumber(parts[i + 1]));
-    const offset = parts.map((part) => /^offset(\d+(?:\.\d+)?)$/.exec(part)).find(Boolean);
-    return {
-        down: at < 0 ? SPIKE_SPRING_DOWN_SECONDS : Number(parts[at]),
-        up: at < 0 ? SPIKE_SPRING_UP_SECONDS : Number(parts[at + 1]),
-        offset: offset ? Number(offset[1]) : 0,
-    };
-}
-
-/** One full round: down, rise, up, sink. @param {SpikeSpringConfig} config */
-const SpikeSpringPeriod = (config) => config.down + SPIKE_SPRING_RISE_SECONDS + config.up + SPIKE_SPRING_SINK_SECONDS;
-
-/**
- * Where a spike spring is in its round at game time `time` — every one runs
- * on the same clock (shifted by its offset), so springs with the same
- * timing go up together — and whether its spikes hurt: from the pop out of
- * the floor until partway into the sink.
- * @param {number} time
- * @param {SpikeSpringConfig} config
- * @returns {{ phase: SpikeSpringPhase, lethal: boolean }}
- */
-function SpikeSpringState(time, config) {
-    const period = SpikeSpringPeriod(config);
-    let t = (((time + config.offset) % period) + period) % period;
-    if (t < config.down) return { phase: "down", lethal: false };
-    t -= config.down;
-    if (t < SPIKE_SPRING_RISE_SECONDS) return { phase: "rise", lethal: t >= SPIKE_SPRING_POP_SECONDS };
-    t -= SPIKE_SPRING_RISE_SECONDS;
-    if (t < config.up) return { phase: "up", lethal: true };
-    t -= config.up;
-    return { phase: "sink", lethal: t < SPIKE_SPRING_SINK_SECONDS * SPIKE_SPRING_SINK_LETHAL_SHARE };
-}
-
-/**
- * The prop_dynamic inputs to fire when a spike spring goes from `previous`
- * to `phase` ([input, animation] pairs). Rise and sink play once, the idle
- * animation set with them holds the end pose afterwards; any other jump (the
- * first update, a hot reload, a skipped phase) puts it straight in the pose.
- * @param {SpikeSpringPhase | undefined} previous
- * @param {SpikeSpringPhase} phase
- * @returns {[string, string][]}
- */
-function SpikeSpringInputs(previous, phase) {
-    if (previous === phase) return [];
-    if (phase === "rise" && previous === "down") return [["SetAnimationNotLooping", "rise"], ["SetIdleAnimationLooping", "up"]];
-    if (phase === "sink" && previous === "up") return [["SetAnimationNotLooping", "sink"], ["SetIdleAnimationLooping", "down"]];
-    if ((phase === "up" && previous === "rise") || (phase === "down" && previous === "sink")) return [];
-    const pose = phase === "rise" || phase === "up" ? "up" : "down";
-    return [["SetAnimationLooping", pose], ["SetIdleAnimationLooping", pose]];
-}
-
-/**
- * A spring's own axes from its angles (degrees, Source's pitch/yaw/roll):
- * forward (x), left (y) and up (z, the way the spikes come out).
- * @param {{ pitch: number, yaw: number, roll: number }} angles
- */
-function SpikeSpringAxes({ pitch, yaw, roll }) {
-    const r = Math.PI / 180;
-    const sp = Math.sin(pitch * r), cp = Math.cos(pitch * r);
-    const sy = Math.sin(yaw * r), cy = Math.cos(yaw * r);
-    const sr = Math.sin(roll * r), cr = Math.cos(roll * r);
-    return {
-        forward: [cp * cy, cp * sy, -sp],
-        left: [sr * sp * cy - cr * sy, sr * sp * sy + cr * cy, sr * cp],
-        up: [cr * sp * cy + sr * sy, cr * sp * sy - sr * cy, cr * cp],
-    };
-}
-
-/**
- * Whether a melon center `offset` from a spike spring's origin is on it, in
- * the spring's own frame (any rotation — floor, wall, ceiling): inside its
- * square, and between SPIKE_SPRING_DEPTH behind its surface and
- * SPIKE_SPRING_HEIGHT out of it.
- * @param {{ x: number, y: number, z: number }} offset
- * @param {{ pitch: number, yaw: number, roll: number }} angles
- */
-function IsOverSpikeSpring(offset, angles) {
-    const { forward, left, up } = SpikeSpringAxes(angles);
-    const d = [offset.x, offset.y, offset.z];
-    const Along = (/** @type {number[]} */ axis) => d[0] * axis[0] + d[1] * axis[1] + d[2] * axis[2];
-    const height = Along(up);
-    if (height < -SPIKE_SPRING_DEPTH || height > SPIKE_SPRING_HEIGHT) return false;
-    return Math.abs(Along(forward)) <= SPIKE_SPRING_HALF_SIZE && Math.abs(Along(left)) <= SPIKE_SPRING_HALF_SIZE;
-}
-
 // Running the map's spike springs (see world/spike-spring/constants.js): every
 // tick each one's animation is kept in step with the shared clock, and while
 // its spikes are out every melon over it breaks. The map is searched for
@@ -13282,7 +13806,8 @@ function UpdateBalloons(now, dt) {
 // popping out of the floor on a clock), ball-pit/ (balls kept in their pit),
 // ball-spawner/ (balls dropping in at a spawn point, removed after a while),
 // bouncer/ (foam bouncers swinging, each started at a random point),
-// balloon/ (the balls floating like balloons).
+// balloon/ (the balls floating like balloons), catapult/ (a melon thrown out of
+// one on its jump; bumped to aim it).
 
 let lastHeartbeatTime = 0;
 // Real elapsed time since the last Think, used for the movement math below —
@@ -13411,6 +13936,11 @@ function Think() {
         UpdateBalloons(now, dt); // before the ball pits: a ball outside is steered back on top of floating
     } catch (err) {
         Debug(`Think: UpdateBalloons threw: ${err}`);
+    }
+    try {
+        UpdateCatapults(now, dt);
+    } catch (err) {
+        Debug(`Think: UpdateCatapults threw: ${err}`);
     }
     try {
         UpdateBallPits(now);

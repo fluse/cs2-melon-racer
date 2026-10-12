@@ -37,6 +37,7 @@ import { LogAttackHeld } from "../../dev/attack-debug.js";
 import { Debug } from "../../core/debug.js";
 import { ApplyJump, RechargeWallJumpCharge, GetWallJumpCharges } from "../jump/jump.js";
 import { UpdatePadFlight, TryPadLaunch } from "../../zones/jump-pad/jump-pad.js";
+import { HoldInCatapult } from "../../world/catapult/catapult.js";
 import { UpdateGrounded, UpdateWallContact } from "../contact/contact.js";
 import { DrawCollisionDebug } from "../../dev/collision-debug.js";
 import { UpdateDrone } from "../../dev/free-look.js";
@@ -114,6 +115,10 @@ export function UpdateKart(slot, kart, dt) {
     }
 
     const now = Instance.GetGameTime();
+    // In a catapult's bucket (world/catapult/): held there, thrown on jump.
+    if (kart.catapult && HoldInCatapult(slot, kart, now)) {
+        return;
+    }
     // A jump pad launch's damage protection ends a moment after landing.
     UpdatePadFlight(kart, now);
     // Heal zones (heal_enter/heal_leave) — before this tick's damage, so a

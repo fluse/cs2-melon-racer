@@ -3,7 +3,8 @@
 // popping out of the floor on a clock), ball-pit/ (balls kept in their pit),
 // ball-spawner/ (balls dropping in at a spawn point, removed after a while),
 // bouncer/ (foam bouncers swinging, each started at a random point),
-// balloon/ (the balls floating like balloons).
+// balloon/ (the balls floating like balloons), catapult/ (a melon thrown out of
+// one on its jump; bumped to aim it).
 export { movers, StartMovers, RestoreMovers } from "./mover/mover.js";
 export { RegisterMoverInputs } from "./mover/inputs.js";
 export { spikeSprings, UpdateSpikeSprings, ResetSpikeSprings } from "./spike-spring/spike-spring.js";
@@ -15,3 +16,4 @@ export { RegisterBallSpawnerInputs } from "./ball-spawner/inputs.js";
 export { bouncers, UpdateBouncers, ResetBouncers, RestoreBouncers } from "./bouncer/bouncer.js";
 export { RegisterBouncerInputs } from "./bouncer/inputs.js";
 export { balloons, UpdateBalloons } from "./balloon/balloon.js";
+export { catapults, UpdateCatapults, HoldInCatapult, ResetCatapults } from "./catapult/catapult.js";

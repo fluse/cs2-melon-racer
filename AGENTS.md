@@ -85,6 +85,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              ball-spawner/ (template_ball copied at spawn_ball at random intervals, removed after a lifetime, capped)
                                           #              balloon/ (every ball with the ball model floats like a balloon: sinks slowly, knocked far, slowed by air drag)
                                           #              bouncer/ (prop_dynamic with the bouncer model: "swing" loop started once, at a random time within one swing, on the script's clock — delayed inputs arrived all at once)
+                                          #              catapult/ (base prop_physics + animated arm prop_dynamic, paired by model; a melon inside the bucket sits in it, jump fires: carried along the swing, thrown; roll.js (+ roll-logic.js): the base rolls on when bumped, kept upright)
 src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
 test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one folder per src/melon_drive/ domain (movement/, race/, …): unit tests
                                           #   for the pure files, engine-side tests against the fake engine (filed under the domain they're mainly about)
@@ -104,30 +105,29 @@ tools/lib/model.mjs                       # shared by the model generators: mesh
                                           #   RadialOutline for teeth/stars, Slot, ChamferedRect), SeededRandom (same output every run), .obj/.smd/.vmdl/.dmx/.vmat writers (SmdText + SmdAnimationText + VmdlText's
                                           #   animations for skinned, animated models) — reuse them before writing a generator-local helper
 tools/lib/png.mjs                         # the PNG encoder make-icons.mjs uses
-tools/models/make-ball-model.mjs          # a ball-pit ball as models/melon_racer/ball.vmdl (+ ball.obj): 320-triangle icosphere in inflatable.vmat,
 tools/lib/inflatable.mjs                  # shared by the inflatable hub decoration (gate, pavilion, tree, hedge, inflatable podium): SegmentedTube (pinched seams,
                                           #   a strap around each), SquashedRing/InflatableFoot, InflatableBlock + BlockOutline (a soft superellipsoid box), Pillow (a lathed ellipsoid with a pinched seam: tree crowns, hedge foliage), GuyRope + RopeLoop, Blower, PolylinePath;
                                           #   the faceted ones (rocks, mountain): PolytopePlanes + Polytope (a convex polytope from seeded planes), Panel (a face puffed between pinched seams),
                                           #   PanelPuff/PuffLift, PolytopeCollision, SidePoint
+tools/models/make-ball-model.mjs          # a ball-pit ball as models/melon_racer/ball.vmdl (+ ball.obj): 320-triangle icosphere in inflatable.vmat,
                                           #   a sphere primitive for collision, light (mass_override) — color each prop_physics by its render color
 tools/models/make-bouncer-model.mjs       # a foam swinger on a spring as models/melon_racer/bouncer/bouncer.vmdl: a tall flat pink ribbed foam paddle,
                                           #   lime top edge, upright on a chrome coil skinned to a bone chain; looping "swing" (side to side, the coil bending
                                           #   along) + "idle"; a prop_dynamic, animations left empty — world/bouncer/ starts the swing at a random point (SWING_SECONDS imported from there) — an obstacle in the air; collision: base + coil
                                           #   static, the paddle on the "head" bone (VmdlText physicsObj as [{ file, bone }]); materials/melon_racer/bouncer/
-tools/models/make-buffer-stop-model.mjs   # a buffer stop (Prellbock) as models/melon_racer/buffer_stop/buffer_stop.vmdl: magenta beam with a white chevron,
 tools/models/make-boutique-model.mjs      # the hub's Melon Boutique, a kit in models/melon_racer/boutique/: the booth (origin: floor, middle of its open front, facing +X, 534 wide, 459 deep) —
                                           #   boutique_frame (inflatable tube loop on four legs, feet, blower; 3.5k), _wall (inflatable back wall), _awning + _awning_stripes (striped,
                                           #   scalloped, each tinted on its own), _sign (MELON BOUTIQUE, both sides) — and the display: boutique_tier_<16..128> (stage-look step blocks
                                           #   128 x 64 to stack into the level ladder), boutique_ring (a swim ring a melon sits in, its origin 9.4 above), boutique_plate_<skin> (name + level
                                           #   from MELON_SKIN_NAMES/_LEVELS, re-run for a new skin); the melons are prop_dynamics placed by hand; materials/melon_racer/boutique/
+tools/models/make-buffer-stop-model.mjs   # a buffer stop (Prellbock) as models/melon_racer/buffer_stop/buffer_stop.vmdl: magenta beam with a white chevron,
                                           #   two buffers, bent grey legs on crossbars (696 triangles); a track obstacle, coarser _physics.obj collision; materials/melon_racer/buffer_stop/
+tools/models/make-catapult-model.mjs     # a wooden catapult a melon rides in, models/melon_racer/catapult/: catapult_base (prop_physics, 1216 triangles: frame on four iron-tyred
+                                          #   wheels, A-frames, rope skeins on the pivot axle, padded crossbar, rest beam, winch; convex hulls clear of the bucket's swing, 2 kg)
+                                          #   and catapult_arm (prop_dynamic, 232: tapered beam, iron bands and cap, braces, box bucket; collision on its bone: bucket + outer beam, checked over the swing to stay 0.5 clear of the base's (ArmClearance); skinned .smd written turned back (Unturn), animations idle/fire/
+                                          #   fired/reload from world/catapult/'s ArmAngle — pivot, length, angles, timing imported from its constants.js); materials/melon_racer/catapult/
 tools/models/make-checkpoint-model.mjs    # the checkpoint gate's frame (glowing pillars, beam, floating diamond) as models/melon_racer/checkpoint_gate.vmdl
                                           #   (+ _physics.obj collision, materials/melon_racer/checkpoint_gate/checkpoint_gate_{body,trim,glow}.vmat); same footprint as the prefab's old poles
-tools/models/make-drone-model.mjs         # the free-look drone as models/melon_racer/drone/drone.vmdl (~3.6k triangles): white shell stepped over a carbon chassis
-                                          #   (twill color + normal map), canopy, vents, battery, antennas, camera gimbal with a blinking red recording light (own bone, in "spin"), amber lights,
-                                          #   about a melon in size (SPAN 16 across), four rotors in guard rings, each on its own bone, looping "spin" (diagonal pairs the other way), "spindown" -> "landed" on touching down, "spinup" taking off, + "idle";
-                                          #   no collision (the script traces it against the world); in the point_template template_drone; materials/melon_racer/drone/
-tools/models/make-laser-model.mjs         # one segment of the drone's laser as models/melon_racer/laser/laser.vmdl: a thin glowing red rod
 tools/models/make-half-pipe-model.mjs     # a half-pipe slide as mesh geometry, models/melon_racer/half_pipe.dmx for Hammer's File → Import (DmxText in model.mjs): a U-shaped
                                           #   sky blue shell (RADIUS 64, ARC_HALF_ANGLE up each side) down along +X: the slide (LENGTH 1024, DROP 256, smootherstep), a curve over
                                           #   the edge, a STEEP_DROP 1000 drop at STEEP_ANGLE 58 (over 60 it'd count as a wall), a wide bottom curve up into a KICK_ANGLE 15 kicker;
@@ -187,10 +187,10 @@ tools/models/make-stage-model.mjs         # the round stage under the pavilion: 
                                           #   models/melon_racer/stage/stage_{deck,steps,step_lights,thrust,thrust_lights}.vmdl, the repeated ones built once (a quarter, the +X
                                           #   platform; 4x by yaw), all at one origin, each tinted on its own (9k triangles placed; flat markings are single faces); deck, steps, platforms, bollards solid;
                                           #   + stage_platform(_lights).vmdl, its own origin: the backdrop platform (448 x 832, steps across its front) the hub's podium, rocks and trees stand on
-                                          #   DRONE_LASER_SEGMENT long (imported from src/melon_drive/dev/constants.js), no collision; in template_drone_laser
-tools/models/make-logo-model.mjs          # extrudes MELON RACER (Bungee, slanted like the logo, lime green outline ring around them) into mesh geometry,
-                                          #   models/melon_racer/logo_text.dmx for Hammer's File → Import (DmxText in model.mjs),
-                                          #   + materials/melon_racer/logo/logo_text_{face,outline,holo}.vmat (holo = an opaque copy of holo_dashes for the letter fronts) (opentype.js + earcut + clipper-lib, devDependencies)
+tools/models/make-drone-model.mjs         # the free-look drone as models/melon_racer/drone/drone.vmdl (~3.6k triangles): white shell stepped over a carbon chassis
+                                          #   (twill color + normal map), canopy, vents, battery, antennas, camera gimbal with a blinking red recording light (own bone, in "spin"), amber lights,
+                                          #   about a melon in size (SPAN 16 across), four rotors in guard rings, each on its own bone, looping "spin" (diagonal pairs the other way), "spindown" -> "landed" on touching down, "spinup" taking off, + "idle";
+                                          #   no collision (the script traces it against the world); in the point_template template_drone; materials/melon_racer/drone/
 tools/models/make-drone-display-model.mjs # the hub's drone show: models/melon_racer/drone_display/drone_display_table.vmdl (a round table, a landing pad with an H on top,
                                           #   an LED ring; 616 triangles) to put a prop_dynamic drone on (Default Animation "landed", 34.5 above its origin), and _sign.vmdl
                                           #   (a graphite board between two posts, both sides: drone icon, DRONE MODE, EXPLORE THE WORLD FROM ABOVE, E > ACTIONS > DRONE MODE
@@ -200,6 +200,11 @@ tools/models/make-floor-spotlight-model.mjs # an event floor spotlight for the h
                                           #   floor_spotlight_beam.vmdl (same origin: two open cones out of the lens, 1536 long, in an additive two-sided csgo_effects material like
                                           #   Valve's materials/effects/smoke/lightshaft_*: fresnel edges, depth feather, fading along U; 64 triangles, no collision) — the beam
                                           #   lights nothing: a light_spot at the lens (the output says where); materials/melon_racer/floor_spotlight/
+tools/models/make-laser-model.mjs         # one segment of the drone's laser as models/melon_racer/laser/laser.vmdl: a thin glowing red rod
+                                          #   DRONE_LASER_SEGMENT long (imported from src/melon_drive/dev/constants.js), no collision; in template_drone_laser
+tools/models/make-logo-model.mjs          # extrudes MELON RACER (Bungee, slanted like the logo, lime green outline ring around them) into mesh geometry,
+                                          #   models/melon_racer/logo_text.dmx for Hammer's File → Import (DmxText in model.mjs),
+                                          #   + materials/melon_racer/logo/logo_text_{face,outline,holo}.vmat (holo = an opaque copy of holo_dashes for the letter fronts) (opentype.js + earcut + clipper-lib, devDependencies)
 tools/models/make-podium-model.mjs        # the hub podium (steps 2-1-3 in the docs/GAME_CI.md colors, glowing Bungee place numbers) as mesh geometry,
                                           #   models/melon_racer/podium.dmx for Hammer's File → Import (DmxText in model.mjs), + materials/melon_racer/podium/podium_*.vmat; prints where the podium_spawn_<place> info_targets go
 tools/models/make-saw-blade-model.mjs     # a circular saw blade as models/melon_racer/saw_blade/saw_blade.vmdl (DIAMETER 36, scaled in the script — never non-uniformly in Hammer): 24 hooked teeth with wider carbide tips,
@@ -209,6 +214,13 @@ tools/models/make-spin-hammer-model.mjs   # a spinning sledgehammer as models/me
                                           #   the floor, its wooden handle the arm sweeping around a low pedestal (304 triangles); one bone ("arm") turning around Z, looping
                                           #   "spin" (+ "idle"), a prop_dynamic with Idle Animation "spin", Loop Mode "Loop"; collision: pedestal static, hub + handle + head on "arm";
                                           #   origin on the floor at the axis; materials/melon_racer/spin_hammer/
+tools/models/make-spawn-pad-model.mjs     # the pad marking hub_spawn, in the stage's look: models/melon_racer/spawn_pad/spawn_pad.vmdl (a low round disc, 88 across, two 1-unit steps
+                                          #   a melon rolls over, dark inlay ring, a dark spot with a white ring in the middle, white chevrons pointing +X = the spawn's facing;
+                                          #   ~600 triangles, solid) + spawn_pad_light.vmdl (the glowing ring, tinted on its own); both on the floor under hub_spawn, its yaw; materials/melon_racer/spawn_pad/
+tools/models/make-shopping-cart-model.mjs # a shopping cart a melon rides in as models/melon_racer/shopping_cart/shopping_cart.vmdl (1620 triangles): chrome wire basket (floor 30 x 22 at 12,
+                                          #   rim 16 higher), chassis with a wire rack, four casters with rubber wheels, back legs up to the handle; plastic (grip, front plate,
+                                          #   caster caps) tinted per prop; a prop_physics, MASS_KG 3, collision convex hulls, one .obj each (VmdlText's `hulls` + `body`:
+                                          #   a moving body can't use a concave mesh); plain physics, no script; materials/melon_racer/shopping_cart/
 tools/models/make-spike-spring-model.mjs  # a spike spring trap as models/melon_racer/spike_spring/spike_spring.vmdl: spiked steel plate on a chrome coil in a shaft
                                           #   with a magenta rim (1248 triangles); the spring skinned between root and plate; animations cycle (looping), rise, sink, up, down;
                                           #   no collision (an optional 32x32 floor hole needs a nodraw lid); timing imported from src/melon_drive/world/spike-spring/constants.js; materials/melon_racer/spike_spring/
@@ -250,7 +262,7 @@ models/melon_racer/melon/melon.vmdl      # the melon as our own copy: CS2's ital
                                           #   prop_data and break pieces; its fixed mass 2.0 added by hand — the decompiler drops mass_override), material remapped to materials/melon_racer/melon/melon_default.vmat —
                                           #   the base for melon skins (no SetMaterialGroup in cs_script: one .vmdl per skin, swapped by SetModel)
 materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/, melon/ (melon skins),
-                                          #   logo/ (logo_text_*), podium/, bouncer/, drone/, laser/, buffer_stop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
+                                          #   logo/ (logo_text_*), podium/, hub_gate/, pavilion/, heal_tent/, tree/, hedge/, rock/, mountain/, park/, inflatable_podium/, stage/, bouncer/, shopping_cart/, catapult/, drone/, drone_display/, spawn_pad/, floor_spotlight/, half_pipe/, bridge/, laser/, buffer_stop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
                                           #   checkpoint_gate/ — a new material goes into the fitting one, never loose in materials/melon_racer/
 materials/melon_racer/decals/*_decal.vmat # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
 ```

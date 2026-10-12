@@ -18,6 +18,7 @@ export function RespawnKartAtCheckpoint(kart) {
     FacePlayerView(kart.pawn, kart.checkpointAngles.yaw);
     kart.lastWallContact = undefined; // that wall is somewhere else now
     kart.podium = undefined; // the respawn button (or a break) takes it down from the podium
+    kart.catapult = undefined; // and out of a catapult's bucket
     RestoreFullHealth(kart);
     // Cleared, not measured against zero: this is our own intentional
     // velocity reset, not a physical impact to react to.
@@ -44,6 +45,7 @@ export function TeleportKartTo(kart, position, angles, velocity) {
     FacePlayerView(kart.pawn, angles.yaw);
     kart.lastWallContact = undefined; // that wall is somewhere else now
     kart.podium = undefined; // not held over a spot it's been teleported away from
+    kart.catapult = undefined; // nor in a catapult's bucket
     kart.lastVelocity = undefined;
     kart.prevLastVelocity = undefined;
     kart.prevOrigin = undefined;

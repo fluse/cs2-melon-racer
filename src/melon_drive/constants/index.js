@@ -50,3 +50,4 @@ export * from "../world/ball-pit/constants.js";
 export * from "../world/ball-spawner/constants.js";
 export * from "../world/bouncer/constants.js";
 export * from "../world/balloon/constants.js";
+export * from "../world/catapult/constants.js";

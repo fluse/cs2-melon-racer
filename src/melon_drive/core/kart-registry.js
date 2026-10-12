@@ -45,6 +45,7 @@ import { predictionDotSet } from "./trace.js";
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
  *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
  *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
+ *   catapult?: { base: any, seatedTime: number }, // sitting in a catapult's bucket (its base), since when — see world/catapult/
  *   testPreview?: { kind: "countdown" | "finish" | "intro" | "call", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro/Grand Prix Call playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
  *   finishTime?: number, timedOut?: boolean, // racing: when it finished this heat; finished by the finish window running out instead (no place) — see FinishKart/TimeOutKart in race/heat/race-flow.js

@@ -39,6 +39,8 @@ this folder, the script doesn't know about it.
 | 20 | [Ball spawner](20-ball-spawner.md) | Balls dropping in at irregular intervals, removed after a while |
 | 21 | [Gravity zones](21-gravity-zones.md) | Lower (or higher) gravity, less speed lost while rolling |
 | 22 | [Bouncers](22-bouncers.md) | Foam paddles swinging on a spring, each started at a random point |
+| 23 | [Shopping carts](23-shopping-carts.md) | A cart a melon rides in, pushed when another bumps it (plain physics) |
+| 24 | [Catapults](24-catapults.md) | A melon gets in, jump throws it; bumped to aim |
 
 ## All script inputs
 
@@ -134,6 +136,7 @@ Names the script parses — the name carries the config.
 | `camera_zone_[noclip_]close[_<b>[_<h>]]` | `camera_zone_close_12_2` | `trigger_multiple` | [Camera zones](11-camera-zones.md#close-up-zones) |
 | `side_view_<yaw>[_<distance>[_<height>]]` | `side_view_90_300_40` | `trigger_multiple` | [Camera zones](11-camera-zones.md#side-view-zones) |
 | `jump_pad_<up>[_<forward>]` | `jump_pad_1000_400` | `trigger_multiple` | [Jump pads](12-jump-pads.md) |
+| `catapult_<forward>_<up>` | `catapult_1500_500` | `prop_physics` (its base) | [Catapults](24-catapults.md) |
 | `gravity_zone_<gravity>[_roll<roll>]` | `gravity_zone_100_roll20` | `trigger_multiple` | [Gravity zones](21-gravity-zones.md) |
 | `mover[_wait<seconds>][_<anything>]` | `mover_wait1.5_left` | `func_movelinear` | [Movers](16-movers.md) |
 | `spike_spring[_<words>][_<down>_<up>][_offset<seconds>]` | `spike_spring_downtime_uptime_2_0.5` | `prop_dynamic` | [Spike springs](18-spike-springs.md) |

@@ -14,7 +14,7 @@ import { UpdateLevel } from "../race/level/level.js";
 import { UpdatePrediction, HidePrediction } from "../fx/prediction/prediction.js";
 import { UpdateLiftCamera, UpdatePodiumCamera, UpdateZoneCamera, UpdateSideViewCamera, UpdateFollowCamera } from "../camera/index.js";
 import { UpdateBoostTrail, StopBoostTrail } from "../fx/boost-trail/boost-trail.js";
-import { UpdateSpikeSprings, UpdateBallPits, UpdateBallSpawner, UpdateBouncers, UpdateBalloons } from "../world/index.js";
+import { UpdateSpikeSprings, UpdateBallPits, UpdateBallSpawner, UpdateBouncers, UpdateBalloons, UpdateCatapults } from "../world/index.js";
 
 let lastHeartbeatTime = 0;
 // Real elapsed time since the last Think, used for the movement math below —
@@ -143,6 +143,11 @@ export function Think() {
         UpdateBalloons(now, dt); // before the ball pits: a ball outside is steered back on top of floating
     } catch (err) {
         Debug(`Think: UpdateBalloons threw: ${err}`);
+    }
+    try {
+        UpdateCatapults(now, dt);
+    } catch (err) {
+        Debug(`Think: UpdateCatapults threw: ${err}`);
     }
     try {
         UpdateBallPits(now);
