@@ -179,13 +179,13 @@ test("the heat waits for every racer to finish, then breaks for BREAK_SECONDS", 
     FinishKart(a);
     assert.equal(a.locked, true, "a finished kart is parked");
     assert.equal(hud.Has(0, "finish_image", "Hidden"), false, "its FINISH shows at once");
-    Tick(50);
+    Tick(20);
     assert.equal(flow.phase, RacePhase.RACING, "b is still racing");
 
     FinishKart(b);
-    Tick(60);
+    Tick(25);
     assert.equal(flow.phase, RacePhase.BREAK);
-    assert.equal(flow.phaseEndTime, 60 + BREAK_SECONDS);
+    assert.equal(flow.phaseEndTime, 25 + BREAK_SECONDS);
 });
 
 test("the break counts BREAK_SECONDS down like the start countdown: each number falls in, knocking out the one before", () => {

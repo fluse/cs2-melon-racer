@@ -37,9 +37,10 @@ import { LogAttackHeld } from "../../dev/attack-debug.js";
 import { Debug } from "../../core/debug.js";
 import { ApplyJump, RechargeWallJumpCharge, GetWallJumpCharges } from "../jump/jump.js";
 import { UpdatePadFlight, TryPadLaunch } from "../../zones/jump-pad/jump-pad.js";
+import { HoldInCatapult } from "../../world/catapult/catapult.js";
 import { UpdateGrounded, UpdateWallContact } from "../contact/contact.js";
 import { DrawCollisionDebug } from "../../dev/collision-debug.js";
-import { UpdateSpectatorHat } from "../../dev/free-look.js";
+import { UpdateDrone } from "../../dev/free-look.js";
 import { ApplyImpactDamage } from "../../health/damage/damage.js";
 import { DetectWallNormal, ComputeWallBounce, SettleWallBounceDamage, WallBounceBreaksAtImpact } from "../wall-bounce/wall-bounce.js";
 import { BreakMelon } from "../../health/breaking/breaking.js";
@@ -76,13 +77,22 @@ export function UpdateKart(slot, kart, dt) {
         return;
     }
 
-    // Free look (dev/free-look.js): the player is flying their pawn around,
+    // Free look (dev/free-look.js): the player is flying a drone around,
     // the melon waits where it was, motion off — no driving, no impacts.
     if (kart.freeLook) {
         kart.lastVelocity = undefined;
         kart.settled = false;
         kart.attackBoosting = false;
-        UpdateSpectatorHat(kart);
+        UpdateDrone(kart, dt);
+        return;
+    }
+
+    // Watching the Grand Prix (race/spectate/): like free look, the melon
+    // waits frozen where it was.
+    if (kart.watching) {
+        kart.lastVelocity = undefined;
+        kart.settled = false;
+        kart.attackBoosting = false;
         return;
     }
 
@@ -105,6 +115,10 @@ export function UpdateKart(slot, kart, dt) {
     }
 
     const now = Instance.GetGameTime();
+    // In a catapult's bucket (world/catapult/): held there, thrown on jump.
+    if (kart.catapult && HoldInCatapult(slot, kart, now)) {
+        return;
+    }
     // A jump pad launch's damage protection ends a moment after landing.
     UpdatePadFlight(kart, now);
     // Heal zones (heal_enter/heal_leave) — before this tick's damage, so a

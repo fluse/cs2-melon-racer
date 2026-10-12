@@ -35,6 +35,12 @@ export const GRAND_PRIX_GATHER_SECONDS = 10;
 export const COUNTDOWN_SECONDS = 3;
 export const GO_DISPLAY_SECONDS = 0.7; // how long "GO" stays on screen once the countdown ends — its grow-and-fade (speedometer.css) is done by .62s
 export const BREAK_SECONDS = 10; // fixed by the original request
+// Once the first racer of a heat finishes, the others have this long to
+// finish too (the finish window, counted down on everyone's HUD as
+// finish_grace). Who hasn't by then gets no place and no points for the
+// heat ("TIME UP"), but stays in the Grand Prix for the next one. Racers
+// who finished spectate the others meanwhile (race/spectate/).
+export const FINISH_GRACE_SECONDS = 30;
 // A racer who reaches no new checkpoint (and counts no lap) for this long
 // after GO or their last one is out of the Grand Prix (DNF) and back in the
 // hub — so one player who stops driving can't block a heat for everyone.

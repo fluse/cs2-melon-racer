@@ -34,5 +34,19 @@ inside the trigger are kept in too.
 - The pull only changes the horizontal direction; a ball blocked by the
   pit's wall from outside is dropped back in after `BALL_PIT_DROP_SECONDS`.
 
+## Balloon balls
+
+Every ball with the ball model (`models/melon_racer/ball.vmdl`) floats like
+a balloon — here and from the [ball spawner](20-ball-spawner.md): it sinks
+slowly instead of falling, and a melon knocks it far before the air slows
+it down. Nothing to set in Hammer; any other physics prop is left to the
+engine.
+
+| Constant | Value | Meaning | Defined in |
+|---|---|---|---|
+| `BALLOON_SINK_SPEED` | 35 units/s | how fast a ball sinks, at most | `world/balloon/constants.js` |
+| `BALLOON_DRAG` | 1.2 /s | air drag: a knock's speed down by a factor of e every 1/1.2 s | `world/balloon/constants.js` |
+| `BALLOON_SCAN_SECONDS` | 0.2 s | how often the map is searched for new balls | `world/balloon/constants.js` |
+
 ---
 [← Spike springs](18-spike-springs.md) · [Ball spawner →](20-ball-spawner.md) · [Mapping API](README.md)

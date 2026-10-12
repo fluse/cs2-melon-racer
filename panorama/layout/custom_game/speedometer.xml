@@ -208,6 +208,10 @@
 			</Button>
 			<Label id="hub_starting" class="HubStartingLabel" text="GRAND PRIX STARTS IN {s:seconds}" />
 			<Label class="HubWaitingLabel" text="Grand Prix in progress…" />
+			<!-- Follow the running Grand Prix (race/spectate/) — everyone outside it. -->
+			<Button id="hub_watch_button" class="HubWatchButton">
+				<Label text="WATCH GRAND PRIX" />
+			</Button>
 			<Button id="hub_abort_button" class="HubAbortButton">
 				<Label text="Cancel Grand Prix" />
 			</Button>
@@ -236,6 +240,46 @@
 		<Image id="finish_image" class="FinishImage Hidden" src="file://{images}/custom_game/word-finish.png" />
 		<!-- The place under it, "1ST  ·  +10 PTS" (Grand Prix points, see FinishKart). -->
 		<Label id="finish_place" class="FinishPlace Hidden" text="{s:place}" />
+
+		<!-- The finish window: once the heat's first racer finished, the seconds
+		     the others have left (FINISH_GRACE_SECONDS, UpdateFinishGraceHud in
+		     race/heat/race-flow.js) — for everyone in the heat or watching it. -->
+		<Label id="finish_grace" class="FinishGrace Hidden" text="FINISH CLOSES IN {s:seconds}" />
+
+		<!-- Spectating (race/spectate/): whose melon the camera follows — the
+		     keys (switch, R back to the own melon) are in .KeyHints, bottom left. -->
+		<Panel id="spectate_panel" class="SpectatePanel Hidden">
+			<Label class="SpectateTitle" text="SPECTATING" />
+			<Label class="SpectateName" text="{s:name}" />
+		</Panel>
+
+		<!-- Key hints, bottom left: a keycap with the letter (.KeyCap) or a mouse
+		     with the button marked (icons/mouse-*.png, tools/images/make-icons.mjs),
+		     and what it does. One group per mode, the script toggles Hidden. -->
+		<Panel class="KeyHints" hittest="false">
+			<!-- Spectating (race/spectate/, SetSpectateHud). A/D switch too. -->
+			<Panel id="spectate_hints" class="KeyHintGroup Hidden">
+				<Panel class="KeyHint">
+					<Image class="KeyHintMouse" src="file://{images}/custom_game/icons/mouse-left.png" />
+					<Label class="KeyHintText" text="NEXT PLAYER" />
+				</Panel>
+				<Panel class="KeyHint">
+					<Image class="KeyHintMouse" src="file://{images}/custom_game/icons/mouse-right.png" />
+					<Label class="KeyHintText" text="PREVIOUS PLAYER" />
+				</Panel>
+				<Panel class="KeyHint">
+					<Panel class="KeyCap"><Label class="KeyCapLetter" text="R" /></Panel>
+					<Label class="KeyHintText" text="BACK TO YOUR MELON" />
+				</Panel>
+			</Panel>
+			<!-- Drone mode (dev/free-look.js, SetDroneHintHud). -->
+			<Panel id="drone_hint" class="KeyHintGroup Hidden">
+				<Panel class="KeyHint">
+					<Panel class="KeyCap"><Label class="KeyCapLetter" text="R" /></Panel>
+					<Label class="KeyHintText" text="EXIT DRONE MODE" />
+				</Panel>
+			</Panel>
+		</Panel>
 
 		<!-- A racer who's gone DNF_WARNING_SECONDS without a new checkpoint:
 		     the seconds until they're out of the Grand Prix (DNF_NO_PROGRESS_SECONDS,
@@ -483,6 +527,27 @@
 									<Panel class="UserMenuButtonContent">
 										<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/restart.png" />
 										<Label class="UserMenuButtonLabel" text="Restart Time Trial [R]" />
+									</Panel>
+								</Button>
+							</Panel>
+							<!-- While a Grand Prix runs that this player isn't in: "Watch Grand
+							     Prix", then "Stop Watching" (race/spectate/, script toggles Hidden). -->
+							<Panel id="usermenu_watch_row" class="UserMenuRestartRow Hidden">
+								<Button id="usermenu_watch_button" class="UserMenuActionButton UserMenuButtonGold">
+									<Panel class="UserMenuButtonContent">
+										<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/spectate.png" />
+										<Label class="UserMenuButtonLabel" text="{s:watch_label}" />
+									</Panel>
+								</Button>
+							</Panel>
+							<!-- "Drone Mode": fly a drone through the map, the melon waits frozen
+							     (dev/free-look.js); then "Exit Drone Mode". Not while this player
+							     is in a Grand Prix (UpdateDroneButtonHud toggles Hidden). -->
+							<Panel id="usermenu_drone_row" class="UserMenuRestartRow">
+								<Button id="usermenu_drone_button" class="UserMenuActionButton UserMenuButtonGold">
+									<Panel class="UserMenuButtonContent">
+										<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/free-look.png" />
+										<Label class="UserMenuButtonLabel" text="{s:drone_label}" />
 									</Panel>
 								</Button>
 							</Panel>
@@ -791,11 +856,6 @@
 							<Button id="usermenu_collisiondebug_button" class="UserMenuToggle">
 								<Label class="UserMenuToggleName" text="Collision Debug" />
 								<Label class="UserMenuTogglePill" text="{s:collisiondebug_state}" />
-							</Button>
-							<!-- Fly through the map with WASD, the melon waits frozen (dev/free-look.js). Off by default; switched off again here (USE opens the menu). -->
-							<Button id="usermenu_freelook_button" class="UserMenuToggle">
-								<Label class="UserMenuToggleName" text="Free Look" />
-								<Label class="UserMenuTogglePill" text="{s:freelook_state}" />
 							</Button>
 							<!-- Opens the camera page in place of these columns: distance and height
 							     of your own chase camera (dev/camera-tuning.js). -->

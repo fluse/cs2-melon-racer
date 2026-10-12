@@ -15,6 +15,7 @@ const OUT_DIR = new URL("../../panorama/images/custom_game/icons/", import.meta.
 const len = (x, y) => Math.hypot(x, y);
 const union = (...shapes) => (x, y) => Math.min(...shapes.map((s) => s(x, y)));
 const cut = (shape, hole) => (x, y) => Math.max(shape(x, y), -hole(x, y));
+const intersect = (...shapes) => (x, y) => Math.max(...shapes.map((s) => s(x, y)));
 
 /** Filled circle. */
 const circle = (cx, cy, r) => (x, y) => len(x - cx, y - cy) - r;
@@ -90,6 +91,18 @@ const respawnArcEnd = 240; // degrees; the arrowhead sits at this end of the arc
 const respawnEnd = [32 + 18 * Math.cos((respawnArcEnd * Math.PI) / 180), 33 + 18 * Math.sin((respawnArcEnd * Math.PI) / 180)];
 const respawnDir = [-Math.sin((respawnArcEnd * Math.PI) / 180), Math.cos((respawnArcEnd * Math.PI) / 180)];
 
+/** A mouse seen from above, the `side` button ("left" / "right") filled — the HUD's key hints. */
+const mouse = (side) => {
+    const body = rect(16, 4, 48, 60, 16);
+    const button = side === "left" ? rect(16, 4, 30.2, 25.5) : rect(33.8, 4, 48, 25.5);
+    return union(
+        rectOutline(16, 4, 48, 60, 16, 3.5),
+        line(32, 4, 32, 27.5, 1.8),
+        line(16, 27.5, 48, 27.5, 1.8),
+        intersect(body, button),
+    );
+};
+
 const ICONS = {
     // Four-way "move" arrows — the NAVIGATION section.
     navigation: union(
@@ -160,6 +173,13 @@ const ICONS = {
         cut(ellipse(32, 32, 28, 15), ellipse(32, 32, 23.5, 10.5)),
         cut(circle(32, 32, 10), circle(35, 29, 3.5)),
     ),
+    // Screen on a stand with a play triangle — "Watch Grand Prix".
+    spectate: union(
+        rectOutline(5, 9, 59, 47, 5, 4.5),
+        polygon([26, 19], [42, 28], [26, 37]),
+        line(32, 47, 32, 54, 3.5),
+        line(20, 56, 44, 56, 3.5),
+    ),
     // Podium steps 2-1-3 with a star over the winner — "Leaderboards".
     leaderboard: union(
         rect(6, 36, 24, 58, 1.5),
@@ -177,6 +197,9 @@ const ICONS = {
         line(20, 22, 20, 30, 3),
         line(44, 22, 44, 30, 3),
     ),
+    // Mouse, left / right button marked — the HUD's key hints (spectating: next / previous player).
+    "mouse-left": mouse("left"),
+    "mouse-right": mouse("right"),
     // Bug — COLLISION DEBUG.
     debug: union(
         cut(ellipse(32, 40, 12, 15), line(32, 29, 32, 56, 1.3)),

@@ -516,6 +516,28 @@
     color: white;
 }
 
+/* "WATCH GRAND PRIX" under the waiting message while a heat runs. */
+.HubWatchButton {
+    visibility: collapse;
+    horizontal-align: center;
+    border-radius: 0px;
+    padding: 12px 28px;
+    margin-top: 10px;
+    border: 2px solid #ffd84d;
+    background-color: #00000000;
+
+    &:hover {
+        background-color: #ffd84d26;
+    }
+}
+
+.HubWatchButton Label {
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: white;
+}
+
 /* A heat is running: no heats, racers or start — just the message. */
 .HubModal.WaitingForOthers {
     width: 560px;
@@ -527,6 +549,9 @@
         visibility: collapse;
     }
     .HubWaitingLabel {
+        visibility: visible;
+    }
+    .HubWatchButton {
         visibility: visible;
     }
 }
@@ -769,6 +794,118 @@
     &.Hidden {
         visibility: collapse;
     }
+}
+
+/* #finish_grace: the finish window's seconds left, top center under where
+   the DNF warning sits. */
+.FinishGrace {
+    horizontal-align: center;
+    vertical-align: top;
+    margin-top: 240px;
+    padding: 6px 20px;
+    font-size: 24px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #ffffff;
+    background-color: #152012e6;
+    border: 2px solid #ffd84d;
+    text-shadow: 2px 2px 3px #000000cc;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+/* #spectate_panel: whose melon the camera follows (race/spectate/), bottom
+   center above the speed panel; the keys are in .KeyHints, bottom left. */
+.SpectatePanel {
+    horizontal-align: center;
+    vertical-align: bottom;
+    margin-bottom: 210px;
+    padding: 8px 30px 10px 30px;
+    flow-children: down;
+    background-color: #152012e6;
+    border: 2px solid #ffd84d;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.SpectateTitle {
+    horizontal-align: center;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 5px;
+    color: #ffd84d;
+}
+
+.SpectateName {
+    horizontal-align: center;
+    font-size: 30px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #ffffff;
+    text-shadow: 2px 2px 3px #000000cc;
+}
+
+
+/* .KeyHints: bottom left corner, one line per key — a keycap with its letter
+   or a mouse with the button marked, then what it does. No background, a
+   white border (#spectate_hints, #drone_hint). */
+.KeyHints {
+    horizontal-align: left;
+    vertical-align: bottom;
+    margin-left: 30px;
+    margin-bottom: 30px;
+    flow-children: down;
+}
+
+.KeyHintGroup {
+    flow-children: down;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.KeyHint {
+    margin-top: 6px;
+    padding: 4px 14px 4px 8px;
+    flow-children: right;
+    border: 1px solid #ffffff;
+}
+
+.KeyCap {
+    width: 24px;
+    height: 24px;
+    vertical-align: center;
+    border: 2px solid #ffffff;
+    border-radius: 4px;
+}
+
+.KeyCapLetter {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.KeyHintMouse {
+    width: 24px;
+    height: 24px;
+    vertical-align: center;
+}
+
+.KeyHintText {
+    vertical-align: center;
+    margin-left: 10px;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #ffffff;
+    text-shadow: 1px 1px 2px #000000cc;
 }
 
 /* #grand_prix_call: a Grand Prix about to start, for everyone outside the

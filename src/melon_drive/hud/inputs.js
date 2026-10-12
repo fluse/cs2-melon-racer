@@ -22,9 +22,10 @@ import { PlaceOnPodium, TestGrandPrix } from "../race/podium/podium.js";
 import { GetSpeedHud } from "./layout.js";
 import { HideHubModal } from "./hub-modal/hub-modal.js";
 import { RefreshProfileHud } from "./profile/index.js";
-import { SetUserMenuOpen, SetUserMenuPage, UpdateGlowColorHud, UpdateSkinHud, UpdateToggleHud } from "./user-menu.js";
+import { SetUserMenuOpen, SetUserMenuPage, UpdateDroneButtonHud, UpdateGlowColorHud, UpdateSkinHud, UpdateToggleHud } from "./user-menu.js";
 import { SelectLeaderboardTab, StepLeaderboardsTrack } from "./leaderboards/index.js";
 import { RacePhase } from "../constants/index.js";
+import { SetWatching, StopSpectating, ToggleWatching } from "../race/spectate/index.js";
 
 /** @typedef {import("../core/kart-registry.js").Kart} Kart */
 
@@ -53,6 +54,30 @@ const KART_BUTTONS = {
     // so they're still pulled into the next heat that starts while they're
     // standing in hub_start_trigger.
     hub_close_button: (slot, kart) => HideHubModal(slot, kart),
+    // Outside a running Grand Prix: follow it (race/spectate/). The window
+    // closes so the mouse is free for Mouse1/Mouse2.
+    hub_watch_button: (slot, kart) => {
+        if (SetWatching(kart, true, phase)) {
+            HideHubModal(slot, kart);
+        }
+    },
+    // The same from the user menu, and "Stop Watching" again.
+    usermenu_watch_button: (slot, kart) => {
+        if (ToggleWatching(kart, phase)) {
+            SetUserMenuOpen(slot, kart, false);
+        }
+    },
+    // Drone mode (dev/free-look.js): this player flies a drone around, their
+    // melon waits frozen; not while they're in a Grand Prix. Switching it on
+    // or off closes the menu, so the mouse looks around / drives right away.
+    usermenu_drone_button: (slot, kart) => {
+        const on = !IsFreeLookOn(kart);
+        if (SetFreeLook(kart, on) === on) {
+            SetUserMenuOpen(slot, kart, false);
+        } else {
+            UpdateDroneButtonHud(slot, kart);
+        }
+    },
     usermenu_close_button: (slot, kart) => SetUserMenuOpen(slot, kart, false),
     usermenu_respawn_button: (slot, kart) => {
         if (kart.breaking) {
@@ -71,6 +96,7 @@ const KART_BUTTONS = {
         // Back to driving: a free-looking player's respawn ends free look
         // (pawn back on its anchor, chase camera on the melon) first.
         SetFreeLook(kart, false);
+        StopSpectating(kart); // a watcher's frozen melon drives again
         RespawnKartAtCheckpoint(kart);
         SetUserMenuOpen(slot, kart, false);
     },
@@ -125,9 +151,6 @@ const TOGGLE_BUTTONS = {
     usermenu_prediction_button: (kart) => void SetPrediction(kart, !IsPredictionOn(kart)),
     // Only this player's melon is drawn/logged (tools mode only).
     usermenu_collisiondebug_button: (kart) => void SetCollisionDebug(kart, !IsCollisionDebugOn(kart)),
-    // This player flies their own pawn around, their melon waits frozen.
-    // Switching it on closes the menu so the mouse looks around right away.
-    usermenu_freelook_button: (kart) => SetFreeLook(kart, !IsFreeLookOn(kart)), // true = it is on now
 };
 
 /**

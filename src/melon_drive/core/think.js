@@ -9,11 +9,12 @@ import { UpdateKart } from "../movement/index.js";
 import { HandleMelonLost } from "../health/index.js";
 import { phase, UpdateRaceFlow } from "../race/heat/race-flow.js";
 import { UpdateStats } from "../race/stats/stats.js";
+import { UpdateSpectating } from "../race/spectate/index.js";
 import { UpdateLevel } from "../race/level/level.js";
 import { UpdatePrediction, HidePrediction } from "../fx/prediction/prediction.js";
 import { UpdateLiftCamera, UpdatePodiumCamera, UpdateZoneCamera, UpdateSideViewCamera, UpdateFollowCamera } from "../camera/index.js";
 import { UpdateBoostTrail, StopBoostTrail } from "../fx/boost-trail/boost-trail.js";
-import { UpdateSpikeSprings, UpdateBallPits, UpdateBallSpawner, UpdateBouncers } from "../world/index.js";
+import { UpdateSpikeSprings, UpdateBallPits, UpdateBallSpawner, UpdateBouncers, UpdateBalloons, UpdateCatapults } from "../world/index.js";
 
 let lastHeartbeatTime = 0;
 // Real elapsed time since the last Think, used for the movement math below —
@@ -119,6 +120,11 @@ export function Think() {
         Debug(`Think: UpdateRaceFlow threw: ${err}`);
     }
     try {
+        UpdateSpectating(now, phase);
+    } catch (err) {
+        Debug(`Think: UpdateSpectating threw: ${err}`);
+    }
+    try {
         UpdateStats(now, Math.min(dt, 1)); // a long pause (a stall, a reload) isn't time on the server
     } catch (err) {
         Debug(`Think: UpdateStats threw: ${err}`);
@@ -132,6 +138,16 @@ export function Think() {
         UpdateSpikeSprings(now);
     } catch (err) {
         Debug(`Think: UpdateSpikeSprings threw: ${err}`);
+    }
+    try {
+        UpdateBalloons(now, dt); // before the ball pits: a ball outside is steered back on top of floating
+    } catch (err) {
+        Debug(`Think: UpdateBalloons threw: ${err}`);
+    }
+    try {
+        UpdateCatapults(now, dt);
+    } catch (err) {
+        Debug(`Think: UpdateCatapults threw: ${err}`);
     }
     try {
         UpdateBallPits(now);

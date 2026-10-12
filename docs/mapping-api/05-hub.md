@@ -55,6 +55,85 @@ IN 10 · PRESS R TO JOIN"), and **R** teleports their melon here.
 |---|---|---|---|
 | `GRAND_PRIX_GATHER_SECONDS` | 10 s | how long the others are called before the Grand Prix starts | `race/constants.js` |
 
+## Route gates
+
+An inflatable arch per route in the hub with the route's name on a sign,
+over the route's teleporter — the way into that route. Only models: the
+teleport is a normal [teleporter](07-teleporters.md) inside the opening.
+Gate and name are two models with the same origin: one gate for every
+route, the sign placed onto it.
+
+| Entity | Class | Setting |
+|---|---|---|
+| Gate | `prop_static` (or `prop_dynamic`) | Model `models/melon_racer/hub_gate/hub_gate.vmdl`; scale 1; **Render Color** tints the white vinyl (straps, plates, ropes, blower stay dark) |
+| Name sign | `prop_static` | Model `models/melon_racer/hub_gate/hub_gate_name_<route>.vmdl`, `<route>` as in the route's prefab `route_<route>.vmap` (`hub_gate_name_side_slice.vmdl` → "SIDE SLICE"); **same origin and angles as the gate**, scale 1 |
+| Teleporter | `trigger_multiple` ([standard setup](01-conventions.md#3-every-melon-trigger-is-set-up-the-same-way)) | inside the opening, named `teleport_stop_checkpoint_to_<destination>` ([name variants](07-teleporters.md#name-variants)) so a break before the start line respawns at the route, not in the hub |
+
+- Origin on the floor in the middle of the opening; the melon drives
+  through along the model's X. The name reads right from both sides.
+- Opening 84 wide, 104 high under the top; the arch 156 wide, 132 high.
+  Guy ropes reach 38 out along X front and back, the blower (behind the
+  right foot, -X) 43 — keep that floor clear. Tube, feet and blower are
+  solid; ropes and the name sign aren't.
+- A new or renamed route: re-run `node tools/models/make-hub-gate-model.mjs`
+  and compile its `hub_gate_name_<route>.vmdl` with `resourcecompiler.exe`.
+
+## Grand Prix pavilion
+
+An inflatable tent over `hub_start_trigger` — where the Grand Prix
+starts. Only models: the trigger stays as it is ([hub start area](#hub-start-area)).
+
+It's split into pieces so each can be colored on its own: every piece is
+a `prop_static` with the model `models/melon_racer/pavilion/pavilion_<piece>.vmdl`,
+**all at the same origin** (the pavilion's middle, on the floor), scale 1,
+only turned. Its **Render Color** tints the piece's white parts; straps,
+plates, ropes, piping and the sign's board stay dark.
+
+| Piece | Copies | Yaw | Render Color tints |
+|---|---|---|---|
+| `leg` (foot, straps, guy rope) | 4 | 0, 90, 180, 270 | the vinyl |
+| `canopy` (one side, its hem) | 4 | 0, 90, 180, 270 | the canvas |
+| `bunting` (one side's pennants) | 3 | 90, 180, 270 — not over the sign | the white pennants |
+| `sign` ("GRAND PRIX") | 1 | 0 — the +X entrance | letters, edge, checks |
+| `crown` | 1 | — | the vinyl |
+| `flag` (waving) | 1 | — · a **`prop_dynamic`**, Idle Animation `wave`, Loop Mode "Loop" | the ball on the pole |
+| `light` (the ring inside) | 1 | — | the light |
+| `blower` | 1 | the yaw of the leg it stands beside (0 = the +X+Y leg) | its duct |
+
+- Origin on the floor in the middle; the legs stand on the diagonals at
+  ±144 / ±144, so `hub_start_trigger` fits inside a 288 × 288 square
+  between them. The main entrance with the "GRAND PRIX" sign faces +X.
+- Side openings 256 wide and 132 high in the middle (94 under the sign);
+  the crown at 166, the flag's top at 239. Guy ropes reach out to 260 on
+  the diagonals, the blower 46 out beside its leg — keep that floor clear.
+- Legs, feet and blower are solid; canopy, ropes, sign and flag aren't.
+- Easiest in Hammer: place all 16 props once, select them and make them
+  a prefab (or group) — then the pavilion moves as one.
+
+### Stage
+
+A round stage for the pavilion to stand on (`tools/models/make-stage-model.mjs`):
+a deck, low steps all round it with an LED strip on every riser, and a
+platform reaching out at each of the pavilion's openings. Like the
+pavilion: `prop_static`s with `models/melon_racer/stage/stage_<piece>.vmdl`,
+all at the same origin (the middle, on the floor), only turned; each
+piece's **Render Color** tints its surface or its lights.
+
+| Piece | Copies | Yaw |
+|---|---|---|
+| `deck` (panel joints, checkered ring, inlay ring) | 1 | — |
+| `steps` (one quarter) | 4 | 0, 90, 180, 270 |
+| `step_lights` | 4 | 0, 90, 180, 270 |
+| `thrust` (the platform at +X: front steps, bollards) | 4 | 0, 90, 180, 270 |
+| `thrust_lights` (its LEDs, the bollards' caps) | 4 | 0, 90, 180, 270 |
+
+- The deck is 16 high, radius 272: place the pavilion's pieces (and
+  `hub_start_trigger`) 16 higher, on the same middle. Its legs, stakes and
+  blower all stand on the deck.
+- Steps 4 high and 16 deep, out to radius 320; the platforms 128 wide, out
+  to 416. Deck, steps, platforms and bollards are solid, the lights and
+  markings aren't.
+
 ## Podium
 
 After a Grand Prix that ran to its last track, the top three are put on the
@@ -87,6 +166,17 @@ podium instead of `hub_spawn`. **No triggers** — one point entity per step:
   seen from the front, which faces +X as imported. Give the `podium_spawn_<place>`
   info_targets the yaw the front faces; the tool prints their spots relative to the
   podium's origin (1st: `0 0 124`, 2nd: `0 -112 96`, 3rd: `0 112 72`).
+- Or the **inflatable podium** (`tools/models/make-inflatable-podium-model.mjs`):
+  the same footprint, heights and spawn spots, as `prop_static`s in pieces
+  that are tinted on their own (Render Color), all at the same origin and
+  angles: `models/melon_racer/inflatable_podium/inflatable_podium_body_<n>`,
+  `_top_<n>` and `_number_<n>` for places 1–3, `_base` (the ground mat
+  under all three) and `_blower` (behind the winner's step). Blocks, tops and
+  blower are solid.
+- Either can stand on the **backdrop platform** (`tools/models/make-stage-model.mjs`):
+  `models/melon_racer/stage/stage_platform` + `stage_platform_lights`, both at the same
+  origin (the deck's middle, on the floor), its steps on the +X side. It's 16 high:
+  raise the podium and its `podium_spawn_<place>`s (the whole prefab) by 16.
 - Keep the steps more than a melon apart and away from `hub_start_trigger`
   if standing on them shouldn't open the hub modal.
 - `npm test` fails on any other `podium*` name (a typo).

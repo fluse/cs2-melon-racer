@@ -19,17 +19,59 @@ reuse a color for something with a different meaning.
 - **Podium** (`tools/models/make-podium-model.mjs`): 1st place in checkpoint gold,
   2nd in heal cyan, 3rd in start magenta (top plate and glowing number);
   the band under each plate in guide green.
+- **Route gates in the hub** (`tools/models/make-hub-gate-model.mjs`): an inflatable arch in the white
+  inflatable vinyl, tinted per prop in Hammer (render color), with graphite straps, plates and blower; the name sign graphite with white letters and edge.
+- **Grand Prix pavilion** (`tools/models/make-pavilion-model.mjs`): white throughout, each piece tinted
+  per prop in Hammer (the vinyl, canvas, pennants, letters, light ring), graphite straps, plates,
+  piping and sign board, a checkered flag.
+- **Inflatable trees** (`tools/models/make-tree-model.mjs`): trunk and crown in the white inflatable vinyl,
+  each tinted per prop in Hammer, graphite straps, plate and valve.
+- **Inflatable hedges** (`tools/models/make-hedge-model.mjs`): foliage and branches in the white inflatable vinyl,
+  each tinted per prop in Hammer (a hedge green, a bark brown), graphite ground strip and valve.
+- **Tree beds** (`tools/models/make-tree-bed-model.mjs`): a light sandstone wall (`#D6D1C6`) and a white
+  picket fence, each tinted per prop in Hammer; bark mulch (`#4A3324`) or a natural grass green (`#5A9438`,
+  darker than guide green on purpose) inside, not tinted.
+- **Park walls, fences, benches** (`tools/models/make-park-model.mjs`): the tree beds' sandstone (`#D6D1C6`, tinted
+  per prop) with grey mortar (`#8A867E`), white painted fences (tinted per prop), benches of oiled wood (`#A87244`)
+  on graphite cast iron.
+- **Inflatable mountain** (`tools/models/make-mountain-model.mjs`): every piece and its snow cap in the white
+  inflatable vinyl, each tinted per prop in Hammer (a rock grey or brown, the caps white), a graphite valve.
+- **Inflatable rocks** (`tools/models/make-rock-model.mjs`): the map borders, panels in the white inflatable vinyl,
+  tinted per prop in Hammer (a stone grey, or any color), graphite valve, tie-down loops and stakes.
+- **Inflatable podium** (`tools/models/make-inflatable-podium-model.mjs`): blocks, cushions and numbers in white,
+  each tinted per prop in Hammer, graphite piping, bands, loops, badges and ground mat.
+- **Stage** (`tools/models/make-stage-model.mjs`): a light grey deck and steps, tinted per prop, graphite panel
+  joints, checks, inlay ring, step edges and bollards, warm white LED strips and bollard caps (their own
+  models: tinted on their own).
 - **Melon skins** (`tools/materials/make-melon-skins.mjs`): gold is one plain,
   faintly glowing metal gold (`#FFC456`), not checkpoint gold; camo is off-palette on
   purpose.
 - **Foam bouncer** (`tools/models/make-bouncer-model.mjs`): pink foam paddle, lime top edge —
   off-palette on purpose, a playground decoration, not a guide line.
+- **First-aid tent** (`tools/models/make-heal-tent-model.mjs`): arches and the roof's mast in the white inflatable vinyl, white canvas —
+  each tinted per prop in Hammer —, graphite straps, plates, piping and signs with white letters; every cross (on the canvas,
+  the mat, the turning one on the roof) a glowing pharmacy green, the heal holo gradient's `#28FF6E`: healing, like heal cyan.
+- **Melon Boutique** (`tools/models/make-boutique-model.mjs`): frame, wall and swim rings in the white inflatable vinyl, the awning's
+  two sets of stripes in white canvas — each tinted per prop in Hammer —, graphite straps, sign, plates and step edges with white letters,
+  the stage's light grey step blocks (tinted per prop) with warm white LEDs.
 - **Buffer stop** (`tools/models/make-buffer-stop-model.mjs`): magenta beam (`#FF20FF`, like the
   spike spring's rim), white chevron, grey steel — off-palette on purpose, an obstacle, not a start gate.
 - **Saw blade** (`tools/models/make-saw-blade-model.mjs`): bright steel, dark carbide
   tips, a signal red ring (`#E83C2A`) — off-palette on purpose, warning colors for a hazard.
 - **Spike spring** (`tools/models/make-spike-spring-model.mjs`): steel spikes, chrome spring, a magenta rim
   (`#FF20FF`) — off-palette on purpose: close to start magenta, but a hazard, not a start gate.
+- **Drone** (`tools/models/make-drone-model.mjs`): white shell, woven carbon chassis and arms, graphite
+  frame, silver motor bells, amber lights, a red recording light on the camera — off-palette on purpose: a player avatar (free look), not a map signal.
+- **Drone display** (`tools/models/make-drone-display-model.mjs`): the stage's light grey (tinted per prop) and graphite,
+  a white landing pad ring and H, warm white LEDs; the sign graphite with white letters and edge, like the route gates' signs.
+- **Spawn pad** (`tools/models/make-spawn-pad-model.mjs`): the stage's light grey (tinted per prop), graphite rings and spot,
+  white chevrons, a warm white glowing ring (its own model: tinted on its own).
+- **Floor spotlight** (`tools/models/make-floor-spotlight-model.mjs`): the stage's light grey base (tinted per prop), graphite
+  yoke and head, grey fins, a warm white lens (`#FFF1D6`, like the pavilion's light ring) and a beam in the same warm white.
+- **Half-pipe slide** (`tools/models/make-half-pipe-model.mjs`): sky blue playground plastic (`#3A8DFF`, not heal cyan), white lips,
+  graphite legs — off-palette on purpose, a playground piece.
+- **Bridge** (`tools/models/make-bridge-model.mjs`): the Severinsbruecke's pale grey-green steel paint (`#C9D2CC`) on deck and pylon,
+  light concrete (`#B9B6AE`) piers, asphalt road (`#3B3E44`) with white markings, graphite railing and cables — off-palette on purpose, a real bridge.
 - **Spinning hammer** (`tools/models/make-spin-hammer-model.mjs`): steel head, signal red rubber faces
   (`#E83C2A`, like the saw blade's ring), wooden handle, dark grey pedestal — off-palette on purpose, a hazard.
 

@@ -25,11 +25,12 @@ export function SideViewCameraOn(kart) {
  * Per tick: swings the camera to the side while the melon is in a side-view
  * zone and back to the chase camera after it leaves. Left alone while the
  * melon is breaking — the camera just stays where it was, watching the crash
- * site — and in free look (dev/free-look.js).
+ * site — in free look (dev/free-look.js) and while spectating someone else
+ * (race/spectate/).
  * @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt
  */
 export function UpdateSideViewCamera(kart, dt) {
-    if (kart.breaking || kart.freeLook) {
+    if (kart.breaking || kart.freeLook || kart.spectateSlot !== undefined) {
         return;
     }
     const origin = kart.melon.GetAbsOrigin();

@@ -1,6 +1,6 @@
 import { CSInputs } from "cs_script/point_script";
 import { IsCollisionDebugOn } from "../dev/collision-debug.js";
-import { IsFreeLookOn } from "../dev/free-look.js";
+import { IsFreeLookOn, SetFreeLook } from "../dev/free-look.js";
 import { UpdateCameraTuningHud } from "../dev/camera-tuning.js";
 import { UpdatePhysicsTuningHud } from "../dev/physics-tuning.js";
 import { IsPredictionOn } from "../fx/prediction/prediction.js";
@@ -37,8 +37,6 @@ export const USER_MENU_TOGGLES = {
     usermenu_prediction_button: { variable: "prediction_state", isOn: IsPredictionOn },
     // The collision debug view (dev/collision-debug.js).
     usermenu_collisiondebug_button: { variable: "collisiondebug_state", isOn: IsCollisionDebugOn },
-    // Free look (dev/free-look.js).
-    usermenu_freelook_button: { variable: "freelook_state", isOn: IsFreeLookOn },
 };
 
 /**
@@ -75,6 +73,7 @@ export function SetUserMenuOpen(slot, kart, open) {
         UpdateSkinHud(slot, kart);
         UpdateGlowColorHud(slot, kart);
         UpdateHubButtonHud(slot, kart);
+        UpdateDroneButtonHud(slot, kart);
         RefreshProfileHud(slot, kart);
     }
     SyncInputCapture(hud, slot, kart);
@@ -108,6 +107,19 @@ export function SetUserMenuPage(slot, kart, page) {
  */
 export function UpdateHubButtonHud(slot, kart) {
     GetSpeedHud()?.SetDialogVariableStringForPlayer(slot, "usermenu_hub_button", "hub_label", kart.racing ? "Exit Race" : "Return to Hub");
+}
+
+/**
+ * The ACTIONS column's drone button (usermenu_drone_row): "Drone Mode", or
+ * "Exit Drone Mode" while flying — hidden while the player is in a Grand
+ * Prix (kart.racing; SetFreeLook refuses it then, and a heat starting ends it).
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart
+ */
+export function UpdateDroneButtonHud(slot, kart) {
+    const hud = GetSpeedHud();
+    const flying = IsFreeLookOn(kart);
+    hud?.SetDialogVariableStringForPlayer(slot, "usermenu_drone_button", "drone_label", flying ? "Exit Drone Mode" : "Drone Mode");
+    hud?.SetHasClassForPlayer(slot, "usermenu_drone_row", "Hidden", kart.racing && !flying);
 }
 
 /**
@@ -182,7 +194,11 @@ export function UpdateUserMenu(slot, kart) {
     // open or not, so a bad start costs one key instead of USE + a click.
     // Pressed outside a time trial it does nothing — and while the call to
     // join a starting Grand Prix is up, R joins it instead (UpdateGathering).
-    if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && !kart.grandPrixCall && CanRestartTimeTrial(kart) && RestartTimeTrial(kart)) {
+    // Spectating, R leaves that instead (race/spectate/); in drone mode it
+    // leaves that (the hint bottom left says so).
+    if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && kart.freeLook && !kart.grandPrixCall) {
+        SetFreeLook(kart, false);
+    } else if (kart.pawn.WasInputJustPressed(CSInputs.RELOAD) && !kart.grandPrixCall && !kart.watching && kart.spectateSlot === undefined && CanRestartTimeTrial(kart) && RestartTimeTrial(kart)) {
         if (kart.userMenuOpen) {
             SetUserMenuOpen(slot, kart, false);
         }
@@ -192,6 +208,7 @@ export function UpdateUserMenu(slot, kart) {
         // a heat, the hub) with the menu up, and so can the player's heat.
         GetSpeedHud()?.SetHasClassForPlayer(slot, "usermenu_restart_row", "Hidden", !CanRestartTimeTrial(kart));
         UpdateHubButtonHud(slot, kart);
+        UpdateDroneButtonHud(slot, kart);
         if (kart.skinHudLevel !== GetKartLevel(kart)) {
             UpdateSkinHud(slot, kart); // a level-up with the menu open unlocks skins
         }

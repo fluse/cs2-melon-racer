@@ -22,7 +22,7 @@ the spawned copies onto the melon / crash site. Particle systems should have
 | `particle_health_template` | its **own** `info_particle_system` (`.vpcf`) | every entry into a [heal zone](09-heal-zones.md) | `HEAL_PARTICLE_LIFETIME` (2 s) | no heal effect |
 | `particle_boost_trail_template` | **2** `info_particle_system`s (`boost_trail.vpcf`, `boost_trail_juice.vpcf`) | boost above the trail speed | fades over `BOOST_TRAIL_FADE_SECONDS` (1 s) | no trail |
 | `prediction_dot_template` | 1 small dot entity | only with `PREDICTION_RENDER_MODE = "dots"` (default `"debug"`) | — | debug line |
-| `template_spectator_hat` | a model, e.g. a hat `prop_dynamic` ("Not solid") | a player switches [free look](#free-look-avatar) on | free look off / player leaves | no avatar |
+| `template_drone` | **1** `prop_dynamic` with `models/melon_racer/drone/drone.vmdl` | a player switches [drone mode](#free-look-drone) on | free look off / player leaves | **no drone mode** (it stays off) |
 
 Two templates must never share one `info_particle_system` (a template copied
 in Hammer still playing the other one's effect) — `npm test` fails on it.
@@ -86,19 +86,57 @@ Nothing else may be in it — `npm test` fails on a third effect.
 `"dots"` (`fx/prediction/constants.js`, default `"debug"`). One small dot
 entity, e.g. a "Never Solid" `func_brush`.
 
-## Free look avatar
+## Free look drone
 
-`template_spectator_hat`: the ghost avatar of a player in free look (user
-menu, DEVELOPER). Their pawn flies around invisible, so a fresh copy of
-this template hangs on it — at eye height (`SPECTATOR_HAT_HEIGHT`, 64 units
-above the feet) and a little behind the eyes (`SPECTATOR_HAT_BACK`, 24 units,
-so the player's own view isn't through it), turned and tilted with the view (looking
-down, it tips forward and rises behind the eyes), flying along —
-and shows the others who
-it is. Removed when free look goes off or the player leaves. Where it sits in
-Hammer doesn't matter. Make the model **"Not solid"**: the script also sends
-it `DisableCollision`, but a solid hat would otherwise be a wall to melons
-and their traces.
+`template_drone`: the drone a player in drone mode (user menu, ACTIONS → "Drone Mode")
+turns into and flies through the map. A fresh copy is spawned above their
+melon, moved by the script every tick, and the chase camera follows it;
+the others see who's flying around. Removed when drone mode goes off or the
+player leaves.
+
+| Setting | Value |
+|---|---|
+| Template01 | a `prop_dynamic` with `models/melon_racer/drone/drone.vmdl` (`tools/models/make-drone-model.mjs`) |
+| Its animation | nothing to set — the script starts the looping `spin` (the rotors), and `spindown`/`landed`/`spinup` when it touches down and takes off |
+| Solidity | doesn't matter: the model has no collision, and the script sends it `DisableCollision` |
+| Where | anywhere — the copy is moved onto the melon |
+
+- Without it in the map, drone mode stays off and the console says why.
+
+### Laser pointer (optional)
+
+`template_drone_laser`: the drone's laser — a red beam from the camera's
+recording light along where the pilot looks, to the first thing in the
+way, at most `DRONE_LASER_LENGTH` (32 units). CS2 has no `env_beam`, so the
+script lays the beam from copies of this template, end to end
+(`DRONE_LASER_SEGMENT`, 4 units each — 8 copies per drone).
+
+| Setting | Value |
+|---|---|
+| Template01 | a `prop_dynamic` with `models/melon_racer/laser/laser.vmdl` (`tools/models/make-laser-model.mjs`: a thin glowing rod) |
+| Solidity | doesn't matter: no collision, and the script sends `DisableCollision` |
+| Where | anywhere — the copies are moved onto the beam |
+
+Without it, the drone flies without a laser.
+
+### Values
+
+| Constant | Value | Meaning | Defined in |
+|---|---|---|---|
+| `DRONE_SPEED` | 600 units/s | flying speed | `dev/constants.js` |
+| `DRONE_FAST_SPEED` | 1400 units/s | with attack held | `dev/constants.js` |
+| `DRONE_RESPONSE` | 3 /s | inertia: how fast the velocity follows the input (two thirds after 1/3 s) | `dev/constants.js` |
+| `DRONE_MAX_TILT` | 25° | how far it leans into speeding up, braking and turns | `dev/constants.js` |
+| `DRONE_RADIUS` | 8 units | its size against the world, to each side (the model is ~16 across, about a melon) | `dev/constants.js` |
+| `DRONE_BOTTOM` / `DRONE_TOP` | 2.5 / 2.7 units | its size against the world, down to its skids / up from its origin (printed by the model generator) | `dev/constants.js` |
+| `DRONE_GROUND_DISTANCE` | 2 units | floor this close under its skids: on the floor | `dev/constants.js` |
+| `DRONE_LAND_SECONDS` | 1.5 s | standing still on the floor this long: landed, the rotors run down to a stop, parked until jump | `dev/constants.js` |
+| `DRONE_LAND_MAX_SPEED` | 5 units/s | slower than this on the floor counts as standing still | `dev/constants.js` |
+| `DRONE_TAKEOFF_SPEED` | 180 units/s | jump on the ground: the hop up (~60 units) | `dev/constants.js` |
+| `DRONE_LASER_LENGTH` | 32 units | how far the laser reaches, at most | `dev/constants.js` |
+| `DRONE_START_HEIGHT` | 40 units | how far above the melon it appears | `dev/constants.js` |
+| `DRONE_CAMERA_DISTANCE` / `_HEIGHT` | 50 / 25 units | the camera behind / above it — the drone close, at the bottom of the picture | `dev/constants.js` |
+| `DRONE_CAMERA_PIVOT` | 12 units | the point above the drone the camera turns around (and is pulled in towards at walls/floor) — not into the drone when landed | `dev/constants.js` |
 
 ---
 [← Core entities](02-core-entities.md) · [Mapping API](README.md) · [Tracks →](04-tracks.md)

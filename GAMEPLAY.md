@@ -515,7 +515,8 @@ run by `race/heat/`):
    `DnfWarningValue` in `race/heat/logic.js`, applied by `UpdateDnf` in
    `race/heat/race-flow.js`.
 5. **BREAK** — once every kart that started this heat is either `finished`
-   or out (disconnected — `OnPlayerDisconnect` drops its kart entry —, left
+   (in time, or when the finish window closed — see "Finish window &
+   spectating") or out (disconnected — `OnPlayerDisconnect` drops its kart entry —, left
    via "Exit Race", or DNF), the heat is over; if nobody finished, it ends
    like a heat everyone left.
    After a fixed `BREAK_SECONDS` (10, decided) the flow either starts a
@@ -587,6 +588,56 @@ is stopped when the hold ends. Constants:
 (`test/race/podium.test.mjs`), applied by `race/podium/podium.js` and the
 hold in `movement/driving/drive.js` (`test/race/podium-flow.test.mjs`).
 Details for mappers: [Mapping API: podium](docs/mapping-api/05-hub.md#podium).
+
+## Finish window & spectating (decided, implemented)
+
+**Finish window:** once the first racer of a heat finishes, the others
+have `FINISH_GRACE_SECONDS` (30, `race/constants.js`) to finish too,
+counted down top center for everyone in the heat and everyone watching it
+("FINISH CLOSES IN 27", `finish_grace`). Whoever hasn't finished when it
+closes gets **no place and no points** for the heat — "TIME UP · NO
+POINTS" where the place would be, no FINISH image, no time saved — but
+**stays in the Grand Prix** for the next heat (decided; only the DNF rule
+takes a racer out of it). Then the heat is over and BREAK starts.
+`TimeOutKart`/`UpdateFinishGraceHud` in `race/heat/race-flow.js`.
+
+**Spectating** (`race/spectate/`) — the chase camera on someone else's
+melon:
+
+- **Finished racers** watch the ones still driving, on their own,
+  `SPECTATE_AFTER_FINISH_SECONDS` (3) after crossing the line (the FINISH
+  image first, then hidden while spectating), **only during the finish
+  window** (decided) — the heat ending puts the camera back on their own
+  melon, FINISH again.
+- **Players outside the Grand Prix** can follow the whole of it (decided):
+  "Watch Grand Prix" in the user menu's ACTIONS column (only while one runs
+  that they aren't in; then "Stop Watching") or under the hub window's
+  "Grand Prix in progress…". Their own melon waits frozen meanwhile (motion
+  off, like free look). It ends with the Grand Prix, by "Stop Watching", or
+  by anything that moves the melon (hub, tutorial, respawn, restart, free
+  look).
+- **Whom:** the racers still driving, the one furthest ahead first (laps,
+  then checkpoints); a watcher with nobody driving (countdown done, break)
+  sees every racer. When the watched one finishes, is out or leaves, the
+  camera moves on by itself.
+- **Switching** like CS2's spectator mode (decided): **Mouse1 / D** next,
+  **Mouse2 / A** previous, wrapping around — not while Tab holds the
+  scoreboard or a menu has the mouse.
+- **R leaves** (decided): a watcher stops watching, a finished racer goes
+  back to their own melon (FINISH again) for the rest of the heat. While
+  spectating, R doesn't restart a time trial. The mouse turns the view around the
+  watched melon as around one's own; that melon's lift/podium/camera-zone
+  zooms apply, the viewer's own camera distance from the camera page.
+- HUD: "SPECTATING" and the name bottom center above the speed panel
+  (`spectate_panel`); the keys in the bottom left corner (`spectate_hints`,
+  decided): a mouse with the left button marked "NEXT PLAYER", the right
+  one "PREVIOUS PLAYER", a keycap R "BACK TO YOUR MELON" — each in a white
+  border, no background (`.KeyHint`; mouse icons from
+  `tools/images/make-icons.mjs`, keycaps in CSS with the letter inside).
+
+Constants: `race/spectate/constants.js`; rules: `race/spectate/logic.js`
+(`test/race/spectate.test.mjs`), applied by `race/spectate/spectate.js`
+and `camera/follow/follow.js` (`test/race/spectate-flow.test.mjs`).
 
 ## Scoreboard (implemented)
 
@@ -981,22 +1032,61 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
 - Tests: those two and `test/movement/jump.test.mjs` (the real
   `UpdateKart` against the fake engine).
 
-## Free look (implemented, dev aid)
+## Drone mode — free look (implemented)
 
-The user menu's "FREE LOOK" section (below "COLLISION DEBUG"; `kart.freeLook`,
-off by default) lets a player fly through the map: their own pawn (NOCLIP
-anyway) is let go — `HoldPawn` stops pulling it back, WASD flies it along
-the view — and the camera switches to its eyes, starting roughly where the
-chase camera was. Switching it on closes the menu. Their melon waits where
-it was, frozen (`UpdateKart` skips it, physics motion off) — no damage, but
-a running time trial's clock keeps going. Switching off (USE → the same
-button) puts the pawn back on its anchor and the chase camera on the melon.
-A heat starting, a new pawn, the respawn button and "Restart Time Trial"
-(button or R) switch it off. Not while the melon is
-breaking. While it's on, a **ghost avatar** hangs on the flying pawn — a
-copy of the `template_spectator_hat` point_template, at eye height, flying
-along — so the others see who's flying around (the pawn itself is
-invisible). All of it in `dev/free-look.js`.
+The user menu's ACTIONS column has **"Drone Mode"** (decided: an action, not a
+developer toggle; `kart.freeLook`, off by default — "Exit Drone Mode"
+while flying). **Not for a player in a Grand Prix** (decided): while they're
+signed up for one (`kart.racing`) the button is hidden and `SetFreeLook`
+refuses, and a heat starting ends it. It turns the player into a **drone** (decided) and lets them
+fly it through the map: a fresh copy of the `template_drone` point_template
+(the quadcopter from `tools/models/make-drone-model.mjs`, its four rotors
+spinning, the red recording light on its camera blinking) appears above
+their melon, and the chase camera follows it.
+Switching it on or off closes the menu.
+
+- **Flying:** W/S along the view (looking down and holding W dives), A/D
+  sideways, jump up, duck down, attack held for `DRONE_FAST_SPEED`.
+- **Inertia, like a real drone in the air** (decided): the velocity only
+  follows the input gradually (`DRONE_RESPONSE`), so it carries its
+  momentum into a turn and coasts on a moment after letting go (then
+  brakes by itself, a stabilized drone). It leans into the way it's
+  speeding up — forward pulling away, back braking, into a turn — and a
+  little while cruising (`DRONE_MAX_TILT`, `DRONE_CRUISE_TILT`), eased.
+- **Collision** (decided): it runs into the world — a box trace the drone's
+  size (`DRONE_RADIUS` to each side, `DRONE_BOTTOM` down to its skids,
+  `DRONE_TOP` up) along every move, so it lands on its skids, sliding along walls, floors and ceilings — but
+  flies **through melons**, players and other drones (the model has no
+  collision at all).
+- **Landing:** on a floor (within `DRONE_GROUND_DISTANCE` under its
+  skids) and **standing still there for `DRONE_LAND_SECONDS` (1.5 s)**
+  (decided; slower than `DRONE_LAND_MAX_SPEED`, moving starts it over) — until
+  then it still flies, sliding along the floor — its rotors run down to a stop (the model's `spindown`,
+  then `landed`: still, the recording light blinking on); taking off (jump,
+  on the ground) they run up again (`spinup`, then `spin`).
+  Landed it also **doesn't turn on the spot** (decided): looking around
+  with the mouse leaves it facing the way it touched down; in the air it
+  swings round to the view at `DRONE_YAW_RATE` (`StepDroneYaw`). And it's
+  **parked** (decided): W/A/S/D, duck and attack do nothing, only **jump**
+  takes off again — a hop up at `DRONE_TAKEOFF_SPEED`, not counted as
+  landed for `DRONE_TAKEOFF_SECONDS`, then every control works again.
+  `IsDroneOnFloor`/`StepDroneStillSeconds`/`IsDroneLanded`/`DroneRotorInputs` in `dev/drone-logic.js`.
+- **The others see the drone** — who's flying around — and its **laser
+  pointer** (decided): a red beam from the camera's blinking recording
+  light along where the pilot looks, to the first wall, at most
+  `DRONE_LASER_LENGTH` (32 units). CS2 has no `env_beam`: it's laid from
+  glowing rod segments, copies of the optional `template_drone_laser`
+  (Mapping API: free look drone).
+
+Their melon waits where it was, frozen (`UpdateKart` skips it, physics
+motion off) — no damage, but a running time trial's clock keeps going.
+While flying, the bottom left corner shows a keycap R **EXIT DRONE MODE**
+(`drone_hint`, the same key hints as spectating); R does it, like USE → "Exit Drone Mode". Switching off removes the drone and puts the chase
+camera back on the melon. A heat starting, a new pawn, the respawn button
+and "Restart Time Trial" (button or R) switch it off. Not while the melon
+is breaking, and not without `template_drone` in the map (it stays
+off, the console says why). Constants: `dev/constants.js`; rules:
+`dev/drone-logic.js`, applied by `dev/free-look.js` (`test/dev/drone.test.mjs`).
 
 ## Camera settings (implemented, dev aid)
 
@@ -1429,6 +1519,23 @@ back in over the middle after `BALL_PIT_DROP_SECONDS`. Constants:
 `world/ball-pit/ball-pit.js` (`test/world/ball-pit.test.mjs`). Details for
 mappers: [Mapping API: ball pits](docs/mapping-api/19-ball-pits.md).
 
+## Balloon balls (implemented)
+
+**Every ball floats like a balloon** (decided) — every physics prop with
+the ball model (`models/melon_racer/ball.vmdl`), in ball pits and from the
+ball spawner alike. Like a real air-filled balloon (decided: it sinks, it
+doesn't hover or rise): it drifts down slowly, at most
+`BALLOON_SINK_SPEED` (35 u/s), and rests on the floor; a melon knocking
+into it sends it flying far, and the air slows it down again
+(`BALLOON_DRAG`: a factor of e every 1/1.2 s), back to sinking. The script
+does it every tick (the engine's gravity taken back out but for the
+sinking); no Hammer setting. The map is searched for new balls every
+`BALLOON_SCAN_SECONDS` (0.2), so spawned ones float too — they fall
+freely only until they're found. A ball that left its pit is still
+steered back on top of it. Constants: `world/balloon/constants.js`; rule:
+`world/balloon/logic.js`, applied by `world/balloon/balloon.js`
+(`test/world/balloon.test.mjs`).
+
 ## Ball spawner (implemented)
 
 Physics balls dropping in at irregular intervals: the script copies the
@@ -1457,7 +1564,71 @@ name or Hammer logic. Constants: `world/bouncer/constants.js`; rules:
 (`test/world/bouncer.test.mjs`). Details for mappers:
 [Mapping API: bouncers](docs/mapping-api/22-bouncers.md).
 
+## Shopping carts (implemented)
+
+A shopping cart on casters (`tools/models/make-shopping-cart-model.mjs`), a
+physics prop: **a melon can sit in its basket, another bumps into it and
+pushes both**. **Plain physics, no script** (decided: the scripted rolling —
+friction given back, kept upright — glitched in-game): how far it goes is
+the engine's friction. A melon in it rides along, pushed by the basket's
+walls; those aren't walls for bounces and wall jumps (a prop). 3 kg against
+the melon's 2. No name or Hammer logic.
+Details for mappers: [Mapping API: shopping carts](docs/mapping-api/23-shopping-carts.md).
+
+## Catapults (implemented)
+
+A wooden catapult on wheels (`tools/models/make-catapult-model.mjs`): **a
+melon jumps into its bucket, and jump fires** (decided) — the arm swings up
+and throws it the way the catapult faces (`CATAPULT_LAUNCH_FORWARD`/`_UP`,
+or `catapult_<forward>_<up>` in the base's name). **Aimed by bumping**
+(decided): the base is a physics prop that rolls and turns when melons push
+it: the script gives back what friction took and keeps it upright
+(`world/catapult/roll.js`, `CATAPULT_ROLL_*`). Two props: the base and the animated arm
+(`idle`, `fire`, `fired`, `reload`), found by their models; the script keeps
+the arm on its base. **The animation only shows the throw** — the melon is
+held in the bucket by the script (no driving), carried along the arm's
+swing and let go at `CATAPULT_RELEASE_ANGLE` with the throw plus the base's
+own speed; the flight takes no damage until shortly after landing, like a
+jump pad launch (`kart.padFlight`). Respawn, hub, tutorial or a heat
+starting take a melon out. Constants: `world/catapult/constants.js` (the
+arm's geometry and timing shared with the generator); rules:
+`world/catapult/logic.js`, applied by `world/catapult/catapult.js` and
+`movement/driving/drive.js` (`test/world/catapult.test.mjs`). Details for
+mappers: [Mapping API: catapults](docs/mapping-api/24-catapults.md).
+
 ## Open design questions (not yet decided — ask before assuming)
+
+## Shopping carts (implemented)
+
+A shopping cart on casters (`tools/models/make-shopping-cart-model.mjs`), a
+physics prop: **a melon can sit in its basket, another bumps into it and
+pushes both**. **Plain physics, no script** (decided: the scripted rolling —
+friction given back, kept upright — glitched in-game): how far it goes is
+the engine's friction. A melon in it rides along, pushed by the basket's
+walls; those aren't walls for bounces and wall jumps (a prop). 3 kg against
+the melon's 2. No name or Hammer logic.
+Details for mappers: [Mapping API: shopping carts](docs/mapping-api/23-shopping-carts.md).
+
+## Catapults (implemented)
+
+A wooden catapult on wheels (`tools/models/make-catapult-model.mjs`): **a
+melon jumps into its bucket, and jump fires** (decided) — the arm swings up
+and throws it the way the catapult faces (`CATAPULT_LAUNCH_FORWARD`/`_UP`,
+or `catapult_<forward>_<up>` in the base's name). **Aimed by bumping**
+(decided): the base is a physics prop that rolls and turns when melons push
+it: the script gives back what friction took and keeps it upright
+(`world/catapult/roll.js`, `CATAPULT_ROLL_*`). Two props: the base and the animated arm
+(`idle`, `fire`, `fired`, `reload`), found by their models; the script keeps
+the arm on its base. **The animation only shows the throw** — the melon is
+held in the bucket by the script (no driving), carried along the arm's
+swing and let go at `CATAPULT_RELEASE_ANGLE` with the throw plus the base's
+own speed; the flight takes no damage until shortly after landing, like a
+jump pad launch (`kart.padFlight`). Respawn, hub, tutorial or a heat
+starting take a melon out. Constants: `world/catapult/constants.js` (the
+arm's geometry and timing shared with the generator); rules:
+`world/catapult/logic.js`, applied by `world/catapult/catapult.js` and
+`movement/driving/drive.js` (`test/world/catapult.test.mjs`). Details for
+mappers: [Mapping API: catapults](docs/mapping-api/24-catapults.md).
 
 - **Per-track progress**: should a free-roaming melon that switches tracks
   keep its progress on the old one (see "Switching tracks while free

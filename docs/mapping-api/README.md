@@ -21,11 +21,11 @@ this folder, the script doesn't know about it.
 | 2 | [Core entities](02-core-entities.md) | Required entities (`point_script`s, HUD, melon template, hub) and spawn points |
 | 3 | [Effect templates](03-effect-templates.md) | Break burst, chunks, perfect spark, heal effect, boost trail, prediction dots |
 | 4 | [Tracks](04-tracks.md) | Start line, checkpoints, respawn spots, finish line, laps |
-| 5 | [Hub](05-hub.md) | Hub start area, `hub_teleport`, podium |
+| 5 | [Hub](05-hub.md) | Hub start area, `hub_teleport`, route gates, Grand Prix pavilion, podium |
 | 6 | [Paint triggers](06-paint-triggers.md) | Recolor the melon |
 | 7 | [Teleporters](07-teleporters.md) | Generic teleports, respawn teleporters |
 | 8 | [Kill & respawn triggers](08-kill-triggers.md) | Break the melon on the spot, or send it back to its checkpoint |
-| 9 | [Heal zones](09-heal-zones.md) | Heal over time, full-heal zones |
+| 9 | [Heal zones](09-heal-zones.md) | Heal over time, full-heal zones, first-aid tent |
 | 10 | [Lift zones](10-lift-zones.md) | Climb shafts by bouncing between walls |
 | 11 | [Camera zones](11-camera-zones.md) | Zoom out/in, front view, close-up, side view (2D) |
 | 12 | [Jump pads](12-jump-pads.md) | Timed launch pads, no damage |
@@ -39,6 +39,8 @@ this folder, the script doesn't know about it.
 | 20 | [Ball spawner](20-ball-spawner.md) | Balls dropping in at irregular intervals, removed after a while |
 | 21 | [Gravity zones](21-gravity-zones.md) | Lower (or higher) gravity, less speed lost while rolling |
 | 22 | [Bouncers](22-bouncers.md) | Foam paddles swinging on a spring, each started at a random point |
+| 23 | [Shopping carts](23-shopping-carts.md) | A cart a melon rides in, pushed when another bumps it (plain physics) |
+| 24 | [Catapults](24-catapults.md) | A melon gets in, jump throws it; bumped to aim |
 
 ## All script inputs
 
@@ -108,7 +110,8 @@ names once, when the script first needs the track list.
 | `particle_health_template` | `point_template` | — | [Effect templates](03-effect-templates.md#heal-effect) |
 | `particle_boost_trail_template` | `point_template` | — | [Effect templates](03-effect-templates.md#boost-trail) |
 | `prediction_dot_template` | `point_template` | — | [Effect templates](03-effect-templates.md#prediction-dots) |
-| `template_spectator_hat` | `point_template` | — | [Effect templates](03-effect-templates.md#free-look-avatar) |
+| `template_drone` | `point_template` | for free look | [Effect templates](03-effect-templates.md#free-look-drone) |
+| `template_drone_laser` | `point_template` | — | [Effect templates](03-effect-templates.md#laser-pointer-optional) |
 | `particle_podium_confetti` | `info_particle_system` | — | [Hub](05-hub.md#confetti) |
 | `template_ball` | `point_template` | — | [Ball spawner](20-ball-spawner.md) |
 | `spawn_ball` | `info_target` | — | [Ball spawner](20-ball-spawner.md) |
@@ -133,6 +136,7 @@ Names the script parses — the name carries the config.
 | `camera_zone_[noclip_]close[_<b>[_<h>]]` | `camera_zone_close_12_2` | `trigger_multiple` | [Camera zones](11-camera-zones.md#close-up-zones) |
 | `side_view_<yaw>[_<distance>[_<height>]]` | `side_view_90_300_40` | `trigger_multiple` | [Camera zones](11-camera-zones.md#side-view-zones) |
 | `jump_pad_<up>[_<forward>]` | `jump_pad_1000_400` | `trigger_multiple` | [Jump pads](12-jump-pads.md) |
+| `catapult_<forward>_<up>` | `catapult_1500_500` | `prop_physics` (its base) | [Catapults](24-catapults.md) |
 | `gravity_zone_<gravity>[_roll<roll>]` | `gravity_zone_100_roll20` | `trigger_multiple` | [Gravity zones](21-gravity-zones.md) |
 | `mover[_wait<seconds>][_<anything>]` | `mover_wait1.5_left` | `func_movelinear` | [Movers](16-movers.md) |
 | `spike_spring[_<words>][_<down>_<up>][_offset<seconds>]` | `spike_spring_downtime_uptime_2_0.5` | `prop_dynamic` | [Spike springs](18-spike-springs.md) |

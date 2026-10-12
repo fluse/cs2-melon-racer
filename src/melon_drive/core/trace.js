@@ -40,3 +40,8 @@ export function TraceLine(config) {
 export function TraceSphere(config) {
     return SkipDots((c) => Instance.TraceSphere(c), config);
 }
+
+/** Instance.TraceBox, but never stops on a prediction dot. @param {Parameters<typeof Instance.TraceBox>[0]} config */
+export function TraceBox(config) {
+    return SkipDots((c) => Instance.TraceBox(c), config);
+}

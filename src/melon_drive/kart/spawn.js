@@ -98,9 +98,6 @@ export function HoldPawn(kart) {
     if (kart.pawn.GetActiveWeapon()) {
         kart.pawn.DestroyWeapons();
     }
-    if (kart.freeLook) {
-        return; // flying through the map — see dev/free-look.js
-    }
     const anchor = kart.pawnAnchor;
     const at = kart.pawn.GetAbsOrigin();
     if (!anchor || Math.hypot(at.x - anchor.x, at.y - anchor.y, at.z - anchor.z) <= PAWN_DRIFT_TOLERANCE) {

@@ -45,8 +45,15 @@ import { predictionDotSet } from "./trace.js";
  *   nextAttackDebugTime?: number, // when dev/attack-debug.js may log this kart's attack state again
  *   collisionDebug?: boolean, // this player's collision debug view is on (user menu toggle) — see dev/collision-debug.js
  *   podium?: import("../race/podium/logic.js").PodiumHold, // standing on the hub's podium after a Grand Prix — see race/podium/
+ *   catapult?: { base: any, seatedTime: number }, // sitting in a catapult's bucket (its base), since when — see world/catapult/
  *   testPreview?: { kind: "countdown" | "finish" | "intro" | "call", endTime: number }, // the user menu's developer Test Countdown/Finish/Intro/Grand Prix Call playing — see TestCountdown in race/heat/race-flow.js
  *   podiumCameraBlend?: number, // how far the podium camera zoom is out, 0..1 — see camera/podium-zoom/
+ *   finishTime?: number, timedOut?: boolean, // racing: when it finished this heat; finished by the finish window running out instead (no place) — see FinishKart/TimeOutKart in race/heat/race-flow.js
+ *   graceShown?: number, graceResendAt?: number, // what finish_grace shows (undefined: hidden) and when it's sent again — see UpdateFinishGraceHud
+ *   watching?: boolean, // "Watch Grand Prix": outside the Grand Prix, following it, own melon frozen — see race/spectate/
+ *   spectateSlot?: number, // whose melon the camera follows instead of the own (unset: the own) — see UpdateSpectating
+ *   spectateDismissed?: boolean, // a finished racer pressed R: their own melon for the rest of the heat
+ *   spectateShown?: string, spectateResendAt?: number, watchRowShown?: string, // what the spectate panel / the user menu's watch row last showed — see race/spectate/spectate.js
  *   freeLook?: boolean, // this player flies their pawn through the map, melon frozen (user menu toggle, off by default) — see dev/free-look.js
  *   cameraTuning?: { distance: number, height: number }, // this player's own chase camera distance/height from the user menu's camera page, else the defaults — see dev/camera-tuning.js
  *   userMenuPage?: import("../hud/user-menu.js").UserMenuPage, // the page (leaderboards, a developer page) the user menu shows in place of its columns, if any — kept when it closes, so it reopens there (this session only) — see SetUserMenuPage
@@ -59,7 +66,8 @@ import { predictionDotSet } from "./trace.js";
  *   xpGainShown?: string, xpGainResendAt?: number, // what the XP notifier last showed, and its next full resend — see UpdateXpGainHud
  *   skinHudLevel?: number, // the level the skin grid's locks were last drawn for — see UpdateSkinHud
  *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud
- *   spectatorHat?: any[], // the free-look ghost avatar hanging on the flying pawn — see AttachSpectatorHat in dev/free-look.js
+ *   droneHintShown?: boolean, droneHintResendAt?: number, // drone mode: the "R → EXIT DRONE MODE" hint as last sent — see dev/free-look.js
+ *   drone?: { entities: any[], parts: any[], body: any, laser: any[], position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number }, tilt: { pitch: number, roll: number }, yaw: number, landed: boolean, stillSeconds: number, takeoffUntil?: number }, // free look: the drone this player flies, where, how fast, how far it leans, which way it faces, how long it's stood still on the floor, whether it has landed there (rotors still) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js
@@ -148,7 +156,7 @@ export function DropKart(slot, kart) {
             entity.Remove();
         }
     }
-    for (const entity of kart.spectatorHat ?? []) {
+    for (const entity of kart.drone?.entities ?? []) {
         if (entity.IsValid()) {
             entity.Remove();
         }

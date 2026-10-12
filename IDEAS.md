@@ -6,6 +6,10 @@
 - Friction Areas
 - Magnete
 
+# Grand Prix
+- Im GrandPrix bekommt jeder spieler, sobald er ein Checkpoint durchqueert Punkte. Balancing muss stimmen für den Sieger des Rennens.
+
+
 # Sequenzen
 - Startfeld Area
 - Zwischen den Rennen werden die ersten 3 angezeigt
@@ -24,6 +28,8 @@
 # Scoreboard
 - In Game 3D
     - auf jeder Strecke ein eigenes Scoreboard mit den temporären Zeiten, die aller spieler, die die strecke gefahren sind und jeweils auch nur die beste zeit. Sortiert schnellste oben, langsamste unten.
+
+# Spectator
 
 # Melon Skins
 - Coconut

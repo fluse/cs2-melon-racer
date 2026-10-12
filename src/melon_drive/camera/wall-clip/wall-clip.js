@@ -12,9 +12,10 @@ import { FOLLOW_OFFSET } from "../../constants/index.js";
  * the camera would be, skipping the melon itself and players.
  * @param {import("../../core/kart-registry.js").Kart} kart
  * @param {{ x: number, y: number, z: number }} offset @param {number} dt
+ * @param {any} [melon] the melon the camera chases — the own, or a spectated one
  */
-export function WallClippedOffset(kart, offset, dt) {
-    const origin = kart.melon.GetAbsOrigin();
+export function WallClippedOffset(kart, offset, dt, melon = kart.melon) {
+    const origin = melon.GetAbsOrigin();
     const pivot = { x: origin.x + FOLLOW_OFFSET.x, y: origin.y + FOLLOW_OFFSET.y, z: origin.z + FOLLOW_OFFSET.z };
     const toCamera = RotateCameraOffset(offset, kart.pawn.GetEyeAngles());
     const length = Math.hypot(toCamera.x, toCamera.y, toCamera.z);
@@ -23,7 +24,7 @@ export function WallClippedOffset(kart, offset, dt) {
         const trace = TraceLine({
             start: pivot,
             end: { x: pivot.x + toCamera.x, y: pivot.y + toCamera.y, z: pivot.z + toCamera.z },
-            ignoreEntity: kart.melon,
+            ignoreEntity: melon,
             ignorePlayers: true,
         });
         target = trace.startedInSolid ? 1 : WallClipScale(trace.didHit, trace.fraction, length);

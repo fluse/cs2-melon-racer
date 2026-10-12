@@ -12,6 +12,7 @@ import { CountStat } from "../stats/stats.js";
 // whole physics tree, which imports race/heat/race-flow.js — a cycle through here.
 import { RespawnKartAtCheckpoint } from "../../kart/teleport.js";
 import { SetFreeLook } from "../../dev/free-look.js";
+import { StopSpectating } from "../spectate/index.js";
 
 // Start line: a trigger_multiple named "start_<trackId>[_laps<M>]",
 // filtered to the melon (prop_physics) so the frozen/parked pawn can't
@@ -221,6 +222,7 @@ export function RestartTimeTrial(kart) {
     // Back to driving: a free-looking player's restart ends free look (pawn
     // back on its anchor, chase camera on the melon) before the melon moves.
     SetFreeLook(kart, false);
+    StopSpectating(kart);
     if (!SendToTrackStart(kart, trackId)) {
         return false;
     }
