@@ -151,7 +151,7 @@ export function UpdateKart(slot, kart, dt) {
     const gravityFactor = PhysicsFactor("gravity") * (gravityZone?.gravity ?? 1);
     const rollFactor = gravityZone?.roll ?? 1;
     const supported = verticalAccel !== undefined ? IsSupported(verticalAccel, gravityFactor) : kart.settled;
-    const grounded = UpdateGrounded(kart, origin, now, supported, verticalAccel);
+    const grounded = UpdateGrounded(kart, origin, now, supported, verticalAccel, currentVelocity);
     const wallNormalNow = UpdateWallContact(kart, origin, now, currentVelocity, dt, grounded);
     // Wall bounce / wall jump tuning for where the melon is (lift zone or not).
     const wallRules = CurrentWallRules(kart);

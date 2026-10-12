@@ -57,12 +57,16 @@ function RunGrandPrix(racers, order) {
     assert.equal(flow.phase, C.RacePhase.HUB, "setup: back in the hub");
 }
 
-/** Floor straight under everything (the spawn points' floor traces land on it). */
+/**
+ * Floor straight under everything (the spawn points' floor traces land on
+ * it), right under the melon for its ground probe (GROUND_CHECK_DISTANCE).
+ */
 function Floor() {
     world.traceLine = (c) => {
         const down = c.end.z < c.start.z - 1;
+        const below = c.start.z - c.end.z === C.GROUND_CHECK_DISTANCE ? 6.9 : C.FLOOR_TRACE_UP;
         return down
-            ? { didHit: true, startedInSolid: false, fraction: 0.5, end: { ...c.end, z: c.start.z - C.FLOOR_TRACE_UP }, normal: { x: 0, y: 0, z: 1 } }
+            ? { didHit: true, startedInSolid: false, fraction: 0.5, end: { ...c.end, z: c.start.z - below }, normal: { x: 0, y: 0, z: 1 } }
             : { didHit: false, startedInSolid: false, fraction: 1, end: c.end, normal: { x: 0, y: 0, z: 1 } };
     };
 }

@@ -26,6 +26,21 @@ export const FREE_FALL_FRACTION = 0.8; // vertical accel at or below -FREE_FALL_
 // up in a jump — together with a moment of measured "support" that allowed
 // a jump in mid-air.
 export const GROUND_CHECK_DISTANCE = 20;
+// The floor the trace finds must also be right at the melon: its plane
+// within this many units of the melon's center (resting: 6.9; tip-down
+// ~8). The physics already slows a falling melon in the tick *before* it
+// touches down — that reads as support while it's still up to ~13 units
+// above the floor, and a (buffered) jump fired there took off before the
+// melon ever landed. Measured to the plane (the trace's length × the
+// floor's normal z), so a slope, where the floor straight below is
+// further down, still counts.
+export const GROUND_CONTACT_DISTANCE = 9; // units
+// That slowed-down tick still moves the melon into the floor (the physics
+// has it arrive exactly at the end of the step: gap / tick), while a melon
+// that's on the floor — resting, rolling, or along a slope — doesn't move
+// into it any more. So moving into the floor's plane faster than this
+// isn't ground yet either (50 = under a unit a tick: a gap you can't see).
+export const GROUND_MAX_APPROACH_SPEED = 50; // units/sec along the floor normal
 export const GROUND_NORMAL_MIN_Z = 0.5; // surface must be at least this floor-like (not a wall) to count as ground
 export const GROUND_COYOTE_TIME = 0.08; // seconds a ground contact stays valid after losing it — only bridges rolling hops
 // Right after a jump (ground or wall) the floor can still be pushing the
@@ -41,10 +56,11 @@ export const GROUND_JUMP_BUFFER = 0.1; // seconds
 
 // Wall jump: in the air, at a wall (a line trace in any of
 // WALL_PROBE_DIRECTIONS horizontal directions finds a steep surface within
-// WALL_JUMP_CONTACT_RADIUS of the melon's center, plus one tick's travel
-// towards it — see WallContactReach — or a wall bounce just happened) and
+// WALL_JUMP_CONTACT_RADIUS of the melon's center and the melon no longer
+// moving into it — see IsAtWall — or a wall bounce just happened) and
 // pressing jump pushes the melon off that wall and up. The timing is that
-// distance: press while the wall is right at the melon, not some time after.
+// distance: press while the wall is right at the melon, not some time after;
+// a press before the touch waits for it (WALL_JUMP_BUFFER).
 // Charges (the HUD's jump icons): the melon holds WALL_JUMP_CHARGES wall
 // jumps, each one full strength (WALL_JUMP_UP_SPEED / WALL_JUMP_PUSH_SPEED)
 // and using up one; with none left there's no wall jump. They refill one
@@ -63,13 +79,19 @@ export const WALL_PROBE_DIRECTIONS = 16;
 // find nothing in-engine. Measured in-game with the collision debug view: a
 // melon lying right against a wall has its center 6.7 from it (6.9 above
 // the floor), and it's only ~10% longer than wide, so ~8 at most with its
-// tip at the wall. 7 (tuned in-game) is just past lying flat against it: a
-// melon resting tip-first at a wall doesn't count, but one moving into the
-// wall does, since one tick's travel towards it is added (WallContactReach).
+// tip at the wall. 8.5 covers a melon tip-first at the wall too. (It was 7,
+// with one tick's travel towards the wall added on top — so a wall jump
+// fired a tick *before* the melon reached the wall, like the ground jump
+// did before the floor; now only a real contact counts, see IsAtWall.)
 // Much more (16) lets a wall ~9 units off the melon's surface count.
-// Higher: more forgiving; lower: the press has to be closer to the touch —
-// below 6.7 not even a melon lying flat against the wall counts.
-export const WALL_JUMP_CONTACT_RADIUS = 7; // units
+// Higher: more forgiving; lower: below 6.7 not even a melon lying flat
+// against the wall counts.
+export const WALL_JUMP_CONTACT_RADIUS = 8.5; // units
+// Like the floor (GROUND_MAX_APPROACH_SPEED): the tick before the touch the
+// physics slows the melon to arrive exactly at the wall, so it's within the
+// radius but still moving into it — not at the wall yet. At it, the wall
+// has stopped it (or pushed it off already).
+export const WALL_JUMP_MAX_APPROACH_SPEED = 50; // units/sec into the wall
 // Seconds a wall contact stays jumpable after the melon was last at the wall
 // — only a tick or two: a melon that hits a wall is pushed off it at once,
 // so the press on the touch can land a tick late. (Lift zones: longer, see

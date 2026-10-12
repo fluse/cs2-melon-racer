@@ -153,7 +153,7 @@ function Tick(kart, { commanded, actual, pressed = [], justPressed = [] }) {
 function Floor() {
     world.traceLine = (c) =>
         c.end.z < c.start.z - 1
-            ? { didHit: true, startedInSolid: false, fraction: 0.5, end: { ...c.end, z: 0 }, normal: { x: 0, y: 0, z: 1 } }
+            ? { didHit: true, startedInSolid: false, fraction: 0.5, end: { ...c.end, z: c.start.z - 6.9 }, normal: { x: 0, y: 0, z: 1 } }
             : { didHit: false, startedInSolid: false, fraction: 1, end: c.end, normal: { x: 0, y: 0, z: 1 } };
 }
 

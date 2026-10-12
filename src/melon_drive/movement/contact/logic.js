@@ -7,7 +7,10 @@ import {
     GRAVITY,
     FREE_FALL_FRACTION,
     GROUND_NORMAL_MIN_Z,
+    GROUND_CONTACT_DISTANCE,
+    GROUND_MAX_APPROACH_SPEED,
     WALL_JUMP_CONTACT_RADIUS,
+    WALL_JUMP_MAX_APPROACH_SPEED,
     GROUND_LIFTOFF_TIME,
 } from "../../constants/index.js";
 
@@ -35,12 +38,43 @@ export function IsSupported(verticalAccel, gravityFactor = 1) {
 }
 
 /**
- * On the ground = held up (IsSupported) by a floor-like surface underneath
- * (the floor trace's normal; undefined if it found nothing).
- * @param {boolean} supported @param {number | undefined} floorNormalZ
+ * On the ground = held up (IsSupported) by a floor-like surface right
+ * underneath: the floor trace's normal (undefined if it found nothing) and
+ * how far straight down it hit, its plane within GROUND_CONTACT_DISTANCE of
+ * the center, and the melon no longer moving into it (`approachSpeed`, at
+ * most GROUND_MAX_APPROACH_SPEED) — support measured a tick before the
+ * touchdown, with the floor still a few units below and the melon on its
+ * way down onto it, isn't ground yet.
+ * @param {boolean} supported @param {number | undefined} floorNormalZ @param {number} floorDistance units straight down to the hit
+ * @param {number} [approachSpeed] units/sec into the floor's plane, see FloorApproachSpeed
  */
-export function IsGrounded(supported, floorNormalZ) {
-    return supported && floorNormalZ !== undefined && floorNormalZ >= GROUND_NORMAL_MIN_Z;
+export function IsGrounded(supported, floorNormalZ, floorDistance, approachSpeed = 0) {
+    return (
+        supported &&
+        floorNormalZ !== undefined &&
+        floorNormalZ >= GROUND_NORMAL_MIN_Z &&
+        FloorPlaneDistance(floorDistance, floorNormalZ) <= GROUND_CONTACT_DISTANCE &&
+        approachSpeed <= GROUND_MAX_APPROACH_SPEED
+    );
+}
+
+/**
+ * How fast the melon moves into the floor's plane (positive = towards it):
+ * its velocity against the floor's normal. Rolling along a slope is 0.
+ * @param {{ x: number, y: number, z: number }} velocity @param {{ x: number, y: number, z: number }} floorNormal
+ */
+export function FloorApproachSpeed(velocity, floorNormal) {
+    return -(velocity.x * floorNormal.x + velocity.y * floorNormal.y + velocity.z * floorNormal.z);
+}
+
+/**
+ * Distance from the melon's center to the floor's plane, from the floor
+ * trace straight down: on a slope the floor below is further down than the
+ * plane is away.
+ * @param {number} floorDistance units straight down to the hit @param {number} floorNormalZ
+ */
+export function FloorPlaneDistance(floorDistance, floorNormalZ) {
+    return floorDistance * floorNormalZ;
 }
 
 /**
@@ -55,24 +89,29 @@ export function InLiftoff(now, lastJumpTime, lastWallJumpTime) {
 
 /**
  * How far from the melon's center (to the wall's plane) a wall still counts
- * as at the melon: WALL_JUMP_CONTACT_RADIUS, plus how far the melon gets
- * towards it in one tick — at speed it would otherwise go from outside the
- * radius into the wall and off it again between two ticks.
+ * as at the melon: WALL_JUMP_CONTACT_RADIUS, plus how far the melon moved
+ * *away* from it over the last tick — a melon the wall pushed off during
+ * the tick was at it, it's just no longer within the radius. Nothing is
+ * added towards the wall: that's a contact still to come (the press waits
+ * for it, WALL_JUMP_BUFFER).
  * @param {number} speedIntoWall units/sec towards the wall (negative: moving away)
  * @param {number} dt
  */
 export function WallContactReach(speedIntoWall, dt) {
-    return WALL_JUMP_CONTACT_RADIUS + Math.max(0, speedIntoWall) * Math.max(0, dt);
+    return WALL_JUMP_CONTACT_RADIUS + Math.max(0, -speedIntoWall) * Math.max(0, dt);
 }
 
 /**
- * Whether a wall `gap` units from the melon's center is at the melon (see
- * WallContactReach) — the wall jump's contact test.
+ * Whether a wall `gap` units from the melon's center is at the melon: within
+ * WallContactReach, and not still moving into it faster than
+ * WALL_JUMP_MAX_APPROACH_SPEED (the tick before the touch) — the wall
+ * jump's contact test.
  * @param {number} gap center to the wall's plane
  * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal (pointing away from it)
  * @param {{ x: number, y: number }} velocity the melon's velocity now
  * @param {number} dt
  */
 export function IsAtWall(gap, n, velocity, dt) {
-    return gap <= WallContactReach(-(velocity.x * n.x + velocity.y * n.y), dt);
+    const into = -(velocity.x * n.x + velocity.y * n.y);
+    return into <= WALL_JUMP_MAX_APPROACH_SPEED && gap <= WallContactReach(into, dt);
 }

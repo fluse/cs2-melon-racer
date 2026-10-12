@@ -922,7 +922,15 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   The floor trace (`GROUND_CHECK_DISTANCE`) is short on purpose: a resting
   melon's center is only ~7 units above the floor, and a longer trace would
   still find it ~40 units up in a jump — one tick of measured support there
-  is enough for a mid-air jump. Nor does ground contact count for
+  is enough for a mid-air jump. And the floor it finds must be right at
+  the melon: its plane within `GROUND_CONTACT_DISTANCE` (9) of the center
+  (on a slope measured to the plane, not straight down), and the melon no
+  longer moving into it (`GROUND_MAX_APPROACH_SPEED`, 50 u/s along the
+  floor's normal; rolling along a slope is 0) — the physics already slows
+  a falling melon in the tick *before* it lands, which reads as support a
+  few units up, and a well-timed (buffered) press jumped off there without
+  ever touching down. The collision debug view shows both values and logs
+  every buffered ground jump. Nor does ground contact count for
   `GROUND_LIFTOFF_TIME` after any jump (the floor still pushes the melon up
   for a tick while it takes off). **Jump buffer:** a press in the air that
   does nothing jumps on the touchdown if the melon lands within
@@ -969,19 +977,21 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   `movement/jump/logic.js`. **The timing is the distance** (decided): a press only
   counts while the wall is right at the melon — a line trace in any of
   `WALL_PROBE_DIRECTIONS` (16) horizontal directions finds a steep, non-prop
-  surface whose plane is within `WALL_JUMP_CONTACT_RADIUS` (7 units) of the
-  melon's center, plus the distance it covers towards that wall in one tick
-  (`WallContactReach`; at speed it would otherwise go from outside the
-  radius into the wall and off it again between two ticks). So a press just
-  before the touch counts, one on it too, and the tick after (the melon is
-  pushed off a wall at once) via `WALL_JUMP_WINDOW` (0.035 s) — not some
-  time later. Measured from the center because traces onto the melon's own
+  surface whose plane is within `WALL_JUMP_CONTACT_RADIUS` (8.5 units) of the
+  melon's center and the melon is no longer moving into it
+  (`WALL_JUMP_MAX_APPROACH_SPEED`, 50 u/s — like the floor: the tick before
+  the touch the physics slows it to arrive exactly at the wall); one pushed
+  off it during the tick still counts, by the distance it moved away
+  (`WallContactReach`). **Only a real contact** (decided): one tick's
+  travel towards the wall used to be added, and the wall jump fired before
+  the melon reached it. So a press on the touch counts, and the tick after
+  (the melon is pushed off a wall at once) via `WALL_JUMP_WINDOW` (0.035 s)
+  — not some time later; a press just before waits for the touch (the wall
+  jump buffer, below). Measured from the center because traces onto the melon's own
   surface find nothing in-engine. The radius is tuned in-game with the
   collision debug view's distance readout: lying right against a wall the
-  melon's center is 6.7 from it, so 7 just covers that — a melon resting
-  tip-first at a wall (~8) doesn't count, but one moving into it does,
-  thanks to the one tick of travel added (16 would let a wall ~9 units off
-  the melon's surface count). A wall bounce also counts as a contact.
+  melon's center is 6.7 from it, tip-first ~8, so 8.5 covers both (16
+  would let a wall ~9 units off the melon's surface count). A wall bounce also counts as a contact.
   **No cooldown between two wall jumps** (decided): the next one needs a
   **new wall contact** — the melon has left the wall it jumped off and
   touched one again (the contact's start, `approachTime`, is later than
@@ -1016,7 +1026,7 @@ rule: `movement/momentum/logic.js`, applied in `movement/driving/drive.js`
   - a light grey ring = `WALL_JUMP_CONTACT_RADIUS` around the center, at its height and flat on the floor below (also on
     the ground: the wall probes run every tick while the view is on, there
     only for the view — a wall jump needs the air)
-    (moving at a wall, one tick's travel is added), and the wall probes:
+    (moving away from a wall, last tick's travel is added), and the wall probes:
     grey = hit nothing, purple = hit a floor/ceiling or a prop (ignored),
     dark blue = wall too far, cyan = wall at the melon, orange = the
     nearest one at the melon, the one jumped off;

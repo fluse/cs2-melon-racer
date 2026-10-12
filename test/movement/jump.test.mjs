@@ -16,7 +16,8 @@ const DT = 1 / 64;
 /** A wall this far from the melon's center is at it (within WALL_JUMP_CONTACT_RADIUS). */
 const NEAR_WALL = C.WALL_JUMP_CONTACT_RADIUS / 2;
 const WALL_TIMING_SPAM_LOCKOUT_HALF = () => C.WALL_TIMING_SPAM_LOCKOUT / 2;
-const FLOOR_Z = 0;
+/** A resting melon's center above the floor — the floor is always right under it. */
+const FLOOR_GAP = 6.9;
 /** Tests that need wall bounces — skipped while WALL_BOUNCE_ENABLED is off. */
 const NEEDS_BOUNCE = { skip: !C.WALL_BOUNCE_ENABLED && "WALL_BOUNCE_ENABLED is off" };
 
@@ -25,12 +26,12 @@ let pawn;
 /** @type {any} */
 let kart;
 
-/** Trace results for a flat floor at FLOOR_Z and, optionally, a wall at x = wallX facing -x. */
+/** Trace results for a flat floor right under the melon (FLOOR_GAP) and, optionally, a wall at x = wallX facing -x. */
 function Geometry({ floorBelow = true, wallX = undefined } = {}) {
     world.traceLine = (c) => {
         const down = c.end.z < c.start.z - 1;
         if (down && floorBelow) {
-            return { didHit: true, startedInSolid: false, fraction: 0.5, end: { ...c.end, z: FLOOR_Z }, normal: { x: 0, y: 0, z: 1 } };
+            return { didHit: true, startedInSolid: false, fraction: 0.5, end: { ...c.end, z: c.start.z - FLOOR_GAP }, normal: { x: 0, y: 0, z: 1 } };
         }
         if (!down && wallX !== undefined && c.end.x > wallX) {
             const fraction = (wallX - c.start.x) / (c.end.x - c.start.x);
@@ -124,12 +125,17 @@ test("wall jump: a wall further than WALL_JUMP_CONTACT_RADIUS (plus one tick's t
     assert.ok(v.z < 0, `still falling (vz=${v.z})`);
 });
 
-test("wall jump: flying at a wall it reaches within one tick already counts (a press just before the touch)", () => {
+// Regression: one tick's travel towards the wall used to count as the
+// contact, so the wall jump fired before the melon had reached the wall.
+test("wall jump: a press just before the touch waits for it (buffered), not a tick early", () => {
     const speed = 300;
     const wallX = kart.melon.GetAbsOrigin().x + C.WALL_JUMP_CONTACT_RADIUS + speed * DT - 2;
     Geometry({ floorBelow: false, wallX });
-    const v = Tick({ ...falling(-100, speed), jump: true });
-    assert.ok(kart.lastWallJump, "wall jump");
+    Tick({ ...falling(-100, speed), jump: true });
+    assert.equal(kart.lastWallJump, undefined, "the wall is still a tick away");
+    kart.melon.origin = { ...kart.melon.origin, x: wallX - NEAR_WALL }; // arrived, stopped by it
+    const v = Tick(touchingWall(-100));
+    assert.ok(kart.lastWallJump, "wall jump on the touch");
     assert.equal(v.z, C.WALL_JUMP_UP_SPEED);
 });
 

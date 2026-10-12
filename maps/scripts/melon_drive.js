@@ -315,6 +315,21 @@ const FREE_FALL_FRACTION = 0.8; // vertical accel at or below -FREE_FALL_FRACTIO
 // up in a jump — together with a moment of measured "support" that allowed
 // a jump in mid-air.
 const GROUND_CHECK_DISTANCE = 20;
+// The floor the trace finds must also be right at the melon: its plane
+// within this many units of the melon's center (resting: 6.9; tip-down
+// ~8). The physics already slows a falling melon in the tick *before* it
+// touches down — that reads as support while it's still up to ~13 units
+// above the floor, and a (buffered) jump fired there took off before the
+// melon ever landed. Measured to the plane (the trace's length × the
+// floor's normal z), so a slope, where the floor straight below is
+// further down, still counts.
+const GROUND_CONTACT_DISTANCE = 9; // units
+// That slowed-down tick still moves the melon into the floor (the physics
+// has it arrive exactly at the end of the step: gap / tick), while a melon
+// that's on the floor — resting, rolling, or along a slope — doesn't move
+// into it any more. So moving into the floor's plane faster than this
+// isn't ground yet either (50 = under a unit a tick: a gap you can't see).
+const GROUND_MAX_APPROACH_SPEED = 50; // units/sec along the floor normal
 const GROUND_NORMAL_MIN_Z = 0.5; // surface must be at least this floor-like (not a wall) to count as ground
 const GROUND_COYOTE_TIME = 0.08; // seconds a ground contact stays valid after losing it — only bridges rolling hops
 // Right after a jump (ground or wall) the floor can still be pushing the
@@ -330,10 +345,11 @@ const GROUND_JUMP_BUFFER = 0.1; // seconds
 
 // Wall jump: in the air, at a wall (a line trace in any of
 // WALL_PROBE_DIRECTIONS horizontal directions finds a steep surface within
-// WALL_JUMP_CONTACT_RADIUS of the melon's center, plus one tick's travel
-// towards it — see WallContactReach — or a wall bounce just happened) and
+// WALL_JUMP_CONTACT_RADIUS of the melon's center and the melon no longer
+// moving into it — see IsAtWall — or a wall bounce just happened) and
 // pressing jump pushes the melon off that wall and up. The timing is that
-// distance: press while the wall is right at the melon, not some time after.
+// distance: press while the wall is right at the melon, not some time after;
+// a press before the touch waits for it (WALL_JUMP_BUFFER).
 // Charges (the HUD's jump icons): the melon holds WALL_JUMP_CHARGES wall
 // jumps, each one full strength (WALL_JUMP_UP_SPEED / WALL_JUMP_PUSH_SPEED)
 // and using up one; with none left there's no wall jump. They refill one
@@ -352,13 +368,19 @@ const WALL_PROBE_DIRECTIONS = 16;
 // find nothing in-engine. Measured in-game with the collision debug view: a
 // melon lying right against a wall has its center 6.7 from it (6.9 above
 // the floor), and it's only ~10% longer than wide, so ~8 at most with its
-// tip at the wall. 7 (tuned in-game) is just past lying flat against it: a
-// melon resting tip-first at a wall doesn't count, but one moving into the
-// wall does, since one tick's travel towards it is added (WallContactReach).
+// tip at the wall. 8.5 covers a melon tip-first at the wall too. (It was 7,
+// with one tick's travel towards the wall added on top — so a wall jump
+// fired a tick *before* the melon reached the wall, like the ground jump
+// did before the floor; now only a real contact counts, see IsAtWall.)
 // Much more (16) lets a wall ~9 units off the melon's surface count.
-// Higher: more forgiving; lower: the press has to be closer to the touch —
-// below 6.7 not even a melon lying flat against the wall counts.
-const WALL_JUMP_CONTACT_RADIUS = 7; // units
+// Higher: more forgiving; lower: below 6.7 not even a melon lying flat
+// against the wall counts.
+const WALL_JUMP_CONTACT_RADIUS = 8.5; // units
+// Like the floor (GROUND_MAX_APPROACH_SPEED): the tick before the touch the
+// physics slows the melon to arrive exactly at the wall, so it's within the
+// radius but still moving into it — not at the wall yet. At it, the wall
+// has stopped it (or pushed it off already).
+const WALL_JUMP_MAX_APPROACH_SPEED = 50; // units/sec into the wall
 // Seconds a wall contact stays jumpable after the melon was last at the wall
 // — only a tick or two: a melon that hits a wall is pushed off it at once,
 // so the press on the touch can land a tick late. (Lift zones: longer, see
@@ -6904,6 +6926,114 @@ function SettleWallBounceDamage(slot, kart) {
     return false;
 }
 
+// Pure ground/wall contact rules — is the melon on the ground, is a wall
+// right at it — no cs_script import, so it's unit-testable in Node (see
+// test/movement/contact.test.mjs). movement/contact/contact.js runs the traces and
+// feeds the results in here; what a jump does with them is
+// movement/jump/logic.js.
+
+/**
+ * The melon's vertical acceleration over the last tick: the vertical
+ * velocity physics left it with, compared to the one we commanded.
+ * @param {number} commandedVz @param {number} actualVz @param {number} dt
+ */
+function VerticalAccel(commandedVz, actualVz, dt) {
+    return dt > 0 ? (actualVz - commandedVz) / dt : 0;
+}
+
+/**
+ * Whether something held the melon up last tick: in free fall gravity
+ * takes the full GRAVITY off its vertical velocity every second, anything
+ * it rests or rolls on cancels a clear part of that. With less gravity
+ * (`gravityFactor` below 1: a gravity zone, the physics page) the script
+ * cancels part of the pull itself, so the floor's share is smaller and the
+ * bar is lowered with it; below ~0.1 a floor can hardly be told from a fall.
+ * @param {number} verticalAccel units/sec^2, see VerticalAccel
+ * @param {number} [gravityFactor] the share of GRAVITY the melon is pulled with
+ */
+function IsSupported(verticalAccel, gravityFactor = 1) {
+    return verticalAccel > -GRAVITY + (1 - FREE_FALL_FRACTION) * GRAVITY * Math.min(1, gravityFactor);
+}
+
+/**
+ * On the ground = held up (IsSupported) by a floor-like surface right
+ * underneath: the floor trace's normal (undefined if it found nothing) and
+ * how far straight down it hit, its plane within GROUND_CONTACT_DISTANCE of
+ * the center, and the melon no longer moving into it (`approachSpeed`, at
+ * most GROUND_MAX_APPROACH_SPEED) — support measured a tick before the
+ * touchdown, with the floor still a few units below and the melon on its
+ * way down onto it, isn't ground yet.
+ * @param {boolean} supported @param {number | undefined} floorNormalZ @param {number} floorDistance units straight down to the hit
+ * @param {number} [approachSpeed] units/sec into the floor's plane, see FloorApproachSpeed
+ */
+function IsGrounded(supported, floorNormalZ, floorDistance, approachSpeed = 0) {
+    return (
+        supported &&
+        floorNormalZ !== undefined &&
+        floorNormalZ >= GROUND_NORMAL_MIN_Z &&
+        FloorPlaneDistance(floorDistance, floorNormalZ) <= GROUND_CONTACT_DISTANCE &&
+        approachSpeed <= GROUND_MAX_APPROACH_SPEED
+    );
+}
+
+/**
+ * How fast the melon moves into the floor's plane (positive = towards it):
+ * its velocity against the floor's normal. Rolling along a slope is 0.
+ * @param {{ x: number, y: number, z: number }} velocity @param {{ x: number, y: number, z: number }} floorNormal
+ */
+function FloorApproachSpeed(velocity, floorNormal) {
+    return -(velocity.x * floorNormal.x + velocity.y * floorNormal.y + velocity.z * floorNormal.z);
+}
+
+/**
+ * Distance from the melon's center to the floor's plane, from the floor
+ * trace straight down: on a slope the floor below is further down than the
+ * plane is away.
+ * @param {number} floorDistance units straight down to the hit @param {number} floorNormalZ
+ */
+function FloorPlaneDistance(floorDistance, floorNormalZ) {
+    return floorDistance * floorNormalZ;
+}
+
+/**
+ * Whether the melon is still taking off from a jump (ground or wall, see
+ * GROUND_LIFTOFF_TIME) — ground contact measured now doesn't count then.
+ * @param {number} now @param {number | undefined} lastJumpTime @param {number | undefined} lastWallJumpTime
+ */
+function InLiftoff(now, lastJumpTime, lastWallJumpTime) {
+    const last = Math.max(lastJumpTime ?? -Infinity, lastWallJumpTime ?? -Infinity);
+    return now - last < GROUND_LIFTOFF_TIME;
+}
+
+/**
+ * How far from the melon's center (to the wall's plane) a wall still counts
+ * as at the melon: WALL_JUMP_CONTACT_RADIUS, plus how far the melon moved
+ * *away* from it over the last tick — a melon the wall pushed off during
+ * the tick was at it, it's just no longer within the radius. Nothing is
+ * added towards the wall: that's a contact still to come (the press waits
+ * for it, WALL_JUMP_BUFFER).
+ * @param {number} speedIntoWall units/sec towards the wall (negative: moving away)
+ * @param {number} dt
+ */
+function WallContactReach(speedIntoWall, dt) {
+    return WALL_JUMP_CONTACT_RADIUS + Math.max(0, -speedIntoWall) * Math.max(0, dt);
+}
+
+/**
+ * Whether a wall `gap` units from the melon's center is at the melon: within
+ * WallContactReach, and not still moving into it faster than
+ * WALL_JUMP_MAX_APPROACH_SPEED (the tick before the touch) — the wall
+ * jump's contact test.
+ * @param {number} gap center to the wall's plane
+ * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal (pointing away from it)
+ * @param {{ x: number, y: number }} velocity the melon's velocity now
+ * @param {number} dt
+ */
+function IsAtWall(gap, n, velocity, dt) {
+    const into = -(velocity.x * n.x + velocity.y * n.y);
+    return into <= WALL_JUMP_MAX_APPROACH_SPEED && gap <= WallContactReach(into, dt);
+}
+
 // Collision debug view: everything that shows how ground/wall contact and jump
 // presses are judged — the on-screen status line, the probes drawn into the
 // world, and the "Jump pressed" console log. Toggled per player from the
@@ -6947,7 +7077,7 @@ function SetCollisionDebug(kart, on) {
  * @param {boolean} supported @param {number | undefined} verticalAccel
  * @param {any} trace the floor TraceLine result @param {boolean} grounded
  */
-function RecordFloorProbe(kart, origin, supported, verticalAccel, trace, grounded) {
+function RecordFloorProbe(kart, origin, supported, verticalAccel, trace, grounded, approachSpeed) {
     if (!IsCollisionDebugOn(kart)) {
         return;
     }
@@ -6961,7 +7091,7 @@ function RecordFloorProbe(kart, origin, supported, verticalAccel, trace, grounde
         floorText: trace.startedInSolid
             ? "started in solid"
             : floorHit
-              ? `hit ${(origin.z - trace.end.z).toFixed(1)} below, normal z ${trace.normal.z.toFixed(2)}`
+              ? `hit ${(origin.z - trace.end.z).toFixed(1)} below (plane ${FloorPlaneDistance(origin.z - trace.end.z, trace.normal.z).toFixed(1)}, counts <= ${GROUND_CONTACT_DISTANCE}; into it ${approachSpeed.toFixed(0)} u/s, counts <= ${GROUND_MAX_APPROACH_SPEED}), normal z ${trace.normal.z.toFixed(2)}`
               : "nothing",
         probes: [],
         wallText: "—",
@@ -6988,7 +7118,7 @@ function RecordWallProbes(kart, probes, wall) {
         return;
     }
     const into = -(wall.actual.x * wall.normal.x + wall.actual.y * wall.normal.y);
-    d.wallText = `${wall.gap.toFixed(1)} from center (counts <= ${wall.reach.toFixed(1)}), into ${into.toFixed(0)} u/s${wall.touching ? " AT WALL" : ""}`;
+    d.wallText = `${wall.gap.toFixed(1)} from center (counts <= ${wall.reach.toFixed(1)}), into ${into.toFixed(0)} u/s (counts <= ${WALL_JUMP_MAX_APPROACH_SPEED})${wall.touching ? " AT WALL" : ""}`;
 }
 
 /**
@@ -7007,6 +7137,21 @@ function LogJumpPress(slot, kart, now, grounded, groundJump, timingPress) {
         `[collision debug] slot ${slot} jump pressed: grounded=${grounded} groundJump=${groundJump} ` +
             `(ground contact ${groundAge}, ${d?.support ?? "—"}, floor: ${d?.floorText ?? "—"}) ` +
             `wall contact ${wallAge} (${d?.wallText ?? "—"}) wallCharge=${(kart.wallJumpCharge ?? 1).toFixed(2)} wallTiming=${timingPress}`
+    );
+}
+
+/**
+ * Console log of a ground jump fired by the jump buffer (a press shortly
+ * before touching down), with what the floor probe saw on that tick.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {number} pressedAgo seconds
+ */
+function LogBufferedGroundJump(slot, kart, pressedAgo) {
+    if (!IsCollisionDebugOn(kart)) {
+        return;
+    }
+    const d = kart.contactDebug;
+    Instance.Msg(
+        `[collision debug] slot ${slot} buffered ground jump, pressed ${pressedAgo.toFixed(3)}s before (${d?.support ?? "—"}, floor: ${d?.floorText ?? "—"})`
     );
 }
 
@@ -7097,7 +7242,7 @@ function DrawCollisionDebug(slot, kart, grounded, wallNormal, jumpWindow) {
         return; // no probes ran (view switched on mid-tick)
     }
     // How close a wall must be to the center to count (standing still —
-    // moving at it, one tick's travel is added): at the center's height,
+    // moving away from it, last tick's travel is added): at the center's height,
     // and again flat on the floor below (FLOOR_RING_LIFT up, so it doesn't
     // sink into it) — from the chase camera the one at center height is
     // mostly hidden by the melon while it's on the ground.
@@ -7122,7 +7267,9 @@ function DrawCollisionDebug(slot, kart, grounded, wallNormal, jumpWindow) {
     const color = w.touching ? COLOR_TOUCH : COLOR_CHOSEN;
     Line(w.point, { x: w.point.x + w.normal.x * 32, y: w.point.y + w.normal.y * 32, z: w.point.z }, color);
     Instance.DebugSphere({ center: w.point, radius: w.touching ? WALL_MARKER_RADIUS_AT : WALL_MARKER_RADIUS_FAR, duration: 0, color });
-    // The melon's velocity now: its part towards the wall widens the reach.
+    // The melon's velocity now: its part away from the wall widens the
+    // reach, a part into it faster than WALL_JUMP_MAX_APPROACH_SPEED means
+    // the touch is still to come.
     Velocity(o, w.actual, COLOR_ACTUAL, 0);
 }
 
@@ -7282,6 +7429,7 @@ function FireBufferedGroundJump(slot, kart, now, grounded, v) {
         kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
     }
     Debug(`ground jump: slot ${slot} from a press ${(now - pressed).toFixed(3)}s before touching down`);
+    LogBufferedGroundJump(slot, kart, now - pressed);
 }
 
 /**
@@ -11746,78 +11894,6 @@ function RegisterHudInputs() {
 // layout.js finds the custom_hud_layout entity; inputs.js handles every
 // button click.
 
-// Pure ground/wall contact rules — is the melon on the ground, is a wall
-// right at it — no cs_script import, so it's unit-testable in Node (see
-// test/movement/contact.test.mjs). movement/contact/contact.js runs the traces and
-// feeds the results in here; what a jump does with them is
-// movement/jump/logic.js.
-
-/**
- * The melon's vertical acceleration over the last tick: the vertical
- * velocity physics left it with, compared to the one we commanded.
- * @param {number} commandedVz @param {number} actualVz @param {number} dt
- */
-function VerticalAccel(commandedVz, actualVz, dt) {
-    return dt > 0 ? (actualVz - commandedVz) / dt : 0;
-}
-
-/**
- * Whether something held the melon up last tick: in free fall gravity
- * takes the full GRAVITY off its vertical velocity every second, anything
- * it rests or rolls on cancels a clear part of that. With less gravity
- * (`gravityFactor` below 1: a gravity zone, the physics page) the script
- * cancels part of the pull itself, so the floor's share is smaller and the
- * bar is lowered with it; below ~0.1 a floor can hardly be told from a fall.
- * @param {number} verticalAccel units/sec^2, see VerticalAccel
- * @param {number} [gravityFactor] the share of GRAVITY the melon is pulled with
- */
-function IsSupported(verticalAccel, gravityFactor = 1) {
-    return verticalAccel > -GRAVITY + (1 - FREE_FALL_FRACTION) * GRAVITY * Math.min(1, gravityFactor);
-}
-
-/**
- * On the ground = held up (IsSupported) by a floor-like surface underneath
- * (the floor trace's normal; undefined if it found nothing).
- * @param {boolean} supported @param {number | undefined} floorNormalZ
- */
-function IsGrounded(supported, floorNormalZ) {
-    return supported && floorNormalZ !== undefined && floorNormalZ >= GROUND_NORMAL_MIN_Z;
-}
-
-/**
- * Whether the melon is still taking off from a jump (ground or wall, see
- * GROUND_LIFTOFF_TIME) — ground contact measured now doesn't count then.
- * @param {number} now @param {number | undefined} lastJumpTime @param {number | undefined} lastWallJumpTime
- */
-function InLiftoff(now, lastJumpTime, lastWallJumpTime) {
-    const last = Math.max(lastJumpTime ?? -Infinity, lastWallJumpTime ?? -Infinity);
-    return now - last < GROUND_LIFTOFF_TIME;
-}
-
-/**
- * How far from the melon's center (to the wall's plane) a wall still counts
- * as at the melon: WALL_JUMP_CONTACT_RADIUS, plus how far the melon gets
- * towards it in one tick — at speed it would otherwise go from outside the
- * radius into the wall and off it again between two ticks.
- * @param {number} speedIntoWall units/sec towards the wall (negative: moving away)
- * @param {number} dt
- */
-function WallContactReach(speedIntoWall, dt) {
-    return WALL_JUMP_CONTACT_RADIUS + Math.max(0, speedIntoWall) * Math.max(0, dt);
-}
-
-/**
- * Whether a wall `gap` units from the melon's center is at the melon (see
- * WallContactReach) — the wall jump's contact test.
- * @param {number} gap center to the wall's plane
- * @param {{ x: number, y: number }} n the wall's horizontal, unit-length normal (pointing away from it)
- * @param {{ x: number, y: number }} velocity the melon's velocity now
- * @param {number} dt
- */
-function IsAtWall(gap, n, velocity, dt) {
-    return gap <= WallContactReach(-(velocity.x * n.x + velocity.y * n.y), dt);
-}
-
 // Steering grip (see STEER_GRIP_* in movement/driving/constants.js): turning the
 // melon's velocity towards where the player looks. Pure math, no engine.
 
@@ -12521,8 +12597,9 @@ function HoldInCatapult(slot, kart, now) {
  * floor was ever found and jumping stopped working entirely.
  * @param {import("../../core/kart-registry.js").Kart} kart @param {any} origin @param {number} now
  * @param {boolean} supported @param {number | undefined} verticalAccel only for the debug view
+ * @param {{ x: number, y: number, z: number }} velocity the melon's velocity now (still moving onto the floor = not on it yet)
  */
-function UpdateGrounded(kart, origin, now, supported, verticalAccel) {
+function UpdateGrounded(kart, origin, now, supported, verticalAccel, velocity) {
     const trace = TraceLine({
         start: origin,
         end: { x: origin.x, y: origin.y, z: origin.z - GROUND_CHECK_DISTANCE },
@@ -12531,8 +12608,10 @@ function UpdateGrounded(kart, origin, now, supported, verticalAccel) {
     });
     const floorNormalZ = trace.didHit && !trace.startedInSolid ? trace.normal.z : undefined;
     kart.floorNormalZ = floorNormalZ; // for this tick's landing damage (FLAT_LANDING_*)
-    const grounded = IsGrounded(supported, floorNormalZ) && !InLiftoff(now, kart.lastJumpTime, kart.lastWallJump?.time);
-    RecordFloorProbe(kart, origin, supported, verticalAccel, trace, grounded);
+    const floorDistance = origin.z - trace.end.z;
+    const approachSpeed = floorNormalZ !== undefined ? FloorApproachSpeed(velocity, trace.normal) : 0;
+    const grounded = IsGrounded(supported, floorNormalZ, floorDistance, approachSpeed) && !InLiftoff(now, kart.lastJumpTime, kart.lastWallJump?.time);
+    RecordFloorProbe(kart, origin, supported, verticalAccel, trace, grounded, approachSpeed);
     if (grounded) {
         kart.lastGroundedTime = now;
     }
@@ -12542,12 +12621,12 @@ function UpdateGrounded(kart, origin, now, supported, verticalAccel) {
 /**
  * In the air: whether a wall is right at the melon — a line trace in each of
  * WALL_PROBE_DIRECTIONS horizontal directions; a steep, non-prop hit counts
- * if its plane is within WallContactReach of the melon's center (the tight
- * WALL_JUMP_CONTACT_RADIUS plus one tick's travel towards it, IsAtWall).
+ * if its plane is within WallContactReach of the melon's center and the
+ * melon isn't still moving into it (IsAtWall).
  * The nearest such wall is recorded as kart.lastWallContact (the wall
  * jump's normal). No physics check on top: being that close *is* the
- * contact, so a press counts when the wall is at the melon — just before
- * the touch, on it, or the tick after (WALL_JUMP_WINDOW).
+ * contact, so a press counts when the wall is at the melon — on the touch
+ * or the tick after (WALL_JUMP_WINDOW); one before it waits (WALL_JUMP_BUFFER).
  * On the ground there's no wall jump: nothing is recorded, and the probes
  * only run at all for the collision debug view, so it shows them always.
  * @param {import("../../core/kart-registry.js").Kart} kart @param {any} origin @param {number} now
@@ -12562,8 +12641,8 @@ function UpdateWallContact(kart, origin, now, currentVelocity, dt, grounded) {
     let nearest = undefined;
     /** @type {{ end: any, state: import("../../dev/collision-debug.js").ProbeState }[]} */
     const probes = [];
-    // Long enough for the widest reach this tick (moving straight at a
-    // wall), and a wall between two probe directions is hit at up to
+    // Long enough for the widest reach this tick (moving straight away
+    // from a wall), and a wall between two probe directions is hit at up to
     // 1/cos(half the angle between them) times its real distance.
     const reach = WallContactReach(Math.hypot(currentVelocity.x, currentVelocity.y), dt) / Math.cos(Math.PI / WALL_PROBE_DIRECTIONS);
     for (let i = 0; i < WALL_PROBE_DIRECTIONS; i++) {
@@ -12782,7 +12861,7 @@ function UpdateKart(slot, kart, dt) {
     const gravityFactor = PhysicsFactor("gravity") * (gravityZone?.gravity ?? 1);
     const rollFactor = gravityZone?.roll ?? 1;
     const supported = verticalAccel !== undefined ? IsSupported(verticalAccel, gravityFactor) : kart.settled;
-    const grounded = UpdateGrounded(kart, origin, now, supported, verticalAccel);
+    const grounded = UpdateGrounded(kart, origin, now, supported, verticalAccel, currentVelocity);
     const wallNormalNow = UpdateWallContact(kart, origin, now, currentVelocity, dt, grounded);
     // Wall bounce / wall jump tuning for where the melon is (lift zone or not).
     const wallRules = CurrentWallRules(kart);

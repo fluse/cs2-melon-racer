@@ -2,7 +2,7 @@
 // traces — see UpdateGrounded for why not TraceSphere). The rules are in
 // ./logic.js; what the probes saw goes to dev/collision-debug.js for the
 // optional debug view.
-import { IsGrounded, InLiftoff, IsAtWall, WallContactReach } from "./logic.js";
+import { IsGrounded, FloorApproachSpeed, InLiftoff, IsAtWall, WallContactReach } from "./logic.js";
 import { TraceLine } from "../../core/trace.js";
 import { WallApproach } from "../jump/logic.js";
 import { RecordFloorProbe, RecordWallProbes, IsCollisionDebugOn } from "../../dev/collision-debug.js";
@@ -25,8 +25,9 @@ import {
  * floor was ever found and jumping stopped working entirely.
  * @param {import("../../core/kart-registry.js").Kart} kart @param {any} origin @param {number} now
  * @param {boolean} supported @param {number | undefined} verticalAccel only for the debug view
+ * @param {{ x: number, y: number, z: number }} velocity the melon's velocity now (still moving onto the floor = not on it yet)
  */
-export function UpdateGrounded(kart, origin, now, supported, verticalAccel) {
+export function UpdateGrounded(kart, origin, now, supported, verticalAccel, velocity) {
     const trace = TraceLine({
         start: origin,
         end: { x: origin.x, y: origin.y, z: origin.z - GROUND_CHECK_DISTANCE },
@@ -35,8 +36,10 @@ export function UpdateGrounded(kart, origin, now, supported, verticalAccel) {
     });
     const floorNormalZ = trace.didHit && !trace.startedInSolid ? trace.normal.z : undefined;
     kart.floorNormalZ = floorNormalZ; // for this tick's landing damage (FLAT_LANDING_*)
-    const grounded = IsGrounded(supported, floorNormalZ) && !InLiftoff(now, kart.lastJumpTime, kart.lastWallJump?.time);
-    RecordFloorProbe(kart, origin, supported, verticalAccel, trace, grounded);
+    const floorDistance = origin.z - trace.end.z;
+    const approachSpeed = floorNormalZ !== undefined ? FloorApproachSpeed(velocity, trace.normal) : 0;
+    const grounded = IsGrounded(supported, floorNormalZ, floorDistance, approachSpeed) && !InLiftoff(now, kart.lastJumpTime, kart.lastWallJump?.time);
+    RecordFloorProbe(kart, origin, supported, verticalAccel, trace, grounded, approachSpeed);
     if (grounded) {
         kart.lastGroundedTime = now;
     }
@@ -46,12 +49,12 @@ export function UpdateGrounded(kart, origin, now, supported, verticalAccel) {
 /**
  * In the air: whether a wall is right at the melon — a line trace in each of
  * WALL_PROBE_DIRECTIONS horizontal directions; a steep, non-prop hit counts
- * if its plane is within WallContactReach of the melon's center (the tight
- * WALL_JUMP_CONTACT_RADIUS plus one tick's travel towards it, IsAtWall).
+ * if its plane is within WallContactReach of the melon's center and the
+ * melon isn't still moving into it (IsAtWall).
  * The nearest such wall is recorded as kart.lastWallContact (the wall
  * jump's normal). No physics check on top: being that close *is* the
- * contact, so a press counts when the wall is at the melon — just before
- * the touch, on it, or the tick after (WALL_JUMP_WINDOW).
+ * contact, so a press counts when the wall is at the melon — on the touch
+ * or the tick after (WALL_JUMP_WINDOW); one before it waits (WALL_JUMP_BUFFER).
  * On the ground there's no wall jump: nothing is recorded, and the probes
  * only run at all for the collision debug view, so it shows them always.
  * @param {import("../../core/kart-registry.js").Kart} kart @param {any} origin @param {number} now
@@ -66,8 +69,8 @@ export function UpdateWallContact(kart, origin, now, currentVelocity, dt, ground
     let nearest = undefined;
     /** @type {{ end: any, state: import("../../dev/collision-debug.js").ProbeState }[]} */
     const probes = [];
-    // Long enough for the widest reach this tick (moving straight at a
-    // wall), and a wall between two probe directions is hit at up to
+    // Long enough for the widest reach this tick (moving straight away
+    // from a wall), and a wall between two probe directions is hit at up to
     // 1/cos(half the angle between them) times its real distance.
     const reach = WallContactReach(Math.hypot(currentVelocity.x, currentVelocity.y), dt) / Math.cos(Math.PI / WALL_PROBE_DIRECTIONS);
     for (let i = 0; i < WALL_PROBE_DIRECTIONS; i++) {

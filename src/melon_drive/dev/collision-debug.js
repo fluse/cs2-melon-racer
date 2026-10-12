@@ -6,7 +6,8 @@
 // Record*/Log*/Draw* functions here, so none of this lives in the gameplay
 // code itself. Debug draws only show in dev environments (tools mode).
 import { Instance } from "cs_script/point_script";
-import { WALL_JUMP_CONTACT_RADIUS } from "../constants/index.js";
+import { WALL_JUMP_CONTACT_RADIUS, GROUND_CONTACT_DISTANCE, GROUND_MAX_APPROACH_SPEED, WALL_JUMP_MAX_APPROACH_SPEED } from "../constants/index.js";
+import { FloorPlaneDistance } from "../movement/contact/logic.js";
 
 /**
  * What this tick's probes saw. Rebuilt every tick (while the view is on)
@@ -43,7 +44,7 @@ export function SetCollisionDebug(kart, on) {
  * @param {boolean} supported @param {number | undefined} verticalAccel
  * @param {any} trace the floor TraceLine result @param {boolean} grounded
  */
-export function RecordFloorProbe(kart, origin, supported, verticalAccel, trace, grounded) {
+export function RecordFloorProbe(kart, origin, supported, verticalAccel, trace, grounded, approachSpeed) {
     if (!IsCollisionDebugOn(kart)) {
         return;
     }
@@ -57,7 +58,7 @@ export function RecordFloorProbe(kart, origin, supported, verticalAccel, trace, 
         floorText: trace.startedInSolid
             ? "started in solid"
             : floorHit
-              ? `hit ${(origin.z - trace.end.z).toFixed(1)} below, normal z ${trace.normal.z.toFixed(2)}`
+              ? `hit ${(origin.z - trace.end.z).toFixed(1)} below (plane ${FloorPlaneDistance(origin.z - trace.end.z, trace.normal.z).toFixed(1)}, counts <= ${GROUND_CONTACT_DISTANCE}; into it ${approachSpeed.toFixed(0)} u/s, counts <= ${GROUND_MAX_APPROACH_SPEED}), normal z ${trace.normal.z.toFixed(2)}`
               : "nothing",
         probes: [],
         wallText: "—",
@@ -84,7 +85,7 @@ export function RecordWallProbes(kart, probes, wall) {
         return;
     }
     const into = -(wall.actual.x * wall.normal.x + wall.actual.y * wall.normal.y);
-    d.wallText = `${wall.gap.toFixed(1)} from center (counts <= ${wall.reach.toFixed(1)}), into ${into.toFixed(0)} u/s${wall.touching ? " AT WALL" : ""}`;
+    d.wallText = `${wall.gap.toFixed(1)} from center (counts <= ${wall.reach.toFixed(1)}), into ${into.toFixed(0)} u/s (counts <= ${WALL_JUMP_MAX_APPROACH_SPEED})${wall.touching ? " AT WALL" : ""}`;
 }
 
 /**
@@ -103,6 +104,21 @@ export function LogJumpPress(slot, kart, now, grounded, groundJump, timingPress)
         `[collision debug] slot ${slot} jump pressed: grounded=${grounded} groundJump=${groundJump} ` +
             `(ground contact ${groundAge}, ${d?.support ?? "—"}, floor: ${d?.floorText ?? "—"}) ` +
             `wall contact ${wallAge} (${d?.wallText ?? "—"}) wallCharge=${(kart.wallJumpCharge ?? 1).toFixed(2)} wallTiming=${timingPress}`
+    );
+}
+
+/**
+ * Console log of a ground jump fired by the jump buffer (a press shortly
+ * before touching down), with what the floor probe saw on that tick.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {number} pressedAgo seconds
+ */
+export function LogBufferedGroundJump(slot, kart, pressedAgo) {
+    if (!IsCollisionDebugOn(kart)) {
+        return;
+    }
+    const d = kart.contactDebug;
+    Instance.Msg(
+        `[collision debug] slot ${slot} buffered ground jump, pressed ${pressedAgo.toFixed(3)}s before (${d?.support ?? "—"}, floor: ${d?.floorText ?? "—"})`
     );
 }
 
@@ -193,7 +209,7 @@ export function DrawCollisionDebug(slot, kart, grounded, wallNormal, jumpWindow)
         return; // no probes ran (view switched on mid-tick)
     }
     // How close a wall must be to the center to count (standing still —
-    // moving at it, one tick's travel is added): at the center's height,
+    // moving away from it, last tick's travel is added): at the center's height,
     // and again flat on the floor below (FLOOR_RING_LIFT up, so it doesn't
     // sink into it) — from the chase camera the one at center height is
     // mostly hidden by the melon while it's on the ground.
@@ -218,6 +234,8 @@ export function DrawCollisionDebug(slot, kart, grounded, wallNormal, jumpWindow)
     const color = w.touching ? COLOR_TOUCH : COLOR_CHOSEN;
     Line(w.point, { x: w.point.x + w.normal.x * 32, y: w.point.y + w.normal.y * 32, z: w.point.z }, color);
     Instance.DebugSphere({ center: w.point, radius: w.touching ? WALL_MARKER_RADIUS_AT : WALL_MARKER_RADIUS_FAR, duration: 0, color });
-    // The melon's velocity now: its part towards the wall widens the reach.
+    // The melon's velocity now: its part away from the wall widens the
+    // reach, a part into it faster than WALL_JUMP_MAX_APPROACH_SPEED means
+    // the touch is still to come.
     Velocity(o, w.actual, COLOR_ACTUAL, 0);
 }

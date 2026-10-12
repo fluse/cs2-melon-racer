@@ -13,7 +13,7 @@ import { PlayPerfectSpark } from "../wall-bounce/wall-bounce.js";
 import { CountStat } from "../../race/stats/stats.js";
 import { GrantXp } from "../../race/level/level.js";
 import { JUMP_SPEED, GROUND_JUMP_BUFFER, WALL_JUMP_BUFFER, BOUNCE_RATINGS, WALL_JUMP_CHARGES, XP_PERFECT_HIT, XP_REASON_PERFECT_WALL_JUMP } from "../../constants/index.js";
-import { LogJumpPress, LogWallJumpVerdict } from "../../dev/collision-debug.js";
+import { LogJumpPress, LogWallJumpVerdict, LogBufferedGroundJump } from "../../dev/collision-debug.js";
 
 /**
  * Records a jump-button press for wall-bounce timing, separately from the
@@ -164,6 +164,7 @@ function FireBufferedGroundJump(slot, kart, now, grounded, v) {
         kart.lastIdleJumpPressTime = undefined; // that press did something after all — not mashing
     }
     Debug(`ground jump: slot ${slot} from a press ${(now - pressed).toFixed(3)}s before touching down`);
+    LogBufferedGroundJump(slot, kart, now - pressed);
 }
 
 /**
