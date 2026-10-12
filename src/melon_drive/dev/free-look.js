@@ -136,19 +136,22 @@ function SpawnDrone(kart) {
 /**
  * The hint in the bottom left corner, "R → EXIT DRONE MODE" (#drone_hint): shown
  * while flying — sent on change and again every HUD_RESEND_SECONDS —,
- * hidden at once when drone mode ends.
- * @param {Kart} kart @param {boolean} on
+ * hidden at once when drone mode ends. Above it "SPACE → JUMP TO START"
+ * (#drone_hint_takeoff) while the drone is parked.
+ * @param {Kart} kart @param {boolean} on @param {boolean} [parked]
  */
-function SetDroneHintHud(kart, on) {
+function SetDroneHintHud(kart, on, parked = false) {
     const now = Instance.GetGameTime();
-    if (on === kart.droneHintShown && now < (kart.droneHintResendAt ?? 0)) {
+    if (on === kart.droneHintShown && parked === kart.droneHintParked && now < (kart.droneHintResendAt ?? 0)) {
         return;
     }
     kart.droneHintShown = on;
+    kart.droneHintParked = parked;
     kart.droneHintResendAt = now + HUD_RESEND_SECONDS;
     const slot = kart.pawn.IsValid() ? kart.pawn.GetPlayerController()?.GetPlayerSlot() : undefined;
     if (slot !== undefined) {
         GetSpeedHud()?.SetHasClassForPlayer(slot, "drone_hint", "Hidden", !on);
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "drone_hint_takeoff", "Hidden", !(on && parked));
     }
 }
 
@@ -235,7 +238,7 @@ export function UpdateDrone(kart, dt) {
     }
     UpdateDroneRotors(kart, takingOff, dt);
     UpdateDroneLaser(kart, angles, view);
-    SetDroneHintHud(kart, true);
+    SetDroneHintHud(kart, true, drone.landed && now >= (drone.takeoffUntil ?? -Infinity));
 }
 
 /**

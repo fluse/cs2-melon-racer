@@ -8,12 +8,22 @@ import { JumpDotFills } from "./logic.js";
 import { HealthBarState } from "../../health/damage/logic.js";
 import { KartMaxSpeed } from "../../movement/momentum/logic.js";
 import { GetSpeedHud } from "../layout.js";
-import { UNITS_TO_KMH, JUMP_DOT_FILL_STEPS, WALL_JUMP_CHARGES, HEALTH_BAR_SEGMENTS, HUD_RESEND_SECONDS, PERFECT_BOUNCE_FLASH_SECONDS, PERFECT_BOUNCE_ANGLE_FACTOR } from "../../constants/index.js";
+import { UNITS_TO_KMH, JUMP_DOT_FILL_STEPS, WALL_JUMP_CHARGES, HEALTH_BAR_SEGMENTS, HUD_RESEND_SECONDS, PERFECT_BOUNCE_FLASH_SECONDS, PERFECT_BOUNCE_ANGLE_FACTOR, DRONE_SPEED } from "../../constants/index.js";
 
 /** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart */
 export function UpdateSpeedHud(slot, kart) {
     const hud = GetSpeedHud();
     if (!hud) {
+        return;
+    }
+    // In drone mode the drone's speed — all of it, climbing and diving too —,
+    // Boosted while attack has it above its normal speed.
+    if (kart.freeLook && kart.drone) {
+        const v = kart.drone.velocity;
+        const droneSpeed = Math.hypot(v.x, v.y, v.z);
+        hud.SetDialogVariableStringForPlayer(slot, "speed_panel", "speed", String(Math.round(droneSpeed * UNITS_TO_KMH)));
+        hud.SetHasClassForPlayer(slot, "speed_panel", "Boosted", droneSpeed > DRONE_SPEED + 1);
+        hud.SetHasClassForPlayer(slot, "speed_panel", "PerfectBounce", false);
         return;
     }
     const vel = kart.melon.GetAbsVelocity();

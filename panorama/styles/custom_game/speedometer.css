@@ -869,11 +869,18 @@
     }
 }
 
+/* All the same length, whatever the text — wide enough for the longest
+   ("BACK TO YOUR MELON"). */
 .KeyHint {
+    width: 260px;
     margin-top: 6px;
     padding: 4px 14px 4px 8px;
     flow-children: right;
     border: 1px solid #ffffff;
+
+    &.Hidden {
+        visibility: collapse;
+    }
 }
 
 .KeyCap {
@@ -882,6 +889,11 @@
     vertical-align: center;
     border: 2px solid #ffffff;
     border-radius: 4px;
+}
+
+/* A key with a word on it (SPACE). */
+.KeyCapWide {
+    width: 64px;
 }
 
 .KeyCapLetter {

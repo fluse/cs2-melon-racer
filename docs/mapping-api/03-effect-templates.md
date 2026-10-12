@@ -130,7 +130,7 @@ Without it, the drone flies without a laser.
 | `DRONE_RADIUS` | 8 units | its size against the world, to each side (the model is ~16 across, about a melon) | `dev/constants.js` |
 | `DRONE_BOTTOM` / `DRONE_TOP` | 2.5 / 2.7 units | its size against the world, down to its skids / up from its origin (printed by the model generator) | `dev/constants.js` |
 | `DRONE_GROUND_DISTANCE` | 2 units | floor this close under its skids: on the floor | `dev/constants.js` |
-| `DRONE_LAND_SECONDS` | 1.5 s | standing still on the floor this long: landed, the rotors run down to a stop, parked until jump | `dev/constants.js` |
+| `DRONE_LAND_SECONDS` | 0.5 s | standing still on the floor this long: landed, the rotors run down to a stop, parked until jump | `dev/constants.js` |
 | `DRONE_LAND_MAX_SPEED` | 5 units/s | slower than this on the floor counts as standing still | `dev/constants.js` |
 | `DRONE_TAKEOFF_SPEED` | 180 units/s | jump on the ground: the hop up (~60 units) | `dev/constants.js` |
 | `DRONE_LASER_LENGTH` | 32 units | how far the laser reaches, at most | `dev/constants.js` |

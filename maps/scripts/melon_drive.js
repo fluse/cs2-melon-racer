@@ -124,7 +124,7 @@ function TraceBox(config) {
  *   xpGainShown?: string, xpGainResendAt?: number, // what the XP notifier last showed, and its next full resend — see UpdateXpGainHud
  *   skinHudLevel?: number, // the level the skin grid's locks were last drawn for — see UpdateSkinHud
  *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud
- *   droneHintShown?: boolean, droneHintResendAt?: number, // drone mode: the "R → EXIT DRONE MODE" hint as last sent — see dev/free-look.js
+ *   droneHintShown?: boolean, droneHintParked?: boolean, droneHintResendAt?: number, // drone mode: the "R → EXIT DRONE MODE" hint (+ "SPACE → JUMP TO START" while parked) as last sent — see dev/free-look.js
  *   drone?: { entities: any[], parts: any[], body: any, laser: any[], position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number }, tilt: { pitch: number, roll: number }, yaw: number, landed: boolean, stillSeconds: number, takeoffUntil?: number }, // free look: the drone this player flies, where, how fast, how far it leans, which way it faces, how long it's stood still on the floor, whether it has landed there (rotors still) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
@@ -4865,19 +4865,22 @@ function SpawnDrone(kart) {
 /**
  * The hint in the bottom left corner, "R → EXIT DRONE MODE" (#drone_hint): shown
  * while flying — sent on change and again every HUD_RESEND_SECONDS —,
- * hidden at once when drone mode ends.
- * @param {Kart} kart @param {boolean} on
+ * hidden at once when drone mode ends. Above it "SPACE → JUMP TO START"
+ * (#drone_hint_takeoff) while the drone is parked.
+ * @param {Kart} kart @param {boolean} on @param {boolean} [parked]
  */
-function SetDroneHintHud(kart, on) {
+function SetDroneHintHud(kart, on, parked = false) {
     const now = Instance.GetGameTime();
-    if (on === kart.droneHintShown && now < (kart.droneHintResendAt ?? 0)) {
+    if (on === kart.droneHintShown && parked === kart.droneHintParked && now < (kart.droneHintResendAt ?? 0)) {
         return;
     }
     kart.droneHintShown = on;
+    kart.droneHintParked = parked;
     kart.droneHintResendAt = now + HUD_RESEND_SECONDS;
     const slot = kart.pawn.IsValid() ? kart.pawn.GetPlayerController()?.GetPlayerSlot() : undefined;
     if (slot !== undefined) {
         GetSpeedHud()?.SetHasClassForPlayer(slot, "drone_hint", "Hidden", !on);
+        GetSpeedHud()?.SetHasClassForPlayer(slot, "drone_hint_takeoff", "Hidden", !(on && parked));
     }
 }
 
@@ -4964,7 +4967,7 @@ function UpdateDrone(kart, dt) {
     }
     UpdateDroneRotors(kart, takingOff, dt);
     UpdateDroneLaser(kart, angles, view);
-    SetDroneHintHud(kart, true);
+    SetDroneHintHud(kart, true, drone.landed && now >= (drone.takeoffUntil ?? -Infinity));
 }
 
 /**
@@ -7416,6 +7419,16 @@ function JumpDotFills(charges, dots) {
 function UpdateSpeedHud(slot, kart) {
     const hud = GetSpeedHud();
     if (!hud) {
+        return;
+    }
+    // In drone mode the drone's speed — all of it, climbing and diving too —,
+    // Boosted while attack has it above its normal speed.
+    if (kart.freeLook && kart.drone) {
+        const v = kart.drone.velocity;
+        const droneSpeed = Math.hypot(v.x, v.y, v.z);
+        hud.SetDialogVariableStringForPlayer(slot, "speed_panel", "speed", String(Math.round(droneSpeed * UNITS_TO_KMH)));
+        hud.SetHasClassForPlayer(slot, "speed_panel", "Boosted", droneSpeed > DRONE_SPEED + 1);
+        hud.SetHasClassForPlayer(slot, "speed_panel", "PerfectBounce", false);
         return;
     }
     const vel = kart.melon.GetAbsVelocity();

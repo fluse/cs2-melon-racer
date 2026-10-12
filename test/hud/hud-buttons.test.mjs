@@ -361,6 +361,35 @@ test("drone mode: the hint under the drone shows while flying, R leaves it", asy
     assert.equal(hud.Has(0, "drone_hint", "Hidden"), true, "hint gone at once");
 });
 
+test("drone mode: SPACE → JUMP TO START only while parked; the speed panel shows the drone's speed", async () => {
+    const { UpdateDrone } = await import("../../src/melon_drive/dev/free-look.js");
+    const { UpdateSpeedHud } = await import("../../src/melon_drive/hud/index.js");
+    Click(0, "usermenu_drone_button");
+    a.pawn.pressed.add("FORWARD");
+    UpdateDrone(a, 0.1);
+    UpdateSpeedHud(0, a);
+    a.pawn.pressed.clear();
+    assert.equal(hud.Has(0, "drone_hint_takeoff", "Hidden"), true, "flying: no takeoff hint");
+    const v = a.drone.velocity;
+    assert.ok(Math.hypot(v.x, v.y, v.z) > 0);
+    assert.equal(hud.Variable(0, "speed_panel", "speed"), String(Math.round(Math.hypot(v.x, v.y, v.z) * C.UNITS_TO_KMH)), "the drone's speed, not the frozen melon's");
+    // A floor right under it: standing still there it lands.
+    a.drone.velocity = { x: 0, y: 0, z: 0 };
+    world.traceBox = (c) => c.end.z < c.start.z && c.end.x === c.start.x && c.end.y === c.start.y
+        ? { didHit: true, fraction: 0.25, end: { ...c.start, z: c.start.z - 0.5 }, normal: { x: 0, y: 0, z: 1 }, startedInSolid: false }
+        : { didHit: false, fraction: 1, end: c.end, normal: { x: 0, y: 0, z: 0 }, startedInSolid: false };
+    for (let t = 0; t <= C.DRONE_LAND_SECONDS + 1; t += 0.1) {
+        UpdateDrone(a, 0.1);
+    }
+    assert.equal(a.drone.landed, true);
+    assert.equal(hud.Has(0, "drone_hint_takeoff", "Hidden"), false, "parked: SPACE → JUMP TO START");
+    a.pawn.justPressed.add("JUMP");
+    UpdateDrone(a, 0.1);
+    a.pawn.justPressed.clear();
+    assert.equal(hud.Has(0, "drone_hint_takeoff", "Hidden"), true, "taking off: gone");
+    world.traceBox = undefined;
+});
+
 test("drone mode: not while the player is in a Grand Prix — the button hidden, a click does nothing", () => {
     a.racing = true;
     SetUserMenuOpen(0, a, true);

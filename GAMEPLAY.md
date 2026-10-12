@@ -1059,7 +1059,7 @@ Switching it on or off closes the menu.
   flies **through melons**, players and other drones (the model has no
   collision at all).
 - **Landing:** on a floor (within `DRONE_GROUND_DISTANCE` under its
-  skids) and **standing still there for `DRONE_LAND_SECONDS` (1.5 s)**
+  skids) and **standing still there for `DRONE_LAND_SECONDS` (0.5 s)**
   (decided; slower than `DRONE_LAND_MAX_SPEED`, moving starts it over) — until
   then it still flies, sliding along the floor — its rotors run down to a stop (the model's `spindown`,
   then `landed`: still, the recording light blinking on); taking off (jump,
@@ -1081,7 +1081,11 @@ Switching it on or off closes the menu.
 Their melon waits where it was, frozen (`UpdateKart` skips it, physics
 motion off) — no damage, but a running time trial's clock keeps going.
 While flying, the bottom left corner shows a keycap R **EXIT DRONE MODE**
-(`drone_hint`, the same key hints as spectating); R does it, like USE → "Exit Drone Mode". Switching off removes the drone and puts the chase
+(`drone_hint`, the same key hints as spectating); R does it, like USE → "Exit Drone Mode".
+While it's parked (landed), a keycap SPACE **JUMP TO START** shows above it
+(`drone_hint_takeoff`). The speed panel shows the **drone's** speed (all of
+it, climbing and diving included; `Boosted` while attack has it above
+`DRONE_SPEED`), not the frozen melon's (`UpdateSpeedHud`). Switching off removes the drone and puts the chase
 camera back on the melon. A heat starting, a new pawn, the respawn button
 and "Restart Time Trial" (button or R) switch it off. Not while the melon
 is breaking, and not without `template_drone` in the map (it stays

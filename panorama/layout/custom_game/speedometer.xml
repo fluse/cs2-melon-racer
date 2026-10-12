@@ -272,8 +272,13 @@
 					<Label class="KeyHintText" text="BACK TO YOUR MELON" />
 				</Panel>
 			</Panel>
-			<!-- Drone mode (dev/free-look.js, SetDroneHintHud). -->
+			<!-- Drone mode (dev/free-look.js, SetDroneHintHud); the jump line only
+			     while it's parked (landed). -->
 			<Panel id="drone_hint" class="KeyHintGroup Hidden">
+				<Panel id="drone_hint_takeoff" class="KeyHint Hidden">
+					<Panel class="KeyCap KeyCapWide"><Label class="KeyCapLetter" text="SPACE" /></Panel>
+					<Label class="KeyHintText" text="JUMP TO START" />
+				</Panel>
 				<Panel class="KeyHint">
 					<Panel class="KeyCap"><Label class="KeyCapLetter" text="R" /></Panel>
 					<Label class="KeyHintText" text="EXIT DRONE MODE" />
