@@ -6,6 +6,10 @@
 - Friction Areas
 - Magnete
 
+# Grand Prix
+- Im GrandPrix bekommt jeder spieler, sobald er ein Checkpoint durchqueert Punkte. Balancing muss stimmen für den Sieger des Rennens.
+
+
 # Sequenzen
 - Startfeld Area
 - Zwischen den Rennen werden die ersten 3 angezeigt
