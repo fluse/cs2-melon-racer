@@ -1,0 +1,13 @@
+.Root {
+    width: 100%;
+    height: 100%;
+}
+
+/* Black fade along the bottom of the screen (behind the speed panel and the
+   bottom-right cluster): 20% opaque at the bottom edge, transparent at the top. */
+.BottomFade {
+    width: 100%;
+    height: 280px;
+    vertical-align: bottom;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( $(black)00 ), to( $(black)33 ) );
+}

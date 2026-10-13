@@ -33,7 +33,7 @@ export const HUB_TRIGGER_NAME = "hub_start_trigger";
 export const GRAND_PRIX_GATHER_SECONDS = 10;
 
 export const COUNTDOWN_SECONDS = 3;
-export const GO_DISPLAY_SECONDS = 0.7; // how long "GO" stays on screen once the countdown ends — its grow-and-fade (speedometer.css) is done by .62s
+export const GO_DISPLAY_SECONDS = 0.7; // how long "GO" stays on screen once the countdown ends — its grow-and-fade (melon_racer.css) is done by .62s
 export const BREAK_SECONDS = 10; // fixed by the original request
 // Once the first racer of a heat finishes, the others have this long to
 // finish too (the finish window, counted down on everyone's HUD as

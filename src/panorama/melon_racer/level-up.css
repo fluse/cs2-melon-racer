@@ -1,0 +1,45 @@
+/* #levelup_panel: a level-up (UpdateLevelUpHud), top center where the DNF
+   warning would be (that one only shows mid-heat, this one never does). */
+.LevelUpPanel {
+    horizontal-align: center;
+    vertical-align: top;
+    margin-top: 190px;
+    padding: 10px 34px 12px 34px;
+    flow-children: down;
+    background-color: $(panel)e6;
+    border: 2px solid $gold;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.LevelUpTitle {
+    horizontal-align: center;
+    font-size: $font-kicker;
+    font-weight: bold;
+    letter-spacing: 5px;
+    color: $gold;
+}
+
+.LevelUpLevel {
+    horizontal-align: center;
+    font-size: $font-headline;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $white;
+    text-shadow: 2px 2px 3px $(black)cc;
+}
+
+.LevelUpSkins {
+    horizontal-align: center;
+    margin-top: 2px;
+    font-size: $font-text;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: $lime;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}

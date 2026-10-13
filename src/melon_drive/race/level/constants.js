@@ -56,7 +56,7 @@ export const XP_REASON_PERFECT_WALL_JUMP = "PERFECT WALL JUMP";
 export const XP_REASON_CHEAT = "CHEAT";
 // Reasons listed on the notifier at most; more add "+ MORE".
 export const XP_GAIN_REASONS_SHOWN = 3;
-// Segments of the profile's XP bar (usermenu_profile_xp_<i> in speedometer.xml)
+// Segments of the profile's XP bar (usermenu_profile_xp_<i> in melon_racer.xml)
 // and of the XP notifier's (xpgain_old_<i>/xpgain_new_<i>).
 export const XP_BAR_SEGMENTS = 20;
 

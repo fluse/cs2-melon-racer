@@ -24,7 +24,7 @@ import { RefreshProfileHud, UpdateProfileHud } from "./profile/index.js";
 
 /**
  * The ON/OFF settings: per button, the dialog variable its pill shows and
- * whether it's on for a kart. One row each in speedometer.xml; clicking one
+ * whether it's on for a kart. One row each in melon_racer.xml; clicking one
  * is in hud/inputs.js (USER_MENU_TOGGLE_CLICKS).
  * @type {Record<string, { variable: string, isOn: (kart: import("../core/kart-registry.js").Kart) => boolean }>}
  */
@@ -41,7 +41,7 @@ export const USER_MENU_TOGGLES = {
 
 /**
  * The pages the menu can show in place of its columns — the leaderboards
- * (ACTIONS) and the developer pages: per page, its panel in speedometer.xml
+ * (ACTIONS) and the developer pages: per page, its panel in melon_racer.xml
  * and what to refresh when it opens.
  * @typedef {"leaderboards" | "camera" | "physics" | "triggers"} UserMenuPage
  * @type {Record<UserMenuPage, { panel: string, refresh?: (slot: number, kart: import("../core/kart-registry.js").Kart) => void }>}

@@ -4,7 +4,7 @@ import { GetSpeedHud } from "./layout.js";
 import { BOUNCE_HUD_SECONDS, BOUNCE_ANGLE_SEGMENTS, BOUNCE_JUMP_SEGMENTS, BOUNCE_RATINGS } from "../constants/index.js";
 
 /**
- * Wall-bounce feedback panel (bounce_panel in speedometer.xml), shown for
+ * Wall-bounce feedback panel (bounce_panel in melon_racer.xml), shown for
  * BOUNCE_HUD_SECONDS after each bounce: a rating word, the exact angle hit,
  * an angle scale with the hit's segment marked against the 45° target, and
  * how well the jump was timed. Reads kart.lastBounceInfo live, so a jump just

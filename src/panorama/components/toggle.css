@@ -1,0 +1,58 @@
+/* One setting per row: its name left, an ON/OFF pill right (the script
+   sets the pill's text and ToggleOn on the button, see hud/user-menu.js).
+   No transitions on the toggled parts (see the HUD notes in AGENTS.md). */
+.UserMenuToggle {
+    width: 100%;
+    height: 42px;
+    margin-top: 6px;
+    border-radius: 0px;
+    border: 1px solid $(white)14;
+    background-color: $(white)0a;
+
+    &:hover {
+        background-color: $(white)17;
+    }
+
+    &.ToggleOn {
+        border: 1px solid $(lime)88;
+    }
+}
+
+.UserMenuToggleName {
+    horizontal-align: left;
+    vertical-align: center;
+    margin-left: 14px;
+    font-size: $font-text;
+    font-weight: bold;
+    color: $white;
+}
+
+/* Fixed width, so ON and OFF are the same size; text centered in it. The
+   letter-spacing also adds a gap after the last letter — the 2px of left
+   padding balance it. */
+.UserMenuTogglePill {
+    horizontal-align: right;
+    vertical-align: center;
+    margin-right: 10px;
+    width: 60px;
+    padding: 4px 0px 3px 2px;
+    text-align: center;
+    border-radius: 0px;
+    background-color: $(white)1a;
+    font-size: $font-small;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: $text-dim;
+}
+
+/* An action row (Test Podium): a gold outlined pill instead of ON/OFF. */
+.UserMenuTogglePill.UserMenuRunPill {
+    background-color: $(black)00;
+    border: 1px solid $gold;
+    color: $gold;
+}
+
+.UserMenuToggle.ToggleOn .UserMenuTogglePill {
+    background-color: $green;
+    color: $white;
+}

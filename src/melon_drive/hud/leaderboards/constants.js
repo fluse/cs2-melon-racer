@@ -4,10 +4,10 @@
 
 // The tab with the best times on one track (◀ ▶ page through the tracks);
 // every other tab is a STAT_SLIDES key. Buttons "lb_tab_<tab>" in
-// speedometer.xml — add one there when adding a stat
+// melon_racer.xml, built from STAT_SLIDES (src/panorama/melon_racer/user-menu/page-leaderboards.xml)
 // (test/hud/leaderboards.test.mjs checks every tab has its button).
 export const LEADERBOARD_TIMES_TAB = "times";
-// Player rows, "lb_row_0" .. "lb_row_{N-1}" in speedometer.xml, one under
+// Player rows, "lb_row_0" .. "lb_row_{N-1}" in melon_racer.xml, one under
 // the other; with more players the viewer's own row takes the last one.
 export const LEADERBOARD_ROWS = 20;
 // How often the open page is rebuilt (seconds): time on the server grows

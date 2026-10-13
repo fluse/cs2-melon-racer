@@ -44,6 +44,14 @@ soundevents/soundevents_addon.vsndevts   # sound event defs (KV3)
 sounds/*.wav                             # ambience: birds, interior, vent
 src/tsconfig.json                        # editor tooling config for src/**/*.js (references ../maps/scripts/point_script.d.ts)
 src/gamemode/index.js                    # gamemode entry: a single small file
+src/panorama/melon_racer/*.xml, *.css    # the HUD layout's parts, each part's styles next to it (melon_racer.xml/.css = the main files, one part per panel,
+                                          #   user-menu/ = the menu's columns and pages): build-panorama.mjs puts them together into
+                                          #   panorama/layout/custom_game/melon_racer.xml and panorama/styles/custom_game/melon_racer.css;
+                                          #   locals.mjs = the values they're built with (every constant by name + skinPages, statRows, … for loops;
+                                          #   styleVariables: $rating-*, $color-* from the script for the CSS)
+src/panorama/components/*.xml, *.css     # reusable HUD components with attributes as values, their styles next to them (toggle, action-button,
+                                          #   tuning-row, tuning-page, key-hint, skin-button, group-header): <module href="…/components/toggle.xml" id="…" name="…" />
+src/panorama/tokens.css                  # the HUD's colors as $variables ($gold, $mint, $panel, …), imported first by every layout's .css
 src/melon_drive/index.js                 # melon_drive entry — wiring only: tick loop, hot-reload snapshot, each domain's Register*Inputs()
 src/melon_drive/<domain>/                # one folder per domain, each with an index.js (its public API); bigger
                                           #   domains have one subfolder per feature (see "Folder layout" below):
@@ -94,6 +102,7 @@ test/helpers/vmap.mjs                    # minimal binary-DMX reader so tests ca
 test/helpers/cs-script-mock.mjs          # fake "cs_script/point_script" (+ register-cs-script.mjs hook) for testing engine-side files
 test/helpers/fake-hud.mjs                # fake custom_hud_layout: per-slot classes, dialog variables, input capture
 build.mjs, package.json                  # Rollup build wiring src/ -> maps/scripts/*.js
+build-panorama.mjs                       # PostHTML/PostCSS build src/panorama/<layout>/ -> panorama/layout/custom_game/<layout>.xml + styles/…/<layout>.css (+ resourcecompiler), run by build.mjs
 site/*.html, style.css, build.mjs        # GitHub Page: `npm run site` -> site/dist/ (gitignored): index.html (+ version, CHANGELOG.md),
                                           #   connect/ (steam://connect), mapping-api/ (every docs/mapping-api/*.md + TRACK_CREATION.md,
                                           #   via site/markdown.mjs — test/site/ checks every link/#anchor); .github/workflows/pages.yml deploys on push to main
@@ -479,7 +488,47 @@ default 1, instant).
 
 CS2 supports a scripted custom UI via Panorama, wired through the same
 `cs_script` system. This addon's whole HUD is one layout: `speed_hud` with
-`speedometer.xml`/`.css` (driven from `hud/`).
+`melon_racer.xml`/`.css` (driven from `hud/`).
+
+**`panorama/layout/custom_game/melon_racer.xml` and
+`panorama/styles/custom_game/melon_racer.css` are generated — edit their
+parts in `src/panorama/`**, then `npm run build` (or `npm run watch`).
+`build-panorama.mjs` puts them together with PostHTML:
+
+- `<module href="part.xml" />` is replaced by that file, relative to the file
+  it's in. Not `<include>`: that's Panorama's own, for the CSS in `<styles>`.
+- **Components** (`src/panorama/components/`): a `<module>`'s other
+  attributes are values inside it (`{{ name }}`), and a `<content />` in it
+  takes what's written between `<module>` and `</module>` (`tuning-page.xml`).
+  Optional attributes: `typeof x === 'string'` in an `<if condition>` or an
+  expression; an attribute that ends up empty (`id="{{ typeof id === 'string' ? id : '' }}"`)
+  is left out. A component's comments document it and don't reach the output.
+  Never name an attribute `class` (a JS keyword in `{{ }}`) — `extra` is used.
+- `{{ }}`, `<each loop="i in range(N)">`, `<if>`/`<elseif>`/`<else>`
+  (posthtml-expressions) work everywhere, with every script constant by name
+  (`src/panorama/melon_racer/locals.mjs`): **panels the script fills in by
+  count or list (rows, segments, skins, stats, colors) are built from its
+  constants, never written out** — a new skin, stat or row count needs no XML.
+  A `{{ }}` without a value fails the build.
+- The output is laid out by nesting depth, so files are written at column 0.
+
+**Styles** (PostCSS): every part and component has its `.css` next to its
+`.xml`; the layout's main `.css` is only `@import`s (postcss-import inlines
+them **in that order — it's the cascade's order**: a rule that overrides
+another comes in a later file). Colors are `$variables`
+(postcss-simple-vars, Panorama has no `var()`): the palette in
+`src/panorama/tokens.css`, with alpha appended as `$(gold)26`; colors the
+script uses too come from it (`styleVariables` in `locals.mjs`:
+`$rating-perfect` … from `BOUNCE_RATINGS`, `$color-<key>` from
+`COLOR_PRESETS`). A new color with a meaning goes into `tokens.css`, not
+as a literal; a `$variable` without a value fails the build. **Font sizes**
+are the type scale's steps in `tokens.css` (`$font-mini` 11 … `$font-display`
+56): pick a step for new text, never a size of its own (the countdown's 240px
+is the one exception).
+
+A changed layout or style is compiled for the game right away
+(`resourcecompiler.exe`, see below); `test/map/hud-layout-build.test.mjs`
+fails while a generated file is out of date.
 
 - Layout: `panorama/layout/custom_game/<name>.xml` (compiles to `.vxml`).
 - Style: `panorama/styles/custom_game/<name>.css` (compiles to `.vcss`).

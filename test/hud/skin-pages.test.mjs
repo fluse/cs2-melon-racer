@@ -1,5 +1,5 @@
 // The user menu's skin grid in pages (kart/skin-logic.js): MELON_SKINS_PER_PAGE
-// skins each, in MELON_SKINS order, ◀ ▶ wrapping around — and speedometer.xml
+// skins each, in MELON_SKINS order, ◀ ▶ wrapping around — and melon_racer.xml
 // laid out the same way, every page with all of its places.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -27,8 +27,8 @@ test("paging wraps around both ways; the indicator shows page and page count", (
     assert.equal(SkinPageLabel(0), `1 / ${SkinPageCount()}`);
 });
 
-test("speedometer.xml: one panel per page, holding that page's skins in order, three rows of three", () => {
-    const xml = readFileSync(new URL("../../panorama/layout/custom_game/speedometer.xml", import.meta.url), "utf8");
+test("melon_racer.xml: one panel per page, holding that page's skins in order, three rows of three", () => {
+    const xml = readFileSync(new URL("../../panorama/layout/custom_game/melon_racer.xml", import.meta.url), "utf8");
     const starts = [...xml.matchAll(/<Panel id="usermenu_skinpage_(\d+)"/g)];
     assert.deepEqual(starts.map((m) => Number(m[1])), Array.from({ length: SkinPageCount() }, (_, i) => i), "a panel for every page, none more");
     starts.forEach((start, page) => {

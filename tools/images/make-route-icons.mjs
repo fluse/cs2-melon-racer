@@ -21,7 +21,7 @@ const MAP = fileURLToPath(new URL("../../maps/melon_racer.vmap", import.meta.url
 const OUT_DIR = new URL("../../panorama/images/custom_game/routes/", import.meta.url);
 const NAMES_FILE = new URL("../../src/melon_drive/hud/hub-modal/routes.js", import.meta.url);
 
-// The picture fills the card's image box (.HeatMapBox in speedometer.css);
+// The picture fills the card's image box (.HeatMapBox in melon_racer.css);
 // the icon's 100x100 grid sits centered in it at ICON_SIZE px.
 const WIDTH = 320;
 const HEIGHT = 176;

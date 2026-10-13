@@ -2,9 +2,9 @@
 
 export const MELON_TEMPLATE_NAME = "melon_template";
 
-// How long the Melon Racer logo (intro_logo in speedometer.xml) shows after
+// How long the Melon Racer logo (intro_logo in melon_racer.xml) shows after
 // a player picks a team, before their melon spawns at the intro. Its
-// animation (.IntroLogoImage in speedometer.css) has the logo out of the
+// animation (.IntroLogoImage in melon_racer.css) has the logo out of the
 // picture after 2.85s — keep this a little longer than that, and shorter
 // than the animation itself (5s).
 export const INTRO_LOGO_SECONDS = 3.2;
@@ -53,7 +53,8 @@ export const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
 // switch material groups, only SetModel. Each one has to be used somewhere
 // in the .vmap too (the default by melon_template, the others e.g. by a
 // prop in the hub), or the map doesn't ship it (test/map/map-skins.test.mjs).
-// The key is the button's: usermenu_skin_<key> in speedometer.xml, in this
+// The key is the button's: usermenu_skin_<key> in melon_racer.xml (built
+// from this list, src/panorama/melon_racer/user-menu/column-settings.xml), in this
 // order (pages of MELON_SKINS_PER_PAGE) — sorted by MELON_SKIN_LEVELS, the
 // free ones first (test/race/level.test.mjs).
 /** @type {Record<string, string>} */
@@ -71,7 +72,7 @@ export const MELON_SKINS = {
 };
 export const MELON_SKIN_DEFAULT = "default";
 // Every skin's name as the user menu shows it: under its button in the skin
-// grid (static text in speedometer.xml) and in the profile (hud/profile/) —
+// grid (built into melon_racer.xml) and in the profile (hud/profile/) —
 // test/hud/profile.test.mjs checks the two agree.
 /** @type {Record<string, string>} */
 export const MELON_SKIN_NAMES = {
@@ -104,7 +105,7 @@ export const MELON_SKIN_LEVELS = {
 };
 // Skins per page of the user menu's skin grid (3 x 3): with more, ◀ ▶ next to
 // the MELON title page through them, in MELON_SKINS order. One panel per page
-// in speedometer.xml, usermenu_skinpage_<page> (test/hud/skin-pages.test.mjs).
+// in melon_racer.xml, usermenu_skinpage_<page>, built from MELON_SKINS (test/hud/skin-pages.test.mjs).
 export const MELON_SKINS_PER_PAGE = 9;
 
 // The frozen pawn (CSMoveType.NOCLIP: non-solid, but WASD still flies it)

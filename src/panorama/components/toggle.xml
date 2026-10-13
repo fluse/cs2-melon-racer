@@ -1,0 +1,17 @@
+<!-- A row button of the user menu (.UserMenuToggle): its name on the left and
+     on the right a pill — an ON/OFF state from a dialog variable, a fixed word
+     for a button that does something, or nothing.
+       id      the button's id (hud/inputs.js handles the click)
+       name    the text
+       state   optional: dialog variable of the pill ("glow_state" -> {s:glow_state})
+       action  optional: fixed pill text ("RUN", "EDIT", "OPEN"; .UserMenuRunPill)
+       extra   optional: more classes on the button ("TuningFooterButton") -->
+<Button id="{{ id }}" class="UserMenuToggle{{ typeof extra === 'string' ? ' ' + extra : '' }}">
+	<Label class="UserMenuToggleName" text="{{ name }}" />
+	<if condition="typeof state === 'string'">
+		<Label class="UserMenuTogglePill" text="{s:{{ state }}}" />
+	</if>
+	<elseif condition="typeof action === 'string'">
+		<Label class="UserMenuTogglePill UserMenuRunPill" text="{{ action }}" />
+	</elseif>
+</Button>

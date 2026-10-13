@@ -10,7 +10,7 @@ import { GetTrackBestTimes } from "../../race/time-trial/time-trial.js";
 import { SCOREBOARD_ROWS, SCOREBOARD_UPDATE_SECONDS, HUD_RESEND_SECONDS } from "../../constants/index.js";
 
 /**
- * The scoreboard (#scoreboard in speedometer.xml), in place of CS2's own:
+ * The scoreboard (#scoreboard in melon_racer.xml), in place of CS2's own:
  * the CSS shows it while the engine's HUD_SCOREBOARD_VISIBLE class is set
  * (Tab held), covering the default one. This only fills it in — the Grand
  * Prix standings or a track's best times (hud/scoreboard/logic.js), a row

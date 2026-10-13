@@ -1,0 +1,20 @@
+<!-- A developer page of the user menu, shown in place of its columns
+     (SetUserMenuPage in hud/user-menu.js): title, intro line, what's written
+     inside the <module> tag, and a footer with "◀ Back" and maybe "Reset to Default".
+       page    usermenu_<page>_page
+       title   after "DEVELOPER · "
+       intro   the line under the title
+       prefix  the footer buttons' id prefix (<prefix>_back_button, <prefix>_reset_button)
+       reset   optional: "true" for the reset button
+       extra   optional: more classes on the page ("TriggersPage") -->
+<Panel id="usermenu_{{ page }}_page" class="TuningPage{{ typeof extra === 'string' ? ' ' + extra : '' }} Hidden">
+	<Label class="UserMenuColumnTitle" text="DEVELOPER · {{ title }}" />
+	<Label class="TuningIntro" text="{{ intro }}" />
+	<content></content>
+	<Panel class="TuningFooter">
+		<module href="toggle.xml" id="{{ prefix }}_back_button" name="◀ Back" extra="TuningFooterButton" />
+		<if condition="typeof reset === 'string'">
+			<module href="toggle.xml" id="{{ prefix }}_reset_button" name="Reset to Default" extra="TuningFooterButton" />
+		</if>
+	</Panel>
+</Panel>

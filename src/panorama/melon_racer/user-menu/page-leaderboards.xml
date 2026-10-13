@@ -1,0 +1,47 @@
+<!-- Leaderboards page (ACTIONS → "Leaderboards", SetUserMenuPage in
+     hud/user-menu.js, filled in by hud/leaderboards/leaderboards.js): laid
+     out like the menu's columns — on the left a column like ACTIONS with a
+     button per leaderboard (lb_tab_<tab>: "times", then a STAT_SLIDES key
+     each, its STAT_SLIDES tab; Selected marks the current one),
+     a divider, the picked board on the right. The best times page through
+     the tracks with ◀ ▶ (shown with Paging). LEADERBOARD_ROWS rows in one
+     column, unused ones collapsed (Unused), the viewer's own one Self. -->
+<Panel id="usermenu_leaderboards_page" class="TuningPage Hidden">
+	<Panel class="UserMenuColumns">
+		<Panel class="UserMenuActions LeaderboardButtons">
+			<Label class="UserMenuColumnTitle" text="LEADERBOARDS" />
+			<module href="../../components/action-button.xml" id="lb_tab_{{ LEADERBOARD_TIMES_TAB }}" color="Plain" extra="LeaderboardTab" label="Best Times" />
+			<each loop="slide in STAT_SLIDES">
+			<module href="../../components/action-button.xml" id="lb_tab_{{ slide.key }}" color="Plain" extra="LeaderboardTab" label="{{ slide.tab }}" /></each>
+		</Panel>
+
+		<Panel class="UserMenuDivider" />
+
+		<Panel class="LeaderboardBoard">
+			<Panel class="LeaderboardHeader">
+				<Button id="lb_track_prev" class="LeaderboardPager"><Label class="LeaderboardPagerLabel" text="◀" /></Button>
+				<Panel class="LeaderboardTitles">
+					<Label class="LeaderboardTitle" text="{s:lb_title}" />
+					<Label class="LeaderboardSubtitle" text="{s:lb_subtitle}" />
+				</Panel>
+				<Button id="lb_track_next" class="LeaderboardPager"><Label class="LeaderboardPagerLabel" text="▶" /></Button>
+			</Panel>
+			<Panel class="LeaderboardTable">
+				<Panel class="LeaderboardRow LeaderboardColumns">
+					<Label class="LbRank" text="#" />
+					<Label class="LbName" text="PLAYER" />
+					<Label class="LbValue" text="{s:lb_column}" />
+				</Panel>
+				<each loop="i in range(LEADERBOARD_ROWS)">
+				<Panel id="lb_row_{{ i }}" class="LeaderboardRow Unused">
+					<Label class="LbRank" text="{s:rank}" />
+					<Label class="LbName" text="{s:name}" />
+					<Label class="LbValue" text="{s:value}" />
+				</Panel></each>
+			</Panel>
+		</Panel>
+	</Panel>
+	<Panel class="TuningFooter">
+		<module href="../../components/toggle.xml" id="leaderboards_back_button" name="◀ Back" extra="TuningFooterButton" />
+	</Panel>
+</Panel>

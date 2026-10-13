@@ -1,0 +1,32 @@
+/* #spectate_panel: whose melon the camera follows (race/spectate/), bottom
+   center above the speed panel; the keys are in .KeyHints, bottom left. */
+.SpectatePanel {
+    horizontal-align: center;
+    vertical-align: bottom;
+    margin-bottom: 210px;
+    padding: 8px 30px 10px 30px;
+    flow-children: down;
+    background-color: $(panel)e6;
+    border: 2px solid $gold;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.SpectateTitle {
+    horizontal-align: center;
+    font-size: $font-kicker;
+    font-weight: bold;
+    letter-spacing: 5px;
+    color: $gold;
+}
+
+.SpectateName {
+    horizontal-align: center;
+    font-size: $font-headline;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: $white;
+    text-shadow: 2px 2px 3px $(black)cc;
+}
