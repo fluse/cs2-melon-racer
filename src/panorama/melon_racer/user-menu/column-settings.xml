@@ -1,0 +1,49 @@
+<Panel class="UserMenuSettings">
+	<Label class="UserMenuColumnTitle" text="SETTINGS" />
+
+	<!-- MELON: the skins, paged — ◀ 1 / 2 ▶ right-aligned next to the title (usermenu_skinpager,
+	     shown with Paging: more than one page; UpdateSkinHud in hud/user-menu.js). -->
+	<Panel id="usermenu_skinpager" class="UserMenuSkinHeader">
+		<module href="../../components/group-header.xml" icon="palette" label="MELON" />
+		<Panel class="SkinPager">
+			<Button id="usermenu_skinpage_prev" class="SkinPagerButton"><Label class="SkinPagerArrow" text="◀" /></Button>
+			<Label class="SkinPagerLabel" text="{s:skin_page}" />
+			<Button id="usermenu_skinpage_next" class="SkinPagerButton"><Label class="SkinPagerArrow" text="▶" /></Button>
+		</Panel>
+	</Panel>
+	<!-- Skins: one button per MELON_SKINS key (kart/constants.js), in its order, MELON_SKINS_PER_PAGE (9) per page
+	     (usermenu_skinpage_<page>, only the player's one shown), three per row — built from skinPages
+	     (locals.mjs), the free places of the last page empty (SkinSlotEmpty) so the menu keeps its
+	     height and the buttons their width. The current skin SkinSelected (UpdateSkinHud). Previews from
+	     tools/materials/make-melon-skins.mjs. Saved per player name (kart/skin.js). -->
+	<each loop="page, p in skinPages">
+	<Panel id="usermenu_skinpage_{{ p }}" class="UserMenuSkinPage{{ p > 0 ? ' Hidden' : '' }}">
+		<each loop="row in page">
+		<Panel class="UserMenuSkinRow">
+			<each loop="skin in row">
+			<if condition="skin">
+				<module href="../../components/skin-button.xml" key="{{ skin.key }}" name="{{ skin.name }}" />
+			</if>
+			<else>
+				<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
+			</else></each>
+		</Panel></each>
+	</Panel></each>
+	<!-- Outline glow around the player's own melon (kart/look.js). On by default. -->
+	<module href="../../components/toggle.xml" id="usermenu_glow_button" name="Glow" state="glow_state" />
+	<!-- The glow's color, one swatch per COLOR_PRESETS key (kart/constants.js), the picked one
+	     SwatchSelected (UpdateGlowColorHud). Only the glow, not the paint; switches the glow on.
+	     Without a pick the glow follows the paint (green until painted). Saved per player name. -->
+	<Panel class="UserMenuColorRow">
+		<each loop="color in colors">
+		<Button id="usermenu_color_{{ color.key }}" class="ColorSwatch ColorSwatch{{ color.suffix }}" /></each>
+	</Panel>
+
+	<module href="../../components/group-header.xml" icon="tutorial" label="ON JOIN" />
+	<!-- Where your melon appears when you join: ON the tutorial (intro_spawn, default), OFF straight in the hub. Saved per player name (kart/join-spot.js). -->
+	<module href="../../components/toggle.xml" id="usermenu_jointutorial_button" name="Start in Tutorial" state="jointutorial_state" />
+
+	<module href="../../components/group-header.xml" icon="guide-line" label="DRIVING AIDS" />
+	<!-- Wall-bounce guide line: where the melon hits the next wall and at what rating (fx/prediction/). Off by default; in the default render mode it only shows in tools mode. -->
+	<module href="../../components/toggle.xml" id="usermenu_prediction_button" name="Guide Line" state="prediction_state" />
+</Panel>

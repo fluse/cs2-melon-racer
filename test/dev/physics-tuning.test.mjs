@@ -56,8 +56,8 @@ test("max speed scales the kart's top speed, momentum steps on top", () => {
     assert.equal(KartMaxSpeed({ momentum }), 2 * C.MAX_SPEED * (1 + C.MOMENTUM_STEP));
 });
 
-test("speedometer.xml has one segment per scale value for every row", () => {
-    const layout = readFileSync(new URL("../../panorama/layout/custom_game/speedometer.xml", import.meta.url), "utf8");
+test("melon_racer.xml has one segment per scale value for every row", () => {
+    const layout = readFileSync(new URL("../../panorama/layout/custom_game/melon_racer.xml", import.meta.url), "utf8");
     const count = ScaleSegmentCount(SCALE);
     for (const id of Object.values(ROW_IDS)) {
         const indices = [...layout.matchAll(new RegExp(`id="phytune_${id}_seg_(\\d+)"`, "g"))].map((m) => Number(m[1]));

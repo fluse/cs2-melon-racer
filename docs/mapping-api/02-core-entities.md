@@ -10,7 +10,7 @@ The map doesn't work without these. Exactly one of each.
 |---|---|---|---|
 | `gamemode` | `point_script` | `cs_script` = `maps/scripts/gamemode.vjs` | cvars, teams, no combat. The name isn't looked up — just the convention. |
 | `melon_drive_script` | `point_script` | `cs_script` = `maps/scripts/melon_drive.vjs` | **Target of every output** in the Mapping API. |
-| `speed_hud` | `custom_hud_layout` | `layout` = `panorama/layout/custom_game/speedometer.vxml` | The whole HUD (speedometer, countdown, hub modal, user menu, …). |
+| `speed_hud` | `custom_hud_layout` | `layout` = `panorama/layout/custom_game/melon_racer.vxml` | The whole HUD (speedometer, countdown, hub modal, user menu, …). |
 | `melon_template` | `point_template` | Template01 = a `prop_physics` with the melon model (`models/melon_racer/melon/melon.vmdl`) | Spawned once per player. Where it sits doesn't matter — the melon is moved into place. |
 | `hub_spawn` | `info_player_start` (any named point entity) | — | See [spawn points](#spawn-points). |
 | `hub_start_trigger` | `trigger_multiple` | `hub_enter` + `hub_leave` | The hub's start area — see [Hub](05-hub.md). |
@@ -51,8 +51,8 @@ by `SetModel`, and a map ships only the models its own entities use — so
 | Camo | `models/melon_racer/melon/melon_camo.vmdl` |
 
 A new skin: add it to `SKINS` in `tools/materials/make-melon-skins.mjs` (run it,
-compile), to `MELON_SKINS`, as a `usermenu_skin_<key>` button in
-`speedometer.xml`, and put its model in the map. For the hub's Melon Boutique, re-run
+compile), to `MELON_SKINS`, `MELON_SKIN_NAMES` and `MELON_SKIN_LEVELS` (the user menu's
+button and profile image are built from them: `npm run build`), and put its model in the map. For the hub's Melon Boutique, re-run
 `tools/models/make-boutique-model.mjs` for its name plate (`boutique_plate_<key>`) and set a
 `prop_dynamic` of the skin on a `boutique_ring`, its origin 9.4 above the ring's.
 

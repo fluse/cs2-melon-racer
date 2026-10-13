@@ -1,6 +1,6 @@
 // The user menu's profile (top of the right column): its rules
 // (hud/profile/logic.js — name, skin, level and XP, every stat with its rank), that
-// speedometer.xml has an image per skin and a tile per stat, and the profile
+// melon_racer.xml has an image per skin and a tile per stat, and the profile
 // against the fake engine (filled in on opening, the big melon follows the skin).
 import "../helpers/register-cs-script.mjs";
 import { test } from "node:test";
@@ -24,7 +24,7 @@ import {
     SPEED_HUD_ENTITY_NAME,
 } from "../../src/melon_drive/constants/index.js";
 
-const XML = readFileSync(new URL("../../panorama/layout/custom_game/speedometer.xml", import.meta.url), "utf8");
+const XML = readFileSync(new URL("../../panorama/layout/custom_game/melon_racer.xml", import.meta.url), "utf8");
 const A = { key: "0:Anna", name: "Anna" };
 const B = { key: "1:Ben", name: "Ben" };
 const [FIRST, SECOND] = STAT_SLIDES;
@@ -58,7 +58,7 @@ test("an unknown skin shows the default's name", () => {
     assert.equal(BuildProfile({ self: A, players: [A], skin: "gone", xp: 0, statTotals: {} }).skin, MELON_SKIN_NAMES[MELON_SKIN_DEFAULT].toUpperCase());
 });
 
-test("speedometer.xml: a profile image per skin, a tile per stat; every skin's name matches its button in the grid", () => {
+test("melon_racer.xml: a profile image per skin, a tile per stat; every skin's name matches its button in the grid", () => {
     assert.deepEqual(Object.keys(MELON_SKIN_NAMES), Object.keys(MELON_SKINS), "a name for every skin");
     for (const key of Object.keys(MELON_SKINS)) {
         assert.ok(XML.includes(`id="usermenu_profile_skin_${key}"`), `profile image for ${key}`);

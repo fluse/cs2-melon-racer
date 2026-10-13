@@ -12,7 +12,7 @@ const PAGE = "usermenu_leaderboards_page";
 
 /**
  * The user menu's leaderboards page (usermenu_leaderboards_page in
- * speedometer.xml, opened from ACTIONS): one leaderboard at a time, picked
+ * melon_racer.xml, opened from ACTIONS): one leaderboard at a time, picked
  * by its button ("lb_tab_<tab>", the current one Selected) — the best times on
  * one track (◀ ▶ page through the tracks, shown with Paging) or a player
  * stat. Up to LEADERBOARD_ROWS players ("lb_row_<i>", one column), the

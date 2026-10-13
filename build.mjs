@@ -14,9 +14,13 @@
 // which would gut this codebase's explanatory "why" comments in the file
 // Hammer actually compiles. Rollup preserves them by default.
 //
+// The HUD layouts (src/panorama/ -> panorama/layout/custom_game/*.xml) are
+// built here too, by build-panorama.mjs.
+//
 // Usage: node build.mjs [--watch]
 
 import { rollup, watch as rollupWatch } from "rollup";
+import { BuildAllLayouts, WatchLayouts } from "./build-panorama.mjs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -76,8 +80,10 @@ function watchAll() {
     console.log("rollup: watching src/ for changes (Ctrl+C to stop)...");
 }
 
+await BuildAllLayouts();
 if (watch) {
     watchAll();
+    WatchLayouts();
 } else {
     await buildOnce();
 }

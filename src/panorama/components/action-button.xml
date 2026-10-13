@@ -1,0 +1,15 @@
+<!-- A big button of the user menu's ACTIONS column (.UserMenuActionButton):
+     an icon and a label.
+       id     the button's id (hud/inputs.js handles the click)
+       color  Green, Gold, Red or Plain (.UserMenuButton<color>)
+       label  the text, or a dialog variable ("{s:hub_label}")
+       icon   optional: icons/<icon>.png (tools/images/make-icons.mjs)
+       extra  optional: more classes on the button ("LeaderboardTab") -->
+<Button id="{{ id }}" class="UserMenuActionButton UserMenuButton{{ color }}{{ typeof extra === 'string' ? ' ' + extra : '' }}">
+	<Panel class="UserMenuButtonContent">
+		<if condition="typeof icon === 'string'">
+			<Image class="UserMenuButtonIcon" src="file://{images}/custom_game/icons/{{ icon }}.png" />
+		</if>
+		<Label class="UserMenuButtonLabel" text="{{ label }}" />
+	</Panel>
+</Button>

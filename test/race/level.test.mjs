@@ -232,7 +232,7 @@ test("XP notifier: shown for a reward (adding up), not for the time on the serve
 });
 
 test("the layout has one XP notifier segment pair per XP_BAR_SEGMENTS", () => {
-    const xml = readFileSync(new URL("../../panorama/layout/custom_game/speedometer.xml", import.meta.url), "utf8");
+    const xml = readFileSync(new URL("../../panorama/layout/custom_game/melon_racer.xml", import.meta.url), "utf8");
     for (let i = 0; i < XP_BAR_SEGMENTS; i++) {
         assert.ok(xml.includes(`id="xpgain_old_${i}"`) && xml.includes(`id="xpgain_new_${i}"`), `segment ${i}`);
     }

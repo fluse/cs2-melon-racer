@@ -18,8 +18,8 @@ const { GetCameraOffsetFor } = await import("../../src/melon_drive/camera/index.
 const { SetUserMenuOpen } = await import("../../src/melon_drive/hud/user-menu.js");
 await import("../../src/melon_drive/index.js"); // registers OnCustomHudClicked
 
-test("speedometer.xml has one segment per scale value for both axes", () => {
-    const layout = readFileSync(new URL("../../panorama/layout/custom_game/speedometer.xml", import.meta.url), "utf8");
+test("melon_racer.xml has one segment per scale value for both axes", () => {
+    const layout = readFileSync(new URL("../../panorama/layout/custom_game/melon_racer.xml", import.meta.url), "utf8");
     const count = ScaleSegmentCount(SCALE);
     for (const axis of ["distance", "height"]) {
         const indices = [...layout.matchAll(new RegExp(`id="camtune_${axis}_seg_(\\d+)"`, "g"))].map((m) => Number(m[1]));

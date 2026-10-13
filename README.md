@@ -72,8 +72,8 @@ melon_racer/
 │       ├── gamemode.js                         # AUTO-GENERATED — do not edit directly
 │       └── point_script.d.ts                   # cs_script API type declarations (for editor tooling)
 ├── panorama/
-│   ├── layout/custom_game/speedometer.xml      # HUD layout (speedometer, HUD, menus)
-│   └── styles/custom_game/speedometer.css      # HUD styling
+│   ├── layout/custom_game/melon_racer.xml      # HUD layout (speedometer, HUD, menus), generated from src/panorama/melon_racer/
+│   └── styles/custom_game/melon_racer.css      # HUD styling
 ├── postprocess/melon_racer.vpost               # post-processing volume (bloom/tonemapping)
 ├── soundevents/soundevents_addon.vsndevts      # sound event definitions
 ├── sounds/*.wav                                # ambience source audio
@@ -116,7 +116,7 @@ maps/scripts/melon_drive.js   (AUTO-GENERATED bundle, this is what Hammer loads)
 src/melon_drive/**/*.js        (source of truth — edit these)
         │  drives
         ▼
-panorama/.../speedometer.xml + .css   (custom_hud_layout — speedometer, menus, banners)
+panorama/.../melon_racer.xml + .css   (custom_hud_layout — speedometer, menus, banners)
 ```
 
 - **Hammer → script**: trigger volumes fire `RunScriptInput` with a specific parameter string. Track layout itself is config-free — a track's lap count and spawn point are parsed straight out of its start trigger's *name* (`start_<id>_laps<M>`) and transform, its checkpoint count from how many `checkpoint_<id>_<index>` triggers it has, and the finish line is its own input (`finish_<id>`) so a track doesn't have to be a loop. See [TRACK_CREATION.md](docs/TRACK_CREATION.md) for the exact entity/output wiring and the [Mapping API](docs/mapping-api/README.md) for the complete list of names and inputs.
@@ -131,7 +131,7 @@ Some common ways to build on this repo, and where to start:
 
 - **Add a new track** — pure Hammer work, no script changes. Follow [TRACK_CREATION.md](docs/TRACK_CREATION.md) step by step.
 - **Tune physics/feel** (acceleration, top speed, jump height, impact-damage sensitivity, camera offsets, timings) — every tunable lives in the `constants.js` of the folder it belongs to (`movement/driving/`, `movement/jump/`, `camera/`, …), all re-exported by `src/melon_drive/constants/index.js`. Change a value, rebuild, and hot-reload in tools mode to feel the difference immediately.
-- **Add HUD elements or menus** — edit `panorama/layout/custom_game/speedometer.xml` and the matching `speedometer.css`, then wire the new elements from `src/melon_drive/hud/`. Note CS2's custom HUD layouts only support `<Panel>`, `<Label>`, `<Image>`, and `<Button>` — no native sliders/inputs and no inline scripting.
+- **Add HUD elements or menus** — edit the layout's parts in `src/panorama/melon_racer/` (`npm run build` puts them together into `panorama/layout/custom_game/melon_racer.xml`) and the matching `melon_racer.css`, then wire the new elements from `src/melon_drive/hud/`. Note CS2's custom HUD layouts only support `<Panel>`, `<Label>`, `<Image>`, and `<Button>` — no native sliders/inputs and no inline scripting.
 - **Add gameplay mechanics** (boost pads, new trigger types, new melon behaviors) — follow the existing pattern: a Hammer trigger fires `RunScriptInput` on `melon_drive`, handled by a new feature folder (or an extended one) under the fitting domain in `src/melon_drive/` — `constants.js`, pure rules in `logic.js`, engine side, `inputs.js` for its script inputs — registered through that domain's `Register*Inputs()`.
 - **Add sound** — `soundevents/soundevents_addon.vsndevts` currently only contains Valve's stock example ambience events; there's no melon-specific audio yet (e.g. a break sound, engine/roll sound, countdown beep) — a good, self-contained first contribution.
 

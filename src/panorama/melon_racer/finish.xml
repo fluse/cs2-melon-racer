@@ -1,0 +1,10 @@
+<!-- Shown to a racer the moment they finish (see FinishKart), until
+     the next heat or the hub. -->
+<Image id="finish_image" class="FinishImage Hidden" src="file://{images}/custom_game/word-finish.png" />
+<!-- The place under it, "1ST  ·  +10 PTS" (Grand Prix points, see FinishKart). -->
+<Label id="finish_place" class="FinishPlace Hidden" text="{s:place}" />
+
+<!-- The finish window: once the heat's first racer finished, the seconds
+     the others have left (FINISH_GRACE_SECONDS, UpdateFinishGraceHud in
+     race/heat/race-flow.js) — for everyone in the heat or watching it. -->
+<Label id="finish_grace" class="FinishGrace Hidden" text="FINISH CLOSES IN {s:seconds}" />

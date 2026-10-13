@@ -89,4 +89,4 @@ onto it when you're working on them anyway:
 | 3D logo outline (`tools/models/make-logo-model.mjs`, `OUTLINE_COLOR`) | `#AAFF33` | Guide green |
 | Holo gate gradient (`tools/materials/make-holo.mjs`, `GRADIENT`) | `#39FF14` → `#AA28FF` | — |
 | Heal holo gradient (`tools/materials/make-holo.mjs`, `HEAL_GRADIENT`) | `#28FF6E` → `#6EFFD7` | Heal cyan |
-| HUD gold (`speedometer.css`, e.g. `.UserMenuButtonGold`) | `#FFD84D` | Checkpoint gold |
+| HUD gold (`melon_racer.css`, e.g. `.UserMenuButtonGold`) | `#FFD84D` | Checkpoint gold |

@@ -3,7 +3,7 @@ import { LevelUpText } from "../race/level/logic.js";
 import { LEVEL_UP_HUD_SECONDS, HUD_RESEND_SECONDS } from "../constants/index.js";
 
 /**
- * The level-up message (levelup_panel in speedometer.xml, top center): "LEVEL
+ * The level-up message (levelup_panel in melon_racer.xml, top center): "LEVEL
  * UP", the new level and the skins it unlocked (levelup_skins, hidden
  * without), for LEVEL_UP_HUD_SECONDS after GrantXp left one in
  * kart.levelUp. Not in the middle of a heat — a racer gets it once

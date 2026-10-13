@@ -1,0 +1,45 @@
+<root>
+	<styles>
+		<include src="file://{resources}/styles/custom_game/melon_racer.css" />
+	</styles>
+
+	<Panel class="Root">
+		<!-- Black fade along the bottom of the screen, behind everything else
+		     (first child): 20% at the bottom edge, fading out upward. -->
+		<Panel class="BottomFade" hittest="false" />
+
+		<module href="time-trial.xml" />
+
+		<module href="checkpoint-strip.xml" />
+
+		<module href="hub-modal.xml" />
+
+		<module href="countdown.xml" />
+
+		<module href="finish.xml" />
+
+		<module href="spectate.xml" />
+
+		<module href="key-hints.xml" />
+
+		<module href="dnf-warning.xml" />
+
+		<module href="grand-prix-call.xml" />
+
+		<module href="level-up.xml" />
+
+		<module href="xp-gain.xml" />
+
+		<module href="break-countdown.xml" />
+
+		<module href="bounce-panel.xml" />
+
+		<module href="speed-panel.xml" />
+
+		<module href="user-menu/user-menu.xml" />
+
+		<module href="scoreboard.xml" />
+
+		<module href="intro-logo.xml" />
+	</Panel>
+</root>

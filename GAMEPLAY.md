@@ -270,7 +270,7 @@ bounces are skipped.
   scrapes as plain physics.
 - HUD: the speed panel's km/h (bottom center) gets `Boosted` while above `MAX_SPEED` and a short
   `PerfectBounce` flash after a bounce with angle closeness ≥
-  `PERFECT_BOUNCE_ANGLE_FACTOR` (`speedometer.css`). Separately, a
+  `PERFECT_BOUNCE_ANGLE_FACTOR` (`melon_racer.css`). Separately, a
   `bounce_panel` in the bottom-right HUD corner (not centered: below the crosshair it would cover the track), shows for `BOUNCE_HUD_SECONDS` after
   each bounce: a rating word by angle closeness (`BOUNCE_RATINGS`:
   PERFECT/GOOD/BAD/MISS), the exact angle hit, a 0°–90° scale in 10°
@@ -475,9 +475,9 @@ run by `race/heat/`):
    (61.8% from the top); the next one falling in knocks it
    down out of the picture at the bottom; GO doesn't fall — it appears in
    the 1's place, small, and grows huge while fading out
-   (`countdown_panel` in `speedometer.xml`, one Label per number with an
+   (`countdown_panel` in `melon_racer.xml`, one Label per number with an
    `In`/`Out` class; rule `CountdownStep`/`CountdownNumberState` in
-   `race/heat/logic.js`, animations in `speedometer.css`). `COUNTDOWN_SECONDS`
+   `race/heat/logic.js`, animations in `melon_racer.css`). `COUNTDOWN_SECONDS`
    in `race/constants.js` controls the length — there are only numbers for
    3..1, so a longer countdown shows nothing until 3.
 4. **RACING** — normal driving, existing checkpoint/lap logic, plus a
@@ -643,7 +643,7 @@ and `camera/follow/follow.js` (`test/race/spectate-flow.test.mjs`).
 
 CS2's own scoreboard knows nothing of points or times, and a custom HUD
 can't replace it — so the custom one covers it: `#scoreboard` in
-`speedometer.xml` shows while the engine sets `HUD_SCOREBOARD_VISIBLE`
+`melon_racer.xml` shows while the engine sets `HUD_SCOREBOARD_VISIBLE`
 (Tab held), full screen on a near-opaque backdrop (pure CSS, the script
 can't tell whether Tab is held). What it shows, per viewer
 (`hud/scoreboard/logic.js`, `test/hud/scoreboard.test.mjs`):
@@ -719,8 +719,8 @@ included; the viewer's own row is outlined in gold and takes the last row
 if they're further down. The tab and track picked stay while the player is
 connected, and the menu reopens on the page it was closed on. Rebuilt every
 `LEADERBOARD_UPDATE_SECONDS` while the page is open; "Back" returns to the
-columns. A new stat needs its tab button (`lb_tab_<key>`) in
-`speedometer.xml`. Constants: `hud/leaderboards/constants.js`; rules:
+columns. A new stat's tab button (`lb_tab_<key>`, its `tab` text) is built
+from `STAT_SLIDES` into the HUD layout. Constants: `hud/leaderboards/constants.js`; rules:
 `hud/leaderboards/logic.js` (rows and ranks from `hud/scoreboard/logic.js`),
 applied by `hud/leaderboards/leaderboards.js` (`test/hud/leaderboards.test.mjs`).
 
@@ -783,9 +783,9 @@ name, level and skin name, the XP towards the next level ("Leveling"), and one t
 and values as the leaderboards) with their all-time rank on it ("#3",
 saved players included, ties shared; no rank while the total is 0).
 Rebuilt every `PROFILE_UPDATE_SECONDS` while the menu shows its columns.
-A new stat needs its tile (`usermenu_profile_stat_<key>`), a new skin its
-image (`usermenu_profile_skin_<key>`) and name (`MELON_SKIN_NAMES`) in
-`speedometer.xml`. Constants: `hud/profile/constants.js`; rules:
+A stat's tile (`usermenu_profile_stat_<key>`, its `label`) and a skin's image
+(`usermenu_profile_skin_<key>`) are built from `STAT_SLIDES` and
+`MELON_SKINS` into the HUD layout. Constants: `hud/profile/constants.js`; rules:
 `hud/profile/logic.js`, applied by `hud/profile/profile.js`
 (`test/hud/profile.test.mjs`).
 
@@ -804,7 +804,7 @@ this: the moderator gets it the same way anyone reaches the hub's "start"
 modal — by standing in `hub_start_trigger`. While a heat is running, a
 non-moderator standing there sees the "Grand Prix in progress…" message;
 the moderator sees a "Cancel Grand Prix" button instead
-(`hub_abort_button` in `speedometer.xml`, toggled via the `IsModerator` HUD
+(`hub_abort_button` in `melon_racer.xml`, toggled via the `IsModerator` HUD
 class). Clicking it runs the same `ReturnAllToHub` + reset-to-`HUB` path a
 heat normally takes when it finishes on its own, just triggered early
 instead of after the last track's `BREAK`.
@@ -1225,7 +1225,7 @@ corrected by a teleport right after `ForceSpawn`). Keep that drop short: a
 long fall lands hard enough for the engine to destroy the melon on impact.
 
 - Picking a team first shows the Melon Racer logo
-  (`logo_melon_racer.png`, `intro_logo` in `speedometer.xml`, full screen
+  (`logo_melon_racer.png`, `intro_logo` in `melon_racer.xml`, full screen
   over a solid dark green backdrop, nothing of the world showing through) for `INTRO_LOGO_SECONDS`, the player's own body
   already frozen and hidden behind it; only then does the melon spawn
   (`ShowIntroLogoThenSpawn` in `kart/spawn.js`). Reconnecting shows it again.
@@ -1318,9 +1318,9 @@ page in `MELON_SKINS` order, ◀ ▶ right-aligned next to the MELON title with
 the page indicator between them ("1 / 2"), wrapping around — shown only with
 more than one page. The menu opens on the page with the player's skin, or
 the one they paged to (kept while connected). Every page has all nine places
-(empty ones as placeholders), so the menu's height doesn't change; a new skin
-goes into the last page's panel in `speedometer.xml`, a new page's panel
-when that's full (`test/hud/skin-pages.test.mjs`). Saved per player name in the addon's save data like "Start in
+(empty ones as placeholders), so the menu's height doesn't change; the pages
+are built from `MELON_SKINS` and `MELON_SKIN_NAMES` into the HUD layout
+(`skinPages` in `src/panorama/melon_racer/locals.mjs`, `test/hud/skin-pages.test.mjs`). Saved per player name in the addon's save data like "Start in
 Tutorial" (`SAVE_DATA_PLAYER_SETTINGS_KEY`), so every later join gets it.
 A skin is a whole model (`MELON_SKINS`, `kart/constants.js`): the same
 mesh, collision and break pieces with another material, swapped by

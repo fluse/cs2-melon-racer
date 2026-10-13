@@ -678,12 +678,12 @@ const PERFECT_SPARK_TEMPLATE_NAME = "perfect_hit_particle_template";
 // Lower: cleaned up sooner; below the .vpcf's own duration the spark is
 //   cut off mid-play.
 const PERFECT_SPARK_LIFETIME = 2;
-// Bounce feedback panel (bounce_panel in speedometer.xml, see
+// Bounce feedback panel (bounce_panel in melon_racer.xml, see
 // UpdateBounceHud): shown for this long after each wall bounce.
 const BOUNCE_HUD_SECONDS = 1.5;
 // Angle scale: 0°..90° split into this many equal segments
 // ("bounce_angle_seg_0".."_{N-1}"), 10° each — the one containing 45° is
-// styled as the target in speedometer.css, the one actually hit gets "Hit".
+// styled as the target in melon_racer.css, the one actually hit gets "Hit".
 const BOUNCE_ANGLE_SEGMENTS = 9;
 // Jump-timing bar ("bounce_jump_seg_0".."_{N-1}"), filled by how well the
 // jump was timed (1 = same tick as the hit).
@@ -693,7 +693,7 @@ const BOUNCE_JUMP_SEGMENTS = 5;
 // last entry is the catch-all. speedMultiplier is what a bounce with that
 // rating does to the melon's speed (before jump timing). cssClass colors the panel; color is the same
 // accent for the in-world prediction line (see fx/prediction/prediction.js) — keep the two
-// in sync with speedometer.css's .Rating* rules.
+// in sync with melon_racer.css's .Rating* rules.
 // PERFECT counts within this many degrees either side of
 // WALL_BOUNCE_OPTIMAL_ANGLE (was 4.5°, then 6.5°).
 const PERFECT_BOUNCE_TOLERANCE = 8.5; // degrees
@@ -760,21 +760,21 @@ const ATTACK_BOOST_HEALTH_PER_SECOND = 20; // was 10
 // Lower (0): only while held — a push landing just after release gets through.
 const ATTACK_PUSH_GUARD_SECONDS = 0.3;
 
-// The speed panel (km/h, health bar, jump dots) in speedometer.xml.
+// The speed panel (km/h, health bar, jump dots) in melon_racer.xml.
 
 // Hammer units/sec -> km/h (1 unit = 1 inch: units/sec * 0.0254 * 3.6).
 const UNITS_TO_KMH = 0.0254 * 3.6;
 
 // Wall-jump charges as dots right of the speed panel, one per
-// WALL_JUMP_CHARGES (stacked bottom up, "jump_dot_<i>" in speedometer.xml):
+// WALL_JUMP_CHARGES (stacked bottom up, "jump_dot_<i>" in melon_racer.xml):
 // an outline, filled white only once that charge is ready. JumpDotFills
 // measures a refilling one in JUMP_DOT_FILL_STEPS steps; only the full step shows.
 const JUMP_DOT_FILL_STEPS = 8;
 
 // Melon health bar, in the speed panel under the km/h: filled left to right
 // in HEALTH_BAR_SEGMENTS steps up to kart.health / MELON_MAX_HEALTH — pieces
-// "health_seg_0" .. "health_seg_{N-1}" in speedometer.xml (add/remove
-// them there when changing the count). HEALTH_LOW/CRITICAL_FRACTION only feed HealthBarState's low/critical
+// "health_seg_0" .. "health_seg_{N-1}" in melon_racer.xml (built from this
+// count, src/panorama/melon_racer/speed-panel.xml). HEALTH_LOW/CRITICAL_FRACTION only feed HealthBarState's low/critical
 // flags — the bar itself stays white (no tint).
 const HEALTH_BAR_SEGMENTS = 30;
 const HEALTH_LOW_FRACTION = 0.6;
@@ -997,7 +997,7 @@ const HUB_TRIGGER_NAME = "hub_start_trigger";
 const GRAND_PRIX_GATHER_SECONDS = 10;
 
 const COUNTDOWN_SECONDS = 3;
-const GO_DISPLAY_SECONDS = 0.7; // how long "GO" stays on screen once the countdown ends — its grow-and-fade (speedometer.css) is done by .62s
+const GO_DISPLAY_SECONDS = 0.7; // how long "GO" stays on screen once the countdown ends — its grow-and-fade (melon_racer.css) is done by .62s
 const BREAK_SECONDS = 10; // fixed by the original request
 // Once the first racer of a heat finishes, the others have this long to
 // finish too (the finish window, counted down on everyone's HUD as
@@ -1155,14 +1155,16 @@ const STATS_SAVE_SECONDS = 30;
 
 // The stats, in the order the leaderboards and the profile show them: `key`
 // in the save data, `title` of the leaderboard, `column` the value column's header, `format` how the
-// value reads ("duration": seconds as 1h 05m / 4m 12s / 37s, "count").
+// value reads ("duration": seconds as 1h 05m / 4m 12s / 37s, "count"); `tab` its button on the
+// leaderboards page and `label` its tile in the profile — both built into the HUD layout
+// (src/panorama/melon_racer/), so a new stat needs nothing more there.
 const STAT_SLIDES = [
-    { key: "playTime", title: "LONGEST ON THE SERVER", column: "TIME", format: "duration" },
-    { key: "crashes", title: "MOST CRASHES", column: "CRASHES", format: "count" },
-    { key: "finishes", title: "MOST FINISHES", column: "FINISHES", format: "count" },
-    { key: "boostTime", title: "LONGEST BOOST TIME", column: "BOOST", format: "duration" },
-    { key: "perfectHits", title: "MOST PERFECT WALL HITS", column: "PERFECT", format: "count" },
-    { key: "trialRestarts", title: "MOST TRIAL RESTARTS", column: "RESTARTS", format: "count" },
+    { key: "playTime", title: "LONGEST ON THE SERVER", column: "TIME", format: "duration", tab: "Time on Server", label: "PLAY TIME" },
+    { key: "crashes", title: "MOST CRASHES", column: "CRASHES", format: "count", tab: "Most Crashes", label: "CRASHES" },
+    { key: "finishes", title: "MOST FINISHES", column: "FINISHES", format: "count", tab: "Most Finishes", label: "FINISHES" },
+    { key: "boostTime", title: "LONGEST BOOST TIME", column: "BOOST", format: "duration", tab: "Boost Time", label: "BOOST TIME" },
+    { key: "perfectHits", title: "MOST PERFECT WALL HITS", column: "PERFECT", format: "count", tab: "Most Perfect Hits", label: "PERFECT HITS" },
+    { key: "trialRestarts", title: "MOST TRIAL RESTARTS", column: "RESTARTS", format: "count", tab: "Most Trial Restarts", label: "RESTARTS" },
 ];
 
 // Leveling: XP for racing, a level from the XP, skins unlocked by level
@@ -1223,7 +1225,7 @@ const XP_REASON_PERFECT_WALL_JUMP = "PERFECT WALL JUMP";
 const XP_REASON_CHEAT = "CHEAT";
 // Reasons listed on the notifier at most; more add "+ MORE".
 const XP_GAIN_REASONS_SHOWN = 3;
-// Segments of the profile's XP bar (usermenu_profile_xp_<i> in speedometer.xml)
+// Segments of the profile's XP bar (usermenu_profile_xp_<i> in melon_racer.xml)
 // and of the XP notifier's (xpgain_old_<i>/xpgain_new_<i>).
 const XP_BAR_SEGMENTS = 20;
 
@@ -1277,9 +1279,9 @@ const TELEPORT_UP_OFFSET = 40;
 
 const MELON_TEMPLATE_NAME = "melon_template";
 
-// How long the Melon Racer logo (intro_logo in speedometer.xml) shows after
+// How long the Melon Racer logo (intro_logo in melon_racer.xml) shows after
 // a player picks a team, before their melon spawns at the intro. Its
-// animation (.IntroLogoImage in speedometer.css) has the logo out of the
+// animation (.IntroLogoImage in melon_racer.css) has the logo out of the
 // picture after 2.85s — keep this a little longer than that, and shorter
 // than the animation itself (5s).
 const INTRO_LOGO_SECONDS = 3.2;
@@ -1328,7 +1330,8 @@ const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
 // switch material groups, only SetModel. Each one has to be used somewhere
 // in the .vmap too (the default by melon_template, the others e.g. by a
 // prop in the hub), or the map doesn't ship it (test/map/map-skins.test.mjs).
-// The key is the button's: usermenu_skin_<key> in speedometer.xml, in this
+// The key is the button's: usermenu_skin_<key> in melon_racer.xml (built
+// from this list, src/panorama/melon_racer/user-menu/column-settings.xml), in this
 // order (pages of MELON_SKINS_PER_PAGE) — sorted by MELON_SKIN_LEVELS, the
 // free ones first (test/race/level.test.mjs).
 /** @type {Record<string, string>} */
@@ -1346,7 +1349,7 @@ const MELON_SKINS = {
 };
 const MELON_SKIN_DEFAULT = "default";
 // Every skin's name as the user menu shows it: under its button in the skin
-// grid (static text in speedometer.xml) and in the profile (hud/profile/) —
+// grid (built into melon_racer.xml) and in the profile (hud/profile/) —
 // test/hud/profile.test.mjs checks the two agree.
 /** @type {Record<string, string>} */
 const MELON_SKIN_NAMES = {
@@ -1379,7 +1382,7 @@ const MELON_SKIN_LEVELS = {
 };
 // Skins per page of the user menu's skin grid (3 x 3): with more, ◀ ▶ next to
 // the MELON title page through them, in MELON_SKINS order. One panel per page
-// in speedometer.xml, usermenu_skinpage_<page> (test/hud/skin-pages.test.mjs).
+// in melon_racer.xml, usermenu_skinpage_<page>, built from MELON_SKINS (test/hud/skin-pages.test.mjs).
 const MELON_SKINS_PER_PAGE = 9;
 
 // The frozen pawn (CSMoveType.NOCLIP: non-solid, but WASD still flies it)
@@ -1604,7 +1607,7 @@ const SIDE_VIEW_CAMERA_HEIGHT_SMOOTH_SECONDS = 0.15;
 // rules keeps its tunables in its folder (speedometer/, track/, scoreboard/).
 
 // Name of the custom_hud_layout entity (place one in Hammer pointing at
-// panorama/layout/custom_game/speedometer.vxml) that shows the whole HUD.
+// panorama/layout/custom_game/melon_racer.vxml) that shows the whole HUD.
 const SPEED_HUD_ENTITY_NAME = "speed_hud";
 
 // Panels that send a class or text only when it changes send their whole
@@ -1613,12 +1616,12 @@ const SPEED_HUD_ENTITY_NAME = "speed_hud";
 // changing, never sent again.
 const HUD_RESEND_SECONDS = 1;
 
-// The track HUD: time trial panel and checkpoint strip in speedometer.xml.
+// The track HUD: time trial panel and checkpoint strip in melon_racer.xml.
 
 // Checkpoint strip at the top of the screen (start flag -> numbered
 // checkpoints -> finish flag) — see CHECKPOINT_HUD_SLOTS panel ids
 // ("cp_slot_0" .. "cp_slot_{N-1}", each with a "cp_link_<i>" line before
-// it) in speedometer.xml. A track with more checkpoints shows a window of
+// it) in melon_racer.xml, built from this count. A track with more checkpoints shows a window of
 // this many that moves along with the kart (see hud/track/logic.js).
 const CHECKPOINT_HUD_SLOTS = 12;
 
@@ -1626,7 +1629,7 @@ const CHECKPOINT_HUD_SLOTS = 12;
 // hud/scoreboard/scoreboard.js).
 
 // This many player rows, "score_row_0" .. "score_row_{N-1}" in
-// speedometer.xml (add/remove them there when changing the count). With
+// melon_racer.xml (built from this count, src/panorama/melon_racer/scoreboard.xml). With
 // more players the viewer's own row takes the last one.
 const SCOREBOARD_ROWS = 12;
 // How often each player's scoreboard is rebuilt (seconds) — it's filled in
@@ -1639,10 +1642,10 @@ const SCOREBOARD_UPDATE_SECONDS = 0.25;
 
 // The tab with the best times on one track (◀ ▶ page through the tracks);
 // every other tab is a STAT_SLIDES key. Buttons "lb_tab_<tab>" in
-// speedometer.xml — add one there when adding a stat
+// melon_racer.xml, built from STAT_SLIDES (src/panorama/melon_racer/user-menu/page-leaderboards.xml)
 // (test/hud/leaderboards.test.mjs checks every tab has its button).
 const LEADERBOARD_TIMES_TAB = "times";
-// Player rows, "lb_row_0" .. "lb_row_{N-1}" in speedometer.xml, one under
+// Player rows, "lb_row_0" .. "lb_row_{N-1}" in melon_racer.xml, one under
 // the other; with more players the viewer's own row takes the last one.
 const LEADERBOARD_ROWS = 20;
 // How often the open page is rebuilt (seconds): time on the server grows
@@ -1661,7 +1664,7 @@ const PROFILE_UPDATE_SECONDS = 0.5;
 // each with its route's icon from tools/images/make-route-icons.mjs.
 
 // This many rows in its racer list, "hub_racer_0" .. "hub_racer_{N-1}" in
-// speedometer.xml (add/remove them there when changing the count). With
+// melon_racer.xml (built from this count, src/panorama/melon_racer/hub-modal.xml). With
 // more players in the start area the viewer's own row takes the last one,
 // and "+N MORE" counts the rest.
 const HUB_RACER_ROWS = 8;
@@ -1770,7 +1773,7 @@ const CAMERA_TUNING_STEP = 10;
 const CAMERA_TUNING_FINE_STEP = 1;
 // The clickable scale between them: one segment every this many units,
 // CAMERA_TUNING_MIN..CAMERA_TUNING_MAX — 41 segments (camtune_<axis>_seg_<i>
-// in speedometer.xml).
+// in melon_racer.xml).
 const CAMERA_TUNING_SCALE_STEP = 10;
 
 // Physics tuning (dev/physics-tuning.js, its scale PHYSICS_TUNING_SCALE in
@@ -1785,7 +1788,7 @@ const PHYSICS_TUNING_STEP = 10;
 const PHYSICS_TUNING_FINE_STEP = 1;
 // The clickable scale: one segment every this many percent,
 // PHYSICS_TUNING_MIN..PHYSICS_TUNING_MAX — 31 segments
-// (phytune_<key>_seg_<i> in speedometer.xml).
+// (phytune_<key>_seg_<i> in melon_racer.xml).
 const PHYSICS_TUNING_SCALE_STEP = 10;
 
 // Movers: a func_movelinear whose name starts with "mover" goes back and
@@ -3683,7 +3686,7 @@ function GetJoinSpawnPoint(pawn) {
     return GetHubSpawnPoint() ?? GetIntroSpawnPoint();
 }
 
-// The one custom_hud_layout entity every HUD panel lives in (speedometer.xml),
+// The one custom_hud_layout entity every HUD panel lives in (melon_racer.xml),
 // plus the per-player input capture the modals share.
 
 /** @type {any} */
@@ -7660,7 +7663,7 @@ function UpdateHealthHud(slot, kart) {
 }
 
 /**
- * Wall-bounce feedback panel (bounce_panel in speedometer.xml), shown for
+ * Wall-bounce feedback panel (bounce_panel in melon_racer.xml), shown for
  * BOUNCE_HUD_SECONDS after each bounce: a rating word, the exact angle hit,
  * an angle scale with the hit's segment marked against the 45° target, and
  * how well the jump was timed. Reads kart.lastBounceInfo live, so a jump just
@@ -7700,7 +7703,7 @@ function UpdateBounceHud(slot, kart) {
 }
 
 /**
- * The level-up message (levelup_panel in speedometer.xml, top center): "LEVEL
+ * The level-up message (levelup_panel in melon_racer.xml, top center): "LEVEL
  * UP", the new level and the skins it unlocked (levelup_skins, hidden
  * without), for LEVEL_UP_HUD_SECONDS after GrantXp left one in
  * kart.levelUp. Not in the middle of a heat — a racer gets it once
@@ -7737,7 +7740,7 @@ function UpdateLevelUpHud(slot, kart, now) {
 }
 
 /**
- * The XP notifier (xpgain_panel in speedometer.xml, top right): for
+ * The XP notifier (xpgain_panel in melon_racer.xml, top right): for
  * XP_GAIN_HUD_SECONDS after XP were earned (kart.xpGain, see ShowXpGain) the
  * XP gained ("+40 XP") and why ("TIME TRIAL FINISH · NEW BEST TIME"), the
  * level and the XP into it, and the bar — the fill from before green
@@ -9025,9 +9028,9 @@ let phaseEndTime = 0;
  * heat's first finisher; undefined before that. */
 let graceEndTime = undefined;
 
-/** The countdown's numbers in countdown_panel (speedometer.xml), in order —
+/** The countdown's numbers in countdown_panel (melon_racer.xml), in order —
  * index = CountdownStep. Each gets "In" or "Out" (CountdownNumberState),
- * which plays its fall in / knock out animation (speedometer.css).
+ * which plays its fall in / knock out animation (melon_racer.css).
  */
 const COUNTDOWN_NUMBER_IDS = ["count_3", "count_2", "count_1", "count_go"];
 
@@ -9343,7 +9346,7 @@ function BeginHeat(trackId) {
 }
 
 /**
- * Shows or hides the big "FINISH" image (finish_image in speedometer.xml)
+ * Shows or hides the big "FINISH" image (finish_image in melon_racer.xml)
  * and the place under it ("1ST · +10 PTS", finish_place — set by FinishKart)
  * for one player. @param {number | undefined} slot @param {boolean} visible
  */
@@ -9886,7 +9889,7 @@ function UpdateRacePhase(now) {
 }
 
 /**
- * The scoreboard (#scoreboard in speedometer.xml), in place of CS2's own:
+ * The scoreboard (#scoreboard in melon_racer.xml), in place of CS2's own:
  * the CSS shows it while the engine's HUD_SCOREBOARD_VISIBLE class is set
  * (Tab held), covering the default one. This only fills it in — the Grand
  * Prix standings or a track's best times (hud/scoreboard/logic.js), a row
@@ -10220,7 +10223,7 @@ function HandleCameraTuningClick(slot, kart, buttonId) {
 /** @typedef {import("./physics-tuning-logic.js").PhysicsTuningKey} PhysicsTuningKey */
 
 /**
- * Per row: its id part in speedometer.xml (phytune_<id>_…), and the
+ * Per row: its id part in melon_racer.xml (phytune_<id>_…), and the
  * constant it scales with its default — shown next to the percent.
  * @type {Record<PhysicsTuningKey, { id: string, constant: string, base: number, unit: string }>}
  */
@@ -11066,7 +11069,7 @@ const PAGE = "usermenu_leaderboards_page";
 
 /**
  * The user menu's leaderboards page (usermenu_leaderboards_page in
- * speedometer.xml, opened from ACTIONS): one leaderboard at a time, picked
+ * melon_racer.xml, opened from ACTIONS): one leaderboard at a time, picked
  * by its button ("lb_tab_<tab>", the current one Selected) — the best times on
  * one track (◀ ▶ page through the tracks, shown with Paging) or a player
  * stat. Up to LEADERBOARD_ROWS players ("lb_row_<i>", one column), the
@@ -11235,7 +11238,7 @@ function BuildProfile({ self, players, skin, xp, statTotals }) {
 const PANEL = "usermenu_profile";
 
 /**
- * The user menu's profile (usermenu_profile in speedometer.xml, top of the
+ * The user menu's profile (usermenu_profile in melon_racer.xml, top of the
  * right column): the player's own melon big — one image per skin,
  * "usermenu_profile_skin_<key>", all but theirs Hidden —, their name and
  * skin name, their level and XP with a bar ("usermenu_profile_xp_<i>", the
@@ -11324,7 +11327,7 @@ function RefreshProfileHud(slot, kart) {
 
 /**
  * The ON/OFF settings: per button, the dialog variable its pill shows and
- * whether it's on for a kart. One row each in speedometer.xml; clicking one
+ * whether it's on for a kart. One row each in melon_racer.xml; clicking one
  * is in hud/inputs.js (USER_MENU_TOGGLE_CLICKS).
  * @type {Record<string, { variable: string, isOn: (kart: import("../core/kart-registry.js").Kart) => boolean }>}
  */
@@ -11341,7 +11344,7 @@ const USER_MENU_TOGGLES = {
 
 /**
  * The pages the menu can show in place of its columns — the leaderboards
- * (ACTIONS) and the developer pages: per page, its panel in speedometer.xml
+ * (ACTIONS) and the developer pages: per page, its panel in melon_racer.xml
  * and what to refresh when it opens.
  * @typedef {"leaderboards" | "camera" | "physics" | "triggers"} UserMenuPage
  * @type {Record<UserMenuPage, { panel: string, refresh?: (slot: number, kart: import("../core/kart-registry.js").Kart) => void }>}
@@ -11825,7 +11828,7 @@ const PREFIX_BUTTONS = [
 
 /**
  * Whether a button id has a handler here (exactly, or by prefix) — every
- * button in speedometer.xml must (test/hud/hud-layout.test.mjs).
+ * button in melon_racer.xml must (test/hud/hud-layout.test.mjs).
  * @param {string} buttonId
  */
 function IsHandledButton(buttonId) {
@@ -11884,7 +11887,7 @@ function RegisterHudInputs() {
     });
 }
 
-// The custom HUD (panorama/layout/custom_game/speedometer.xml). A panel
+// The custom HUD (panorama/layout/custom_game/melon_racer.xml). A panel
 // with its own rules has its own folder — speedometer/ (speed, jump and
 // health bars), track/ (time trial clock + checkpoint strip), scoreboard/
 // (Tab: Grand Prix points, best times), leaderboards/ (the user menu's

@@ -50,7 +50,7 @@ Warum das funktioniert:
 | `FindEntityByName`, `ConnectOutput`, `EntFireAtName`/`EntFireAtTarget` | Entity-Registry (Name → Objekt) und ein kleiner I/O-Bus |
 | `CSPlayerPawn.IsInputPressed`, Blickwinkel, `SetEyeAngles` | Tastatur und Pointer Lock, auf `CSInputs`-Bitflags abgebildet |
 | `CustomPlayerCamera` (`FOLLOW_POSITION`, `CONTROLLED`) | eigener Kamera-Controller |
-| `custom_hud_layout` (`SetHasClass`, Dialog-Variablen, Klicks, Input Capture) | HTML/CSS-Overlay; `speedometer.xml`/`.css` lassen sich größtenteils übernehmen |
+| `custom_hud_layout` (`SetHasClass`, Dialog-Variablen, Klicks, Input Capture) | HTML/CSS-Overlay; `melon_racer.xml`/`.css` lassen sich größtenteils übernehmen |
 | `SetSaveData`/`GetSaveData` | `localStorage` |
 | `DebugLine`/`DebugSphere`/`DebugScreenText` | `THREE.Line`, Helper, DOM-Text |
 | `PointTemplate.ForceSpawn` (Partikel, Bruchstücke, Melone) | Factory-Funktionen |
@@ -125,7 +125,7 @@ Ein Befehl nach jedem Hammer-Compile:
   verhält sich anders als Source 2, also müssen die Schwellwerte
   (`IMPACT_DAMAGE_THRESHOLD`, `FREE_FALL_FRACTION`, `WALL_CONTACT_*`, …) neu
   eingestellt werden. Masse, Reibung und Restitution der Melone ebenso.
-- **HUD:** `speedometer.xml`/`.css` als DOM nachbauen. Panorama-CSS ist nah an
+- **HUD:** `melon_racer.xml`/`.css` als DOM nachbauen. Panorama-CSS ist nah an
   Web-CSS; Klassen-Toggles und Animationen funktionieren fast genauso.
 - **Partikel:** `.vpcf` ist nicht übertragbar. Boost-Trail, PERFECT-Funke,
   Heal-Kreuze, Bruch und die Zonen-Effekte neu bauen, z. B. mit

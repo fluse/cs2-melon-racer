@@ -1,4 +1,4 @@
-// The one custom_hud_layout entity every HUD panel lives in (speedometer.xml),
+// The one custom_hud_layout entity every HUD panel lives in (melon_racer.xml),
 // plus the per-player input capture the modals share.
 import { Instance } from "cs_script/point_script";
 import { Debug } from "../core/debug.js";

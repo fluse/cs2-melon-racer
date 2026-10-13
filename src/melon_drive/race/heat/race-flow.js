@@ -49,9 +49,9 @@ export let phaseEndTime = 0;
  * heat's first finisher; undefined before that. */
 export let graceEndTime = undefined;
 
-/** The countdown's numbers in countdown_panel (speedometer.xml), in order —
+/** The countdown's numbers in countdown_panel (melon_racer.xml), in order —
  * index = CountdownStep. Each gets "In" or "Out" (CountdownNumberState),
- * which plays its fall in / knock out animation (speedometer.css).
+ * which plays its fall in / knock out animation (melon_racer.css).
  */
 const COUNTDOWN_NUMBER_IDS = ["count_3", "count_2", "count_1", "count_go"];
 
@@ -367,7 +367,7 @@ export function BeginHeat(trackId) {
 }
 
 /**
- * Shows or hides the big "FINISH" image (finish_image in speedometer.xml)
+ * Shows or hides the big "FINISH" image (finish_image in melon_racer.xml)
  * and the place under it ("1ST · +10 PTS", finish_place — set by FinishKart)
  * for one player. @param {number | undefined} slot @param {boolean} visible
  */

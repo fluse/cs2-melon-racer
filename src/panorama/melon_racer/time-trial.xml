@@ -1,0 +1,10 @@
+<!-- Time trial, top left: the run clock, the player's best on this track,
+     and after the finish the result (see time-trial.js). -->
+<Panel id="run_panel" class="RunPanel Hidden">
+	<Label id="run_time" class="RunTime" text="{s:time}" />
+	<Panel class="RunBestRow">
+		<Label class="RunBestUnit" text="BEST" />
+		<Label id="run_best" class="RunBest" text="{s:best}" />
+	</Panel>
+	<Label id="run_result" class="RunResult Hidden" text="{s:result}" />
+</Panel>

@@ -1,0 +1,6 @@
+<!-- Spectating (race/spectate/): whose melon the camera follows — the
+     keys (switch, R back to the own melon) are in .KeyHints, bottom left. -->
+<Panel id="spectate_panel" class="SpectatePanel Hidden">
+	<Label class="SpectateTitle" text="SPECTATING" />
+	<Label class="SpectateName" text="{s:name}" />
+</Panel>

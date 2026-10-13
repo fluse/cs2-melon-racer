@@ -1,0 +1,8 @@
+<!-- Level up (race/level/, UpdateLevelUpHud in hud/level-up-panel.js), top center
+     for LEVEL_UP_HUD_SECONDS — not mid-heat: a racer sees it once they've finished.
+     The skins it unlocked below (levelup_skins, hidden without). -->
+<Panel id="levelup_panel" class="LevelUpPanel Hidden">
+	<Label class="LevelUpTitle" text="LEVEL UP" />
+	<Label class="LevelUpLevel" text="{s:levelup_level}" />
+	<Label id="levelup_skins" class="LevelUpSkins Hidden" text="{s:levelup_skins}" />
+</Panel>

@@ -34,7 +34,7 @@ test("skins: every skin model weighs the same fixed mass as CS2's melon", () => 
 });
 
 test("skins: the user menu has one button per skin, and no others", () => {
-    const xml = readFileSync(addon("panorama/layout/custom_game/speedometer.xml"), "utf8");
+    const xml = readFileSync(addon("panorama/layout/custom_game/melon_racer.xml"), "utf8");
     const buttons = [...xml.matchAll(/id="usermenu_skin_([a-z0-9_]+)"/g)].map((m) => m[1]);
     assert.deepEqual(buttons.sort(), Object.keys(MELON_SKINS).sort());
 });

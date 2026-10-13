@@ -1,0 +1,12 @@
+<!-- Developer camera page (dev/camera-tuning.js): your own chase camera's
+     distance and height, CAMERA_TUNING_MIN..MAX, each with − / + (big and fine) and a
+     clickable scale (one segment per CAMERA_TUNING_SCALE_STEP, lit up to
+     the value — "On"). Values are logged to the console. -->
+<module href="../../components/tuning-page.xml" page="camera" prefix="camtune" reset="true"
+	title="CAMERA SETTINGS"
+	intro="Your own chase camera only, until you leave or the map restarts. Each change is logged to the console.">
+	<module href="../../components/tuning-row.xml" key="camtune_distance" steps="camtune" segments="{{ cameraSegments }}"
+		name="DISTANCE" help="◀ closer   ·   further ▶   (default {s:camtune_distance_default})" />
+	<module href="../../components/tuning-row.xml" key="camtune_height" steps="camtune" segments="{{ cameraSegments }}"
+		name="HEIGHT" help="◀ lower   ·   higher ▶   (default {s:camtune_height_default})" />
+</module>

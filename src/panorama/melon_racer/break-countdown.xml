@@ -1,0 +1,9 @@
+<!-- Countdown between heats (BREAK_SECONDS … 0, see SetBreakCountdown in
+     race-flow.js), under the finish image and just like the start
+     countdown (same spot, look and animations): each number falls in
+     and knocks the one before it out. Two Labels taking turns, the
+     number in their dialog variable — see BreakCountdownLabels. -->
+<Panel id="break_countdown" class="CountdownPanel Hidden" hittest="false">
+	<Label id="break_num_0" class="CountdownNumber" text="{s:n}" />
+	<Label id="break_num_1" class="CountdownNumber" text="{s:n}" />
+</Panel>

@@ -1,4 +1,4 @@
-// The custom HUD (panorama/layout/custom_game/speedometer.xml). A panel
+// The custom HUD (panorama/layout/custom_game/melon_racer.xml). A panel
 // with its own rules has its own folder — speedometer/ (speed, jump and
 // health bars), track/ (time trial clock + checkpoint strip), scoreboard/
 // (Tab: Grand Prix points, best times), leaderboards/ (the user menu's

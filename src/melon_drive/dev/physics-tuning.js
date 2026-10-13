@@ -19,7 +19,7 @@ import { MAX_SPEED, FORWARD_ACCEL, JUMP_SPEED, ATTACK_BOOST_ACCEL, GRAVITY } fro
 /** @typedef {import("./physics-tuning-logic.js").PhysicsTuningKey} PhysicsTuningKey */
 
 /**
- * Per row: its id part in speedometer.xml (phytune_<id>_…), and the
+ * Per row: its id part in melon_racer.xml (phytune_<id>_…), and the
  * constant it scales with its default — shown next to the percent.
  * @type {Record<PhysicsTuningKey, { id: string, constant: string, base: number, unit: string }>}
  */

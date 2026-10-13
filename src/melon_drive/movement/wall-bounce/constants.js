@@ -81,12 +81,12 @@ export const PERFECT_SPARK_TEMPLATE_NAME = "perfect_hit_particle_template";
 // Lower: cleaned up sooner; below the .vpcf's own duration the spark is
 //   cut off mid-play.
 export const PERFECT_SPARK_LIFETIME = 2;
-// Bounce feedback panel (bounce_panel in speedometer.xml, see
+// Bounce feedback panel (bounce_panel in melon_racer.xml, see
 // UpdateBounceHud): shown for this long after each wall bounce.
 export const BOUNCE_HUD_SECONDS = 1.5;
 // Angle scale: 0°..90° split into this many equal segments
 // ("bounce_angle_seg_0".."_{N-1}"), 10° each — the one containing 45° is
-// styled as the target in speedometer.css, the one actually hit gets "Hit".
+// styled as the target in melon_racer.css, the one actually hit gets "Hit".
 export const BOUNCE_ANGLE_SEGMENTS = 9;
 // Jump-timing bar ("bounce_jump_seg_0".."_{N-1}"), filled by how well the
 // jump was timed (1 = same tick as the hit).
@@ -96,7 +96,7 @@ export const BOUNCE_JUMP_SEGMENTS = 5;
 // last entry is the catch-all. speedMultiplier is what a bounce with that
 // rating does to the melon's speed (before jump timing). cssClass colors the panel; color is the same
 // accent for the in-world prediction line (see fx/prediction/prediction.js) — keep the two
-// in sync with speedometer.css's .Rating* rules.
+// in sync with melon_racer.css's .Rating* rules.
 // PERFECT counts within this many degrees either side of
 // WALL_BOUNCE_OPTIMAL_ANGLE (was 4.5°, then 6.5°).
 export const PERFECT_BOUNCE_TOLERANCE = 8.5; // degrees
