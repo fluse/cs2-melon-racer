@@ -1,0 +1,115 @@
+.TuningRow {
+    width: 100%;
+    margin-top: 22px;
+    flow-children: down;
+}
+
+/* The physics page's five rows: closer together and lower, so the card
+   stays on screen. */
+.TuningRow.TuningRowCompact {
+    margin-top: 12px;
+}
+
+.TuningRowCompact .TuningValue {
+    font-size: 22px;
+}
+
+.TuningRowCompact .TuningStep,
+.TuningRowCompact .TuningSegments {
+    height: 34px;
+}
+
+/* Name left, a hint next to it, the current value big on the right. */
+.TuningHeader {
+    width: 100%;
+    flow-children: right;
+}
+
+.TuningName {
+    vertical-align: bottom;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $white;
+}
+
+.TuningHelp {
+    vertical-align: bottom;
+    margin-left: 18px;
+    font-size: 12px;
+    color: $(white)77;
+}
+
+.TuningValue {
+    width: fill-parent-flow( 1.0 );
+    vertical-align: bottom;
+    text-align: right;
+    font-size: 30px;
+    font-weight: bold;
+    color: $lime;
+}
+
+/* −10 −1 | scale (41 segments, lit up to the value) | +1 +10 */
+.TuningControls {
+    width: 100%;
+    margin-top: 8px;
+    flow-children: right;
+}
+
+.TuningStep {
+    width: 62px;
+    margin: 0px 2px;
+    height: 46px;
+    border-radius: 0px;
+    border: 1px solid $(white)22;
+    background-color: $(white)0a;
+
+    &:hover {
+        background-color: $(white)1f;
+    }
+}
+
+/* The fine steps (±1) between the big ones and the scale: narrower, dimmer. */
+.TuningStep.TuningFine {
+    width: 50px;
+    background-color: $(white)05;
+}
+
+.TuningStepLabel {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    color: $white;
+}
+
+.TuningScale {
+    width: fill-parent-flow( 1.0 );
+    margin: 0px 10px;
+    flow-children: down;
+}
+
+.TuningSegments {
+    width: 100%;
+    height: 46px;
+    flow-children: right;
+}
+
+/* No transitions on the toggled "On" (see the HUD notes in AGENTS.md). */
+.TuningSegment {
+    width: fill-parent-flow( 1.0 );
+    height: 100%;
+    margin: 0px 1px;
+    min-width: 4px;
+    border-radius: 0px;
+    border: 1px solid $(white)14;
+    background-color: $(white)08;
+
+    &:hover {
+        border: 1px solid $(lime)88;
+    }
+
+    &.On {
+        background-color: $(green)cc;
+    }
+}

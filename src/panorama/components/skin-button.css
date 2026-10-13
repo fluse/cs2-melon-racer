@@ -1,0 +1,91 @@
+.SkinButton {
+    width: fill-parent-flow(1.0);
+    height: 76px;
+    margin-left: 6px;
+    border-radius: 0px;
+    border: 2px solid $(white)14;
+    background-color: $(white)0a;
+    flow-children: down;
+
+    &:first-child {
+        margin-left: 0px;
+    }
+
+    &:hover {
+        background-color: $(white)17;
+    }
+
+    &.SkinSelected {
+        border: 2px solid $lime;
+        background-color: $(lime)1f;
+    }
+}
+
+/* A skin still locked by level (SkinLocked, UpdateSkinHud): the preview
+   dimmed under a padlock, the level it needs ("LV 12") in place of its name. */
+.SkinLock {
+    horizontal-align: center;
+    margin-top: 3px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: $gold;
+    visibility: collapse;
+}
+
+.SkinButton.SkinLocked {
+    background-color: $(black)40;
+
+    &:hover {
+        background-color: $(black)40;
+    }
+}
+
+.SkinButton.SkinLocked .SkinPreview {
+    opacity: 0.25;
+}
+
+.SkinButton.SkinLocked .SkinLockIcon,
+.SkinButton.SkinLocked .SkinLock {
+    visibility: visible;
+}
+
+.SkinButton.SkinLocked .SkinName {
+    visibility: collapse;
+}
+
+/* A placeholder in a row with fewer than three skins: takes the space, shows nothing. */
+.SkinSlotEmpty {
+    border: 0px solid transparent;
+    background-color: transparent;
+}
+
+/* The preview with the padlock laid over it (only shown while locked). */
+.SkinPreviewFrame {
+    width: 44px;
+    height: 44px;
+    horizontal-align: center;
+    margin-top: 5px;
+}
+
+.SkinPreview {
+    width: 44px;
+    height: 44px;
+}
+
+.SkinLockIcon {
+    width: 22px;
+    height: 22px;
+    horizontal-align: center;
+    vertical-align: center;
+    visibility: collapse;
+}
+
+.SkinName {
+    horizontal-align: center;
+    margin-top: 3px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: $white;
+}

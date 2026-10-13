@@ -1,0 +1,155 @@
+/* PROFILE, top of the right column (hud/profile/): your melon big next to
+   your name and skin, then one tile per stat, two per row. The title below
+   it (DEVELOPER) gets a gap like a new column section. */
+.UserMenuColumnTitleLower {
+    margin-top: 22px;
+}
+
+.UserMenuProfile {
+    width: 100%;
+    flow-children: down;
+}
+
+.ProfileHero {
+    width: 100%;
+    flow-children: right;
+    margin-top: 10px;
+    margin-bottom: 4px;
+}
+
+/* Framed like the picked skin in the grid. The skin images (96x96, shown
+   at their own size) lie on top of each other; all but yours Hidden. */
+.ProfileMelon {
+    width: 112px;
+    height: 112px;
+    border: 2px solid $lime;
+    background-color: $(lime)1f;
+}
+
+.ProfileMelonImage {
+    width: 96px;
+    height: 96px;
+    horizontal-align: center;
+    vertical-align: center;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.ProfileIdentity {
+    width: fill-parent-flow( 1.0 );
+    vertical-align: center;
+    margin-left: 16px;
+    flow-children: down;
+}
+
+.ProfileName {
+    width: 100%;
+    font-size: 22px;
+    font-weight: bold;
+    color: $white;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* "LV 7" in a gold badge, the skin's name next to it. */
+.ProfileLevelRow {
+    flow-children: right;
+    margin-top: 4px;
+}
+
+.ProfileLevel {
+    vertical-align: center;
+    padding: 2px 6px 1px 7px;
+    background-color: $gold;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: $panel;
+}
+
+/* XP towards the next level: segments, transparent until On (the HUD
+   notes in AGENTS.md: hiding white pieces by a class leaves them faint). */
+.ProfileXpBar {
+    width: 100%;
+    height: 8px;
+    margin-top: 10px;
+    flow-children: right;
+    background-color: $(white)14;
+}
+
+.ProfileXpSegment {
+    width: fill-parent-flow( 1.0 );
+    height: 100%;
+    background-color: $(black)00;
+
+    &.On {
+        background-color: $lime;
+    }
+}
+
+.ProfileXp {
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: $(mint)aa;
+}
+
+.ProfileSkin {
+    vertical-align: center;
+    margin-left: 10px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $gold;
+}
+
+.ProfileStatRow {
+    width: 100%;
+    flow-children: right;
+    margin-top: 6px;
+}
+
+/* Label small on top; value left, rank (gold, "#3") right below it. */
+.ProfileStat {
+    width: fill-parent-flow( 1.0 );
+    height: 46px;
+    margin-left: 6px;
+    padding: 5px 10px 0px 10px;
+    flow-children: down;
+    border: 1px solid $(white)14;
+    background-color: $(white)0a;
+
+    &:first-child {
+        margin-left: 0px;
+    }
+}
+
+.ProfileStatLabel {
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: $(mint)aa;
+}
+
+.ProfileStatLine {
+    width: 100%;
+    margin-top: 2px;
+}
+
+.ProfileStatValue {
+    horizontal-align: left;
+    font-size: 17px;
+    font-weight: bold;
+    color: $white;
+}
+
+.ProfileStatRank {
+    horizontal-align: right;
+    vertical-align: center;
+    font-size: 12px;
+    font-weight: bold;
+    color: $gold;
+}

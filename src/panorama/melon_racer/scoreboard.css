@@ -1,0 +1,158 @@
+/* Scoreboard in place of CS2's own (#scoreboard, hud/scoreboard.js): only
+   while the engine sets HUD_SCOREBOARD_VISIBLE on an ancestor (Tab held).
+   Full screen and near-opaque so the default scoreboard under it doesn't
+   show through. No transition: the engine class flips instantly with Tab. */
+.Scoreboard {
+    width: 100%;
+    height: 100%;
+    background-color: #050805f2;
+    visibility: collapse;
+}
+
+.HUD_SCOREBOARD_VISIBLE .Scoreboard {
+    visibility: visible;
+}
+
+.ScoreboardFrame {
+    width: 820px;
+    horizontal-align: center;
+    vertical-align: center;
+}
+
+/* Like .UserMenuCard: the card's top edge runs through the logo banner's
+   middle (148px down), the logo is drawn after it, on top. */
+.ScoreboardCard {
+    width: 100%;
+    margin-top: 148px;
+    flow-children: down;
+
+    padding: 50px 32px 26px 32px;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( $(panel)f4 ), to( $(panel-deep)f4 ) );
+    border: 2px solid $panel-border;
+    border-radius: 0px;
+    box-shadow: $(black)aa 0px 18px 50px 0px;
+}
+
+.ScoreboardLogo {
+    horizontal-align: center;
+    vertical-align: top;
+    width: 520px;
+    height: 181px;
+}
+
+.ScoreboardTitle {
+    horizontal-align: center;
+    font-size: 30px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: $white;
+}
+
+.ScoreboardSubtitle {
+    horizontal-align: center;
+    margin-top: 2px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: $red-light;
+}
+
+/* "◀ A  ROUTE 2 / 3  D ▶" under the subtitle, time trial only. */
+.ScoreboardSwitch {
+    horizontal-align: center;
+    margin-top: -8px;
+    margin-bottom: 16px;
+    padding: 5px 16px;
+    border-radius: 0px;
+    border: 1px solid $(mint)55;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $mint;
+
+    &.Unused {
+        visibility: collapse;
+    }
+}
+
+/* One line per player, and the column headers. Unused rows (fewer players
+   than SCOREBOARD_ROWS) collapse; the viewer's own row is outlined in gold
+   (Self), like the user menu's buttons — the outline is there but
+   transparent on every row, so marking one doesn't shift the layout. */
+.ScoreRow {
+    width: 100%;
+    height: 40px;
+    margin-top: 4px;
+    flow-children: right;
+    border-radius: 0px;
+    border: 2px solid $(black)00;
+    background-color: $(white)08;
+
+    &.Unused {
+        visibility: collapse;
+    }
+
+    &.Self {
+        border: 2px solid $gold;
+    }
+}
+
+.ScoreRow Label {
+    vertical-align: center;
+    font-size: 20px;
+    font-weight: bold;
+    color: $white;
+}
+
+.ScoreHeader {
+    height: 30px;
+    margin-top: 0px;
+    margin-bottom: 2px;
+    border-radius: 0px;
+    border: 0px solid $(black)00;
+    border-bottom: 1px solid $(white)1f;
+    background-color: $(black)00;
+}
+
+.ScoreRow.ScoreHeader Label {
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: $(mint)aa;
+}
+
+.ScoreRank {
+    width: 64px;
+    text-align: center;
+}
+
+.ScoreName {
+    width: fill-parent-flow( 1 );
+    margin-left: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ScoreRow .ScorePoints {
+    width: 80px;
+    text-align: right;
+    color: $gold;
+}
+
+.ScoreRow .ScoreHeat {
+    width: 90px;
+    text-align: right;
+}
+
+.ScoreRow .ScoreBest {
+    width: 140px;
+    margin-right: 12px;
+    text-align: right;
+    color: $mint;
+}
+
+/* Time trial: only rank, name and best time. */
+.Scoreboard.TimeTrial .ScorePoints,
+.Scoreboard.TimeTrial .ScoreHeat {
+    visibility: collapse;
+}

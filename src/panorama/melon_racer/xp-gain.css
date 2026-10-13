@@ -1,0 +1,88 @@
+/* #xpgain_panel: XP just earned (UpdateXpGainHud), top right — nothing else
+   sits there. The bar's segments hold two layers: the fill from before
+   (.XpGainOld, green like the profile's bar) and the part just gained
+   (.XpGainNew, gold), both transparent until On (see the HUD notes in
+   AGENTS.md: hiding colored pieces by a class leaves them faint). */
+.XpGainPanel {
+    horizontal-align: right;
+    vertical-align: top;
+    margin-top: 24px;
+    margin-right: 24px;
+    width: 260px;
+    padding: 8px 14px 10px 14px;
+    flow-children: down;
+    background-color: $(panel)e6;
+    border: 2px solid $lime;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.XpGainTop {
+    width: 100%;
+    flow-children: right;
+}
+
+.XpGainAmount {
+    font-size: 24px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: $gold;
+    text-shadow: 2px 2px 3px $(black)cc;
+}
+
+.XpGainLevel {
+    horizontal-align: right;
+    vertical-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $white;
+}
+
+.XpGainReason {
+    width: 100%;
+    margin-top: 1px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: $white;
+}
+
+.XpGainBar {
+    width: 100%;
+    height: 8px;
+    margin-top: 6px;
+    flow-children: right;
+    background-color: $(white)14;
+}
+
+.XpGainSegment {
+    width: fill-parent-flow( 1.0 );
+    height: 100%;
+}
+
+.XpGainOld,
+.XpGainNew {
+    width: 100%;
+    height: 100%;
+    background-color: $(black)00;
+}
+
+.XpGainOld.On {
+    background-color: $lime;
+}
+
+.XpGainNew.On {
+    background-color: $gold;
+}
+
+.XpGainXp {
+    horizontal-align: right;
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: $(mint)aa;
+}

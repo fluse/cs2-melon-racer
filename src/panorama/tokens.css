@@ -1,0 +1,33 @@
+/* The HUD's colors, one name each, for every style sheet (imported first by
+   each layout's main .css). Panorama's CSS has no var(): postcss-simple-vars
+   (build-panorama.mjs) writes the values in. A color with alpha appends it:
+   $(gold)26. Not here: the bounce ratings' colors, $rating-perfect, -good,
+   -bad, -miss — they come from BOUNCE_RATINGS (the script draws the guide
+   line in them too), see styleVariables in the layout's locals.mjs. The map's
+   own palette (surfaces, gates, podium) is docs/GAME_CI.md. */
+
+$white: #ffffff;
+$black: #000000;
+
+/* Gold: what's picked or important — the selected tab, ranks, the start button. */
+$gold: #ffd84d;
+/* Yellow: reached checkpoints, the time trial's new best. */
+$yellow: #ffe066;
+
+/* Pale green: secondary text and outlines on the dark panels. */
+$mint: #cfe8a8;
+/* Lime: a picked skin, a toggle that's on, the lit tuning scale. */
+$lime: #7fd13b;
+/* Green fills: an ON pill, the tuning scale's lit segments. */
+$green: #3fae3f;
+/* The green action button's outline (Respawn). */
+$green-button: #4fb84f;
+
+/* Red: leaving (Exit Race, Cancel Grand Prix), warnings. */
+$red: #ff5a5f;
+$red-light: #ff7a7e;
+
+/* The cards' dark green: the user menu, hub window, scoreboard. */
+$panel: #152012;
+$panel-deep: #0b100a;
+$panel-border: #2f7a2f;

@@ -1,0 +1,52 @@
+/* ACTIONS: big stacked buttons, outlined only — the outline's color says
+   what kind of action it is, a faint fill of it on hover. Icon and text
+   left-aligned. */
+.UserMenuActionButton {
+    width: 100%;
+    height: 62px;
+    margin-top: 10px;
+    border-radius: 0px;
+    border: 2px solid $(mint)55;
+    background-color: $(black)00;
+}
+
+.UserMenuButtonGreen {
+    border: 2px solid $green-button;
+    &:hover { background-color: $(green-button)26; }
+}
+
+/* Leaves the current heat — banner red, so it isn't clicked by accident. */
+.UserMenuButtonRed {
+    border: 2px solid $red;
+    &:hover { background-color: $(red)26; }
+}
+
+.UserMenuButtonGold {
+    border: 2px solid $gold;
+    &:hover { background-color: $(gold)26; }
+}
+
+.UserMenuButtonPlain {
+    border: 2px solid $(mint)55;
+    &:hover { background-color: $(mint)1a; }
+}
+
+.UserMenuButtonContent {
+    flow-children: right;
+    vertical-align: center;
+    padding: 0px 18px;
+}
+
+.UserMenuButtonIcon {
+    width: 30px;
+    height: 30px;
+    vertical-align: center;
+    margin-right: 14px;
+}
+
+.UserMenuButtonLabel {
+    font-size: 21px;
+    font-weight: bold;
+    color: $white;
+    vertical-align: center;
+}

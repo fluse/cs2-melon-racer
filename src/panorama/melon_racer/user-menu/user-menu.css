@@ -1,0 +1,159 @@
+/* General user menu (USE to toggle) — one wide card under the Melon Racer
+   logo, whose red banner sits on the card's top edge, over full-screen holo
+   scanlines. Colors follow the logo: rind green, banner red, cream.
+   #user_menu fills the screen (it only fades, see SetUserMenuOpen for the
+   Hidden toggle); UserMenuFrame inside it is just an unstyled wrapper (no
+   flow-children), so the card, the logo and the close button can overlap:
+   the card starts at the banner's middle, the logo and close button are
+   drawn after it (later children on top). Inside the card: ACTIONS on the
+   left, SETTINGS on the right, a gap and a divider between them. */
+.UserMenu {
+    width: 100%;
+    height: 100%;
+
+    transition-property: opacity;
+    transition-duration: .15s;
+    opacity: 1;
+
+    &.Hidden {
+        opacity: 0;
+    }
+}
+
+.UserMenuFrame {
+    width: 1240px; /* three columns: actions, settings, developer */
+    horizontal-align: center;
+    vertical-align: center;
+}
+
+/* Holo scanlines over the whole screen, behind the menu: 1px panels every
+   3px rather than a texture — a tiled image moirés into wide soft bands
+   whenever the HUD is scaled to a non-1080p screen, panels snap to whole
+   pixels and stay crisp. 400 of them (UserMenuScanline in melon_racer.xml)
+   cover 1200px; the rest is clipped. The lines stay still (moving thin lines
+   by fractions of a pixel flickers); UserMenuScanBar, a soft glow band,
+   sweeps down over them instead. */
+.UserMenuScanlines {
+    width: 100%;
+    height: 100%;
+    flow-children: down;
+    overflow: clip;
+}
+
+.UserMenuScanline {
+    width: 100%;
+    height: 1px;
+    margin-bottom: 2px;
+    background-color: #9a9a9a88;
+}
+
+.UserMenuScanBar {
+    width: 100%;
+    height: 220px;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( $(lime)00 ), color-stop( 0.5, $(lime)1c ), to( $(lime)00 ) );
+
+    animation-name: UserMenuScanBar;
+    animation-duration: 5s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+@keyframes 'UserMenuScanBar' {
+    0% {
+        transform: translateY(-220px);
+    }
+    100% {
+        transform: translateY(1200px);
+    }
+}
+
+.UserMenuCard {
+    width: 100%;
+    margin-top: 148px;
+    padding: 50px 32px 30px 32px;
+
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( $(panel)f4 ), to( $(panel-deep)f4 ) );
+    border: 2px solid $panel-border;
+    border-radius: 0px;
+    box-shadow: $(black)aa 0px 18px 50px 0px;
+}
+
+/* 846x295 source at 520px wide, keeping its aspect. Its red banner spans
+   about 68%..97% of the height, so the card's top edge (148px down) runs
+   through the banner's middle. */
+.UserMenuLogo {
+    horizontal-align: center;
+    vertical-align: top;
+    width: 520px;
+    height: 181px;
+}
+
+/* Top right corner of the card. */
+.UserMenuCloseButton {
+    horizontal-align: right;
+    vertical-align: top;
+    margin-top: 162px;
+    margin-right: 14px;
+    width: 28px;
+    height: 28px;
+
+    border-radius: 0px;
+    background-color: $(white)1a;
+
+    transition-property: background-color;
+    transition-duration: .1s;
+    &:hover {
+        background-color: $(red)88;
+    }
+}
+
+.UserMenuCloseIcon {
+    font-size: 15px;
+    font-weight: bold;
+    color: $(white)cc;
+    horizontal-align: center;
+    vertical-align: center;
+}
+
+/* ACTIONS | divider | SETTINGS */
+.UserMenuColumns {
+    width: 100%;
+    flow-children: right;
+}
+
+.UserMenuActions {
+    width: 360px;
+    height: 100%; /* as tall as the longest column, so the tutorial button can sit at the bottom */
+    flow-children: down;
+}
+
+/* Fills the actions column's free height, pushing the tutorial button below
+   it to the bottom edge; at least a clear gap when the column is full. */
+.UserMenuActionsSpacer {
+    width: 100%;
+    height: fill-parent-flow( 1.0 );
+    min-height: 28px;
+}
+
+.UserMenuDivider {
+    width: 1px;
+    height: 100%;
+    margin: 0px 32px;
+    background-color: $(mint)26;
+}
+
+.UserMenuSettings {
+    width: fill-parent-flow( 1.0 );
+    flow-children: down;
+}
+
+.UserMenuColumnTitle {
+    width: 100%;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: $red-light;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid $(white)1f;
+}

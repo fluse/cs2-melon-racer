@@ -270,7 +270,7 @@ bounces are skipped.
   scrapes as plain physics.
 - HUD: the speed panel's km/h (bottom center) gets `Boosted` while above `MAX_SPEED` and a short
   `PerfectBounce` flash after a bounce with angle closeness ≥
-  `PERFECT_BOUNCE_ANGLE_FACTOR` (`melon_racer.css`). Separately, a
+  `PERFECT_BOUNCE_ANGLE_FACTOR` (`src/panorama/melon_racer/speed-panel.css`). Separately, a
   `bounce_panel` in the bottom-right HUD corner (not centered: below the crosshair it would cover the track), shows for `BOUNCE_HUD_SECONDS` after
   each bounce: a rating word by angle closeness (`BOUNCE_RATINGS`:
   PERFECT/GOOD/BAD/MISS), the exact angle hit, a 0°–90° scale in 10°
@@ -477,7 +477,7 @@ run by `race/heat/`):
    the 1's place, small, and grows huge while fading out
    (`countdown_panel` in `melon_racer.xml`, one Label per number with an
    `In`/`Out` class; rule `CountdownStep`/`CountdownNumberState` in
-   `race/heat/logic.js`, animations in `melon_racer.css`). `COUNTDOWN_SECONDS`
+   `race/heat/logic.js`, animations in `src/panorama/melon_racer/countdown.css`). `COUNTDOWN_SECONDS`
    in `race/constants.js` controls the length — there are only numbers for
    3..1, so a longer countdown shows nothing until 3.
 4. **RACING** — normal driving, existing checkpoint/lap logic, plus a

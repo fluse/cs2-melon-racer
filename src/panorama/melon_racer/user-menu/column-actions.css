@@ -1,0 +1,8 @@
+/* "Restart Time Trial" — only during a free-roaming time trial. */
+.UserMenuRestartRow {
+    width: 100%;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}

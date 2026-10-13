@@ -1,0 +1,340 @@
+/* Hub "start the Grand Prix" window (hud/hub-modal/) — shown while a kart
+   stands in hub_start_trigger: kicker + title, the heats as route cards
+   (icons from tools/images/make-route-icons.mjs), who rides along as
+   name chips, one big start button. .WaitingForOthers (a heat is running)
+   swaps it all for a waiting message, or the moderator's abort button. */
+.HubModal {
+    width: 800px;
+    horizontal-align: center;
+    vertical-align: center;
+
+    transition-property: opacity;
+    transition-duration: .15s;
+    opacity: 1;
+
+    &.Hidden {
+        opacity: 0;
+    }
+}
+
+/* Like .UserMenuCard: the card's top edge runs through the logo banner's
+   middle (148px down), the logo is drawn after it, on top. */
+.HubCard {
+    width: 100%;
+    margin-top: 148px;
+    flow-children: down;
+
+    padding: 50px 32px 30px 32px;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( $(panel)f4 ), to( $(panel-deep)f4 ) );
+    border: 2px solid $panel-border;
+    border-radius: 0px;
+    box-shadow: $(black)aa 0px 18px 50px 0px;
+}
+
+.HubLogo {
+    horizontal-align: center;
+    vertical-align: top;
+    width: 520px;
+    height: 181px;
+}
+
+/* Dismisses the modal for just this player without leaving the hub trigger
+   (see hub_close_button in hud/inputs.js) — they still get pulled into the
+   next Grand Prix that starts while they're standing in it, they just
+   don't have to stare at the prompt until then. Top right corner of the
+   card, like the user menu's. */
+.HubCloseButton {
+    horizontal-align: right;
+    vertical-align: top;
+    margin-top: 162px;
+    margin-right: 14px;
+    width: 28px;
+    height: 28px;
+
+    border-radius: 0px;
+    background-color: $(white)1a;
+
+    transition-property: background-color;
+    transition-duration: .1s;
+    &:hover {
+        background-color: $(red)88;
+    }
+}
+
+.HubCloseIcon {
+    font-size: 15px;
+    font-weight: bold;
+    color: $(white)cc;
+    horizontal-align: center;
+    vertical-align: center;
+}
+
+.HubKicker {
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: $red-light;
+}
+
+.HubTitle {
+    font-size: 34px;
+    font-weight: bold;
+    color: $white;
+    margin-bottom: 18px;
+}
+
+/* A titled block: "HEATS · 3", "RACERS · 2". */
+.HubSection {
+    width: 100%;
+    flow-children: down;
+    margin-bottom: 20px;
+}
+
+.HubSectionTitle {
+    width: 100%;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $(mint)aa;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid $(white)1f;
+}
+
+/* The heats: one card per track, three to a row — 3 × (226 + 2 border
+   + 14 gap) fits the window's 736px inside its padding. */
+.HeatCards {
+    width: 100%;
+    flow-children: right-wrap;
+}
+
+.HeatCard {
+    width: 226px;
+    flow-children: down;
+    margin-right: 14px;
+    margin-bottom: 12px;
+    padding: 8px 8px 10px 8px;
+
+    border-radius: 0px;
+    background-color: $(white)0d;
+    border: 1px solid $(white)14;
+
+    &.Unused {
+        visibility: collapse;
+    }
+}
+
+/* The route icon with the heat number over its top-left corner. */
+.HeatMapBox {
+    width: 210px;
+    height: 116px;
+    border-radius: 0px;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( #0b0f0a ), to( #121a10 ) );
+}
+
+.HeatMap {
+    width: 210px;
+    height: 116px;
+}
+
+.HeatBadge {
+    margin: 6px 0px 0px 6px;
+    padding: 2px 8px;
+    border-radius: 0px;
+    background-color: $red;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: $white;
+}
+
+.HeatName {
+    margin-top: 8px;
+    margin-left: 2px;
+    font-size: 19px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: $white;
+}
+
+.HeatInfo {
+    margin-left: 2px;
+    margin-top: 2px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: $(white)88;
+}
+
+/* Who rides along: a name chip each, the viewer's own tinted (Self:
+   transparent tint by default, the class sets the color). */
+.HubRacerChips {
+    width: 100%;
+    flow-children: right-wrap;
+}
+
+.HubRacerChip {
+    height: 34px;
+    margin-right: 8px;
+    margin-bottom: 8px;
+    padding: 0px 16px;
+    border-radius: 0px;
+    border: 2px solid $(white)22;
+    background-color: $(white)0a;
+
+    &.Unused {
+        visibility: collapse;
+    }
+
+    &.Self {
+        border: 2px solid $gold;
+    }
+}
+
+.HubRacerName {
+    vertical-align: center;
+    font-size: 17px;
+    font-weight: bold;
+    color: $white;
+}
+
+.HubRacersMore {
+    height: 34px;
+    padding-top: 7px;
+    font-size: 15px;
+    color: $(white)aa;
+
+    &.Unused {
+        visibility: collapse;
+    }
+}
+
+/* Outlined like the user menu's buttons, in gold: the one thing to press. */
+.HubStartButton {
+    width: 100%;
+    height: 62px;
+    border-radius: 0px;
+    margin-top: 4px;
+    border: 2px solid $gold;
+    background-color: $(black)00;
+
+    &:hover {
+        background-color: $(gold)26;
+    }
+}
+
+.HubStartButton Label {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: $white;
+}
+
+/* The seconds until the Grand Prix starts, in place of the start button
+   while the others are called (.Starting below). */
+.HubStartingLabel {
+    horizontal-align: center;
+    margin-top: 14px;
+    font-size: 24px;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: $gold;
+    visibility: collapse;
+}
+
+.HubWaitingLabel {
+    horizontal-align: center;
+    font-size: 18px;
+    color: $(white)aa;
+    visibility: collapse;
+}
+
+/* Moderator-only "abort the running Grand Prix" button — shown instead of
+   HubWaitingLabel while a heat is running, see .IsModerator below. Outlined
+   in banner red. */
+.HubAbortButton {
+    visibility: collapse;
+    horizontal-align: center;
+    border-radius: 0px;
+    padding: 12px 28px;
+    margin-top: 10px;
+    border: 2px solid $red;
+    background-color: $(black)00;
+
+    &:hover {
+        background-color: $(red)26;
+    }
+}
+
+.HubAbortButton Label {
+    font-size: 18px;
+    font-weight: bold;
+    color: $white;
+}
+
+/* "WATCH GRAND PRIX" under the waiting message while a heat runs. */
+.HubWatchButton {
+    visibility: collapse;
+    horizontal-align: center;
+    border-radius: 0px;
+    padding: 12px 28px;
+    margin-top: 10px;
+    border: 2px solid $gold;
+    background-color: $(black)00;
+
+    &:hover {
+        background-color: $(gold)26;
+    }
+}
+
+.HubWatchButton Label {
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $white;
+}
+
+/* A heat is running: no heats, racers or start — just the message. */
+.HubModal.WaitingForOthers {
+    width: 560px;
+
+    .HubSection {
+        visibility: collapse;
+    }
+    .HubStartButton {
+        visibility: collapse;
+    }
+    .HubWaitingLabel {
+        visibility: visible;
+    }
+    .HubWatchButton {
+        visibility: visible;
+    }
+}
+
+/* Calling the others to join: the lists stay, the countdown replaces the
+   start button — the moderator can still call it off. */
+.HubModal.Starting {
+    .HubStartButton {
+        visibility: collapse;
+    }
+    .HubStartingLabel {
+        visibility: visible;
+    }
+}
+
+.HubModal.Starting.IsModerator {
+    .HubAbortButton {
+        visibility: visible;
+    }
+}
+
+.HubModal.WaitingForOthers.IsModerator {
+    .HubWaitingLabel {
+        visibility: collapse;
+    }
+    .HubAbortButton {
+        visibility: visible;
+    }
+}

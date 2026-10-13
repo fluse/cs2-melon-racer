@@ -1,0 +1,50 @@
+/* All the same length, whatever the text — wide enough for the longest
+   ("BACK TO YOUR MELON"). */
+.KeyHint {
+    width: 260px;
+    margin-top: 6px;
+    padding: 4px 14px 4px 8px;
+    flow-children: right;
+    border: 1px solid $white;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.KeyCap {
+    width: 24px;
+    height: 24px;
+    vertical-align: center;
+    border: 2px solid $white;
+    border-radius: 4px;
+}
+
+/* A key with a word on it (SPACE). */
+.KeyCapWide {
+    width: 64px;
+}
+
+.KeyCapLetter {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    color: $white;
+}
+
+.KeyHintMouse {
+    width: 24px;
+    height: 24px;
+    vertical-align: center;
+}
+
+.KeyHintText {
+    vertical-align: center;
+    margin-left: 10px;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $white;
+    text-shadow: 1px 1px 2px $(black)cc;
+}

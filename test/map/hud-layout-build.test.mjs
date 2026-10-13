@@ -1,17 +1,23 @@
-// The HUD layouts in panorama/layout/custom_game/ are built from their parts
-// in src/panorama/ (build-panorama.mjs): the file the game reads has to be
-// what the parts make, or an edit to a part never reached it.
+// The HUD layouts in panorama/layout/custom_game/ and their styles in
+// panorama/styles/custom_game/ are built from their parts in src/panorama/
+// (build-panorama.mjs): the files the game reads have to be what the parts
+// make, or an edit to a part never reached them.
 
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { layouts, BuildLayout, LayoutOutputPath } from "../../build-panorama.mjs";
+import { layouts, BuildLayout, LayoutOutputPath, BuildStyle, StyleOutputPath } from "../../build-panorama.mjs";
 
 for (const name of layouts) {
     test(`panorama/layout/custom_game/${name}.xml is built from src/panorama/${name}/ (npm run build)`, async () => {
         const built = await BuildLayout(name);
         const current = readFileSync(LayoutOutputPath(name), "utf8").replace(/\r\n/g, "\n");
         assert.ok(built === current, `${name}.xml is out of date — run npm run build`);
+    });
+    test(`panorama/styles/custom_game/${name}.css is built from src/panorama/${name}/ (npm run build)`, async () => {
+        const built = await BuildStyle(name);
+        const current = readFileSync(StyleOutputPath(name), "utf8").replace(/\r\n/g, "\n");
+        assert.ok(built === current, `${name}.css is out of date — run npm run build`);
     });
 }
 

@@ -28,6 +28,21 @@ const skins = Object.keys(MELON_SKINS).map(key => ({ key, name: MELON_SKIN_NAMES
 const skinPages = Chunks(skins, MELON_SKINS_PER_PAGE).map(page => Chunks(
     range(MELON_SKINS_PER_PAGE).map(i => page[i] ?? null), SKIN_GRID_COLUMNS));
 
+/** A script color ({ r, g, b }) as CSS hex. @param {{ r: number, g: number, b: number }} color */
+const Hex = ({ r, g, b }) => `#${[r, g, b].map(v => v.toString(16).padStart(2, "0")).join("")}`;
+
+/**
+ * The style sheets' $variables taken from the script (build-panorama.mjs,
+ * next to src/panorama/tokens.css): colors the script uses too, so HUD and
+ * script can't drift apart — $rating-perfect … $rating-miss (BOUNCE_RATINGS,
+ * the guide line's colors) and $color-<key> (COLOR_PRESETS, the glow color
+ * swatches).
+ */
+export const styleVariables = {
+    ...Object.fromEntries(constants.BOUNCE_RATINGS.map(rating => [`rating-${rating.label.toLowerCase()}`, Hex(rating.color)])),
+    ...Object.fromEntries(Object.entries(COLOR_PRESETS).map(([key, color]) => [`color-${key}`, Hex(color)])),
+};
+
 export default {
     ...constants,
     range,

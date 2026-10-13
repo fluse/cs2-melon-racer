@@ -1,0 +1,139 @@
+/* The between-heat countdown (#break_countdown) is styled like the start
+   countdown: .CountdownPanel / .CountdownNumber above. */
+
+/* Speed panel, bottom center (see UpdateSpeedHud / UpdateHealthHud): the
+   km/h readout over the melon's health bar. Sits right on the bottom edge
+   of the screen (#speed_panel's padding-bottom keeps the content off it). */
+.SpeedBottom {
+    horizontal-align: center;
+    vertical-align: bottom;
+    perspective: 400;
+}
+
+/* Spacer, speed panel and the wall-jump dots in a row, tilted back (top
+   away from the viewer) around its bottom edge. Second try: the first tilt
+   seemed to swallow script class changes, but that was before the
+   one-class-per-panel and periodic-resend fixes — if the health bar or the
+   jump dots stop updating in-game again, remove the transform. */
+.SpeedRow {
+    flow-children: right;
+    transform-origin: 50% 100%;
+    transform: rotateX( 50deg ) scale3d( 1, 1.4, 1 );
+}
+
+/* As wide as .JumpDots (its width + margin-left), so #speed_panel stays centered. */
+.SpeedRowSpacer {
+    width: 26px;
+    height: 1px;
+}
+
+/* Readout and bar — a faint white line left and right, and a black
+   background, 20% opaque at the bottom, fading to transparent at the top. */
+#speed_panel {
+    vertical-align: bottom;
+    flow-children: down;
+
+    padding: 0px 14px 10px 14px;
+    border-left: 2px solid $(white)0d;
+    border-right: 2px solid $(white)0d;
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( $(black)00 ), to( $(black)33 ) );
+}
+
+/* Wall-jump charges: three dots stacked right of #speed_panel's right line.
+   Each dot is a white outline (.JumpDot, like .HealthBar around the health
+   fill) with a fill inside: transparent while that charge is used up or
+   refilling, white with "On" once it's ready (UpdateJumpHud; see .HealthSeg
+   why not the other way round). No transition. */
+.JumpDots {
+    vertical-align: center;
+    margin-left: 10px;
+    width: 16px;
+    flow-children: down;
+}
+
+.JumpDot {
+    width: 16px;
+    height: 16px;
+    margin-top: 5px;
+    padding: 2px;
+    border: 1px solid $(white)80; /* 1px is the minimum — half transparent to look thinner */
+    border-radius: 8px;
+
+    &:first-child {
+        margin-top: 0px;
+    }
+}
+
+.JumpDotFill {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%; /* round whatever size is left inside the outline */
+    background-color: $(black)00;
+
+    &.On {
+        background-color: $white;
+    }
+}
+
+/* Health bar, CSS only. .HealthBar is the container: just a white outline,
+   transparent inside. In it .HealthFill, the fill bar: HEALTH_BAR_SEGMENTS
+   pieces sharing its width, emptying right to left. A piece is transparent
+   by default; UpdateHealthHud makes the ones up to the health left white
+   with "On". Not the other way round (white, hidden by a class): whether by
+   opacity or a transparent background, a hidden piece's white still showed
+   faintly in-game, while a color the class sets shows reliably. No
+   transition, blur, shadow or tint. */
+.HealthBar {
+    horizontal-align: center;
+    width: 240px;
+    height: 14px;
+    padding: 2px;
+    border: 2px solid $white;
+    border-radius: 7px;
+}
+
+.HealthFill {
+    width: 100%;
+    height: 100%;
+    flow-children: right;
+}
+
+.HealthSeg {
+    width: fill-parent-flow(1.0);
+    height: 100%;
+    background-color: $(black)00;
+
+    &:first-child {
+        border-radius: 3px 0px 0px 3px;
+    }
+    &:last-child {
+        border-radius: 0px 3px 3px 0px;
+    }
+}
+
+.HealthSeg.On {
+    background-color: $white;
+}
+
+.SpeedReadout {
+    horizontal-align: center;
+    flow-children: down;
+}
+
+/* Wall-bounce feedback (see UpdateSpeedHud): Boosted while above normal top
+   speed, PerfectBounce as a short flash after a perfect hit. */
+#speed_panel.Boosted .SpeedValue {
+    color: #ffb347;
+}
+
+#speed_panel.PerfectBounce .SpeedValue {
+    color: $yellow;
+}
+
+.SpeedValue {
+    font-size: 54px;
+    font-weight: bold;
+    color: $white;
+    text-shadow: 2px 2px 3px $black;
+    horizontal-align: center;
+}

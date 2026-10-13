@@ -73,7 +73,7 @@ melon_racer/
 │       └── point_script.d.ts                   # cs_script API type declarations (for editor tooling)
 ├── panorama/
 │   ├── layout/custom_game/melon_racer.xml      # HUD layout (speedometer, HUD, menus), generated from src/panorama/melon_racer/
-│   └── styles/custom_game/melon_racer.css      # HUD styling
+│   └── styles/custom_game/melon_racer.css      # HUD styling, generated from src/panorama/
 ├── postprocess/melon_racer.vpost               # post-processing volume (bloom/tonemapping)
 ├── soundevents/soundevents_addon.vsndevts      # sound event definitions
 ├── sounds/*.wav                                # ambience source audio
@@ -131,7 +131,7 @@ Some common ways to build on this repo, and where to start:
 
 - **Add a new track** — pure Hammer work, no script changes. Follow [TRACK_CREATION.md](docs/TRACK_CREATION.md) step by step.
 - **Tune physics/feel** (acceleration, top speed, jump height, impact-damage sensitivity, camera offsets, timings) — every tunable lives in the `constants.js` of the folder it belongs to (`movement/driving/`, `movement/jump/`, `camera/`, …), all re-exported by `src/melon_drive/constants/index.js`. Change a value, rebuild, and hot-reload in tools mode to feel the difference immediately.
-- **Add HUD elements or menus** — edit the layout's parts in `src/panorama/melon_racer/` (`npm run build` puts them together into `panorama/layout/custom_game/melon_racer.xml`) and the matching `melon_racer.css`, then wire the new elements from `src/melon_drive/hud/`. Note CS2's custom HUD layouts only support `<Panel>`, `<Label>`, `<Image>`, and `<Button>` — no native sliders/inputs and no inline scripting.
+- **Add HUD elements or menus** — edit the layout's parts and their styles in `src/panorama/melon_racer/` (each part's `.xml` with its `.css`, reusable pieces in `src/panorama/components/`, colors in `src/panorama/tokens.css`; `npm run build` puts them together into `panorama/layout/custom_game/melon_racer.xml` and `panorama/styles/custom_game/melon_racer.css`), then wire the new elements from `src/melon_drive/hud/`. Note CS2's custom HUD layouts only support `<Panel>`, `<Label>`, `<Image>`, and `<Button>` — no native sliders/inputs and no inline scripting.
 - **Add gameplay mechanics** (boost pads, new trigger types, new melon behaviors) — follow the existing pattern: a Hammer trigger fires `RunScriptInput` on `melon_drive`, handled by a new feature folder (or an extended one) under the fitting domain in `src/melon_drive/` — `constants.js`, pure rules in `logic.js`, engine side, `inputs.js` for its script inputs — registered through that domain's `Register*Inputs()`.
 - **Add sound** — `soundevents/soundevents_addon.vsndevts` currently only contains Valve's stock example ambience events; there's no melon-specific audio yet (e.g. a break sound, engine/roll sound, countdown beep) — a good, self-contained first contribution.
 
