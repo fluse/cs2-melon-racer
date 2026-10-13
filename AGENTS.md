@@ -134,10 +134,22 @@ tools/models/make-half-pipe-model.mjs     # a half-pipe slide as mesh geometry, 
                                           #   rounded white lips, graphite legs (2.9k triangles); materials/melon_racer/half_pipe/ — the top 30 degrees of each side count as walls (bounces)
 tools/models/make-bridge-model.mjs        # a cable-stayed bridge after Cologne's Severinsbruecke as a race track, mesh geometry, models/melon_racer/bridge.dmx for Hammer's File → Import
                                           #   (DmxText in model.mjs): a straight steel deck LENGTH 6000 along +X, the road DECK_HEIGHT 800 up, ROAD_WIDTH 512 between parapets (40, the walls
-                                          #   melons bounce off) with a railing to 96 (over a ground jump), asphalt with white markings; an A-pylon (PYLON_TOP 2000) whose legs stand on a
-                                          #   pier in the river, 12 stay cables in two inclined planes from its head to brackets outside the deck (205+ over the road), a second river pier
-                                          #   with cutwaters, twin columns on land (1.6k triangles); origin on the floor (river bed) under the road's start, the river along Y;
+                                          #   melons bounce off) with a railing to 96 (over a ground jump), asphalt with white markings, street lamps; under the slab two trapezoid box girders,
+                                          #   cross girders, a stringer, a stiffener + cantilever bracket every BAY; an A-pylon (PYLON_TOP 2000, cross ties) whose legs stand on a long low
+                                          #   stone pier in the river (the Sockel, masonry texture), 12 stays of 3 ropes each in two inclined planes from its head to brackets outside the deck
+                                          #   (194+ over the road), a lower stone river pier, concrete plinths on land, each pier with two steel struts leaning out to the girders; all steel
+                                          #   #87CC96, cables included (4k triangles); origin on the floor (river bed) under the road's start, the river along Y;
                                           #   materials/melon_racer/bridge/ — needs a melon_respawn trigger below and a func_water under FOUNDATION_TOP
+tools/models/make-kranhaus-model.mjs      # a crane house after Cologne's Kranhaeuser as mesh geometry, models/melon_racer/kranhaus.dmx for Hammer's File → Import (DmxText in model.mjs):
+                                          #   an upside-down L HEIGHT 1600 tall, 17 floors: a tower, on top the 7-floor arm along +X, carried by a glass stair tower (an open passage under the arm between it and the tower),
+                                          #   cantilevering past them, a canyon splitting the arm's end down the middle, concrete slab included; checkered balconies (white slabs only) on every glass facade, a white concrete frame inside the L (pillar at the tower's inner edge, slab under the arm), a slimmer stair tower, parapet round
+                                          #   the flat roof (drivable); lengths in window modules so the 4 x 4-module facade textures line up (1.6k triangles); origin on the floor in
+                                          #   the middle of the tower's outer face; materials/melon_racer/kranhaus/
+tools/models/make-colonius-model.mjs     # Cologne's TV tower, the Colonius, as mesh geometry, models/melon_racer/colonius.dmx for Hammer's File → Import (DmxText in model.mjs):
+                                          #   HEIGHT 3000 to the mast's tip: a concrete shaft tapering up from a flared foot, the pulpit basket (flat underneath and narrowest
+                                          #   there, sides leaning out to the roof, three window bands, 1778..2000, 536 across; proportions measured off a side-on photo), two open steel platforms on diagonal struts with rails and antennas,
+                                          #   the white upper shaft into the mast with orange and white bands (3.6k triangles); origin on the floor in the shaft's middle;
+                                          #   materials/melon_racer/colonius/
 tools/models/make-heal-tent-model.mjs     # the hub's first-aid tent, models/melon_racer/heal_tent/heal_tent_<piece>.vmdl, all at one origin (floor, middle; the tunnel along X):
                                           #   _frame (two inflatable arches in the gates' style, feet, guy ropes, blower; solid), _canvas (white canvas down to the floor, green pharmacy
                                           #   crosses on both walls and the roof, a HEAL sign under each arch; walls + roof solid), _floor (a 1-high mat with a glowing cross: the
@@ -262,7 +274,7 @@ models/melon_racer/melon/melon.vmdl      # the melon as our own copy: CS2's ital
                                           #   prop_data and break pieces; its fixed mass 2.0 added by hand — the decompiler drops mass_override), material remapped to materials/melon_racer/melon/melon_default.vmat —
                                           #   the base for melon skins (no SetMaterialGroup in cs_script: one .vmdl per skin, swapped by SetModel)
 materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/, melon/ (melon skins),
-                                          #   logo/ (logo_text_*), podium/, hub_gate/, pavilion/, heal_tent/, tree/, hedge/, rock/, mountain/, park/, inflatable_podium/, stage/, bouncer/, shopping_cart/, catapult/, drone/, drone_display/, spawn_pad/, floor_spotlight/, half_pipe/, bridge/, laser/, buffer_stop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
+                                          #   logo/ (logo_text_*), podium/, hub_gate/, pavilion/, heal_tent/, tree/, hedge/, rock/, mountain/, park/, inflatable_podium/, stage/, bouncer/, shopping_cart/, catapult/, drone/, drone_display/, spawn_pad/, floor_spotlight/, half_pipe/, bridge/, kranhaus/, colonius/, laser/, buffer_stop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
                                           #   checkpoint_gate/ — a new material goes into the fitting one, never loose in materials/melon_racer/
 materials/melon_racer/decals/*_decal.vmat # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
 ```

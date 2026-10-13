@@ -34,6 +34,8 @@ export class Mesh {
         /** @type {Record<string, number[][][]>} triangles per material part */
         this.tris = {};
         this.smoothCos = Math.cos((35 * Math.PI) / 180);
+        /** @type {number[]} first vertex index of every shell after the first (see NewShell) */
+        this.shellStarts = [];
     }
 
     // OBJ indices are 1-based.
@@ -241,6 +243,14 @@ export class Mesh {
             this.#SmoothTri(center, this.#Corner(b1, down, [0, 0]), this.#Corner(b0, down, [0, 0]), part);
         }
     }
+
+    /**
+     * Starts a new shell: DmxText welds vertices only within one shell, so
+     * solids that touch or overlap (a tower and the arm on top of it) stay
+     * separate closed pieces in Hammer instead of sharing an edge between
+     * four faces, which a Hammer mesh can't hold (it drops faces).
+     */
+    NewShell() { this.shellStarts.push(this.v.length); }
 
     get triangleCount() { return Object.values(this.tris).reduce((s, t) => s + t.length, 0); }
 }
@@ -697,8 +707,8 @@ function MergeHoleFree(triangles) {
  */
 export function DmxText(mesh, name, materials) {
     const positions = [], weld = new Map();
-    const Weld = p => {
-        const k = p.map(n => n.toFixed(4)).join(" ");
+    const Weld = (p, i) => {
+        const k = `${mesh.shellStarts.filter(start => start <= i).length}|${p.map(n => n.toFixed(4)).join(" ")}`;
         if (!weld.has(k)) { weld.set(k, positions.length); positions.push(p); }
         return weld.get(k);
     };
@@ -732,14 +742,23 @@ export function DmxText(mesh, name, materials) {
                 while (parent.get(i) !== i) i = parent.get(i);
                 return i;
             };
+            // Two triangles join only where their texcoords agree along the shared
+            // edge: coplanar faces of different extrusions (a tower's side and the
+            // arm above it) meet with different UVs, and one polygon over both
+            // would get a sheared texture in Hammer.
+            const SameUv = (i, k, p) => {
+                const [u, w] = [i, k].map(n => mesh.vt[corners[n].find(c => c.p === p).vt]);
+                return Math.abs(u[0] - w[0]) < 1e-4 && Math.abs(u[1] - w[1]) < 1e-4;
+            };
             const byEdge = new Map();
             for (const i of members) {
                 const t = corners[i];
                 for (let j = 0; j < 3; j++) {
                     const a = t[j].p, b = t[(j + 1) % 3].p;
                     const e = a < b ? `${a}_${b}` : `${b}_${a}`;
-                    if (byEdge.has(e)) parent.set(Find(i), Find(byEdge.get(e)));
-                    else byEdge.set(e, i);
+                    const k = byEdge.get(e);
+                    if (k === undefined) byEdge.set(e, i);
+                    else if (SameUv(i, k, a) && SameUv(i, k, b)) parent.set(Find(i), Find(k));
                 }
             }
             const regions = new Map();

@@ -70,8 +70,11 @@ reuse a color for something with a different meaning.
   yoke and head, grey fins, a warm white lens (`#FFF1D6`, like the pavilion's light ring) and a beam in the same warm white.
 - **Half-pipe slide** (`tools/models/make-half-pipe-model.mjs`): sky blue playground plastic (`#3A8DFF`, not heal cyan), white lips,
   graphite legs — off-palette on purpose, a playground piece.
-- **Bridge** (`tools/models/make-bridge-model.mjs`): the Severinsbruecke's pale grey-green steel paint (`#C9D2CC`) on deck and pylon,
-  light concrete (`#B9B6AE`) piers, asphalt road (`#3B3E44`) with white markings, graphite railing and cables — off-palette on purpose, a real bridge.
+- **Bridge** (`tools/models/make-bridge-model.mjs`): the Severinsbruecke's green steel paint (`#87CC96`) on deck, pylon, struts,
+  railing and cables, stone masonry (`#8E8476`) river piers with light concrete (`#B9B6AE`) coping and land plinths, asphalt road (`#3B3E44`)
+  with white markings, graphite lamp posts with warm white lamps (`#FFF1D6`) — off-palette on purpose, a real bridge.
+- **Kranhaus** (`tools/models/make-kranhaus-model.mjs`): dark blue-grey glass facades between white slab edges (`#DCDBD5`), white balcony
+  slabs (`#E6E5E0`), a light glass stair tower, white concrete (`#E4E2DC`) inside the L — off-palette on purpose, a real building.
 - **Spinning hammer** (`tools/models/make-spin-hammer-model.mjs`): steel head, signal red rubber faces
   (`#E83C2A`, like the saw blade's ring), wooden handle, dark grey pedestal — off-palette on purpose, a hazard.
 
