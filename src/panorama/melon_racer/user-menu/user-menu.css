@@ -108,9 +108,9 @@
 }
 
 .UserMenuCloseIcon {
-    font-size: 15px;
+    font-size: $font-text;
     font-weight: bold;
-    color: $(white)cc;
+    color: $text-soft;
     horizontal-align: center;
     vertical-align: center;
 }
@@ -149,7 +149,7 @@
 
 .UserMenuColumnTitle {
     width: 100%;
-    font-size: 13px;
+    font-size: $font-kicker;
     font-weight: bold;
     letter-spacing: 4px;
     color: $red-light;

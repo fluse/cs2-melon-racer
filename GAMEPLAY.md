@@ -291,7 +291,7 @@ bounces are skipped.
   wall, then on along the direction it would bounce off in, colored by the
   rating that hit would get at the current angle (`BOUNCE_RATINGS[].color`,
   same colors as the HUD panel; white = no wall in range). Uses the same
-  angle math as the bounce, so steer until it turns yellow (PERFECT).
+  angle math as the bounce, so steer until it turns gold (PERFECT).
   **Off by default**, switched on/off per player in the user menu's
   "GUIDE LINE" section (above "COLLISION DEBUG"; `kart.predictionLine`) — only
   that player's own melon gets a line. `PREDICTION_ENABLED` stays the

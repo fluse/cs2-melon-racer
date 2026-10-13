@@ -38,7 +38,7 @@
 
 .LeaderboardTitle {
     horizontal-align: center;
-    font-size: 24px;
+    font-size: $font-title;
     font-weight: bold;
     letter-spacing: 4px;
     color: $white;
@@ -47,7 +47,7 @@
 .LeaderboardSubtitle {
     horizontal-align: center;
     margin-top: 2px;
-    font-size: 12px;
+    font-size: $font-small;
     font-weight: bold;
     letter-spacing: 3px;
     color: $red-light;
@@ -74,7 +74,7 @@
 .LeaderboardPagerLabel {
     horizontal-align: center;
     vertical-align: center;
-    font-size: 16px;
+    font-size: $font-text;
     color: $mint;
 }
 
@@ -103,7 +103,7 @@
 
 .LeaderboardRow Label {
     vertical-align: center;
-    font-size: 16px;
+    font-size: $font-text;
     font-weight: bold;
     color: $white;
 }
@@ -117,7 +117,7 @@
 }
 
 .LeaderboardRow.LeaderboardColumns Label {
-    font-size: 11px;
+    font-size: $font-mini;
     letter-spacing: 3px;
     color: $(mint)aa;
 }

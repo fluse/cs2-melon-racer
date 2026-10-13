@@ -42,7 +42,7 @@
 
 .ScoreboardTitle {
     horizontal-align: center;
-    font-size: 30px;
+    font-size: $font-headline;
     font-weight: bold;
     letter-spacing: 4px;
     color: $white;
@@ -52,7 +52,7 @@
     horizontal-align: center;
     margin-top: 2px;
     margin-bottom: 18px;
-    font-size: 13px;
+    font-size: $font-kicker;
     font-weight: bold;
     letter-spacing: 4px;
     color: $red-light;
@@ -66,7 +66,7 @@
     padding: 5px 16px;
     border-radius: 0px;
     border: 1px solid $(mint)55;
-    font-size: 13px;
+    font-size: $font-kicker;
     font-weight: bold;
     letter-spacing: 3px;
     color: $mint;
@@ -100,7 +100,7 @@
 
 .ScoreRow Label {
     vertical-align: center;
-    font-size: 20px;
+    font-size: $font-large;
     font-weight: bold;
     color: $white;
 }
@@ -116,7 +116,7 @@
 }
 
 .ScoreRow.ScoreHeader Label {
-    font-size: 12px;
+    font-size: $font-small;
     letter-spacing: 3px;
     color: $(mint)aa;
 }

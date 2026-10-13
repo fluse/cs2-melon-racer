@@ -521,7 +521,10 @@ another comes in a later file). Colors are `$variables`
 script uses too come from it (`styleVariables` in `locals.mjs`:
 `$rating-perfect` … from `BOUNCE_RATINGS`, `$color-<key>` from
 `COLOR_PRESETS`). A new color with a meaning goes into `tokens.css`, not
-as a literal; a `$variable` without a value fails the build.
+as a literal; a `$variable` without a value fails the build. **Font sizes**
+are the type scale's steps in `tokens.css` (`$font-mini` 11 … `$font-display`
+56): pick a step for new text, never a size of its own (the countdown's 240px
+is the one exception).
 
 A changed layout or style is compiled for the game right away
 (`resourcecompiler.exe`, see below); `test/map/hud-layout-build.test.mjs`

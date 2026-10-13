@@ -22,7 +22,7 @@
     horizontal-align: left;
     vertical-align: center;
     margin-left: 14px;
-    font-size: 15px;
+    font-size: $font-text;
     font-weight: bold;
     color: $white;
 }
@@ -39,10 +39,10 @@
     text-align: center;
     border-radius: 0px;
     background-color: $(white)1a;
-    font-size: 12px;
+    font-size: $font-small;
     font-weight: bold;
     letter-spacing: 2px;
-    color: $(white)aa;
+    color: $text-dim;
 }
 
 /* An action row (Test Podium): a gold outlined pill instead of ON/OFF. */

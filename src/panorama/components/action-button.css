@@ -11,8 +11,8 @@
 }
 
 .UserMenuButtonGreen {
-    border: 2px solid $green-button;
-    &:hover { background-color: $(green-button)26; }
+    border: 2px solid $green;
+    &:hover { background-color: $(green)26; }
 }
 
 /* Leaves the current heat — banner red, so it isn't clicked by accident. */
@@ -45,7 +45,7 @@
 }
 
 .UserMenuButtonLabel {
-    font-size: 21px;
+    font-size: $font-large;
     font-weight: bold;
     color: $white;
     vertical-align: center;

@@ -1,29 +1,34 @@
-/* The HUD's colors, one name each, for every style sheet (imported first by
-   each layout's main .css). Panorama's CSS has no var(): postcss-simple-vars
-   (build-panorama.mjs) writes the values in. A color with alpha appends it:
-   $(gold)26. Not here: the bounce ratings' colors, $rating-perfect, -good,
-   -bad, -miss — they come from BOUNCE_RATINGS (the script draws the guide
-   line in them too), see styleVariables in the layout's locals.mjs. The map's
-   own palette (surfaces, gates, podium) is docs/GAME_CI.md. */
+/* The HUD's colors and type scale, one name each, for every style sheet
+   (imported first by each layout's main .css). Panorama's CSS has no var():
+   postcss-simple-vars (build-panorama.mjs) writes the values in. A color
+   with alpha appends it: $(gold)26. Not here: the bounce ratings' colors,
+   $rating-perfect, -good, -bad, -miss — they come from BOUNCE_RATINGS (the
+   script draws the guide line in them too), and the glow swatches'
+   $color-<key> from COLOR_PRESETS, see styleVariables in the layout's
+   locals.mjs. The map's own palette (surfaces, gates, podium) is
+   docs/GAME_CI.md. */
 
 $white: #ffffff;
 $black: #000000;
 
-/* Gold: what's picked or important — the selected tab, ranks, the start button. */
-$gold: #ffd84d;
-/* Yellow: reached checkpoints, the time trial's new best. */
-$yellow: #ffe066;
+/* White text, three strengths: $white for what's read first, then these. */
+$text-soft: #ffffffcc;
+$text-dim: #ffffff88;
+
+/* Gold: the one gold of HUD and map (checkpoint gold, docs/GAME_CI.md) —
+   what's picked or important (the selected tab, ranks, the start button)
+   and what's made it (reached checkpoints, a new best, PERFECT). */
+$gold: #ffca4f;
 
 /* Pale green: secondary text and outlines on the dark panels. */
 $mint: #cfe8a8;
 /* Lime: a picked skin, a toggle that's on, the lit tuning scale. */
 $lime: #7fd13b;
-/* Green fills: an ON pill, the tuning scale's lit segments. */
+/* Green: the ON pill, the tuning scale's lit segments, the Respawn button. */
 $green: #3fae3f;
-/* The green action button's outline (Respawn). */
-$green-button: #4fb84f;
 
-/* Red: leaving (Exit Race, Cancel Grand Prix), warnings. */
+/* Red: leaving (Exit Race, Cancel Grand Prix), warnings; the lighter one
+   for the uppercase kicker titles, readable on the dark green. */
 $red: #ff5a5f;
 $red-light: #ff7a7e;
 
@@ -31,3 +36,16 @@ $red-light: #ff7a7e;
 $panel: #152012;
 $panel-deep: #0b100a;
 $panel-border: #2f7a2f;
+
+/* Type scale: every font-size is one of these steps (the countdown's
+   numbers, 240px, are the one exception). Pick a step for new text, don't
+   invent a size. */
+$font-mini: 11px;      /* scale edges, column headers, tile labels */
+$font-small: 12px;     /* pills, badges, help lines, group headers */
+$font-kicker: 13px;    /* uppercase column and card titles, intro lines */
+$font-text: 15px;      /* menu rows, key hints, names */
+$font-strong: 18px;    /* smaller buttons, values, the lap counter */
+$font-large: 20px;     /* action buttons, the bounce rating, table rows */
+$font-title: 24px;     /* subtitles, big values, the start button */
+$font-headline: 30px;  /* panel titles, messages mid-screen */
+$font-display: 56px;   /* speedometer and run clock */

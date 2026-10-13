@@ -11,7 +11,7 @@
 }
 
 .TuningRowCompact .TuningValue {
-    font-size: 22px;
+    font-size: $font-title;
 }
 
 .TuningRowCompact .TuningStep,
@@ -27,7 +27,7 @@
 
 .TuningName {
     vertical-align: bottom;
-    font-size: 15px;
+    font-size: $font-text;
     font-weight: bold;
     letter-spacing: 3px;
     color: $white;
@@ -36,15 +36,15 @@
 .TuningHelp {
     vertical-align: bottom;
     margin-left: 18px;
-    font-size: 12px;
-    color: $(white)77;
+    font-size: $font-small;
+    color: $text-dim;
 }
 
 .TuningValue {
     width: fill-parent-flow( 1.0 );
     vertical-align: bottom;
     text-align: right;
-    font-size: 30px;
+    font-size: $font-headline;
     font-weight: bold;
     color: $lime;
 }
@@ -78,7 +78,7 @@
 .TuningStepLabel {
     horizontal-align: center;
     vertical-align: center;
-    font-size: 16px;
+    font-size: $font-text;
     font-weight: bold;
     color: $white;
 }

@@ -68,6 +68,9 @@ reuse a color for something with a different meaning.
   white chevrons, a warm white glowing ring (its own model: tinted on its own).
 - **Floor spotlight** (`tools/models/make-floor-spotlight-model.mjs`): the stage's light grey base (tinted per prop), graphite
   yoke and head, grey fins, a warm white lens (`#FFF1D6`, like the pavilion's light ring) and a beam in the same warm white.
+- **HUD** (`src/panorama/tokens.css`): its one gold (`$gold`) is checkpoint gold — the selected tab, ranks, reached
+  checkpoints, a new best and the PERFECT rating (`BOUNCE_RATINGS`, also the guide line) alike. The rest of the HUD's
+  colors (dark green panels, pale green text, lime, red) are listed there.
 - **Half-pipe slide** (`tools/models/make-half-pipe-model.mjs`): sky blue playground plastic (`#3A8DFF`, not heal cyan), white lips,
   graphite legs — off-palette on purpose, a playground piece.
 - **Bridge** (`tools/models/make-bridge-model.mjs`): the Severinsbruecke's green steel paint (`#87CC96`) on deck, pylon, struts,
@@ -89,4 +92,3 @@ onto it when you're working on them anyway:
 | 3D logo outline (`tools/models/make-logo-model.mjs`, `OUTLINE_COLOR`) | `#AAFF33` | Guide green |
 | Holo gate gradient (`tools/materials/make-holo.mjs`, `GRADIENT`) | `#39FF14` → `#AA28FF` | — |
 | Heal holo gradient (`tools/materials/make-holo.mjs`, `HEAL_GRADIENT`) | `#28FF6E` → `#6EFFD7` | Heal cyan |
-| HUD gold (`$gold` in `src/panorama/tokens.css`, e.g. `.UserMenuButtonGold`) | `#FFD84D` | Checkpoint gold |

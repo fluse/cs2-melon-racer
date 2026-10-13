@@ -62,22 +62,22 @@
 }
 
 .HubCloseIcon {
-    font-size: 15px;
+    font-size: $font-text;
     font-weight: bold;
-    color: $(white)cc;
+    color: $text-soft;
     horizontal-align: center;
     vertical-align: center;
 }
 
 .HubKicker {
-    font-size: 13px;
+    font-size: $font-kicker;
     font-weight: bold;
     letter-spacing: 4px;
     color: $red-light;
 }
 
 .HubTitle {
-    font-size: 34px;
+    font-size: $font-headline;
     font-weight: bold;
     color: $white;
     margin-bottom: 18px;
@@ -92,7 +92,7 @@
 
 .HubSectionTitle {
     width: 100%;
-    font-size: 13px;
+    font-size: $font-kicker;
     font-weight: bold;
     letter-spacing: 3px;
     color: $(mint)aa;
@@ -129,7 +129,7 @@
     width: 210px;
     height: 116px;
     border-radius: 0px;
-    background-color: gradient( linear, 0% 0%, 0% 100%, from( #0b0f0a ), to( #121a10 ) );
+    background-color: gradient( linear, 0% 0%, 0% 100%, from( $panel-deep ), to( $panel ) );
 }
 
 .HeatMap {
@@ -142,7 +142,7 @@
     padding: 2px 8px;
     border-radius: 0px;
     background-color: $red;
-    font-size: 12px;
+    font-size: $font-small;
     font-weight: bold;
     letter-spacing: 2px;
     color: $white;
@@ -151,7 +151,7 @@
 .HeatName {
     margin-top: 8px;
     margin-left: 2px;
-    font-size: 19px;
+    font-size: $font-large;
     font-weight: bold;
     letter-spacing: 1px;
     color: $white;
@@ -160,9 +160,9 @@
 .HeatInfo {
     margin-left: 2px;
     margin-top: 2px;
-    font-size: 12px;
+    font-size: $font-small;
     letter-spacing: 1px;
-    color: $(white)88;
+    color: $text-dim;
 }
 
 /* Who rides along: a name chip each, the viewer's own tinted (Self:
@@ -192,7 +192,7 @@
 
 .HubRacerName {
     vertical-align: center;
-    font-size: 17px;
+    font-size: $font-strong;
     font-weight: bold;
     color: $white;
 }
@@ -200,8 +200,8 @@
 .HubRacersMore {
     height: 34px;
     padding-top: 7px;
-    font-size: 15px;
-    color: $(white)aa;
+    font-size: $font-text;
+    color: $text-dim;
 
     &.Unused {
         visibility: collapse;
@@ -225,7 +225,7 @@
 .HubStartButton Label {
     horizontal-align: center;
     vertical-align: center;
-    font-size: 24px;
+    font-size: $font-title;
     font-weight: bold;
     letter-spacing: 4px;
     color: $white;
@@ -236,7 +236,7 @@
 .HubStartingLabel {
     horizontal-align: center;
     margin-top: 14px;
-    font-size: 24px;
+    font-size: $font-title;
     font-weight: bold;
     letter-spacing: 4px;
     color: $gold;
@@ -245,8 +245,8 @@
 
 .HubWaitingLabel {
     horizontal-align: center;
-    font-size: 18px;
-    color: $(white)aa;
+    font-size: $font-strong;
+    color: $text-dim;
     visibility: collapse;
 }
 
@@ -268,7 +268,7 @@
 }
 
 .HubAbortButton Label {
-    font-size: 18px;
+    font-size: $font-strong;
     font-weight: bold;
     color: $white;
 }
@@ -289,7 +289,7 @@
 }
 
 .HubWatchButton Label {
-    font-size: 18px;
+    font-size: $font-strong;
     font-weight: bold;
     letter-spacing: 3px;
     color: $white;

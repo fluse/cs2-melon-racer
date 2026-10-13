@@ -28,7 +28,7 @@
 .KeyCapLetter {
     horizontal-align: center;
     vertical-align: center;
-    font-size: 14px;
+    font-size: $font-kicker;
     font-weight: bold;
     color: $white;
 }
@@ -42,7 +42,7 @@
 .KeyHintText {
     vertical-align: center;
     margin-left: 10px;
-    font-size: 15px;
+    font-size: $font-text;
     font-weight: bold;
     letter-spacing: 3px;
     color: $white;

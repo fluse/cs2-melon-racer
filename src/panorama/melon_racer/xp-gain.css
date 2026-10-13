@@ -25,7 +25,7 @@
 }
 
 .XpGainAmount {
-    font-size: 24px;
+    font-size: $font-title;
     font-weight: bold;
     letter-spacing: 2px;
     color: $gold;
@@ -35,7 +35,7 @@
 .XpGainLevel {
     horizontal-align: right;
     vertical-align: center;
-    font-size: 16px;
+    font-size: $font-text;
     font-weight: bold;
     letter-spacing: 3px;
     color: $white;
@@ -44,7 +44,7 @@
 .XpGainReason {
     width: 100%;
     margin-top: 1px;
-    font-size: 12px;
+    font-size: $font-small;
     font-weight: bold;
     letter-spacing: 1px;
     color: $white;
@@ -81,7 +81,7 @@
 .XpGainXp {
     horizontal-align: right;
     margin-top: 4px;
-    font-size: 11px;
+    font-size: $font-mini;
     font-weight: bold;
     letter-spacing: 1px;
     color: $(mint)aa;

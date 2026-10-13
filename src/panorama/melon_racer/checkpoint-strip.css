@@ -39,7 +39,7 @@
 
     &.Reached {
         opacity: 1;
-        wash-color: $yellow;
+        wash-color: $gold;
     }
 }
 
@@ -50,7 +50,7 @@
     background-color: $(white)40;
 
     &.Reached {
-        background-color: $yellow;
+        background-color: $gold;
     }
 
     &.Unused {
@@ -78,8 +78,8 @@
     }
 
     &.Reached {
-        border: 2px solid $yellow;
-        background-color: $yellow;
+        border: 2px solid $gold;
+        background-color: $gold;
     }
 
     &.Unused {
@@ -98,13 +98,13 @@
     text-align: center;
     vertical-align: center;
     transform: translateY(1px);
-    font-size: 13px;
+    font-size: $font-kicker;
     font-weight: bold;
-    color: $(white)aa;
+    color: $text-dim;
 }
 
 .StripCheckpoint.Next .StripNumber {
-    font-size: 15px;
+    font-size: $font-text;
     color: $white;
 }
 
@@ -116,8 +116,8 @@
     vertical-align: center;
     margin-left: 6px;
     margin-right: 6px;
-    font-size: 18px;
-    color: $(white)88;
+    font-size: $font-strong;
+    color: $text-dim;
 
     &.Hidden {
         visibility: collapse;
@@ -135,28 +135,28 @@
 }
 
 .LapUnit {
-    font-size: 12px;
+    font-size: $font-small;
     font-weight: bold;
     letter-spacing: 2px;
-    color: $(white)88;
+    color: $text-dim;
     margin-right: 6px;
     vertical-align: center;
 }
 
 .LapCurrent {
-    font-size: 18px;
+    font-size: $font-strong;
     font-weight: bold;
-    color: $yellow;
+    color: $gold;
 }
 
 .LapSlash {
-    font-size: 18px;
-    color: $(white)77;
+    font-size: $font-strong;
+    color: $text-dim;
     margin-left: 2px;
     margin-right: 2px;
 }
 
 .LapTotal {
-    font-size: 18px;
-    color: $(yellow)cc;
+    font-size: $font-strong;
+    color: $(gold)cc;
 }

@@ -21,10 +21,10 @@
     horizontal-align: center;
     vertical-align: center;
     margin-top: 24px;
-    font-size: 30px;
+    font-size: $font-headline;
     font-weight: bold;
     letter-spacing: 3px;
-    color: $yellow;
+    color: $gold;
     text-shadow: 3px 3px 4px $(black)cc;
 
     &.Hidden {
@@ -39,7 +39,7 @@
     vertical-align: top;
     margin-top: 240px;
     padding: 6px 20px;
-    font-size: 24px;
+    font-size: $font-title;
     font-weight: bold;
     letter-spacing: 3px;
     color: $white;

@@ -83,14 +83,14 @@
 .SkinPagerArrow {
     horizontal-align: center;
     vertical-align: center;
-    font-size: 11px;
+    font-size: $font-mini;
     color: $mint;
 }
 
 .SkinPagerLabel {
     vertical-align: center;
     margin: 0px 10px;
-    font-size: 12px;
+    font-size: $font-small;
     font-weight: bold;
     letter-spacing: 2px;
     color: $mint;

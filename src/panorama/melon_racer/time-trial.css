@@ -19,7 +19,7 @@
 }
 
 .RunTime {
-    font-size: 56px;
+    font-size: $font-display;
     font-weight: bold;
     letter-spacing: 1px;
     color: $white;
@@ -32,16 +32,16 @@
 }
 
 .RunBestUnit {
-    font-size: 14px;
+    font-size: $font-kicker;
     font-weight: bold;
     letter-spacing: 2px;
-    color: $(white)88;
+    color: $text-dim;
     margin-right: 8px;
     vertical-align: center;
 }
 
 .RunBest {
-    font-size: 24px;
+    font-size: $font-title;
     font-weight: bold;
     color: #9fe8ff;
     text-shadow: 2px 2px 3px $(black)cc;
@@ -49,14 +49,14 @@
 
 .RunResult {
     margin-top: 6px;
-    font-size: 20px;
+    font-size: $font-large;
     font-weight: bold;
     letter-spacing: 2px;
     color: $white;
     text-shadow: 2px 2px 3px $(black)cc;
 
     &.NewBest {
-        color: $yellow;
+        color: $gold;
     }
 
     &.Hidden {

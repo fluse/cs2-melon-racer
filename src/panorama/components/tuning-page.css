@@ -16,8 +16,8 @@
 
 .TuningIntro {
     margin-top: 6px;
-    font-size: 13px;
-    color: $(white)88;
+    font-size: $font-kicker;
+    color: $text-dim;
 }
 
 .TuningFooter {

@@ -46,7 +46,7 @@
 
 .ProfileName {
     width: 100%;
-    font-size: 22px;
+    font-size: $font-title;
     font-weight: bold;
     color: $white;
     text-overflow: ellipsis;
@@ -63,7 +63,7 @@
     vertical-align: center;
     padding: 2px 6px 1px 7px;
     background-color: $gold;
-    font-size: 12px;
+    font-size: $font-small;
     font-weight: bold;
     letter-spacing: 1px;
     color: $panel;
@@ -91,7 +91,7 @@
 
 .ProfileXp {
     margin-top: 4px;
-    font-size: 11px;
+    font-size: $font-mini;
     font-weight: bold;
     letter-spacing: 1px;
     color: $(mint)aa;
@@ -100,7 +100,7 @@
 .ProfileSkin {
     vertical-align: center;
     margin-left: 10px;
-    font-size: 12px;
+    font-size: $font-small;
     font-weight: bold;
     letter-spacing: 3px;
     color: $gold;
@@ -128,7 +128,7 @@
 }
 
 .ProfileStatLabel {
-    font-size: 10px;
+    font-size: $font-mini;
     font-weight: bold;
     letter-spacing: 2px;
     color: $(mint)aa;
@@ -141,7 +141,7 @@
 
 .ProfileStatValue {
     horizontal-align: left;
-    font-size: 17px;
+    font-size: $font-strong;
     font-weight: bold;
     color: $white;
 }
@@ -149,7 +149,7 @@
 .ProfileStatRank {
     horizontal-align: right;
     vertical-align: center;
-    font-size: 12px;
+    font-size: $font-small;
     font-weight: bold;
     color: $gold;
 }

@@ -16,7 +16,7 @@
 
 .SpectateTitle {
     horizontal-align: center;
-    font-size: 13px;
+    font-size: $font-kicker;
     font-weight: bold;
     letter-spacing: 5px;
     color: $gold;
@@ -24,7 +24,7 @@
 
 .SpectateName {
     horizontal-align: center;
-    font-size: 30px;
+    font-size: $font-headline;
     font-weight: bold;
     letter-spacing: 2px;
     color: $white;
