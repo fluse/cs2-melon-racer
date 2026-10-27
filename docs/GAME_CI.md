@@ -91,7 +91,10 @@ reuse a color for something with a different meaning.
   containers in blue/orange/green/red, yellow gantry cranes (`#F0B824`) — off-palette on purpose, a real harbor.
 - **Coast rocks and plants** (`tools/models/make-coast-rock-model.mjs`, `make-coast-plant-model.mjs`): stone (`#868178`) with
   lichen-grey tops (`#B2AD96`); marram green (`#8EA452`) and straw, gorse green with yellow (`#F2C41E`), heather with purple, sea thrift
-  pink, pine bark and needles — natural colors, tinted per prop.
+  pink, pine bark and needles, ice plant green with magenta flowers (`#E03C9A`) and reddish tips, dark ivy, fern and moss green, weathered
+  roots — natural colors, tinted per prop.
+- **Seagull** (`tools/models/make-seagull-model.mjs`): a herring gull — white, grey mantle (`#9CA6B0`), black wing tips, yellow beak with
+  a red spot — on a straw nest with olive eggs; natural colors, not tinted.
 - **Spinning hammer** (`tools/models/make-spin-hammer-model.mjs`): steel head, signal red rubber faces
   (`#E83C2A`, like the saw blade's ring), wooden handle, dark grey pedestal — off-palette on purpose, a hazard.
 

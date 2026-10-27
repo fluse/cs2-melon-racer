@@ -159,6 +159,11 @@ tools/models/make-parkour-model.mjs       # the lighthouse parkour race track, m
                                           #   tower, a ramp 4 times round it with 4 gaps to jump (RAMP_GAPS) up to the gallery = finish at ~3190, glowing lantern), 07_rock (the core in tiers, the plateau its
                                           #   top; rocks round the foot), 08_seabed; ~25400 along the course, ~14.9k triangles; laid out along the course (s along, t across, z up) in world units; prints where start, checkpoints, finish,
                                           #   func_water and melon_respawn go; materials/melon_racer/parkour/
+tools/models/make-freighter-model.mjs     # the lighthouse parkour's container freighter as a model, models/melon_racer/freighter/freighter.vmdl (1.4k triangles): the parkour's hull
+                                          #   (896 x 320, deck 224 over the waterline = the origin, bow +X, bulwarks with stern and bow open), two gantry cranes, each trolley
+                                          #   carrying one container; looping "shuttle" (each container across the deck and back, SHUTTLE_SECONDS, the two on opposite sides,
+                                          #   swinging behind as it speeds up — checked to stay off the bulwarks) + "idle"; a prop_dynamic, Idle Animation "shuttle", Loop;
+                                          #   collision hull + bulwarks + cranes on the root, each container on its bone; .smd written turned back (Unturn); materials/melon_racer/freighter/
 tools/models/make-bridge-model.mjs        # a cable-stayed bridge after Cologne's Severinsbruecke as a race track, mesh geometry, models/melon_racer/bridge.dmx for Hammer's File → Import
                                           #   (DmxText in model.mjs): a straight steel deck LENGTH 6000 along +X, the road DECK_HEIGHT 800 up, ROAD_WIDTH 512 between parapets (40, the walls
                                           #   melons bounce off) with a railing to 96 (over a ground jump), asphalt with white markings, street lamps; under the slab two trapezoid box girders,
@@ -258,8 +263,17 @@ tools/models/make-coast-rock-model.mjs    # hard low-poly coastal rocks for deco
                                           #   models/melon_racer/coast/coast_rock_<variant>.vmdl, tinted per prop; materials/melon_racer/coast/
 tools/models/make-coast-plant-model.mjs   # low-poly coastal plants in the coast rocks' style: dune_grass (bent blades, both sides), gorse (yellow specks; solid), heather,
                                           #   thrift (pink flower balls), pine + pine_small + pine_large (wind-bent trunk leaning +X, flat needle pads), umbrella_pine, oak + oak_large
-                                          #   (round crowns of blobs), cypress (~460 high); trees: trunk + boughs solid; ~65-260 triangles each;
+                                          #   (round crowns of blobs), cypress (~460 high); trees: trunk + boughs solid; for rock faces (no collision, origin on the ledge's edge /
+                                          #   the wall's top, facing +X): ice_plant + _small/_large (a hanging carpet of Carpobrotus over the edge, magenta flowers; ~200-500),
+                                          #   ivy + _short/_long (stems with leaves flat down a wall; ~130-720), roots + _long (hanging over the edge under a pine; ~380-500),
+                                          #   ferns for crevices: fern, fern_small, fern_large, fern_upright (a shuttlecock vase), fern_hanging (out of a crack in a wall, fronds
+                                          #   hanging down towards +X), fern_dry (rust brown), fern_clump (four kinds grown together; ~100-450), moss + moss_strip for joints
+                                          #   (~90-150); ~65-720 triangles each;
                                           #   models/melon_racer/coast/coast_plant_<variant>.vmdl, tinted per prop; materials/melon_racer/coast/
+tools/models/make-seagull-model.mjs       # an eye-catcher for a ledge: a herring gull sitting on its nest, flat-shaded faceted blobs like the coast plants: models/melon_racer/seagull/
+                                          #   seagull.vmdl (292 triangles, facing +X; bones root/body/head, looping "wobble" (WOBBLE_SECONDS 8: body sways and breathes, the head looks
+                                          #   round, cocks, preens) + "idle"; a prop_dynamic, Idle Animation "wobble", Loop; collision one blob) and seagull_nest.vmdl (straw tufts, twigs,
+                                          #   three eggs; 412, solid) at the same origin (the gull's belly SEAT 4 up); .smd written turned back (Unturn); materials/melon_racer/seagull/
 tools/models/make-wood-scaffold-model.mjs # a wooden scaffold hanging on a rock wall (decoration, the lighthouse parkour), flat-shaded boxes like the coast rocks: a plank deck
                                           #   (BAY 192 wide, DEPTH 64 out) on brackets (ledger, beam, strut), a railing round front and ends, ropes up to iron anchors in the wall;
                                           #   wood_scaffold (one deck, bucket + plank pile; 558 triangles) and wood_scaffold_double (two decks LEVEL 128 apart, a ladder through
@@ -274,6 +288,13 @@ tools/models/make-swing-anchor-model.mjs  # an obstacle for the lighthouse ramp:
                                           #   across, along X) on the "pendulum" bone, looping "swing" (+-34 degrees along Y, SWING_SECONDS 4), "swing_across" (+-20 along X, kept off the wall: checked), "swing_round" + "idle"; a prop_dynamic, Idle
                                           #   Animation "swing", Loop; origin on the wall face at the beam's underside, the anchor reaching ~318 down (the output says);
                                           #   collision mount on the root, chain + anchor on the bone; .smd written turned back (Unturn) like the catapult arm; materials/melon_racer/swing_anchor/
+tools/models/make-portcullis-model.mjs    # an obstacle for the cliff paths: a portcullis gate (Fallgatter) as models/melon_racer/portcullis/portcullis.vmdl (1.2k triangles): a natural
+                                          #   rock arch in the parkour rock's grey (CHUNKS: seeded polytopes like the coast rocks, each clipped by one face of the passage — straight sides,
+                                          #   a faceted arch ARCH_FACES), passage CLEAR 160 wide, crown APEX 240; an iron grid with spikes on the "grid" bone, sliding into the rock over it
+                                          #   (the generator fails if it would show through anywhere outside the passage); the course through it along X, the rock ~580 across (its ends
+                                          #   into the cliff and over the lip), 480 high; looping "cycle" (closed 1.2 s, winched up 1.2, open 1.6, slams down 0.35) + "open"/"closed"/"idle";
+                                          #   a prop_dynamic, Idle Animation "cycle", Loop; origin on the floor in the passage's middle; collision every rock chunk (convex)
+                                          #   on the root, the grid one slab on its bone; .smd written turned back (Unturn); materials/melon_racer/portcullis/
 tools/models/make-inflatable-podium-model.mjs # an inflatable winners' podium, the solid podium's footprint and heights (its podium_spawn_<place> fit): per place
                                           #   inflatable_podium_body_<n> (soft block sunk into the floor, corner piping, seam band, grab loops, valve; solid), _top_<n> (cushion with piping;
                                           #   solid), _number_<n> (puffed Bungee digit on a round badge), + _base (ground mat, D-rings, stakes) and _blower —
@@ -359,7 +380,7 @@ models/melon_racer/melon/melon.vmdl      # the melon as our own copy: CS2's ital
                                           #   prop_data and break pieces; its fixed mass 2.0 added by hand — the decompiler drops mass_override), material remapped to materials/melon_racer/melon/melon_default.vmat —
                                           #   the base for melon skins (no SetMaterialGroup in cs_script: one .vmdl per skin, swapped by SetModel)
 materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/, melon/ (melon skins),
-                                          #   logo/ (logo_text_*), podium/, hub_gate/, pavilion/, heal_tent/, tree/, hedge/, rock/, mountain/, park/, inflatable_podium/, stage/, bouncer/, shopping_cart/, catapult/, coast/ (coast rocks + plants), wood_scaffold/, lantern/, swing_anchor/, drone/, drone_display/, spawn_pad/, floor_spotlight/, half_pipe/, parkour/, bridge/, hohenzollern_bridge/, kranhaus/, highrise/, tower_crane/, colonius/, harbor_dock/, cologne_cathedral/, chocolate_museum/, laser/, buffer_stop/, basketball_hoop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
+                                          #   logo/ (logo_text_*), podium/, hub_gate/, pavilion/, heal_tent/, tree/, hedge/, rock/, mountain/, park/, inflatable_podium/, stage/, bouncer/, shopping_cart/, catapult/, coast/ (coast rocks + plants), seagull/, wood_scaffold/, lantern/, swing_anchor/, portcullis/, freighter/, drone/, drone_display/, spawn_pad/, floor_spotlight/, half_pipe/, parkour/, bridge/, hohenzollern_bridge/, kranhaus/, highrise/, tower_crane/, colonius/, harbor_dock/, cologne_cathedral/, chocolate_museum/, laser/, buffer_stop/, basketball_hoop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
                                           #   checkpoint_gate/ — a new material goes into the fitting one, never loose in materials/melon_racer/
 materials/melon_racer/decals/*_decal.vmat # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
 ```
