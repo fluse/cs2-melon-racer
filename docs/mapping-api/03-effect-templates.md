@@ -102,6 +102,14 @@ player leaves.
 | Where | anywhere — the copy is moved onto the melon |
 
 - Without it in the map, drone mode stays off and the console says why.
+- **Limits:** every `info_visibility_box` is also a fence for the drone: it
+  stays inside the one it starts in (the smallest round the melon), its edge
+  stopping it like a wall; outside every box it flies anywhere. No name or
+  setting needed — but the script reads the boxes (position, `box_size`,
+  the prefab's rotation) from the .vmap at build time, so after adding,
+  moving or resizing one (or the prefab it sits in), run `npm run build` —
+  or keep `npm run watch` running, it rebuilds on every Hammer save. The
+  console says which box holds the drone each time drone mode starts.
 
 ### Laser pointer (optional)
 

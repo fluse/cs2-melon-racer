@@ -1,5 +1,5 @@
 // The scoreboard's rules (hud/scoreboard/logic.js): which board a viewer
-// sees, its rows and ranks — and that speedometer.xml has every panel
+// sees, its rows and ranks — and that melon_racer.xml has every panel
 // hud/scoreboard/scoreboard.js fills in.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -108,10 +108,10 @@ test("more players than rows: the viewer's own row takes the last one", () => {
     assert.equal(board.rows[0].name, "P00");
 });
 
-const layout = readFileSync(new URL("../../panorama/layout/custom_game/speedometer.xml", import.meta.url), "utf8");
-const css = readFileSync(new URL("../../panorama/styles/custom_game/speedometer.css", import.meta.url), "utf8");
+const layout = readFileSync(new URL("../../panorama/layout/custom_game/melon_racer.xml", import.meta.url), "utf8");
+const css = readFileSync(new URL("../../panorama/styles/custom_game/melon_racer.css", import.meta.url), "utf8");
 
-test("speedometer.xml has the scoreboard and SCOREBOARD_ROWS rows, each with every column", () => {
+test("melon_racer.xml has the scoreboard and SCOREBOARD_ROWS rows, each with every column", () => {
     assert.match(layout, /<Panel id="scoreboard"/);
     for (const variable of ["title", "subtitle", "best_header"]) {
         assert.ok(layout.includes(`{s:${variable}}`), variable);

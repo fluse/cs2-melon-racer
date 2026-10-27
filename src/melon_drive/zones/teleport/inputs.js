@@ -1,5 +1,5 @@
 // The generic teleporter input, melon_teleport.
-import { Instance } from "cs_script/point_script";
+import { Instance, Console } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { FindKartByMelon } from "../../core/kart-registry.js";
 import { Lifted, LevelAngles } from "../../kart/spawn-points.js";
@@ -25,13 +25,13 @@ export function RegisterTeleportInput() {
         const triggerName = caller.GetEntityName();
         const parsed = ParseTeleportTrigger(triggerName);
         if (!parsed) {
-            Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" isn't named teleport_[stop_|keep_][checkpoint_]to_<destination>, ignoring`);
+            Console.Log(`[melon_drive] melon_teleport: trigger "${triggerName}" isn't named teleport_[stop_|keep_][checkpoint_]to_<destination>, ignoring`);
             return;
         }
         const destinationName = parsed.destination;
         const destination = Instance.FindEntityByName(destinationName);
         if (!destination) {
-            Instance.Msg(`[melon_drive] melon_teleport: trigger "${triggerName}" points at "${destinationName}", but no entity has that name`);
+            Console.Log(`[melon_drive] melon_teleport: trigger "${triggerName}" points at "${destinationName}", but no entity has that name`);
             return;
         }
         const yaw = destination.GetAbsAngles().yaw;

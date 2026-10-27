@@ -97,7 +97,7 @@ export const CAMERA_TUNING_STEP = 10;
 export const CAMERA_TUNING_FINE_STEP = 1;
 // The clickable scale between them: one segment every this many units,
 // CAMERA_TUNING_MIN..CAMERA_TUNING_MAX — 41 segments (camtune_<axis>_seg_<i>
-// in speedometer.xml).
+// in melon_racer.xml).
 export const CAMERA_TUNING_SCALE_STEP = 10;
 
 // Physics tuning (dev/physics-tuning.js, its scale PHYSICS_TUNING_SCALE in
@@ -112,5 +112,5 @@ export const PHYSICS_TUNING_STEP = 10;
 export const PHYSICS_TUNING_FINE_STEP = 1;
 // The clickable scale: one segment every this many percent,
 // PHYSICS_TUNING_MIN..PHYSICS_TUNING_MAX — 31 segments
-// (phytune_<key>_seg_<i> in speedometer.xml).
+// (phytune_<key>_seg_<i> in melon_racer.xml).
 export const PHYSICS_TUNING_SCALE_STEP = 10;

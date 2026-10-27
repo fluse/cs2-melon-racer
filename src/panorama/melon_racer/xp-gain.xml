@@ -1,0 +1,17 @@
+<!-- XP notifier (UpdateXpGainHud in hud/xp-gain-panel.js), top right for
+     XP_GAIN_HUD_SECONDS after XP were earned: "+40 XP", why, the level, the XP bar
+     (XP_BAR_SEGMENTS, 20) with the fill from before green (xpgain_old_<i>)
+     and the part just gained gold (xpgain_new_<i>), the XP into the level. -->
+<Panel id="xpgain_panel" class="XpGainPanel Hidden" hittest="false">
+	<Panel class="XpGainTop">
+		<Label class="XpGainAmount" text="{s:xpgain_amount}" />
+		<Label class="XpGainLevel" text="{s:xpgain_level}" />
+	</Panel>
+	<!-- Why: every reward's reason (XP_REASON_* in race/level/constants.js), see XpGainReasonText. -->
+	<Label class="XpGainReason" text="{s:xpgain_reason}" />
+	<Panel class="XpGainBar">
+	<each loop="i in range(XP_BAR_SEGMENTS)">
+	<Panel class="XpGainSegment"><Panel id="xpgain_old_{{ i }}" class="XpGainOld" /><Panel id="xpgain_new_{{ i }}" class="XpGainNew" /></Panel></each>
+	</Panel>
+	<Label class="XpGainXp" text="{s:xpgain_xp}" />
+</Panel>

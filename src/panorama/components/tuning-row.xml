@@ -1,0 +1,29 @@
+<!-- One value on a developer page (dev/tuning-scale.js): its name, a help
+     line and the value, under it − / + in big and fine steps around a
+     clickable scale, one segment per step of the scale (lit up to the value — "On").
+       key       id prefix of the row and dialog variable of its value ("camtune_distance":
+                 camtune_distance_minus, _seg_<i>, {s:camtune_distance}, …)
+       steps     prefix of the step sizes' dialog variables ("camtune": {s:camtune_step}, {s:camtune_fine_step})
+       name      the value's name
+       help      the help line (may hold dialog variables)
+       segments  how many segments the scale has
+       extra     optional: more classes on the row ("TuningRowCompact") -->
+<Panel class="TuningRow{{ typeof extra === 'string' ? ' ' + extra : '' }}">
+	<Panel class="TuningHeader">
+		<Label class="TuningName" text="{{ name }}" />
+		<Label class="TuningHelp" text="{{ help }}" />
+		<Label class="TuningValue" text="{s:{{ key }}}" />
+	</Panel>
+	<Panel class="TuningControls">
+		<Button id="{{ key }}_minus" class="TuningStep"><Label class="TuningStepLabel" text="−{s:{{ steps }}_step}" /></Button>
+		<Button id="{{ key }}_minus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="−{s:{{ steps }}_fine_step}" /></Button>
+		<Panel class="TuningScale">
+			<Panel class="TuningSegments">
+				<each loop="i in range(Number(segments))">
+				<Button id="{{ key }}_seg_{{ i }}" class="TuningSegment" /></each>
+			</Panel>
+		</Panel>
+		<Button id="{{ key }}_plus_fine" class="TuningStep TuningFine"><Label class="TuningStepLabel" text="+{s:{{ steps }}_fine_step}" /></Button>
+		<Button id="{{ key }}_plus" class="TuningStep"><Label class="TuningStepLabel" text="+{s:{{ steps }}_step}" /></Button>
+	</Panel>
+</Panel>

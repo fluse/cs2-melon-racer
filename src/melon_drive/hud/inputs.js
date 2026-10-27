@@ -246,7 +246,7 @@ const PREFIX_BUTTONS = [
 
 /**
  * Whether a button id has a handler here (exactly, or by prefix) — every
- * button in speedometer.xml must (test/hud/hud-layout.test.mjs).
+ * button in melon_racer.xml must (test/hud/hud-layout.test.mjs).
  * @param {string} buttonId
  */
 export function IsHandledButton(buttonId) {

@@ -1,0 +1,7 @@
+<!-- A group's heading in the user menu's SETTINGS: an icon and a word.
+       icon   icons/<icon>.png
+       label  the text -->
+<Panel class="UserMenuGroupHeader">
+	<Image class="UserMenuGroupIcon" src="file://{images}/custom_game/icons/{{ icon }}.png" />
+	<Label class="UserMenuGroupLabel" text="{{ label }}" />
+</Panel>

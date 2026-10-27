@@ -1,0 +1,37 @@
+<!-- Developer test triggers page (SetUserMenuPage in hud/user-menu.js):
+     previews of what a player only sees at certain moments. Each one closes
+     the menu when it starts. -->
+<module href="../../components/tuning-page.xml" page="triggers" prefix="triggers" extra="TriggersPage"
+	title="TEST TRIGGERS"
+	intro="Plays a moment or an effect for you alone (the podium puts everyone up). Not while you race.">
+	<Panel class="TriggersList">
+		<!-- Plays the end of a Grand Prix: everyone to the hub, you on place 1,
+		     the others on 2 and 3 (usermenu_podium_button in hud/inputs.js).
+		     Ignored while a heat runs. -->
+		<module href="../../components/toggle.xml" id="usermenu_podium_button" name="Test Podium" action="RUN" />
+		<!-- Plays the heat's 3…2…1…GO for you alone, the melon held until GO
+		     (TestCountdown in race/heat/race-flow.js). Not while you race. -->
+		<module href="../../components/toggle.xml" id="usermenu_testcountdown_button" name="Test Countdown" action="RUN" />
+		<!-- Plays what a racer sees at the finish: FINISH, "1ST · +10 PTS" and
+		     the break countdown, the melon held meanwhile (TestFinish). Not while you race. -->
+		<module href="../../components/toggle.xml" id="usermenu_testfinish_button" name="Test Finish" action="RUN" />
+		<!-- Plays the Melon Racer logo a player sees on joining, the melon held
+		     behind it (TestIntro in race/heat/race-flow.js). Not while you race. -->
+		<module href="../../components/toggle.xml" id="usermenu_testintro_button" name="Test Intro" action="RUN" />
+		<!-- Plays the call everyone outside the hub's start area gets when a Grand
+		     Prix is started: "GRAND PRIX STARTS IN 10 · PRESS R TO JOIN", R takes you
+		     to the hub (TestGrandPrixCall in race/heat/race-flow.js). Not while you race. -->
+		<module href="../../components/toggle.xml" id="usermenu_testgpcall_button" name="Test Grand Prix Call" action="RUN" />
+		<!-- Your melon breaks where it is: effects, pieces, break camera, then the
+		     respawn at your respawn point (TestBreak in dev/test-effects.js). -->
+		<module href="../../components/toggle.xml" id="usermenu_testbreak_button" name="Test Break" action="RUN" />
+		<!-- A PERFECT bounce's feedback only: spark, bounce panel, speedometer flash
+		     — no speed (TestPerfectBounce). -->
+		<module href="../../components/toggle.xml" id="usermenu_testbounce_button" name="Test Perfect Bounce" action="RUN" />
+		<!-- The heal zone's effect on your melon, health refilled (TestHeal). -->
+		<module href="../../components/toggle.xml" id="usermenu_testheal_button" name="Test Heal" action="RUN" />
+		<!-- The XP notifier as if XP_GAIN_TEST_AMOUNT XP were earned — only
+		     shown, nothing given (TestXpGain). -->
+		<module href="../../components/toggle.xml" id="usermenu_testxp_button" name="Test XP Gain" action="RUN" />
+	</Panel>
+</module>

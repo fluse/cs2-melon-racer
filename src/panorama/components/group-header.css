@@ -1,0 +1,22 @@
+/* SETTINGS: a small header per group, then its controls. */
+.UserMenuGroupHeader {
+    flow-children: right;
+    margin-top: 16px;
+    margin-bottom: 8px;
+}
+
+.UserMenuGroupIcon {
+    width: 16px;
+    height: 16px;
+    vertical-align: center;
+    margin-right: 8px;
+    opacity: 0.8;
+}
+
+.UserMenuGroupLabel {
+    font-size: $font-small;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $(mint)aa;
+    vertical-align: center;
+}

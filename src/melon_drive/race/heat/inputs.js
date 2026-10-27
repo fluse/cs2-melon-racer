@@ -1,6 +1,6 @@
 // The hub's script inputs: hub_enter/hub_leave (the start modal) and
 // hub_teleport (send a melon to the hub).
-import { Instance } from "cs_script/point_script";
+import { Instance, Console } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { FindKartByMelon } from "../../core/kart-registry.js";
 import { ShowHubModal, HideHubModal } from "../../hud/hub-modal/hub-modal.js";
@@ -29,7 +29,7 @@ export function RegisterHeatInputs() {
         // hub trigger had one), which would otherwise reject the real trigger.
         const callerName = caller?.GetEntityName().trim();
         if (callerName !== HUB_TRIGGER_NAME) {
-            Instance.Msg(`[melon_drive] hub_enter fired by "${callerName ?? "?"}", not "${HUB_TRIGGER_NAME}" — ignoring. To send melons to the hub, use RunScriptInput hub_teleport instead.`);
+            Console.Log(`[melon_drive] hub_enter fired by "${callerName ?? "?"}", not "${HUB_TRIGGER_NAME}" — ignoring. To send melons to the hub, use RunScriptInput hub_teleport instead.`);
             return;
         }
         kart.inHub = true;

@@ -1,0 +1,18 @@
+/* .KeyHints: bottom left corner, one line per key — a keycap with its letter
+   or a mouse with the button marked, then what it does. No background, a
+   white border (#spectate_hints, #drone_hint). */
+.KeyHints {
+    horizontal-align: left;
+    vertical-align: bottom;
+    margin-left: 30px;
+    margin-bottom: 30px;
+    flow-children: down;
+}
+
+.KeyHintGroup {
+    flow-children: down;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}

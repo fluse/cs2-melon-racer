@@ -1,5 +1,5 @@
 // The hub's "Start Grand Prix" window: the rules for its heat cards and racer
-// list (hud/hub-modal/logic.js), its panels in speedometer.xml (and a route
+// list (hud/hub-modal/logic.js), its panels in melon_racer.xml (and a route
 // image per card), and what the real hud/hub-modal/hub-modal.js sends each
 // player, against the fake engine.
 import "../helpers/register-cs-script.mjs";
@@ -55,10 +55,10 @@ test("a heat card per track in race order: number, route name, laps and checkpoi
     assert.equal(HeatsTitle(3), "HEATS · 3");
 });
 
-const layout = readFileSync(new URL("../../panorama/layout/custom_game/speedometer.xml", import.meta.url), "utf8");
-const css = readFileSync(new URL("../../panorama/styles/custom_game/speedometer.css", import.meta.url), "utf8");
+const layout = readFileSync(new URL("../../panorama/layout/custom_game/melon_racer.xml", import.meta.url), "utf8");
+const css = readFileSync(new URL("../../panorama/styles/custom_game/melon_racer.css", import.meta.url), "utf8");
 
-test("speedometer.xml has a heat card for every track id, each with its route image", () => {
+test("melon_racer.xml has a heat card for every track id, each with its route image", () => {
     const modal = layout.match(/<Panel id="hub_modal"[\s\S]*?<Button id="hub_start_button"/);
     assert.ok(modal, "hub_modal");
     assert.match(modal[0], /<Panel id="hub_heats"[^>]*>\s*<Label[^>]*text="\{s:title\}"/);
@@ -73,11 +73,11 @@ test("speedometer.xml has a heat card for every track id, each with its route im
 
 // Found in-game: texturewidth/textureheight on an Image made the whole
 // custom HUD disappear, with no console error and resourcecompiler "OK".
-test("no Image in speedometer.xml sets texturewidth/textureheight", () => {
+test("no Image in melon_racer.xml sets texturewidth/textureheight", () => {
     assert.doesNotMatch(layout, /texture(width|height)=/);
 });
 
-test("speedometer.xml has the racer list inside the hub window, HUB_RACER_ROWS rows", () => {
+test("melon_racer.xml has the racer list inside the hub window, HUB_RACER_ROWS rows", () => {
     const modal = layout.match(/<Panel id="hub_modal"[\s\S]*?<Button id="hub_start_button"/);
     assert.ok(modal, "hub_modal");
     assert.match(modal[0], /<Panel id="hub_racers"[^>]*>\s*<Label[^>]*text="\{s:title\}"/);
