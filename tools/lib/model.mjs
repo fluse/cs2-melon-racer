@@ -277,6 +277,30 @@ export const V3 = {
     Unit: a => a.map(n => n / Math.hypot(...a)),
 };
 
+/** A flat-shaded box into `mesh` round `c` along the unit axes ax, ay, az (right-handed), `h` its half sizes. */
+export function Box(mesh, c, [ax, ay, az], h, part) {
+    const axes = [ax, ay, az];
+    const At = s => axes.reduce((p, a, k) => V3.Add(p, V3.Scale(a, s[k] * h[k])), c);
+    for (const [i, j, k] of [[1, 2, 0], [2, 0, 1], [0, 1, 2]]) {
+        for (const sign of [1, -1]) {
+            const quad = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([si, sj]) => { const s = [0, 0, 0]; s[i] = si; s[j] = sj; s[k] = sign; return At(s); });
+            if (sign < 0) quad.reverse();
+            mesh.Tri(quad[0], quad[1], quad[2], part);
+            mesh.Tri(quad[0], quad[2], quad[3], part);
+        }
+    }
+}
+/** A flat-shaded box from corner `lo` to corner `hi`, along the world axes. */
+export const AxisBox = (mesh, lo, hi, part) => Box(mesh, V3.Scale(V3.Add(lo, hi), 0.5), [[1, 0, 0], [0, 1, 0], [0, 0, 1]], V3.Scale(V3.Sub(hi, lo), 0.5), part);
+/** A flat-shaded beam `w` x `t` from a to b, its `t` side facing `up` as far as it can. */
+export function Beam(mesh, a, b, w, t, part, up = [0, 0, 1]) {
+    const ax = V3.Unit(V3.Sub(b, a));
+    let side = V3.Cross(up, ax);
+    if (Math.hypot(...side) < 1e-6) side = V3.Cross([1, 0, 0], ax);
+    const ay = V3.Unit(side), az = V3.Cross(ax, ay);
+    Box(mesh, V3.Scale(V3.Add(a, b), 0.5), [ax, ay, az], [Math.hypot(...V3.Sub(b, a)) / 2, w / 2, t / 2], part);
+}
+
 /**
  * A helix's centerline around the Z axis through (x, y): from z0 to z1 in
  * `turns` turns, `stepsPerTurn` points each — a coil spring for Mesh.Tube.

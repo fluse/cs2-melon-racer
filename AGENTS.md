@@ -113,7 +113,7 @@ tools/                                    # generators, `node tools/<folder>/<fi
                                           #   lib/ shared helpers (no output of their own), models/, materials/, images/ (panorama PNGs), media/ (GIFs); a new tool goes
                                           #   into the fitting one, never loose in tools/
 tools/lib/font.mjs                        # shared by the text-cutting model generators (logo, podiums, signs): a line of text in a font (Bungee) as 2D shapes, GrowShapes (clipper offset)
-tools/lib/model.mjs                       # shared by the model generators: mesh builder (extrude, triangles, Mesh.Face: a flat polygon with its own UVs), Mesh.Tube/Cone, Mesh.Surface (a smooth grid: canopy, flag), Helix, V3 vector math, 2D outlines (Shape, Circle,
+tools/lib/model.mjs                       # shared by the model generators: mesh builder (extrude, triangles, Mesh.Face: a flat polygon with its own UVs), Mesh.Tube/Cone, Mesh.Surface (a smooth grid: canopy, flag), Box/AxisBox/Beam (flat-shaded boxes), Helix, V3 vector math, 2D outlines (Shape, Circle,
                                           #   RadialOutline for teeth/stars, Slot, ChamferedRect), SeededRandom (same output every run), .obj/.smd/.vmdl/.dmx/.vmat writers (SmdText + SmdAnimationText + VmdlText's
                                           #   animations for skinned, animated models) — reuse them before writing a generator-local helper
 tools/lib/png.mjs                         # the PNG encoder make-icons.mjs uses
@@ -149,14 +149,16 @@ tools/models/make-half-pipe-model.mjs     # a half-pipe slide as mesh geometry, 
                                           #   sky blue shell (RADIUS 64, ARC_HALF_ANGLE up each side) down along +X: the slide (LENGTH 1024, DROP 256, smootherstep), a curve over
                                           #   the edge, a STEEP_DROP 1000 drop at STEEP_ANGLE 58 (over 60 it'd count as a wall), a wide bottom curve up into a KICK_ANGLE 15 kicker;
                                           #   rounded white lips, graphite legs (2.9k triangles); materials/melon_racer/half_pipe/ — the top 30 degrees of each side count as walls (bounces)
-tools/models/make-parkour-model.mjs       # a vertical parkour race track shaped like a snail shell, mesh geometry, models/melon_racer/parkour.dmx for Hammer's File → Import (DmxText in model.mjs):
-                                          #   laid out along the course (s along, t across, z up; horizontal sizes x SCALE 0.8) and wound counter-clockwise round a central spire,
-                                          #   the radius shrinking SPIRAL.shrink per turn (1200 -> ~570 world, 1.3 turns) so each turn runs inside and above the last; start deck
-                                          #   384 up -> summit 2048 up: floating jump platforms (+64 each), a curved canyon gap between tall orange walls (wall jumps/bounces),
-                                          #   a tower climbed without a lift zone (a spiral staircase of corner ledges, +64 each, wall jumps skip some), a deck with magenta
-                                          #   chicanes + hurdles, ledges on alternating sides between two walls up to the summit; a round catch floor (3.6k triangles, every
-                                          #   solid its own shell, curves in SPIRAL.stepDegrees pieces); prints position + yaw for start, checkpoints, respawn and finish;
-                                          #   materials/melon_racer/parkour/
+tools/models/make-parkour-model.mjs       # the lighthouse parkour race track, mesh geometry for Hammer's File → Import (DmxText in model.mjs), one .dmx per section
+                                          #   (models/melon_racer/parkour/parkour_<nn>_<section>.dmx, all at one origin: the lighthouse's middle at sea level; `node … <section>`
+                                          #   writes only that one): 01_harbor (quay with the start, moles, warehouse), 02_ships (low-poly hulls lofted from cross-sections: cutter with wheelhouse, derrick and stern gantry, tug with funnel,
+                                          #   towing arch and tire fenders, freighter with container
+                                          #   chicanes under two gantry cranes and a bulbous bow, barge with hatch hurdles: jumped from deck to deck, gaps 160-192, +32/+64; ~3.5k triangles), 03_cliff_path + 04_cliff_climb + 05_cliff_summit (paths up the
+                                          #   rock's flank counter-clockwise, ~1.8 turns, ~5 degrees, each turn inside and above the last; a rough inner wall and an outer lip:
+                                          #   a gorge between ochre walls for wall jumps, boulders, rock steps, a crevice, onto the plateau at ~1380), 06_lighthouse (red/white
+                                          #   tower, a ramp 4 times round it with 4 gaps to jump (RAMP_GAPS) up to the gallery = finish at ~3190, glowing lantern), 07_rock (the core in tiers, the plateau its
+                                          #   top; rocks round the foot), 08_seabed; ~25400 along the course, ~14.9k triangles; laid out along the course (s along, t across, z up) in world units; prints where start, checkpoints, finish,
+                                          #   func_water and melon_respawn go; materials/melon_racer/parkour/
 tools/models/make-bridge-model.mjs        # a cable-stayed bridge after Cologne's Severinsbruecke as a race track, mesh geometry, models/melon_racer/bridge.dmx for Hammer's File → Import
                                           #   (DmxText in model.mjs): a straight steel deck LENGTH 6000 along +X, the road DECK_HEIGHT 800 up, ROAD_WIDTH 512 between parapets (40, the walls
                                           #   melons bounce off) with a railing to 96 (over a ground jump), asphalt with white markings, street lamps; under the slab two trapezoid box girders,
@@ -250,6 +252,28 @@ tools/models/make-mountain-model.mjs      # an inflatable mountain kit for the b
 tools/models/make-rock-model.mjs          # inflatable rocks for the map borders, four variants (VARIANTS: boulder, spire _2, slab _3, small _4; ~400-530 triangles each): a convex polytope
                                           #   cut by seeded random planes, each face a vinyl panel puffed out between pinched seams on its edges, sunk into the floor, a valve, two tie-downs;
                                           #   models/melon_racer/rock/rock<suffix>.vmdl, tinted per prop, collision the polytope (convex); a jump reaches their tops — back a border with a clip brush
+tools/models/make-coast-rock-model.mjs    # hard low-poly coastal rocks for decoration (the lighthouse parkour), flat-shaded seeded polytopes (lib/inflatable.mjs), up-facing facets
+                                          #   a lighter stone: boulder, slab, stack, cluster, pebble (~20-110 triangles) and big ones to dress a cliff: boulder_2/_3, crag/_2,
+                                          #   cliff/_2 (wide wall pieces up to ~850 x 460), outcrop, stack_large + _2.._5 (sea stacks ~540-870 high: slim, stumpy, two peaks, a fallen chunk), cluster_large (~50-160); collision the polytopes;
+                                          #   models/melon_racer/coast/coast_rock_<variant>.vmdl, tinted per prop; materials/melon_racer/coast/
+tools/models/make-coast-plant-model.mjs   # low-poly coastal plants in the coast rocks' style: dune_grass (bent blades, both sides), gorse (yellow specks; solid), heather,
+                                          #   thrift (pink flower balls), pine + pine_small + pine_large (wind-bent trunk leaning +X, flat needle pads), umbrella_pine, oak + oak_large
+                                          #   (round crowns of blobs), cypress (~460 high); trees: trunk + boughs solid; ~65-260 triangles each;
+                                          #   models/melon_racer/coast/coast_plant_<variant>.vmdl, tinted per prop; materials/melon_racer/coast/
+tools/models/make-wood-scaffold-model.mjs # a wooden scaffold hanging on a rock wall (decoration, the lighthouse parkour), flat-shaded boxes like the coast rocks: a plank deck
+                                          #   (BAY 192 wide, DEPTH 64 out) on brackets (ledger, beam, strut), a railing round front and ends, ropes up to iron anchors in the wall;
+                                          #   wood_scaffold (one deck, bucket + plank pile; 558 triangles) and wood_scaffold_double (two decks LEVEL 128 apart, a ladder through
+                                          #   a hatch; 1.1k); origin on the wall face at the (upper) deck's top, reaching out +X, WALL_SINK 8 behind it to push into a curved wall;
+                                          #   collision decks, railings, brackets; models/melon_racer/wood_scaffold/, materials/melon_racer/wood_scaffold/
+tools/models/make-lantern-model.mjs       # old hexagonal storm lanterns, blackened iron, the glass glowing warm (self-illum, lights nothing: the output prints where
+                                          #   the light entity goes per variant), flat-shaded: lantern_hanging (origin at its ring's top), lantern_standing (on the floor;
+                                          #   ~200 triangles each), lantern_wall (plate + braced arm out +X, origin on the wall face), lantern_post / _post_double (wooden
+                                          #   post, arm(s) out +-X; ~290 / 530); only the posts solid; models/melon_racer/lantern/, materials/melon_racer/lantern/
+tools/models/make-swing-anchor-model.mjs  # an obstacle for the lighthouse ramp: an admiralty anchor on a chain swinging from a wooden gallows on the wall, models/melon_racer/swing_anchor/
+                                          #   swing_anchor.vmdl (988 triangles): post, beam ARM.reach 160 out along +X, strut, iron tie rod, bracket + pin; chain + anchor (arms
+                                          #   across, along X) on the "pendulum" bone, looping "swing" (+-34 degrees along Y, SWING_SECONDS 4), "swing_across" (+-20 along X, kept off the wall: checked), "swing_round" + "idle"; a prop_dynamic, Idle
+                                          #   Animation "swing", Loop; origin on the wall face at the beam's underside, the anchor reaching ~318 down (the output says);
+                                          #   collision mount on the root, chain + anchor on the bone; .smd written turned back (Unturn) like the catapult arm; materials/melon_racer/swing_anchor/
 tools/models/make-inflatable-podium-model.mjs # an inflatable winners' podium, the solid podium's footprint and heights (its podium_spawn_<place> fit): per place
                                           #   inflatable_podium_body_<n> (soft block sunk into the floor, corner piping, seam band, grab loops, valve; solid), _top_<n> (cushion with piping;
                                           #   solid), _number_<n> (puffed Bungee digit on a round badge), + _base (ground mat, D-rings, stakes) and _blower —
@@ -335,7 +359,7 @@ models/melon_racer/melon/melon.vmdl      # the melon as our own copy: CS2's ital
                                           #   prop_data and break pieces; its fixed mass 2.0 added by hand — the decompiler drops mass_override), material remapped to materials/melon_racer/melon/melon_default.vmat —
                                           #   the base for melon skins (no SetMaterialGroup in cs_script: one .vmdl per skin, swapped by SetModel)
 materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/, melon/ (melon skins),
-                                          #   logo/ (logo_text_*), podium/, hub_gate/, pavilion/, heal_tent/, tree/, hedge/, rock/, mountain/, park/, inflatable_podium/, stage/, bouncer/, shopping_cart/, catapult/, drone/, drone_display/, spawn_pad/, floor_spotlight/, half_pipe/, parkour/, bridge/, hohenzollern_bridge/, kranhaus/, highrise/, tower_crane/, colonius/, harbor_dock/, cologne_cathedral/, chocolate_museum/, laser/, buffer_stop/, basketball_hoop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
+                                          #   logo/ (logo_text_*), podium/, hub_gate/, pavilion/, heal_tent/, tree/, hedge/, rock/, mountain/, park/, inflatable_podium/, stage/, bouncer/, shopping_cart/, catapult/, coast/ (coast rocks + plants), wood_scaffold/, lantern/, swing_anchor/, drone/, drone_display/, spawn_pad/, floor_spotlight/, half_pipe/, parkour/, bridge/, hohenzollern_bridge/, kranhaus/, highrise/, tower_crane/, colonius/, harbor_dock/, cologne_cathedral/, chocolate_museum/, laser/, buffer_stop/, basketball_hoop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
                                           #   checkpoint_gate/ — a new material goes into the fitting one, never loose in materials/melon_racer/
 materials/melon_racer/decals/*_decal.vmat # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
 ```

@@ -85,6 +85,13 @@ reuse a color for something with a different meaning.
   (`#D8342A`), rusty rebar, a galvanized scaffold with wooden planks — off-palette on purpose, a real building site.
 - **Tower crane** (`tools/models/make-tower-crane-model.mjs`): steel and cab white, tinted per prop in Hammer (a crane color),
   graphite turntable, trolley and cables, concrete ballast, an amber hook block (`#E8A020`).
+- **Lighthouse parkour** (`tools/models/make-parkour-model.mjs`): grey rock (`#7D7870`) with lighter paths (`#A89F8E`), ochre gorge walls
+  (`#C27A3A`) where a wall is there to wall-jump off, a red and white lighthouse (`#D8342A`) with a glowing yellow lantern, stone quay,
+  ships in red, navy and black over dark red antifouling, white stripes and deckhouses with dark window bands, black tire fenders,
+  containers in blue/orange/green/red, yellow gantry cranes (`#F0B824`) — off-palette on purpose, a real harbor.
+- **Coast rocks and plants** (`tools/models/make-coast-rock-model.mjs`, `make-coast-plant-model.mjs`): stone (`#868178`) with
+  lichen-grey tops (`#B2AD96`); marram green (`#8EA452`) and straw, gorse green with yellow (`#F2C41E`), heather with purple, sea thrift
+  pink, pine bark and needles — natural colors, tinted per prop.
 - **Spinning hammer** (`tools/models/make-spin-hammer-model.mjs`): steel head, signal red rubber faces
   (`#E83C2A`, like the saw blade's ring), wooden handle, dark grey pedestal — off-palette on purpose, a hazard.
 
@@ -99,6 +106,3 @@ onto it when you're working on them anyway:
 | 3D logo outline (`tools/models/make-logo-model.mjs`, `OUTLINE_COLOR`) | `#AAFF33` | Guide green |
 | Holo gate gradient (`tools/materials/make-holo.mjs`, `GRADIENT`) | `#39FF14` → `#AA28FF` | — |
 | Heal holo gradient (`tools/materials/make-holo.mjs`, `HEAL_GRADIENT`) | `#28FF6E` → `#6EFFD7` | Heal cyan |
-- **Parkour snail** (`tools/models/make-parkour-model.mjs`): light grey floors (`#D3D6DA`), graphite slab edges, railings, supports and the central spire,
-  orange walls (`#FF8A1F`) wherever a wall is there to wall-jump or bounce off (canyon, tower, stairs), magenta obstacles (`#FF20FF`, like the
-  buffer stop) — off-palette on purpose.
