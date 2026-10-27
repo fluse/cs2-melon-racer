@@ -7,7 +7,7 @@
 // camera/follow/constants.js. The scale is the shared one
 // (tuning-scale-logic.js); opening/closing the page is SetUserMenuPage in
 // hud/user-menu.js.
-import { Instance } from "cs_script/point_script";
+import { Console } from "cs_script/point_script";
 import { GetSpeedHud } from "../hud/layout.js";
 import { CAMERA_TUNING_SCALE, ParseTuningButton, TunedValue } from "./tuning-scale-logic.js";
 import { UpdateTuningScaleHud } from "./tuning-scale.js";
@@ -33,7 +33,7 @@ export function GetCameraTuning(kart) {
  */
 function SetCameraTuning(slot, kart, tuning) {
     kart.cameraTuning = tuning.distance === CAMERA_DISTANCE && tuning.height === CAMERA_HEIGHT ? undefined : tuning;
-    Instance.Msg(`[camera tuning] slot ${slot}: distance ${tuning.distance}, height ${tuning.height} (CAMERA_DISTANCE/CAMERA_HEIGHT)`);
+    Console.Log(`[camera tuning] slot ${slot}: distance ${tuning.distance}, height ${tuning.height} (CAMERA_DISTANCE/CAMERA_HEIGHT)`);
     UpdateCameraTuningHud(slot, kart);
 }
 

@@ -4,7 +4,7 @@
 // (world/catapult/roll.js), seats a melon that comes
 // into the bucket and — on its jump — carries it along the arm's swing and
 // throws it (HoldInCatapult, from UpdateKart).
-import { Instance, CSInputs } from "cs_script/point_script";
+import { Instance, Console, CSInputs } from "cs_script/point_script";
 import {
     CATAPULT_BASE_CLASSES,
     CATAPULT_ARM_CLASS,
@@ -88,12 +88,12 @@ function ScanCatapults() {
             best.arm = arm;
             Animate(best, undefined);
         } else {
-            Instance.Msg(`[melon_drive] catapults: an arm at ${at.x.toFixed(0)} ${at.y.toFixed(0)} ${at.z.toFixed(0)} has no catapult base within ${CATAPULT_PAIR_DISTANCE}\n`);
+            Console.Log(`[melon_drive] catapults: an arm at ${at.x.toFixed(0)} ${at.y.toFixed(0)} ${at.z.toFixed(0)} has no catapult base within ${CATAPULT_PAIR_DISTANCE}\n`);
         }
     }
     if (found) {
         const armless = [...catapults.values()].filter(c => !c.arm).length;
-        Instance.Msg(`[melon_drive] catapults: ${found} new, ${catapults.size} in all${armless ? `, ${armless} without an arm` : ""}\n`);
+        Console.Log(`[melon_drive] catapults: ${found} new, ${catapults.size} in all${armless ? `, ${armless} without an arm` : ""}\n`);
     }
 }
 

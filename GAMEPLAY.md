@@ -1068,6 +1068,15 @@ Switching it on or off closes the menu.
   `DRONE_TOP` up) along every move, so it lands on its skids, sliding along walls, floors and ceilings — but
   flies **through melons**, players and other drones (the model has no
   collision at all).
+- **Limits** (decided): the drone stays inside the `info_visibility_box`
+  it starts in — the smallest one round the melon — so it can't fly out of
+  the area that's drawn; its edge stops it like a wall, the drone sliding
+  along it. Starting outside every box, there's no limit. The script can't
+  read the boxes from the engine: `build-map-data.mjs` (run by `npm run
+  build`) reads them from the .vmap into `dev/visibility-boxes.js`, so a
+  box moved in Hammer needs a build or a running `npm run watch` (it
+  rebuilds on every .vmap save; `test/dev/drone-bounds.test.mjs` fails
+  until then). `DroneBoundsAt`/`KeepInBounds` in `dev/drone-logic.js`.
 - **Landing:** on a floor (within `DRONE_GROUND_DISTANCE` under its
   skids) and **standing still there for `DRONE_LAND_SECONDS` (0.5 s)**
   (decided; slower than `DRONE_LAND_MAX_SPEED`, moving starts it over) — until

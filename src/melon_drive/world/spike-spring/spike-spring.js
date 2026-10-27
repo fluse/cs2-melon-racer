@@ -3,7 +3,7 @@
 // its spikes are out every melon over it breaks. The map is searched for
 // springs every SPIKE_SPRING_SCAN_SECONDS, so one that spawned after the
 // script's first look (or was respawned by a round restart) still joins.
-import { Instance } from "cs_script/point_script";
+import { Instance, Console } from "cs_script/point_script";
 import { SPIKE_SPRING_CLASS, SPIKE_SPRING_SCAN_SECONDS } from "../../constants/index.js";
 import { karts } from "../../core/kart-registry.js";
 import { BreakKartNow } from "../../health/index.js";
@@ -37,7 +37,7 @@ function ScanSpikeSprings() {
         }
     }
     if (added.length) {
-        Instance.Msg(`[melon_drive] spike springs: ${spikeSprings.size} running, new: ${added.join(", ")}`);
+        Console.Log(`[melon_drive] spike springs: ${spikeSprings.size} running, new: ${added.join(", ")}`);
     }
 }
 
@@ -59,7 +59,7 @@ export function UpdateSpikeSprings(now) {
         // Said once per kind of error, not every tick (Think's own catch only logs with DEBUG on).
         if (String(err) !== lastError) {
             lastError = String(err);
-            Instance.Msg(`[melon_drive] spike springs: ${err}`);
+            Console.Log(`[melon_drive] spike springs: ${err}`);
         }
     }
 }

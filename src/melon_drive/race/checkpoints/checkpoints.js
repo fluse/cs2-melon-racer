@@ -1,4 +1,4 @@
-import { Instance } from "cs_script/point_script";
+import { Instance, Console } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { FindKartByMelon } from "../../core/kart-registry.js";
 import { activeTrackId, FinishKart } from "../heat/race-flow.js";
@@ -243,7 +243,7 @@ function TrackIdFromCaller(input, caller, parse) {
     const name = caller?.GetEntityName() ?? "";
     const trackId = parse(name);
     if (trackId === undefined || trackId < 1 || trackId > MAX_TRACKS) {
-        Instance.Msg(`[melon_drive] ${input} fired by "${name}", which names no track 1..${MAX_TRACKS} — ignoring. See docs/mapping-api/04-tracks.md.`);
+        Console.Log(`[melon_drive] ${input} fired by "${name}", which names no track 1..${MAX_TRACKS} — ignoring. See docs/mapping-api/04-tracks.md.`);
         return undefined;
     }
     return trackId;
@@ -295,7 +295,7 @@ export function RegisterCheckpointAndFinishInputs() {
         const name = caller.GetEntityName();
         const checkpoint = CheckpointFromTrigger(name);
         if (!checkpoint || checkpoint.trackId < 1 || checkpoint.trackId > MAX_TRACKS || checkpoint.index < 1 || checkpoint.index > MAX_CHECKPOINTS_PER_TRACK) {
-            Instance.Msg(`[melon_drive] checkpoint fired by "${name}", which isn't named checkpoint_<trackId 1..${MAX_TRACKS}>_<index 1..${MAX_CHECKPOINTS_PER_TRACK}> — ignoring. See docs/mapping-api/04-tracks.md.`);
+            Console.Log(`[melon_drive] checkpoint fired by "${name}", which isn't named checkpoint_<trackId 1..${MAX_TRACKS}>_<index 1..${MAX_CHECKPOINTS_PER_TRACK}> — ignoring. See docs/mapping-api/04-tracks.md.`);
             return;
         }
         OnCheckpointTouched(checkpoint.trackId, checkpoint.index, kart, caller);

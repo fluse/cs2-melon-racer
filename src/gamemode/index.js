@@ -1,4 +1,4 @@
-import { Instance } from "cs_script/point_script";
+import { Instance, Console, GameRules } from "cs_script/point_script";
 
 // Free-for-all race mode: no team select, no combat, no round interruptions.
 // Everyone should be able to connect and start running immediately.
@@ -17,30 +17,30 @@ function IsPlayingTeam(team) {
 // Warmup never ends, so there's never a "round start" that freezes/resets
 // racers mid-run. mp_warmup_pausetimer keeps the warmup clock from ever
 // ticking down to a real match.
-// Instance.ServerCommand("mp_warmup_enabled 1");
+// Console.SetConvar("mp_warmup_enabled", 1);
 // mp_warmup_enabled alone isn't reliable on a local/offline listen server
 // (the usual way this map gets tested) — mp_warmup_offline_enabled is the
 // cvar CS2 actually checks there. Setting both covers dedicated servers too.
-// Instance.ServerCommand("mp_warmup_offline_enabled 1");
-// Instance.ServerCommand("mp_warmup_pausetimer 1");
-Instance.ServerCommand("mp_warmup_end");
-Instance.ServerCommand("mp_roundtime 60");
-Instance.ServerCommand("mp_autoteambalance 0");
-Instance.ServerCommand("mp_roundtime_defuse 60");
-Instance.ServerCommand("mp_roundtime_hostage 60");
-Instance.ServerCommand("mp_limitteams 0");
-Instance.ServerCommand("mp_friendlyfire 0");
-Instance.ServerCommand("mp_solid_teammates 0"); // don't block each other on the track
-Instance.ServerCommand("mp_ignore_round_win_conditions 1");
-Instance.ServerCommand("mp_teamcashawards false");
-Instance.ServerCommand("mp_playercashawards false");
+// Console.SetConvar("mp_warmup_offline_enabled", 1);
+// Console.SetConvar("mp_warmup_pausetimer", 1);
+GameRules.EndWarmup();
+Console.SetConvar("mp_roundtime", 60);
+Console.SetConvar("mp_autoteambalance", 0);
+Console.SetConvar("mp_roundtime_defuse", 60);
+Console.SetConvar("mp_roundtime_hostage", 60);
+Console.SetConvar("mp_limitteams", 0);
+Console.SetConvar("mp_friendlyfire", 0);
+Console.SetConvar("mp_solid_teammates", 0); // don't block each other on the track
+Console.SetConvar("mp_ignore_round_win_conditions", 1);
+Console.SetConvar("mp_teamcashawards", false);
+Console.SetConvar("mp_playercashawards", false);
 // No default loadout: the engine handed every pawn a knife back after
 // DestroyWeapons, and a knife swing shoves melons — a free-looking pawn
 // could fly up to someone's melon and knife it to pieces.
-Instance.ServerCommand('mp_t_default_melee ""');
-Instance.ServerCommand('mp_ct_default_melee ""');
-Instance.ServerCommand('mp_t_default_secondary ""');
-Instance.ServerCommand('mp_ct_default_secondary ""');
+Console.SetConvar("mp_t_default_melee", "");
+Console.SetConvar("mp_ct_default_melee", "");
+Console.SetConvar("mp_t_default_secondary", "");
+Console.SetConvar("mp_ct_default_secondary", "");
 
 /** @param {import("cs_script/point_script").CSPlayerPawn} pawn */
 function PutPlayerInRaceMode(pawn) {

@@ -8,7 +8,7 @@
 // value, ready to copy into the constants. The scale is the shared one
 // (tuning-scale-logic.js); opening/closing the page is SetUserMenuPage in
 // hud/user-menu.js.
-import { Instance } from "cs_script/point_script";
+import { Console } from "cs_script/point_script";
 import { karts } from "../core/kart-registry.js";
 import { GetSpeedHud } from "../hud/layout.js";
 import { PHYSICS_TUNING_KEYS, PhysicsFactor, PhysicsPercent, SetPhysicsPercent, ResetPhysicsTuning } from "./physics-tuning-logic.js";
@@ -76,7 +76,7 @@ export function UpdatePhysicsTuningHud(slot) {
 export function HandlePhysicsTuningClick(slot, kart, buttonId) {
     if (buttonId === "phytune_reset_button") {
         ResetPhysicsTuning();
-        Instance.Msg(`[physics tuning] ${PlayerName(slot)}: everything back to 100 % (all melons)`);
+        Console.Log(`[physics tuning] ${PlayerName(slot)}: everything back to 100 % (all melons)`);
         RefreshOpenPages();
         return true;
     }
@@ -87,7 +87,7 @@ export function HandlePhysicsTuningClick(slot, kart, buttonId) {
     }
     SetPhysicsPercent(key, TunedValue(PHYSICS_TUNING_SCALE, PhysicsPercent(key), button));
     const row = ROWS[key];
-    Instance.Msg(`[physics tuning] ${PlayerName(slot)}: ${key} ${PhysicsPercent(key)} % = ${row.constant} ${Math.round(row.base * PhysicsFactor(key))} (all melons)`);
+    Console.Log(`[physics tuning] ${PlayerName(slot)}: ${key} ${PhysicsPercent(key)} % = ${row.constant} ${Math.round(row.base * PhysicsFactor(key))} (all melons)`);
     RefreshOpenPages();
     return true;
 }
