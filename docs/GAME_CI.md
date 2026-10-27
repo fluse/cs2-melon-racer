@@ -56,6 +56,8 @@ reuse a color for something with a different meaning.
   the stage's light grey step blocks (tinted per prop) with warm white LEDs.
 - **Buffer stop** (`tools/models/make-buffer-stop-model.mjs`): magenta beam (`#FF20FF`, like the
   spike spring's rim), white chevron, grey steel — off-palette on purpose, an obstacle, not a start gate.
+- **Basketball hoop** (`tools/models/make-basketball-hoop-model.mjs`): graphite steel post, a navy pad (`#1E3A8A`), white
+  backboard with black lines, rim orange (`#F26B1D`), white net — off-palette on purpose, a real court.
 - **Saw blade** (`tools/models/make-saw-blade-model.mjs`): bright steel, dark carbide
   tips, a signal red ring (`#E83C2A`) — off-palette on purpose, warning colors for a hazard.
 - **Spike spring** (`tools/models/make-spike-spring-model.mjs`): steel spikes, chrome spring, a magenta rim
@@ -78,6 +80,11 @@ reuse a color for something with a different meaning.
   with white markings, graphite lamp posts with warm white lamps (`#FFF1D6`) — off-palette on purpose, a real bridge.
 - **Kranhaus** (`tools/models/make-kranhaus-model.mjs`): dark blue-grey glass facades between white slab edges (`#DCDBD5`), white balcony
   slabs (`#E6E5E0`), a light glass stair tower, white concrete (`#E4E2DC`) inside the L — off-palette on purpose, a real building.
+- **High-rise under construction** (`tools/models/make-highrise-model.mjs`): raw formwork concrete (`#B0AEA8`) with fresher
+  slab edges and columns (`#C6C4BE`), dark window openings (some plywood, foil or red/white tape), red/white safety rails
+  (`#D8342A`), rusty rebar, a galvanized scaffold with wooden planks — off-palette on purpose, a real building site.
+- **Tower crane** (`tools/models/make-tower-crane-model.mjs`): steel and cab white, tinted per prop in Hammer (a crane color),
+  graphite turntable, trolley and cables, concrete ballast, an amber hook block (`#E8A020`).
 - **Spinning hammer** (`tools/models/make-spin-hammer-model.mjs`): steel head, signal red rubber faces
   (`#E83C2A`, like the saw blade's ring), wooden handle, dark grey pedestal — off-palette on purpose, a hazard.
 
@@ -92,3 +99,6 @@ onto it when you're working on them anyway:
 | 3D logo outline (`tools/models/make-logo-model.mjs`, `OUTLINE_COLOR`) | `#AAFF33` | Guide green |
 | Holo gate gradient (`tools/materials/make-holo.mjs`, `GRADIENT`) | `#39FF14` → `#AA28FF` | — |
 | Heal holo gradient (`tools/materials/make-holo.mjs`, `HEAL_GRADIENT`) | `#28FF6E` → `#6EFFD7` | Heal cyan |
+- **Parkour snail** (`tools/models/make-parkour-model.mjs`): light grey floors (`#D3D6DA`), graphite slab edges, railings, supports and the central spire,
+  orange walls (`#FF8A1F`) wherever a wall is there to wall-jump or bounce off (canyon, tower, stairs), magenta obstacles (`#FF20FF`, like the
+  buffer stop) — off-palette on purpose.
