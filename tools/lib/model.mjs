@@ -58,6 +58,18 @@ export class Mesh {
     }
 
     /**
+     * One flat convex polygon (3D points, counter-clockwise seen from its
+     * front) with its own texcoords, one per point — a fan of flat-shaded
+     * triangles, for textures that must sit a certain way on it (a window).
+     */
+    Face(points, uvs, part) {
+        const n = V3.Unit(points.reduce((s, p, i) => V3.Add(s, V3.Cross(p, points[(i + 1) % points.length])), [0, 0, 0]));
+        const ni = this.#Add(this.vn, n);
+        const corners = points.map((p, i) => [this.#Add(this.v, p), this.#Add(this.vt, uvs[i]), ni]);
+        for (let i = 1; i + 1 < corners.length; i++) this.#Part(part).push([corners[0], corners[i], corners[i + 1]]);
+    }
+
+    /**
      * Flat 2D shapes ({ outer, holes }) at depth d along `axis`, facing +axis
      * (facing -1: -axis) — one side only, e.g. a decal-like layer on a cap.
      */
