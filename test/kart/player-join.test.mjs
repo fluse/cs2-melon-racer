@@ -8,9 +8,10 @@ import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate, CustomCameraMode } from "../helpers/cs-script-mock.mjs";
 
 const { karts } = await import("../../src/melon_drive/core/kart-registry.js");
-const { SetUpPlayerKart, EnsurePlayerKarts, HoldPawn } = await import("../../src/melon_drive/kart/spawn.js");
+const { DropKart } = await import("../../src/melon_drive/core/kart-registry.js");
+const { SetUpPlayerKart, EnsurePlayerKarts, HoldPawn, DelayKartRebuild, ForgetIntroLogo } = await import("../../src/melon_drive/kart/spawn.js");
 const { GetIntroSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
-const { MELON_TEMPLATE_NAME, INTRO_SPAWN_NAME, PAWN_DRIFT_TOLERANCE, INTRO_LOGO_SECONDS, SPEED_HUD_ENTITY_NAME, HUB_SPAWN_NAME, SAVE_DATA_PLAYER_SETTINGS_KEY } = await import("../../src/melon_drive/constants/index.js");
+const { MELON_TEMPLATE_NAME, INTRO_SPAWN_NAME, PAWN_DRIFT_TOLERANCE, INTRO_LOGO_SECONDS, KART_REBUILD_SECONDS, SPEED_HUD_ENTITY_NAME, HUB_SPAWN_NAME, SAVE_DATA_PLAYER_SETTINGS_KEY } = await import("../../src/melon_drive/constants/index.js");
 
 const INTRO = { x: -2000, y: -900, z: 24 };
 const PLAYER_SPAWN = { x: 5000, y: 5000, z: 0 };
@@ -40,6 +41,8 @@ class FakeHud extends Entity {
 let hud;
 
 beforeEach(() => {
+    ForgetIntroLogo(0);
+    hud?.Remove(); // GetSpeedHud keeps the last one while it's valid
     world.reset();
     karts.clear();
     hud = world.add(new FakeHud());
@@ -141,4 +144,38 @@ test("with \"Start in Tutorial\" off, a joining player's melon appears in the hu
     assert.equal(kart.melon.GetAbsOrigin().x, HUB.x);
     assert.equal(kart.melon.GetAbsOrigin().y, HUB.y);
     assert.equal(kart.checkpointPosition.x, HUB.x, "the hub is its respawn point too");
+});
+
+test("a kart dropped after an error comes back in the hub without the logo, at most every KART_REBUILD_SECONDS", () => {
+    const HUB = { x: 300, y: 600, z: 16 };
+    world.add(new Entity({ name: HUB_SPAWN_NAME, className: "info_player_start", origin: HUB }));
+    AddPawn();
+    EnsurePlayerKarts();
+    world.time = INTRO_LOGO_SECONDS;
+    EnsurePlayerKarts();
+    assert.equal(hud.hidden.intro_logo, true);
+    // What Think does when a kart's update throws.
+    DropKart(0, karts.get(0));
+    DelayKartRebuild(0);
+    EnsurePlayerKarts();
+    assert.equal(karts.size, 0, "not right away");
+    world.time += KART_REBUILD_SECONDS;
+    EnsurePlayerKarts();
+    assert.equal(hud.hidden.intro_logo, true, "no logo again — it looped logo, spawn, logo, … on a server");
+    const kart = karts.get(0);
+    assert.ok(kart, "a fresh kart");
+    assert.equal(kart.melon.GetAbsOrigin().x, HUB.x);
+    assert.equal(kart.melon.GetAbsOrigin().y, HUB.y);
+});
+
+test("after a reconnect the logo shows again", () => {
+    AddPawn();
+    EnsurePlayerKarts();
+    world.time = INTRO_LOGO_SECONDS;
+    EnsurePlayerKarts();
+    DropKart(0, karts.get(0));
+    ForgetIntroLogo(0); // OnPlayerDisconnect
+    EnsurePlayerKarts();
+    assert.equal(hud.hidden.intro_logo, false);
+    assert.equal(karts.size, 0);
 });
