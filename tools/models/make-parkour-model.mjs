@@ -4,7 +4,8 @@
 // from ship to ship across the harbor bay, climbs the rock counter-clockwise
 // (seen from above) twice round on paths cut into its flank — a gorge
 // crossed by wall jumps, boulders, rock steps, a crevice — onto the plateau,
-// and winds up a ramp round the lighthouse, over gaps, to the finish on its gallery.
+// and winds round the lighthouse (a model of its own) — stairs, stepping
+// stones, a chimney, a plank, obstacles — to the finish on its gallery.
 //
 // One .dmx per section, so a change re-imports only that part — every file
 // has the same origin (the lighthouse's middle, at sea level z 0): import each
@@ -14,7 +15,7 @@
 //   models/melon_racer/parkour/parkour_03_cliff_path.dmx rock ledge, cliff path 1, the gorge (wall jumps), its landing
 //   models/melon_racer/parkour/parkour_04_cliff_climb.dmx cliff path 2 (boulders), rock steps
 //   models/melon_racer/parkour/parkour_05_cliff_summit.dmx the second turn: cliff paths 3 + 4 (a crevice between), 5 (boulders), the plateau
-//   models/melon_racer/parkour/parkour_06_lighthouse.dmx tower, the ramp round it, gallery (finish), lantern
+//   models/melon_racer/parkour/parkour_06_lighthouse.dmx the course round the lighthouse (the tower: make-lighthouse-model.mjs, a prop)
 //   models/melon_racer/parkour/parkour_07_rock.dmx       the rock's core (its top the plateau), the rocks round its foot
 //   models/melon_racer/parkour/parkour_08_seabed.dmx     the sea floor under it all
 //   materials/melon_racer/parkour/parkour_<part>.vmat (+ _color.png)
@@ -26,6 +27,7 @@
 // Every solid is a shell of its own (Mesh.NewShell): they touch and overlap.
 // Curved solids are cut into straight pieces of at most stepDegrees.
 import { Circle, DmxText, Mesh, SeededRandom, SolidPng, V3, VmatText, WriteAddonFile } from "../lib/model.mjs";
+import { DOOR, GALLERY, SHAFT, ShaftRadius, WINDOW, WINDOWS } from "../lib/lighthouse.mjs";
 
 // --- Jump physics (src/melon_drive): a ground jump rises ~85 and flies ~600
 // at MAX_SPEED (JUMP_SPEED 370, GRAVITY 800, MAX_SPEED 650); over a gap with
@@ -71,19 +73,53 @@ Add("path", 2000, z, z + 180, 384, "cliff_summit", { name: "path5", boulders: [4
 z += 180;
 Add("path", 512, z, z, 512, "cliff_summit", { name: "plateau" });
 const PLATEAU_Z = z;
-// 3. The lighthouse: a ramp round it, its inner edge on the tower.
-const TOWER = { r0: 256, r1: 176, sides: 24, bands: 11 }; // radius at its foot / top, red and white bands
-const RAMP = { width: 224, slab: 24, turns: 4, slope: 0.22 }; // ~430 up per turn
-// Gaps in the ramp (where along it, 0..1, and how long): uphill jumps of
-// +30..40 that get longer the higher they are; a miss drops onto the turn below.
-const RAMP_GAPS = [{ at: 0.3, length: 128 }, { at: 0.5, length: 144 }, { at: 0.7, length: 160 }, { at: 0.86, length: 176 }];
-const RampMiddle = r => r + RAMP.width / 2;
-const HELIX_ANGLE = 2 * Math.PI * RAMP.turns;
-const HELIX_LENGTH = HELIX_ANGLE * (RampMiddle(TOWER.r0) + RampMiddle(TOWER.r1)) / 2;
-const GALLERY_Z = Math.round(PLATEAU_Z + HELIX_LENGTH * RAMP.slope);
-Add("ramp", HELIX_LENGTH, PLATEAU_Z, GALLERY_Z, RAMP.width, "lighthouse");
-const GALLERY = { radius: 416, slab: 24, rail: 48 };
-const LANTERN = { radius: 128, height: 240, roof: 160 };
+// 3. The lighthouse (a model of its own, tools/models/make-lighthouse-model.mjs,
+// its measures in tools/lib/lighthouse.mjs): the course winds up round its
+// shaft, its inner edge on the tower, every stretch something else — stairs,
+// hurdles, bouncers, stepping stones on brackets, a gap under a swinging
+// anchor, a chimney climbed by bouncing (a lift zone), a plank off the wall,
+// then out round the gallery: a slalom between crates and barrels, bouncers,
+// onto its deck (the finish). A miss drops onto the turn below.
+// `offset` moves a stretch's middle outwards (a number, or [start, end]
+// eased between); a gap eases from the stretch before to the one after.
+const RAMP = { width: 224, slab: 24 };
+const GALLERY_Z = PLATEAU_Z + SHAFT.height;
+const STAIR = { count: 6, tread: 144, rise: 40 }; // too high to roll up: a hop per step, or one jump over two
+const HURDLE = { height: 20, depth: 24 }; // timber beams across the ramp: jump them
+const PAD = { radius: 64, slab: 16, offsets: [56, -24, 64, -16, 48], gap: 112, rise: 24 }; // stepping stones off the wall, in and out
+const PLANK = { width: 72, slab: 12, inner: 120 }; // its inner edge `inner` off the tower: no wall to lean on
+const CHIMNEY = { length: 176, width: 160, rise: 384, wall: 24, liner: 16, door: 112 }; // a lift zone: bounce between tower and outer wall up onto the turn above
+const CRATE = { size: 64, height: 56, barrel: 26 };
+const FINAL_OFFSET = GALLERY.radius + 4 - SHAFT.r1; // the last stretch's inner edge just outside the gallery
+const Climb = (kind, length, rise, extra = {}) => { Add(kind, length, z, z + rise, extra.width ?? (kind === "gap" ? 0 : RAMP.width), "lighthouse", extra); z += rise; };
+z = PLATEAU_Z;
+Climb("ramp", 640, 128, { name: "tower1" });
+for (let i = 0; i < STAIR.count; i++) { z += STAIR.rise; Climb("stair", STAIR.tread, 0, { name: `stair${i + 1}`, spikes: i === 1 || i === 4 }); }
+Climb("ramp", 640, 128, { name: "tower2", hurdles: [200, 440] });
+Climb("gap", 144, 32);
+Climb("ramp", 480, 96, { name: "tower3", bouncers: [160, 320] });
+for (const [i, offset] of PAD.offsets.entries()) {
+    Climb("gap", PAD.gap, PAD.rise);
+    Climb("pad", 2 * PAD.radius, 0, { name: `pad${i + 1}`, offset, width: 2 * PAD.radius });
+}
+Climb("gap", PAD.gap, PAD.rise);
+Climb("ramp", 320, 64, { name: "tower4" });
+Climb("gap", 144, 32, { anchor: true }); // under the anchor: the turn above comes after the chimney, high enough for its mount
+Climb("ramp", 192, 16, { name: "chimney_way" });
+Climb("chimney", CHIMNEY.length, 0); // its walls narrow the lane to CHIMNEY.width from the tower
+z += CHIMNEY.rise;
+Climb("ramp", 560, 112, { name: "tower5" });
+Climb("gap", 96, 16);
+Climb("plank", 768, 96, { width: PLANK.width, offset: PLANK.inner + PLANK.width / 2 - RAMP.width / 2 });
+Climb("gap", 128, 32);
+// From here on out round the gallery (its inner edge FINAL_OFFSET off the tower, in line with the plank's): the gallery is right overhead.
+Climb("ramp", 640, 128, { name: "tower6", offset: FINAL_OFFSET, crates: [128, 256, 384, 512] });
+Climb("gap", 160, 32);
+const ARRIVAL = Math.round(((GALLERY.opening - 4) * Math.PI * (GALLERY.radius + 4)) / 180); // the open stretch along the gallery's gap, flat at the deck
+const FINAL_LENGTH = 960;
+if ((GALLERY_Z - z) / FINAL_LENGTH > 0.3) throw new Error(`the last stretch climbs ${GALLERY_Z - z} in ${FINAL_LENGTH}: too steep`);
+Climb("ramp", FINAL_LENGTH, GALLERY_Z - z, { name: "tower7", offset: FINAL_OFFSET, bouncers: [240, 600] });
+Climb("ramp", ARRIVAL, 0, { name: "arrival", offset: FINAL_OFFSET });
 
 let total = 0;
 for (const g of segments) { g.s0 = total; total += g.length; g.s1 = total; }
@@ -119,13 +155,37 @@ const SHRINK_PER_TURN = 2 * Math.PI * k, WIDEST = Math.max(...segments.filter(g 
 if (SHRINK_PER_TURN < WIDEST + 2 * LIP.thickness) throw new Error(`the rock's turns overlap: ${SHRINK_PER_TURN.toFixed(0)} in per turn, the widest path ${WIDEST}: raise SPIRAL.r0 or lower SPIRAL.r1`);
 const SpiralRadius = a => SPIRAL.r0 - k * Math.min(a, SPIRAL_END);
 const HELIX_START = SPIRAL_END + 0.5; // the ramp starts a bit on from where the plateau ends, across the core's top
-const TowerRadius = zz => TOWER.r0 + ((TOWER.r1 - TOWER.r0) * (zz - PLATEAU_Z)) / (GALLERY_Z - PLATEAU_Z);
+const TowerRadius = zz => ShaftRadius(zz - PLATEAU_Z);
+// Each lighthouse stretch's offset at its start and end (o0, o1); a gap's eases from the stretch before to the one after.
+const towerSegments = segments.filter(g => g.section === "lighthouse");
+for (const g of towerSegments) [g.o0, g.o1] = Array.isArray(g.offset) ? g.offset : [g.offset ?? 0, g.offset ?? 0];
+for (const [i, g] of towerSegments.entries()) if (g.kind === "gap") [g.o0, g.o1] = [towerSegments[i - 1].o1, towerSegments[i + 1].o0];
+const Smooth = f => f * f * (3 - 2 * f);
+function Offset(s) {
+    const g = towerSegments.find(g => s >= g.s0 && s <= g.s1) ?? (s < HELIX_S ? towerSegments[0] : towerSegments.at(-1));
+    const f = Math.min(Math.max((s - g.s0) / g.length, 0), 1);
+    return g.o0 + (g.o1 - g.o0) * (g.kind === "gap" ? f : Smooth(f));
+}
+/** The helix round the tower: [s from its start, angle, the middle's radius] — the tower's radius at the course's height (eased over steps and the chimney's climb) plus the offset. */
+const helix = (() => {
+    const rows = [], step = 2, Height = s => [-48, -32, -16, 0, 16, 32, 48].reduce((sum, d) => sum + ZAt(Math.min(Math.max(s + d, HELIX_S), total)), 0) / 7;
+    for (let s = 0, a = HELIX_START; s <= total - HELIX_S + step; s += step) {
+        const r = TowerRadius(Height(HELIX_S + s)) + RAMP.width / 2 + Offset(HELIX_S + s);
+        rows.push([s, a, r]);
+        a += step / r;
+    }
+    return rows;
+})();
+const HelixAt = s => {
+    const i = Math.min(Math.max(Math.floor((s - HELIX_S) / 2), 0), helix.length - 2), f = (s - HELIX_S) / 2 - i;
+    return [helix[i][1] + f * (helix[i + 1][1] - helix[i][1]), helix[i][2] + f * (helix[i + 1][2] - helix[i][2])];
+};
 
 /** Course coordinates to the world: s along, t across (outwards), z up. */
 function P(s, t, zz) {
     if (s < ROCK_S) return [SPIRAL.r0 + t, s - ROCK_S, zz];
     if (s < HELIX_S) { const a = AngleIn(spiral, s - ROCK_S), r = SpiralRadius(a) + t; return [r * Math.cos(a), r * Math.sin(a), zz]; }
-    const a = HELIX_START + (HELIX_ANGLE * (s - HELIX_S)) / HELIX_LENGTH, r = RampMiddle(TowerRadius(ZAt(s))) + t;
+    const [a, middle] = HelixAt(s), r = middle + t;
     return [r * Math.cos(a), r * Math.sin(a), zz];
 }
 /** The course's direction at s, measured within its own part (harbor, spiral, helix), so one part's change doesn't reach into the next. */
@@ -458,32 +518,146 @@ function CliffSummit() {
     NoteAt("checkpoint 6", Segment("plateau").s0 + 256);
 }
 
+const HEADROOM = 176; // free over a driving surface up to the turn above: a jump (~85), the chase camera
+const ANCHOR = { drop: 318, clear: 24, top: 78, reach: 176 }; // tools/models/make-swing-anchor-model.mjs: lowest point under its origin, its mount over it, out from the wall (+ a melon)
+const Deg = a => ((((a * 180) / Math.PI) % 360) + 360) % 360;
+const AngleAt = s => HelixAt(s)[0];
+const Wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+const AnchorAt = g => ({ s: (g.s0 + g.s1) / 2, z: Math.max(g.z0, g.z1) + ANCHOR.drop + ANCHOR.clear });
+
+/** A railing on a stretch: s0..s1 between t0 and t1, RAIL.height over the floor. */
+const Railing = (s0, s1, t0, t1) => Block(s0, s1, t0, t1, ZAt, s => ZAt(s) + RAIL.height, "white");
+/** An iron bracket from the tower out to the underside of what's at (s, t), height zz: an arm and a strut under it. */
+function Bracket(s, t, zz) {
+    const wall = h => TowerRadius(h) - 4 - HelixAt(s)[1];
+    Beam([s, wall(zz - 5), zz - 5], [s, t, zz - 5], 5, "steel");
+    Beam([s, wall(zz - 80), zz - 80], [s, t, zz - 8], 4, "steel");
+}
+
+/**
+ * Where the course stands in plan round the tower, sampled along it: angle,
+ * radius from its inner to its outer edge, and the heights it takes up (its
+ * slab up to HEADROOM over the floor; the chimney's walls; an anchor's
+ * mount) — checked against each other one turn apart, against the gallery
+ * overhead and the lighthouse's door and windows.
+ */
+function TowerFootprint() {
+    const rows = [];
+    for (const g of towerSegments) {
+        if (g.kind === "gap" && !g.anchor) continue;
+        for (let s = g.s0 + 4; s < g.s1; s += 16) {
+            const [a, middle] = HelixAt(s), floor = ZAt(s);
+            if (g.kind === "gap") { // the anchor hung over it
+                const anchor = AnchorAt(g), wall = TowerRadius(anchor.z);
+                rows.push({ s, a, rIn: wall, rOut: wall + ANCHOR.reach, zLo: floor, zHi: anchor.z + ANCHOR.top, slabHi: floor, what: "the anchor" });
+                continue;
+            }
+            const top = g.kind === "chimney" ? floor + CHIMNEY.rise + 64 : floor + HEADROOM;
+            const hanging = g.kind === "pad" || g.kind === "plank" || g.o0 > 24 ? 80 : 0; // brackets under it
+            const bottom = floor - (g.kind === "pad" ? PAD.slab : g.kind === "plank" ? PLANK.slab : RAMP.slab) - (g.kind === "stair" ? STAIR.rise : 0) - hanging;
+            rows.push({ s, a, rIn: middle - g.width / 2, rOut: middle + g.width / 2, zLo: bottom, zHi: top, slabHi: g.kind === "chimney" ? top : floor + RAIL.height, what: g.name ?? g.kind });
+        }
+    }
+    return rows;
+}
+function CheckTower(rows, yaw) {
+    const problems = [];
+    // One turn over another: the one above must clear the one below's headroom.
+    for (let i = 0; i < rows.length; i++) for (let j = i + 1; j < rows.length; j++) {
+        const p = rows[i], q = rows[j];
+        if (Math.abs(p.s - q.s) < 600 || p.rOut < q.rIn || q.rOut < p.rIn) continue;
+        if (Math.abs(Wrap(p.a - q.a)) * Math.max(p.rOut, q.rOut) > 24) continue;
+        if (p.zHi > q.zLo && q.zHi > p.zLo) problems.push(`${p.what} (z ${Math.round(p.zLo)}..${Math.round(p.zHi)}) and ${q.what} (z ${Math.round(q.zLo)}..${Math.round(q.zHi)}) at ${Math.round(Deg(p.a))} degrees`);
+    }
+    // Under the gallery (and its corbels): nothing that reaches up into it.
+    const under = GALLERY_Z - GALLERY.slab - 72;
+    for (const p of rows) if (p.rIn < GALLERY.radius - 2 && p.zHi > under) problems.push(`${p.what} runs under the gallery (up to z ${Math.round(p.zHi)}, the corbels from ${under})`);
+    // The door and the windows on the tower's face: no slab or railing over them.
+    const OnFace = (deg, z0, z1, what) => {
+        const a = ((yaw + deg) * Math.PI) / 180;
+        for (const p of rows) if (p.rIn < TowerRadius(z0) + 12 && Math.abs(Wrap(p.a - a)) * TowerRadius(z0) < 48 && p.slabHi > z0 && p.zLo < z1) { problems.push(`${what} is behind ${p.what}`); return; }
+    };
+    OnFace(DOOR.angle, PLATEAU_Z, PLATEAU_Z + DOOR.height + 40, "the door");
+    for (const [deg, zz] of WINDOWS) OnFace(deg, PLATEAU_Z + zz - WINDOW.height / 2 - 12, PLATEAU_Z + zz + WINDOW.height / 2 + 12, `the window at ${deg} degrees, ${zz} up`);
+    if (problems.length) throw new Error(`the lighthouse's course collides:\n  ${[...new Set(problems)].slice(0, 12).join("\n  ")}`);
+}
+/** Window spots up the tower's face: in a column at each model angle, one between every two passes of the course, staggered. */
+function SuggestWindows(rows, yaw) {
+    const spots = [];
+    for (const [k, deg] of [110, 250].entries()) {
+        const a = ((yaw + deg) * Math.PI) / 180, wall = TowerRadius(PLATEAU_Z + 400);
+        const passes = rows.filter(p => p.rIn < wall + 12 && Math.abs(Wrap(p.a - a)) * wall < 64).map(p => [p.zLo - PLATEAU_Z, p.slabHi - PLATEAU_Z]).sort((x, y) => x[0] - y[0]);
+        let from = DOOR.height + 80;
+        for (const [lo, hi] of [...passes, [SHAFT.height - 160, SHAFT.height]]) {
+            if (lo - from > WINDOW.height + 72) spots.push([deg, Math.round((from + lo) / 2 + (k ? 24 : -24))]);
+            from = Math.max(from, hi);
+        }
+    }
+    return spots;
+}
+
 function Lighthouse() {
-    const g = First("lighthouse");
     stepDegrees = 8; // ~45-unit pieces round the tower
-    // The tower: red and white bands from the plateau up to the gallery.
-    for (let i = 0; i < TOWER.bands; i++) {
-        const z0 = PLATEAU_Z + ((GALLERY_Z - PLATEAU_Z) * i) / TOWER.bands, z1 = PLATEAU_Z + ((GALLERY_Z - PLATEAU_Z) * (i + 1)) / TOWER.bands;
-        Frustum(0, 0, TowerRadius(z0), TowerRadius(z1), i === 0 ? PLATEAU_Z - 16 : z0, z1, TOWER.sides, i % 2 ? "red" : "white");
+    for (const g of towerSegments) {
+        const half = g.width / 2, floor = ZAt;
+        switch (g.kind) {
+        case "ramp": case "stair": {
+            Block(g.s0, g.s1, -half, half, s => ZAt(s) - RAMP.slab - (g.kind === "stair" ? STAIR.rise : 0), floor, "edge", "floor");
+            Railing(g.name === "tower1" ? g.s0 + 64 : g.s0, g.s1, half - RAIL.thickness, half);
+            // Off the wall: a railing on the inside too (not where it opens onto the gallery), brackets under it.
+            if (g.o0 > 24 && g.name !== "arrival") Railing(g.s0, g.s1, -half, -half + RAIL.thickness);
+            if (g.o0 > 24) for (let s = g.s0 + 96; s < g.s1; s += 256) Bracket(s, -half + 12, ZAt(s) - RAMP.slab);
+            if (g.name === "arrival") Railing(g.s1 - RAIL.thickness, g.s1, -half, half);
+            for (const at of g.hurdles ?? []) Block(g.s0 + at, g.s0 + at + HURDLE.depth, -half + RAIL.thickness, half - RAIL.thickness, s => ZAt(s) - 4, s => ZAt(s) + HURDLE.height, "wood");
+            for (const [i, at] of (g.crates ?? []).entries()) { // a slalom: crates and barrels from alternating sides
+                const s = g.s0 + at, t = (i % 2 ? 1 : -1) * 44;
+                if (i % 2) { const [x, y] = P(s, t, 0); Cylinder(x, y, CRATE.barrel, 10, ZAt(s) - 4, ZAt(s) + CRATE.height - 8, "blue", "edge"); }
+                else Block(s - CRATE.size / 2, s + CRATE.size / 2, t - CRATE.size / 2, t + CRATE.size / 2, ss => ZAt(ss) - 4, ZAt(s + CRATE.size / 2) + CRATE.height, "wood");
+            }
+            break;
+        }
+        case "pad": { // a round wooden platform on a bracket
+            const s = (g.s0 + g.s1) / 2, [x, y] = P(s, 0, 0);
+            Cylinder(x, y, PAD.radius, 12, g.z0 - PAD.slab, g.z0, "edge", "wood");
+            Bracket(s, Math.min(-PAD.radius + 24, 0), g.z0 - PAD.slab);
+            break;
+        }
+        case "plank":
+            Block(g.s0, g.s1, -half, half, s => ZAt(s) - PLANK.slab, floor, "wood");
+            for (let s = g.s0 + 64; s < g.s1; s += 192) Bracket(s, 0, ZAt(s) - PLANK.slab);
+            break;
+        case "chimney": { // the lane narrowed to CHIMNEY.width from the tower, walled in; the course goes on one turn's worth higher over its front wall
+            const t0 = -half, t1 = t0 + CHIMNEY.width, w = CHIMNEY.wall, top = g.z0 + CHIMNEY.rise;
+            Block(g.s0, g.s1, t0, t1 + w, g.z0 - RAMP.slab, g.z0, "edge", "floor");
+            Block(g.s0, g.s1, t0, t0 + CHIMNEY.liner, g.z0, top + 64, "steel"); // against the tower: a wall that counts whatever the prop's collision
+            Block(g.s0, g.s1, t1, t1 + w, g.z0, top + 64, "steel");
+            Block(g.s0, g.s0 + w, t0, t1 + w, g.z0 + CHIMNEY.door, top + 64, "steel"); // over the way in
+            Block(g.s1 - w, g.s1, t0, t1 + w, g.z0, top, "steel"); // its top level with the stretch after it
+            Railing(g.s0 - RAIL.thickness, g.s0, t1 + w, half); // the stretch before ends beside it
+            notes.push(`lift zone (lift_enter/lift_leave trigger) in the chimney: center ${fmt(P(g.s0 + g.length / 2, (t0 + t1) / 2, g.z0 + (CHIMNEY.rise + 96) / 2))}, yaw ${Yaw(g.s0 + g.length / 2)}, size ${g.length} along x ${t1 - t0} across x ${CHIMNEY.rise + 96} high`);
+            break;
+        }
+        case "gap":
+            if (g.anchor) {
+                const { s, z: zz } = AnchorAt(g), a = AngleAt(s), wall = TowerRadius(zz);
+                notes.push(`swing_anchor prop_dynamic (Idle Animation "swing", Loop) over the gap: origin ${fmt([wall * Math.cos(a), wall * Math.sin(a), zz])}, yaw ${Math.round(Deg(a))} (away from the tower)`);
+            }
+            break;
+        }
+        for (const [i, at] of (g.bouncers ?? []).entries()) { const s = g.s0 + at; notes.push(`bouncer prop_dynamic on ${g.name}: at ${fmt(P(s, (i % 2 ? 1 : -1) * 40, ZAt(s)))}, yaw ${(Yaw(s) + 450) % 360}`); }
+        if (g.spikes) notes.push(`spike_spring props on ${g.name} (three across, offsets 0 / 0.5 / 1): ${[-64, 0, 64].map(t => fmt(P((g.s0 + g.s1) / 2, t, g.z0))).join(", ")}, yaw ${Yaw((g.s0 + g.s1) / 2)}`);
     }
-    // The ramp round it, its inner edge on the tower, a railing on its outer edge — in pieces between its gaps.
-    const cuts = RAMP_GAPS.map(gap => [g.s0 + g.length * gap.at, g.s0 + g.length * gap.at + gap.length]);
-    const pieces = [g.s0, ...cuts.flat(), g.s1].reduce((list, s, i, all) => (i % 2 ? [...list, [all[i - 1], s]] : list), []);
-    for (const [a, b] of pieces) {
-        Block(a, b, -RAMP.width / 2, RAMP.width / 2, s => ZAt(s) - RAMP.slab, ZAt, "edge", "floor");
-        Block(a === g.s0 ? a + 64 : a, b, RAMP.width / 2 - RAIL.thickness, RAMP.width / 2, ZAt, s => ZAt(s) + RAIL.height, "white");
-    }
-    // The gallery: a round deck over the tower's top with a railing round it — the finish.
-    Cylinder(0, 0, GALLERY.radius, 32, GALLERY_Z - GALLERY.slab, GALLERY_Z, "edge", "floor");
-    mesh.NewShell();
-    mesh.Extrude([{ outer: Circle(0, 0, GALLERY.radius, 32), holes: [[...Circle(0, 0, GALLERY.radius - RAIL.thickness, 32)].reverse()] }], GALLERY_Z, GALLERY_Z + GALLERY.rail, "white", "z");
-    // The lantern on top: glowing glass, a graphite ring, a red roof.
-    Cylinder(0, 0, LANTERN.radius, 16, GALLERY_Z, GALLERY_Z + LANTERN.height, "lantern", "edge");
-    Cylinder(0, 0, LANTERN.radius + 16, 16, GALLERY_Z + LANTERN.height, GALLERY_Z + LANTERN.height + 16, "edge");
-    mesh.NewShell();
-    mesh.Cone([0, 0, GALLERY_Z + LANTERN.height + 16], [0, 0, GALLERY_Z + LANTERN.height + 16 + LANTERN.roof], LANTERN.radius + 24, 16, "red");
-    NoteBox("finish_<trackId> trigger, on the gallery where the ramp arrives", g.s1 - 48, 96, RAMP.width, 192);
-    notes.push(`light_spot / env_light in the lantern: at ${fmt([0, 0, GALLERY_Z + LANTERN.height / 2])}`);
+    // The lighthouse prop: turned so its gallery's opening is where the course arrives.
+    const arrival = Segment("arrival"), yaw = Math.round(Deg(AngleAt((arrival.s0 + arrival.s1) / 2)));
+    const rows = TowerFootprint();
+    CheckTower(rows, yaw);
+    notes.push(`lighthouse prop_static (models/melon_racer/lighthouse/lighthouse.vmdl): origin ${fmt([0, 0, PLATEAU_Z])}, yaw ${yaw}`);
+    notes.push(`  door facing the plateau: DOOR.angle ${Math.round((((Deg(SPIRAL_END) - yaw) % 360) + 360) % 360)} in tools/lib/lighthouse.mjs (now ${DOOR.angle}); free window spots: WINDOWS = ${JSON.stringify(SuggestWindows(rows, yaw))}`);
+    const a = (yaw * Math.PI) / 180, r = GALLERY.radius - 40;
+    notes.push(`finish_<trackId> trigger in the gallery's opening: center ${fmt([r * Math.cos(a), r * Math.sin(a), GALLERY_Z + 96])}, yaw ${yaw}, size 64 along x 240 across x 192 high`);
+    NoteAt("checkpoint 7", Segment("tower3").s0 + 64);
+    NoteAt("checkpoint 8 (after the chimney)", Segment("tower5").s0 + 160);
+    NoteAt("checkpoint 9 (out round the gallery)", Segment("tower6").s0 + 64);
 }
 
 function Rock() {
@@ -567,7 +741,7 @@ const COLORS = {
     blue: [0x2f, 0x6f, 0xb8], // containers
     orange: [0xe8, 0x7a, 0x1f],
     green: [0x3a, 0x8a, 0x4a],
-    lantern: [0xff, 0xe6, 0x80],
+    lantern: [0xff, 0xe6, 0x80], // the ships' mast lights and searchlights
     sand: [0xc8, 0xb8, 0x8e],
 };
 const GLOW = { lantern: 2 };
@@ -597,8 +771,7 @@ for (const [part, rgb] of Object.entries(COLORS)) {
 }
 const length = section => Math.round(segments.filter(g => g.section === section).reduce((sum, g) => sum + g.length, 0));
 console.log(`${NAME}: ${triangles} triangles; ${Math.round(total)} along the course (harbor + ships ${length("harbor") + length("ships")}, cliff ${length("cliff_path") + length("cliff_climb") + length("cliff_summit")}, `
-    + `${(SPIRAL_END / (2 * Math.PI)).toFixed(2)} turns round the rock, ${SHRINK_PER_TURN.toFixed(0)} in per turn; ramp ${length("lighthouse")}, ${RAMP.turns} turns); quay ${First("harbor").z0} up, plateau ${PLATEAU_Z}, gallery (finish) ${GALLERY_Z}, `
-    + `lantern roof ${GALLERY_Z + LANTERN.height + 16 + LANTERN.roof}`);
+    + `${(SPIRAL_END / (2 * Math.PI)).toFixed(2)} turns round the rock, ${SHRINK_PER_TURN.toFixed(0)} in per turn; round the lighthouse ${length("lighthouse")}, ${((helix.at(-1)[1] - HELIX_START) / (2 * Math.PI)).toFixed(2)} turns); quay ${First("harbor").z0} up, plateau ${PLATEAU_Z}, gallery (finish) ${GALLERY_Z}`);
 console.log("place in Hammer (world positions relative to where the .dmx files' shared origin lands; yaw = the course's direction there):");
 for (const note of notes) console.log(`  ${note}`);
 console.log(`import: Hammer, File > Import > ${MODEL_DIR}/${NAME}_<section>.dmx, every one at the same position (origin: the lighthouse's middle at sea level)`);

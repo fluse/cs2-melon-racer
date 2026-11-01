@@ -135,6 +135,7 @@ Names the script parses — the name carries the config.
 | `camera_zone_[noclip_][front_]<a>[_<h>]` | `camera_zone_250_40` | `trigger_multiple` | [Camera zones](11-camera-zones.md) |
 | `camera_zone_[noclip_]close[_<b>[_<h>]]` | `camera_zone_close_12_2` | `trigger_multiple` | [Camera zones](11-camera-zones.md#close-up-zones) |
 | `side_view_<yaw>[_<distance>[_<height>]]` | `side_view_90_300_40` | `trigger_multiple` | [Camera zones](11-camera-zones.md#side-view-zones) |
+| `side_view_corner_<from>_<to>[_<distance>[_<height>]]` | `side_view_corner_180_270_300_40` | `trigger_multiple` (origin on the corner) | [Camera zones](11-camera-zones.md#corner-zones) |
 | `jump_pad_<up>[_<forward>]` | `jump_pad_1000_400` | `trigger_multiple` | [Jump pads](12-jump-pads.md) |
 | `catapult_<forward>_<up>` | `catapult_1500_500` | `prop_physics` (its base) | [Catapults](24-catapults.md) |
 | `gravity_zone_<gravity>[_roll<roll>]` | `gravity_zone_100_roll20` | `trigger_multiple` | [Gravity zones](21-gravity-zones.md) |

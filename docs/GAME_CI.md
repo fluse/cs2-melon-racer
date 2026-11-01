@@ -51,6 +51,12 @@ reuse a color for something with a different meaning.
 - **First-aid tent** (`tools/models/make-heal-tent-model.mjs`): arches and the roof's mast in the white inflatable vinyl, white canvas —
   each tinted per prop in Hammer —, graphite straps, plates, piping and signs with white letters; every cross (on the canvas,
   the mat, the turning one on the roof) a glowing pharmacy green, the heal holo gradient's `#28FF6E`: healing, like heal cyan.
+- **Heal gate** (`tools/models/make-heal-gate-model.mjs`): the white inflatable vinyl tinted heal cyan per prop in Hammer,
+  graphite straps, plates, stakes and blower, white glowing bulbs, a glowing cross in the pharmacy green `#28FF6E`;
+  the holo panel is `holo_heal`.
+- **Checkpoint and finish gates** (`tools/models/make-race-gate-model.mjs`): the white inflatable vinyl, tinted per prop in Hammer —
+  checkpoint gold on a checkpoint gate, white on a finish gate —, graphite straps, plates, stakes and blower; the checkpoint sign graphite
+  with white letters and a glowing checkpoint gold edge, the finish sign black with white letters, white edge and black/white checkers.
 - **Melon Boutique** (`tools/models/make-boutique-model.mjs`): frame, wall and swim rings in the white inflatable vinyl, the awning's
   two sets of stripes in white canvas — each tinted per prop in Hammer —, graphite straps, sign, plates and step edges with white letters,
   the stage's light grey step blocks (tinted per prop) with warm white LEDs.
@@ -97,6 +103,8 @@ reuse a color for something with a different meaning.
   a red spot — on a straw nest with olive eggs; natural colors, not tinted.
 - **Spinning hammer** (`tools/models/make-spin-hammer-model.mjs`): steel head, signal red rubber faces
   (`#E83C2A`, like the saw blade's ring), wooden handle, dark grey pedestal — off-palette on purpose, a hazard.
+- **Rotating gates** (`tools/models/make-rotating-gate-model.mjs`): oiled wood planks (`#A87244`, like the park benches), steel straps,
+  signal red rubber tips (`#E83C2A`, like the spinning hammer's faces), graphite post — off-palette on purpose, a hazard.
 
 ## Not on the palette yet
 

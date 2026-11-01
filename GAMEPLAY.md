@@ -1238,6 +1238,9 @@ long fall lands hard enough for the engine to destroy the melon on impact.
   over a solid dark green backdrop, nothing of the world showing through) for `INTRO_LOGO_SECONDS`, the player's own body
   already frozen and hidden behind it; only then does the melon spawn
   (`ShowIntroLogoThenSpawn` in `kart/spawn.js`). Reconnecting shows it again.
+  Only then: a kart dropped later (its tick update threw) comes back at
+  `hub_spawn` without the logo, at most every `KART_REBUILD_SECONDS`
+  (`RebuildKart`) — it used to loop logo → spawn → error → logo for good.
 - A player's very first melon (first join, i.e. no kart entry yet) appears
   at the `info_player_start` named `intro_spawn` — the tutorial area —
   facing that entity's own angles. It's also that new kart's respawn point
@@ -1478,6 +1481,13 @@ camera looks, Hammer yaw; defaults `SIDE_VIEW_*`). Inside:
 - The melon stays on the plane it entered on: speed towards/away from the
   camera is dropped every tick and a drift pulled back
   (`SIDE_VIEW_PLANE_PULL`).
+- **Corner zones** (`side_view_corner_<from>_<to>[_<distance>[_<height>]]`,
+  decided): for a 2D course round the outside of a building, the camera
+  turns round the corner with the melon instead of cutting from one side's
+  view to the next — looking at the corner (the trigger's origin) from the
+  melon, kept between the two sides' yaws, so it starts and ends exactly on
+  them; A/D drive round it and the melon is held at its distance from the
+  corner (`CornerYaw`, `SideViewDepth` in `zones/side-view/logic.js`).
 - Leaving, the player's view is turned the way the melon faced on screen,
   so driving carries on in that direction behind the chase camera.
   Teleported out instead (hub, checkpoint, teleporter — a jump of more than

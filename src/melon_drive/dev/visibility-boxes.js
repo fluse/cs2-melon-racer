@@ -9,5 +9,9 @@ export const VISIBILITY_BOXES = [
     // maps/prefabs/route_bridge.vmap
     { center: {x: -7952,y: 120,z: 718}, axes: [{x: 0,y: -1,z: 0},{x: 1,y: 0,z: 0},{x: 0,y: 0,z: 1}], half: [3056,880,722] },
     // maps/melon_racer.vmap
-    { center: {x: -5800,y: -16827.332,z: 1152}, axes: [{x: 1,y: 0,z: 0},{x: 0,y: 1,z: 0},{x: 0,y: 0,z: 1}], half: [1528,1166.531,1440] },
+    { center: {x: -5800,y: -16827.332,z: 1088}, axes: [{x: 1,y: 0,z: 0},{x: 0,y: 1,z: 0},{x: 0,y: 0,z: 1}], half: [1528,1166.531,1440] },
+    // maps/prefabs/route_lighthouse.vmap
+    { center: {x: 1531.871,y: -5901.42,z: 1830.253}, axes: [{x: 1,y: 0,z: 0},{x: 0,y: 1,z: 0},{x: 0,y: 0,z: 1}], half: [2304,3073.42,2264] },
+    // maps/prefabs/route_motorcross.vmap
+    { center: {x: -80,y: 2879,z: 720}, axes: [{x: 1,y: 0,z: 0},{x: 0,y: 1,z: 0},{x: 0,y: 0,z: 1}], half: [3024,2064,816] },
 ];

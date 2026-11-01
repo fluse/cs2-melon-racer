@@ -49,6 +49,24 @@ beats any other heal zone it overlaps. Several triggers may share that name.
   goes through its `OnEndTouch` as usual.
 - Every entry plays `particle_health_template` on the melon.
 
+## Heal gate model
+
+`heal_gate.vmap` ([prefabs](14-prefabs.md)) draws its frame with a model
+(`tools/models/make-heal-gate-model.mjs`): an inflatable arch like the hub's
+route gates, smaller and shaped like a door, bulbs along the opening, a
+glowing cross on top and the holo panel inside.
+
+| Setting | Value |
+|---|---|
+| Entity | `prop_static`, `models/melon_racer/heal_gate/heal_gate.vmdl` |
+| Origin | on the floor in the opening's middle, the melon driving through along Y; in the prefab at `0 0 -48` |
+| Render Color | tints the vinyl: heal cyan `100 251 223` ([GAME_CI](../GAME_CI.md)); straps, bulbs and cross aren't tinted |
+| Size | opening 70 wide, 101 high under the top; 116 wide over the feet, 138 high with the cross; guy ropes 26 out front and back |
+| Solid | tube, feet, blower; the holo panel and the ropes aren't |
+
+The heal trigger (`heal_zone_full`) fills the opening: 70 wide (x ±35),
+from the floor up ~100, a few units deep.
+
 ## First-aid tent
 
 A place to heal up in the hub (`tools/models/make-heal-tent-model.mjs`):

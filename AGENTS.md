@@ -110,8 +110,14 @@ site/*.html, style.css, build.mjs        # GitHub Page: `npm run site` -> site/d
                                           #   connect/ (steam://connect), mapping-api/ (every docs/mapping-api/*.md + TRACK_CREATION.md,
                                           #   via site/markdown.mjs — test/site/ checks every link/#anchor); .github/workflows/pages.yml deploys on push to main
 tools/                                    # generators, `node tools/<folder>/<file>.mjs`, one folder per kind of output; each writes its files relative to the addon root:
-                                          #   lib/ shared helpers (no output of their own), models/, materials/, images/ (panorama PNGs), media/ (GIFs); a new tool goes
+                                          #   lib/ shared helpers (no output of their own), models/, materials/, images/ (panorama PNGs), media/ (GIFs), maps/ (prefab .vmaps); a new tool goes
                                           #   into the fitting one, never loose in tools/
+tools/lib/vmap.mjs                        # shared by the map generators (tools/maps/): writes a Hammer .vmap prefab from script — entities + outputs, half-edge
+                                          #   polygon meshes (world or a trigger's), placed prefabs with map-variable overrides — as keyvalues2 text, converted to
+                                          #   binary with the game's dmxconvert.exe (layout read off Hammer's own files: dmxconvert -i <vmap> -o <out> -oe keyvalues2)
+tools/maps/make-generator-test-prefab.mjs # maps/prefabs/generator_test.vmap: a floor, a corner trigger, an info_target, a prop_static, a checkpoint gate — checks Hammer opens generated prefabs
+tools/maps/make-glasshouse-prefab.mjs     # track 6, the Glasshouse: a 2.5D jump & run spiralling up round a tower (4 faces = side-view zones, 3 corner zones), written from its LAYOUT
+                                          #   as maps/prefabs/glasshouse_course.vmap (overwritten every run: blockout, triggers, spawns) + once maps/prefabs/route_glasshouse.vmap (the hand-edited route file placing it)
 tools/lib/font.mjs                        # shared by the text-cutting model generators (logo, podiums, signs): a line of text in a font (Bungee) as 2D shapes, GrowShapes (clipper offset)
 tools/lib/model.mjs                       # shared by the model generators: mesh builder (extrude, triangles, Mesh.Face: a flat polygon with its own UVs), Mesh.Tube/Cone, Mesh.Surface (a smooth grid: canopy, flag), Box/AxisBox/Beam (flat-shaded boxes), Helix, V3 vector math, 2D outlines (Shape, Circle,
                                           #   RadialOutline for teeth/stars, Slot, ChamferedRect), SeededRandom (same output every run), .obj/.smd/.vmdl/.dmx/.vmat writers (SmdText + SmdAnimationText + VmdlText's
@@ -132,6 +138,12 @@ tools/models/make-boutique-model.mjs      # the hub's Melon Boutique, a kit in m
                                           #   scalloped, each tinted on its own), _sign (MELON BOUTIQUE, both sides) — and the display: boutique_tier_<16..128> (stage-look step blocks
                                           #   128 x 64 to stack into the level ladder), boutique_ring (a swim ring a melon sits in, its origin 9.4 above), boutique_plate_<skin> (name + level
                                           #   from MELON_SKIN_NAMES/_LEVELS, re-run for a new skin); the melons are prop_dynamics placed by hand; materials/melon_racer/boutique/
+tools/models/make-kicker-model.mjs        # kicker ramps to place by hand (prop_static each, flat-shaded): models/melon_racer/kicker/kicker_planks (planks on a timber frame, steel
+                                          #   plates; 128 x 112, 48 high), _steel (yellow side plates, hazard stripes at the lip; 128 x 96, 40), _board (a board leaning on a crate,
+                                          #   a barrel beside; 112 x 56, 36), _rock (a tilted slab, broken sides tinted per prop, three small glowing green chevrons up
+                                          #   its top (materials/glowgreen.vmat, not in the collision); 144 x 128, 48); ~60-200 triangles, collision the
+                                          #   plain wedge; origin on the floor in the middle of the lip, rising towards +X: put it on a step's edge (48 up at MAX_SPEED clears a 96 gap
+                                          #   onto +64 without a jump); materials/melon_racer/kicker/
 tools/models/make-basketball-hoop-model.mjs # a court's basketball hoop as models/melon_racer/basketball_hoop/basketball_hoop.vmdl (1.6k triangles): graphite post on a foot plate,
                                           #   navy pad, gooseneck arm + brace, white backboard with black frame and shooter's square, orange rim on a bracket, white cord
                                           #   net in diamonds; sized to the melon as the ball (rim RIM_HEIGHT 178 up = 3.05 m, 24 across inside, 94 in front of the post);
@@ -155,10 +167,29 @@ tools/models/make-parkour-model.mjs       # the lighthouse parkour race track, m
                                           #   towing arch and tire fenders, freighter with container
                                           #   chicanes under two gantry cranes and a bulbous bow, barge with hatch hurdles: jumped from deck to deck, gaps 160-192, +32/+64; ~3.5k triangles), 03_cliff_path + 04_cliff_climb + 05_cliff_summit (paths up the
                                           #   rock's flank counter-clockwise, ~1.8 turns, ~5 degrees, each turn inside and above the last; a rough inner wall and an outer lip:
-                                          #   a gorge between ochre walls for wall jumps, boulders, rock steps, a crevice, onto the plateau at ~1380), 06_lighthouse (red/white
-                                          #   tower, a ramp 4 times round it with 4 gaps to jump (RAMP_GAPS) up to the gallery = finish at ~3190, glowing lantern), 07_rock (the core in tiers, the plateau its
-                                          #   top; rocks round the foot), 08_seabed; ~25400 along the course, ~14.9k triangles; laid out along the course (s along, t across, z up) in world units; prints where start, checkpoints, finish,
-                                          #   func_water and melon_respawn go; materials/melon_racer/parkour/
+                                          #   a gorge between ochre walls for wall jumps, boulders, rock steps, a crevice, onto the plateau at ~1380), 06_lighthouse (only the course,
+                                          #   ~3.7 turns round the lighthouse prop, its inner edge on the shaft: stairs, hurdles, stepping-stone pads on brackets (in and out), a gap
+                                          #   under a swing anchor, a walled chimney climbed in a lift zone (CHIMNEY.rise), a plank off the wall, then out round the gallery
+                                          #   (FINAL_OFFSET): a crate/barrel slalom, onto the gallery through its railing's gap = finish at ~3170; `offset` per stretch moves it
+                                          #   out from the tower; TowerFootprint/CheckTower fail the run if one turn hits the next, the gallery or the prop's door/windows),
+                                          #   07_rock (the core in tiers, the plateau its
+                                          #   top; rocks round the foot), 08_seabed; ~25600 along the course, ~14.4k triangles; laid out along the course (s along, t across, z up) in world units; prints where start, checkpoints, finish,
+                                          #   func_water and melon_respawn go, and the lighthouse prop, swing anchor, bouncers, spike springs, lift zone; materials/melon_racer/parkour/
+tools/models/make-motocross-model.mjs     # the motocross stadium race track (track 5), mesh geometry for Hammer's File → Import (DmxText in model.mjs), one .dmx per section
+                                          #   (models/melon_racer/motocross/motocross_<nn>_<section>.dmx, all at one origin: the crossing at floor level; `node … <section>` writes only
+                                          #   that one): 01_floor (dirt, grass islands), 02_banden (boards along both edges, 40 high, open at the crossing; clipper offsets of the middle
+                                          #   line), 03_hills (tabletop, double, step-up), 04_whoops, 05_crossing (kicker + landing over the other lane: the gap open, chaos decided),
+                                          #   06_berms (the four tight corners' outsides), 07_stadium (perimeter wall, stands, tunnel out at -Y, floodlight masts); a figure eight
+                                          #   from CORNERS with rounded corners, TRACK_WIDTH 288, ~11600 a lap, ~5.9k triangles; hill profiles timed for a jump at the lip at MAX_SPEED,
+                                          #   OnStraight fails the run if a hill lands on a curve; prints where gates, start_spawn, checkpoints and floodlights go; materials/melon_racer/motocross/
+tools/lib/lighthouse.mjs                  # the lighthouse's measures shared by the two generators round it: SHAFT (radius foot/top, height to the gallery's deck),
+                                          #   GALLERY (+ the railing's opening), DOOR, WINDOWS (spots make-parkour-model.mjs prints as free), ShaftRadius(z)
+tools/models/make-lighthouse-model.mjs    # the lighthouse parkour's lighthouse as a prop_static, models/melon_racer/lighthouse/lighthouse.vmdl (2.6k triangles): a tapering
+                                          #   32-sided shaft (faces touching the true circle the ramp follows) in red/white bands on a granite foot, a green door, framed windows
+                                          #   with sills, a granite cornice on 16 corbels under the gallery (deck, iron railing open towards +X = where the course arrives), the
+                                          #   watch room (portholes, a door towards the opening), the glowing lantern between mullions, a red dome, ventilator ball, rod + vane;
+                                          #   collision shaft, deck, railing, top (540); origin on the floor in the shaft's middle, yaw from make-parkour-model.mjs's output;
+                                          #   materials/melon_racer/lighthouse/
 tools/models/make-freighter-model.mjs     # the lighthouse parkour's container freighter as a model, models/melon_racer/freighter/freighter.vmdl (1.4k triangles): the parkour's hull
                                           #   (896 x 320, deck 224 over the waterline = the origin, bow +X, bulwarks with stern and bow open), two gantry cranes, each trolley
                                           #   carrying one container; looping "shuttle" (each container across the deck and back, SHUTTLE_SECONDS, the two on opposite sides,
@@ -218,6 +249,17 @@ tools/models/make-chocolate-museum-model.mjs # Cologne's Schokoladenmuseum for t
                                           #   a white slab, the glazed drum of floors, the white prow; windows, bands and panes only in the textures; metres at the cathedral's scale
                                           #   (11.28 u/m, 121 m = 1365 long); origin on the floor in the middle of its length, the prow +Y, the Rhine side +X like harbor_dock.dmx;
                                           #   materials/melon_racer/chocolate_museum/
+tools/models/make-race-gate-model.mjs     # the checkpoint and finish gates as inflatable arches in the hub gates' style, models/melon_racer/race_gate/gate_checkpoint.vmdl
+                                          #   (~3.1k triangles: CHECKPOINT sign, gold edge, holo_checkpoint panel) and gate_finish.vmdl (~2.9k: FINISH between checkered blocks,
+                                          #   holo_zigzag panel); opening 216 wide (the checkpoint trigger's), flattened: legs to SPRING 60, then a superellipse only RISE 62 high
+                                          #   (137 high in all, a half circle would be ~200); signs flat on straight boards front and back, collision gate_physics.obj (tube, feet,
+                                          #   blower); origin on the floor in the opening's middle, the melon through along X; materials/melon_racer/race_gate/
+tools/models/make-heal-gate-model.mjs     # the heal gate as models/melon_racer/heal_gate/heal_gate.vmdl (2.5k triangles): an inflatable arch in the hub gates' style
+                                          #   (lib/inflatable.mjs), smaller and door-shaped: opening 70 wide, 101 high (the prefab's trigger widened to match), a segmented
+                                          #   vinyl tube (tinted per prop: heal cyan) with dark straps, feet, guy ropes, a blower; glowing bulbs along the opening front and
+                                          #   back, a puffy glowing pharmacy green cross on top, the holo panel shaped to the arch (holo_heal.vmat, no collision);
+                                          #   collision tube, feet, blower; origin on the floor in the opening's middle, the melon through along Y (prefab: at 0 0 -48);
+                                          #   materials/melon_racer/heal_gate/
 tools/models/make-heal-tent-model.mjs     # the hub's first-aid tent, models/melon_racer/heal_tent/heal_tent_<piece>.vmdl, all at one origin (floor, middle; the tunnel along X):
                                           #   _frame (two inflatable arches in the gates' style, feet, guy ropes, blower; solid), _canvas (white canvas down to the floor, green pharmacy
                                           #   crosses on both walls and the roof, a HEAL sign under each arch; walls + roof solid), _floor (a 1-high mat with a glowing cross: the
@@ -332,6 +374,13 @@ tools/models/make-spin-hammer-model.mjs   # a spinning sledgehammer as models/me
                                           #   the floor, its wooden handle the arm sweeping around a low pedestal (304 triangles); one bone ("arm") turning around Z, looping
                                           #   "spin" (+ "idle"), a prop_dynamic with Idle Animation "spin", Loop Mode "Loop"; collision: pedestal static, hub + handle + head on "arm";
                                           #   origin on the floor at the axis; materials/melon_racer/spin_hammer/
+tools/models/make-rotating-gate-model.mjs # rotating gates (Drehtore), models/melon_racer/rotating_gate/: a graphite post on a base disc, one long wooden plank through it
+                                          #   reaching out on two opposite sides only (ARM_LENGTH 144, steel straps, red rubber bumpers at the tips), each tier on its own bone:
+                                          #   rotating_gate (one tier, plank 6..22 up: jumped over; looping "spin" counter-clockwise, "spin_reverse", "idle"; 280 triangles),
+                                          #   rotating_gate_double (a second tier 46..62 up turning the other way: rolled under, catches a late jump; "spin", "idle"; 444) and
+                                          #   rotating_gate_triple (a third tier 86..102 up, each tier turning the other way from the one under it; "spin", "idle"; 608);
+                                          #   a prop_dynamic, Idle Animation "spin", Loop; collision post on the root, each plank + collar on its bone;
+                                          #   origin on the floor at the axis; materials/melon_racer/rotating_gate/
 tools/models/make-spawn-pad-model.mjs     # the pad marking hub_spawn, in the stage's look: models/melon_racer/spawn_pad/spawn_pad.vmdl (a low round disc, 88 across, two 1-unit steps
                                           #   a melon rolls over, dark inlay ring, a dark spot with a white ring in the middle, white chevrons pointing +X = the spawn's facing;
                                           #   ~600 triangles, solid) + spawn_pad_light.vmdl (the glowing ring, tinted on its own); both on the floor under hub_spawn, its yaw; materials/melon_racer/spawn_pad/
@@ -380,7 +429,7 @@ models/melon_racer/melon/melon.vmdl      # the melon as our own copy: CS2's ital
                                           #   prop_data and break pieces; its fixed mass 2.0 added by hand — the decompiler drops mass_override), material remapped to materials/melon_racer/melon/melon_default.vmat —
                                           #   the base for melon skins (no SetMaterialGroup in cs_script: one .vmdl per skin, swapped by SetModel)
 materials/melon_racer/<folder>/          # every material + its textures, one folder per use: holo/ (the gates' holo_* surfaces), decals/, melon/ (melon skins),
-                                          #   logo/ (logo_text_*), podium/, hub_gate/, pavilion/, heal_tent/, tree/, hedge/, rock/, mountain/, park/, inflatable_podium/, stage/, bouncer/, shopping_cart/, catapult/, coast/ (coast rocks + plants), seagull/, wood_scaffold/, lantern/, swing_anchor/, portcullis/, freighter/, drone/, drone_display/, spawn_pad/, floor_spotlight/, half_pipe/, parkour/, bridge/, hohenzollern_bridge/, kranhaus/, highrise/, tower_crane/, colonius/, harbor_dock/, cologne_cathedral/, chocolate_museum/, laser/, buffer_stop/, basketball_hoop/, saw_blade/, spike_spring/, spin_hammer/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
+                                          #   logo/ (logo_text_*), podium/, hub_gate/, pavilion/, heal_tent/, heal_gate/, race_gate/, tree/, hedge/, rock/, mountain/, park/, inflatable_podium/, stage/, bouncer/, shopping_cart/, catapult/, coast/ (coast rocks + plants), seagull/, wood_scaffold/, lantern/, swing_anchor/, portcullis/, freighter/, drone/, drone_display/, spawn_pad/, floor_spotlight/, half_pipe/, parkour/, motocross/, lighthouse/, bridge/, hohenzollern_bridge/, kranhaus/, highrise/, tower_crane/, colonius/, harbor_dock/, cologne_cathedral/, chocolate_museum/, laser/, buffer_stop/, kicker/, basketball_hoop/, saw_blade/, spike_spring/, spin_hammer/, rotating_gate/, surfaces/ (rubber004, ambientCG CC0; inflatable from make-inflatable.mjs), particles/ (particle sprites .vtex + .png),
                                           #   checkpoint_gate/ — a new material goes into the fitting one, never loose in materials/melon_racer/
 materials/melon_racer/decals/*_decal.vmat # decals (csgo_static_overlay, translucent): logo_melon_racer_decal, press_use_decal, jump_decal, arrow_decal, wall_jump_decal, attack_for_boost_decal — textures from make-decal.mjs
 ```

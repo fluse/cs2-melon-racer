@@ -13,6 +13,15 @@ function Debug(text) {
     }
 }
 
+/**
+ * An error the tick loop caught and carried on after — logged whatever DEBUG
+ * says: on a server it's the only trace of what went wrong.
+ * @param {string} text @param {unknown} err
+ */
+function LogError(text, err) {
+    Console.Log(`[melon_drive] ERROR ${text}: ${err instanceof Error ? err.stack ?? err.message : err}`);
+}
+
 // Every kart's prediction-line dot entities (see fx/prediction/prediction.js). They sit
 // right on the melon's line of travel, so a trace along it — the prediction
 // line's own, or the wall bounce's — would otherwise hit the first dot
@@ -1287,6 +1296,12 @@ const MELON_TEMPLATE_NAME = "melon_template";
 // than the animation itself (5s).
 const INTRO_LOGO_SECONDS = 3.2;
 
+// A player who lost their kart after the intro (core/think.js drops one whose
+// update threw) gets a new one in the hub, without the logo, at most this
+// often (seconds) — an error that keeps coming back mustn't spawn and drop a
+// melon every tick.
+const KART_REBUILD_SECONDS = 1;
+
 // How far above the floor under a spawn entity (hub_spawn, intro_spawn) the
 // melon's origin appears — straight above it, no sideways offset (see
 // PositionAboveFloor in kart/spawn-points.js). Just enough to clear the floor:
@@ -1549,6 +1564,13 @@ const CAMERA_CLOSEUP_EASE_SECONDS = 1.2;
 //   side_view_<yaw>_<distance>            ... from <distance> units away
 //   side_view_<yaw>_<distance>_<height>   ... and <height> units above the melon's center,
 //                                         looking down at it (negative: from below)
+//   side_view_corner_<from>_<to>[_<distance>[_<height>]]
+//                                         a corner zone round the outside of a building's corner:
+//                                         the camera turns from <from> to <to> (yaws, the two
+//                                         side views either side) as the melon goes round the
+//                                         trigger's origin (put on the corner), looking at the
+//                                         corner from the melon's side; A/D drive round it and
+//                                         the melon is held at its distance from the corner
 // Any other name: SIDE_VIEW_DEFAULT_YAW, SIDE_VIEW_DISTANCE, SIDE_VIEW_HEIGHT.
 // Overlapping zones: the one entered last counts.
 // Only A/D drive (decided) — W/S do nothing, except inside a side-view depth
@@ -1559,6 +1581,7 @@ const CAMERA_CLOSEUP_EASE_SECONDS = 1.2;
 // the melon isn't held on its plane, and leaving it the plane is wherever the
 // melon is then. Outside a side view it does nothing.
 const SIDE_VIEW_NAME_PATTERN = /^side_view_(-?\d+(?:\.\d+)?)(?:_(\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?)?$/;
+const SIDE_VIEW_CORNER_NAME_PATTERN = /^side_view_corner_(-?\d+(?:\.\d+)?)_(-?\d+(?:\.\d+)?)(?:_(\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?)?$/;
 const SIDE_VIEW_DEFAULT_YAW = 90; // degrees, for a zone without values in its name
 // How far from the melon the camera sits, without a distance in the name.
 // Higher: more of the level in view, the melon gets smaller on screen.
@@ -2890,16 +2913,29 @@ function UpdateZoneCamera(kart, dt) {
 // in Node (see test/zones/side-view.test.mjs). movement/driving/drive.js
 // applies the driving part, camera/side-view/ the camera.
 
-/** @typedef {{ yaw: number, distance: number, height: number }} SideView where the camera looks from */
+/** @typedef {{ x: number, y: number, from: number, to: number }} SideViewCorner a corner zone's corner (the trigger's origin) and the yaws either side */
+/** @typedef {{ yaw: number, distance: number, height: number, corner?: SideViewCorner }} SideView where the camera looks from; a corner zone's `yaw` is resolved by ResolveSideView */
 /** @typedef {{ x: number, y: number }} Dir2 a horizontal unit direction */
 
 /**
- * The side view a trigger sets up, from its name (see SIDE_VIEW_NAME_PATTERN),
- * else the SIDE_VIEW_* defaults.
- * @param {string} triggerName @returns {SideView}
+ * The side view a trigger sets up, from its name (see SIDE_VIEW_NAME_PATTERN
+ * and SIDE_VIEW_CORNER_NAME_PATTERN), else the SIDE_VIEW_* defaults. A corner
+ * zone turns round `origin`, the trigger's own origin.
+ * @param {string} triggerName @param {{ x: number, y: number }} [origin] @returns {SideView}
  */
-function SideViewFromName(triggerName) {
-    const match = SIDE_VIEW_NAME_PATTERN.exec(triggerName.trim());
+function SideViewFromName(triggerName, origin) {
+    const name = triggerName.trim();
+    const corner = SIDE_VIEW_CORNER_NAME_PATTERN.exec(name);
+    if (corner) {
+        const from = Number(corner[1]);
+        return {
+            yaw: from,
+            distance: corner[3] === undefined ? SIDE_VIEW_DISTANCE : Number(corner[3]),
+            height: corner[4] === undefined ? SIDE_VIEW_HEIGHT : Number(corner[4]),
+            corner: { x: origin?.x ?? 0, y: origin?.y ?? 0, from, to: Number(corner[2]) },
+        };
+    }
+    const match = SIDE_VIEW_NAME_PATTERN.exec(name);
     if (!match) {
         return { yaw: SIDE_VIEW_DEFAULT_YAW, distance: SIDE_VIEW_DISTANCE, height: SIDE_VIEW_HEIGHT };
     }
@@ -2908,6 +2944,46 @@ function SideViewFromName(triggerName) {
         distance: match[2] === undefined ? SIDE_VIEW_DISTANCE : Number(match[2]),
         height: match[3] === undefined ? SIDE_VIEW_HEIGHT : Number(match[3]),
     };
+}
+
+/** `degrees` wrapped into -180..180. @param {number} degrees */
+function WrapYaw(degrees) {
+    return ((((degrees + 180) % 360) + 360) % 360) - 180;
+}
+
+/**
+ * A corner zone's yaw where the melon is: looking at the corner from the
+ * melon (so the camera, out beyond the melon, sees it in front of the
+ * building), kept within the arc from `from` to `to` the short way round —
+ * outside it, the nearer end. On the line from the corner along either
+ * side's face it's exactly that side's yaw, so the camera turns on smoothly
+ * from the side view before and into the one after.
+ * @param {SideViewCorner} corner @param {{ x: number, y: number }} origin
+ */
+function CornerYaw(corner, origin) {
+    const arc = WrapYaw(corner.to - corner.from);
+    const toCorner = (Math.atan2(corner.y - origin.y, corner.x - origin.x) * 180) / Math.PI;
+    const along = WrapYaw(toCorner - corner.from); // how far round from `from`, the arc's way
+    const lo = Math.min(0, arc);
+    const hi = Math.max(0, arc);
+    if (along >= lo && along <= hi) {
+        return corner.from + along;
+    }
+    const pastLo = Math.abs(WrapYaw(along - lo));
+    const pastHi = Math.abs(WrapYaw(along - hi));
+    return corner.from + (pastLo <= pastHi ? lo : hi);
+}
+
+/**
+ * The side view to drive and look in with the melon at `origin`: a corner
+ * zone's yaw resolved (CornerYaw), any other one as it is.
+ * @param {SideView} sideView @param {{ x: number, y: number }} origin @returns {SideView}
+ */
+function ResolveSideView(sideView, origin) {
+    if (!sideView.corner) {
+        return sideView;
+    }
+    return { yaw: CornerYaw(sideView.corner, origin), distance: sideView.distance, height: sideView.height };
 }
 
 /**
@@ -2925,11 +3001,13 @@ function SideViewAxes(yaw) {
 
 /**
  * Which way the melon faces on screen when it enters a side view: the way
- * it's moving along the screen axis, right if it isn't.
- * @param {{ x: number, y: number }} velocity @param {Dir2} right @returns {1 | -1}
+ * it's moving along the screen axis, else `still` (right, or the facing it
+ * had in the side view just before).
+ * @param {{ x: number, y: number }} velocity @param {Dir2} right @param {1 | -1} [still] @returns {1 | -1}
  */
-function InitialFacing(velocity, right) {
-    return velocity.x * right.x + velocity.y * right.y < 0 ? -1 : 1;
+function InitialFacing(velocity, right, still = 1) {
+    const along = velocity.x * right.x + velocity.y * right.y;
+    return along < 0 ? -1 : along > 0 ? 1 : still;
 }
 
 /**
@@ -2958,6 +3036,18 @@ function SideViewDepthInput(forwardInput, inDepthZone) {
 /** How far along `view` (towards the camera's far side) a point is. @param {{ x: number, y: number }} origin @param {Dir2} view */
 function PlaneDepth(origin, view) {
     return origin.x * view.x + origin.y * view.y;
+}
+
+/**
+ * The melon's depth in a side view, `view` its (resolved) view: along the
+ * view (PlaneDepth), measured from the corner in a corner zone — there the
+ * view points at the corner, so this is minus the melon's distance from it,
+ * and holding it steady holds the melon on a circle round the corner.
+ * @param {SideView} sideView @param {{ x: number, y: number }} origin @param {Dir2} view
+ */
+function SideViewDepth(sideView, origin, view) {
+    const corner = sideView.corner;
+    return corner ? PlaneDepth({ x: origin.x - corner.x, y: origin.y - corner.y }, view) : PlaneDepth(origin, view);
 }
 
 /**
@@ -3221,7 +3311,7 @@ function UpdateSideViewCamera(kart, dt) {
         return;
     }
     if (!zone && kart.sideViewZone) {
-        LookAlongTravel(kart, kart.sideViewZone);
+        LookAlongTravel(kart, ResolveSideView(kart.sideViewZone, origin));
     }
     if (zone) {
         kart.sideViewZone = zone;
@@ -3240,11 +3330,12 @@ function UpdateSideViewCamera(kart, dt) {
         }
         return;
     }
-    const sideView = kart.sideViewZone ?? kart.sideViewLast;
-    if (!sideView) {
+    const zoneView = kart.sideViewZone ?? kart.sideViewLast;
+    if (!zoneView) {
         return;
     }
-    kart.sideViewLast = sideView; // swinging back out: from the zone just left
+    kart.sideViewLast = zoneView; // swinging back out: from the zone just left
+    const sideView = ResolveSideView(zoneView, origin); // a corner zone turns with the melon
     const camera = kart.pawn.GetCustomCamera();
     if (camera.GetMode() !== CustomCameraMode.CONTROLLED) {
         camera.SetMode(CustomCameraMode.CONTROLLED);
@@ -4574,7 +4665,11 @@ const VISIBILITY_BOXES = [
     // maps/prefabs/route_bridge.vmap
     { center: {x: -7952,y: 120,z: 718}, axes: [{x: 0,y: -1,z: 0},{x: 1,y: 0,z: 0},{x: 0,y: 0,z: 1}], half: [3056,880,722] },
     // maps/melon_racer.vmap
-    { center: {x: -5800,y: -16827.332,z: 1152}, axes: [{x: 1,y: 0,z: 0},{x: 0,y: 1,z: 0},{x: 0,y: 0,z: 1}], half: [1528,1166.531,1440] },
+    { center: {x: -5800,y: -16827.332,z: 1088}, axes: [{x: 1,y: 0,z: 0},{x: 0,y: 1,z: 0},{x: 0,y: 0,z: 1}], half: [1528,1166.531,1440] },
+    // maps/prefabs/route_lighthouse.vmap
+    { center: {x: 1531.871,y: -5901.42,z: 1830.253}, axes: [{x: 1,y: 0,z: 0},{x: 0,y: 1,z: 0},{x: 0,y: 0,z: 1}], half: [2304,3073.42,2264] },
+    // maps/prefabs/route_motorcross.vmap
+    { center: {x: -80,y: 2879,z: 720}, axes: [{x: 1,y: 0,z: 0},{x: 0,y: 1,z: 0},{x: 0,y: 0,z: 1}], half: [3024,2064,816] },
 ];
 
 // Pure rules of the free-look drone (no engine calls) — see free-look.js.
@@ -5189,10 +5284,15 @@ function DroneTrace(kart, start, end) {
 // INTRO_LOGO_SECONDS, then spawns their melon at the intro. OnPlayerReset
 // only re-sets-up a player who already has a kart; EnsurePlayerKarts also
 // catches a pawn that lost its chase camera — e.g. the engine finishing a
-// team-join spawn after that callback ran.
+// team-join spawn after that callback ran. A player who loses their kart
+// after the intro gets a new one in the hub, never the logo again: an error
+// dropping the kart every tick once looped them through logo, spawn, logo, …
+// for good.
 
 /** Game time each new player's intro logo ends, by slot — see EnsurePlayerKarts. @type {Map<number, number>} */
 const introLogoEnd = new Map();
+/** Slots through the intro since they connected, each with the game time its next kart rebuild may come — see RebuildKart. @type {Map<number, number>} */
+const nextRebuildTime = new Map();
 
 /**
  * Spawns a fresh melon from the melon_template point_template — shared by
@@ -5352,6 +5452,9 @@ function SetUpPlayerKart(pawn, newKartSpawnPoint) {
             return undefined;
         }
     }
+    if (!nextRebuildTime.has(slot)) {
+        nextRebuildTime.set(slot, 0); // through the intro: a lost kart comes back without it
+    }
     // A new pawn ends free look (the old one was flying, the camera is reset).
     SetFreeLook(kart, false);
     kart.pawn = pawn;
@@ -5383,7 +5486,11 @@ function EnsurePlayerKarts() {
         const slot = controller.GetPlayerSlot();
         const kart = karts.get(slot);
         if (!kart) {
-            ShowIntroLogoThenSpawn(slot, pawn);
+            if (nextRebuildTime.has(slot)) {
+                RebuildKart(slot, pawn);
+            } else {
+                ShowIntroLogoThenSpawn(slot, pawn);
+            }
         } else if (kart.pawn !== pawn) {
             Debug(`EnsurePlayerKarts: slot ${slot} got a new pawn, moving the kart over`);
             SetUpPlayerKart(pawn, undefined);
@@ -5420,6 +5527,32 @@ function ShowIntroLogoThenSpawn(slot, pawn) {
     }
 }
 
+/**
+ * A kart for a player who had one already (Think dropped it after an error):
+ * in the hub, no logo, at most every KART_REBUILD_SECONDS.
+ * @param {number} slot @param {any} pawn
+ */
+function RebuildKart(slot, pawn) {
+    const now = Instance.GetGameTime();
+    if (now < (nextRebuildTime.get(slot) ?? 0)) {
+        return;
+    }
+    nextRebuildTime.set(slot, now + KART_REBUILD_SECONDS);
+    if (SetUpPlayerKart(pawn, GetHubSpawnPoint() ?? GetJoinSpawnPoint(pawn))) {
+        Debug(`EnsurePlayerKarts: slot ${slot} got a fresh kart in the hub`);
+    }
+}
+
+/**
+ * Holds back the next RebuildKart for KART_REBUILD_SECONDS — Think, dropping
+ * a kart whose update threw. @param {number} slot
+ */
+function DelayKartRebuild(slot) {
+    if (nextRebuildTime.has(slot)) {
+        nextRebuildTime.set(slot, Instance.GetGameTime() + KART_REBUILD_SECONDS);
+    }
+}
+
 /** Shows or hides the Melon Racer logo (intro_logo) for one player — also the user menu's "Test Intro". @param {number} slot @param {boolean} visible */
 function SetIntroLogoVisible(slot, visible) {
     GetSpeedHud()?.SetHasClassForPlayer(slot, "intro_logo", "Hidden", !visible);
@@ -5431,6 +5564,7 @@ function SetIntroLogoVisible(slot, visible) {
  * @param {number} slot
  */
 function ForgetIntroLogo(slot) {
+    nextRebuildTime.delete(slot);
     if (introLogoEnd.delete(slot)) {
         SetIntroLogoVisible(slot, false);
     }
@@ -13251,7 +13385,8 @@ function UpdateKart(slot, kart, dt) {
  * the view and the plane moves with the melon (`free`), so leaving the
  * depth zone holds it on the plane it's on then.
  * undefined outside one. Entering a (new) zone starts on the plane the melon
- * is on, facing the way it moves.
+ * is on, facing the way it moves. In a corner zone the screen axis turns
+ * round the corner and the "plane" is a circle round it.
  * @param {import("../../core/kart-registry.js").Kart} kart
  * @param {{ x: number, y: number, z: number }} origin @param {{ x: number, y: number, z: number }} velocity
  * @param {number} forwardInput @param {number} strafeInput
@@ -13261,9 +13396,11 @@ function SideViewDriving(kart, origin, velocity, forwardInput, strafeInput) {
     if (!zone) {
         return undefined; // kart.sideViewDrive stays: the camera turns the view along its facing on the way out
     }
-    const { view, right } = SideViewAxes(zone.yaw);
+    // A corner zone turns its axes round the corner as the melon goes round it.
+    const { view, right } = SideViewAxes(ResolveSideView(zone, origin).yaw);
+    const depth = SideViewDepth(zone, origin, view);
     if (kart.sideViewDrive?.zone !== zone) {
-        kart.sideViewDrive = { zone, plane: PlaneDepth(origin, view), facing: InitialFacing(velocity, right) };
+        kart.sideViewDrive = { zone, plane: depth, facing: InitialFacing(velocity, right, kart.sideViewDrive?.facing) };
     }
     const input = SideViewInput(strafeInput, kart.sideViewDrive.facing);
     kart.sideViewDrive.facing = input.facing;
@@ -13271,7 +13408,7 @@ function SideViewDriving(kart, origin, velocity, forwardInput, strafeInput) {
     // melon is (it may have rested in the zone, skipping this).
     const free = InSideViewDepthZone(kart);
     if (free || kart.sideViewDrive.free) {
-        kart.sideViewDrive.plane = PlaneDepth(origin, view);
+        kart.sideViewDrive.plane = depth;
     }
     kart.sideViewDrive.free = free;
     const dir = input.axis !== 0 ? Math.sign(input.axis) : input.facing;
@@ -13281,7 +13418,7 @@ function SideViewDriving(kart, origin, velocity, forwardInput, strafeInput) {
         depthInput: SideViewDepthInput(forwardInput, free),
         free,
         view,
-        depthError: kart.sideViewDrive.plane - PlaneDepth(origin, view),
+        depthError: kart.sideViewDrive.plane - depth,
     };
 }
 
@@ -14034,7 +14171,7 @@ function Think() {
     try {
         EnsurePlayerKarts();
     } catch (err) {
-        Debug(`Think: EnsurePlayerKarts threw: ${err}`);
+        LogError("Think: EnsurePlayerKarts threw", err);
     }
 
     for (const [slot, kart] of karts) {
@@ -14103,9 +14240,10 @@ function Think() {
                 );
             }
         } catch (err) {
-            Debug(`Think: slot ${slot} update threw, dropping kart to keep the gamemode alive for everyone else: ${err}`);
+            // EnsurePlayerKarts gives them a new one in the hub (RebuildKart).
+            LogError(`Think: slot ${slot} update threw, dropping kart to keep the gamemode alive for everyone else`, err);
             DropKart(slot, kart);
-            ScheduleKartRebuild(slot, kart.pawn);
+            DelayKartRebuild(slot);
         }
     }
     EnsureModerator();
@@ -14168,30 +14306,6 @@ function Think() {
     // own tick rate means some jump presses land on a tick we never check and
     // are silently lost. Same pattern as cs_script_demo's input.js.
     Instance.SetNextThink(Instance.GetGameTime());
-}
-
-/**
- * Gives a player whose kart got dropped by Think's error handler a fresh one
- * — otherwise they'd sit melon-less until the next OnPlayerReset, which on
- * this map practically never comes (see gamemode/index.js). Delayed, not
- * immediate, so an error that keeps recurring rebuilds at most once a second
- * instead of spawning (and dropping) a melon every tick.
- * @param {number} slot @param {any} pawn
- */
-function ScheduleKartRebuild(slot, pawn) {
-    Instance.Delay(1).then(() => {
-        if (karts.has(slot) || !pawn.IsValid()) {
-            return; // already rebuilt elsewhere (e.g. OnPlayerReset), or player gone
-        }
-        try {
-            // The hub, not the intro: this player was already playing.
-            if (SetUpPlayerKart(pawn, GetHubSpawnPoint())) {
-                Debug(`ScheduleKartRebuild: slot ${slot} got a fresh kart`);
-            }
-        } catch (err) {
-            Debug(`ScheduleKartRebuild: slot ${slot} rebuild threw: ${err}`);
-        }
-    });
 }
 
 // Player lifecycle (reset, disconnect), the paint triggers (melon_paint) and
@@ -14364,7 +14478,7 @@ function RegisterTeleportInput() {
 /**
  * @param {string} enterInput @param {string} leaveInput
  * @param {import("./registry.js").ZoneKind} kind
- * @param {(triggerName: string) => any} valueFromName @param {string} unit for the debug log
+ * @param {(triggerName: string, trigger: any) => any} valueFromName @param {string} unit for the debug log
  * @param {(kart: import("../core/kart-registry.js").Kart) => void} [onEnter] e.g. an effect on entering
  */
 function RegisterZone(enterInput, leaveInput, kind, valueFromName, unit, onEnter) {
@@ -14374,7 +14488,7 @@ function RegisterZone(enterInput, leaveInput, kind, valueFromName, unit, onEnter
             Debug(`${enterInput}: activator wasn't a tracked melon, ignoring`);
             return;
         }
-        const value = valueFromName(caller.GetEntityName());
+        const value = valueFromName(caller.GetEntityName(), caller);
         EnterZone(kart, kind, caller, value);
         onEnter?.(kart);
         Debug(`${enterInput}: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} in "${caller.GetEntityName()}" (${typeof value === "object" ? JSON.stringify(value) : value} ${unit})`);
@@ -14396,7 +14510,8 @@ function RegisterZoneInputs() {
     // Camera zones — see CAMERA_ZONE_* in camera-zone/constants.js. Read by the zone camera (camera/zone-zoom/).
     RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
     // Side-view zones — see side-view/constants.js. Read by UpdateKart (2D driving) and the side camera (camera/side-view/).
-    RegisterZone("side_view_enter", "side_view_leave", "sideViews", SideViewFromName, "yaw/distance/height");
+    // A corner zone (side_view_corner_…) turns round the trigger's own origin.
+    RegisterZone("side_view_enter", "side_view_leave", "sideViews", (name, trigger) => SideViewFromName(name, trigger.GetAbsOrigin()), "yaw/distance/height");
     // Side-view depth zones — inside a side view, W/S move the melon towards/away from the camera. Read by UpdateKart.
     RegisterZone("side_view_depth_enter", "side_view_depth_leave", "sideViewDepths", () => 1, "(side-view depth)");
     // Jump pads — see jump-pad/constants.js. Read by jump-pad/jump-pad.js (launch, no damage).

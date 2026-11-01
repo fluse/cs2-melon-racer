@@ -6,7 +6,7 @@ import "../helpers/register-cs-script.mjs";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { world, Entity, CSPlayerPawn, PointTemplate } from "../helpers/cs-script-mock.mjs";
-import { SideViewFromName, SideViewAxes, InitialFacing, SideViewInput, SideViewDepthInput, KeepOnPlane } from "../../src/melon_drive/zones/side-view/logic.js";
+import { SideViewFromName, SideViewAxes, InitialFacing, SideViewInput, SideViewDepthInput, KeepOnPlane, CornerYaw, ResolveSideView, SideViewDepth } from "../../src/melon_drive/zones/side-view/logic.js";
 import { StepSideViewBlend, SideViewPose, StepSideViewFocus, ChaseCameraPose, BlendPose, IsTeleportJump, CutsSideViewExit } from "../../src/melon_drive/camera/side-view/logic.js";
 import {
     SIDE_VIEW_DEFAULT_YAW,
@@ -38,6 +38,41 @@ test("side view from the name: yaw, distance and height, defaults for the rest",
     assert.deepEqual(SideViewFromName("2d_section"), { yaw: SIDE_VIEW_DEFAULT_YAW, distance: SIDE_VIEW_DISTANCE, height: SIDE_VIEW_HEIGHT });
 });
 
+test("corner zone from the name: the two yaws, distance and height, round the trigger's origin", () => {
+    assert.deepEqual(SideViewFromName("side_view_corner_180_270_400_60", { x: 5, y: -7 }), {
+        yaw: 180,
+        distance: 400,
+        height: 60,
+        corner: { x: 5, y: -7, from: 180, to: 270 },
+    });
+    assert.deepEqual(SideViewFromName("side_view_corner_0_-90", { x: 0, y: 0 }).corner, { x: 0, y: 0, from: 0, to: -90 });
+    assert.equal(SideViewFromName("side_view_corner_0_-90").distance, SIDE_VIEW_DISTANCE);
+});
+
+// The corner at the origin, the building in x < 0, y < 0: its east face is
+// seen looking west (180), its north face looking south (270).
+test("corner zone: the camera looks at the corner from the melon, turning from one side's yaw to the other's", () => {
+    const corner = { x: 0, y: 0, from: 180, to: 270 };
+    const yaw = (/** @type {number} */ x, /** @type {number} */ y) => ((CornerYaw(corner, { x, y }) % 360) + 360) % 360;
+    assert.ok(close(yaw(100, 0), 180), "on the east face's line: the east side's yaw");
+    assert.ok(close(yaw(100, 100), 225), "halfway round");
+    assert.ok(close(yaw(0, 100), 270), "on the north face's line: the north side's yaw");
+    assert.ok(close(yaw(100, -50), 180), "short of the arc (still beside the east face): held at its yaw");
+    assert.ok(close(yaw(-50, 100), 270), "past it: held at the north side's");
+    // The other way round (clockwise) works the same.
+    assert.ok(close(((CornerYaw({ x: 0, y: 0, from: 270, to: 180 }, { x: 100, y: 100 }) % 360) + 360) % 360, 225));
+});
+
+test("corner zone: the depth is minus the distance from the corner, so the melon is held on a circle round it", () => {
+    const zone = SideViewFromName("side_view_corner_180_270", { x: 10, y: 20 });
+    for (const p of [{ x: 110, y: 20 }, { x: 80.71, y: 90.71 }, { x: 10, y: 120 }]) {
+        const { view } = SideViewAxes(ResolveSideView(zone, p).yaw);
+        assert.ok(Math.abs(SideViewDepth(zone, p, view) + 100) < 0.01, `100 from the corner at ${JSON.stringify(p)}`);
+    }
+    const plain = SideViewFromName("side_view_90");
+    assert.equal(ResolveSideView(plain, { x: 1, y: 2 }), plain, "a plain side view stays as it is");
+});
+
 test("looking north (yaw 90), screen right is east", () => {
     const { view, right } = SideViewAxes(90);
     assert.ok(close(view.x, 0) && close(view.y, 1));
@@ -54,6 +89,7 @@ test("only A/D drive and turn the melon on screen; W/S only drive in a depth zon
     assert.equal(SideViewDepthInput(-1, true), -1);
     assert.equal(InitialFacing({ x: -100, y: 0 }, { x: 1, y: 0 }), -1);
     assert.equal(InitialFacing({ x: 0, y: 0 }, { x: 1, y: 0 }), 1);
+    assert.equal(InitialFacing({ x: 0, y: 0 }, { x: 1, y: 0 }, -1), -1, "standing still: the facing it had before");
 });
 
 test("on the plane: no speed towards the camera, a drift is pulled back, capped", () => {
@@ -234,4 +270,25 @@ test("teleported out of a side view, the camera cuts straight back to the chase 
     assert.equal(camera.GetMode(), 3); // FOLLOW_POSITION at once, no swing
     assert.equal(kart.sideViewBlend, 0);
     assert.ok(close(pawn.GetEyeAngles().yaw, hubYaw), `view kept the hub's facing ${hubYaw}, got ${pawn.GetEyeAngles().yaw}`);
+});
+
+test("round a corner zone, D drives the melon round the building, held at its distance, the camera turning with it", () => {
+    const corner = world.add(new Entity({ name: "side_view_corner_180_270_300_0", className: "trigger_multiple", origin: { x: 0, y: 0, z: 0 } }));
+    kart.melon.origin = { x: 100, y: 0, z: 10 }; // beside the east face, at the corner's line
+    kart.melon.velocity = { x: 0, y: 300, z: 0 }; // heading north, round the corner
+    ScriptInput("side_view_enter")({ caller: corner, activator: kart.melon });
+    const dt = 1 / 64;
+    for (let i = 0; i < 64 * 2 && Math.atan2(kart.melon.origin.y, kart.melon.origin.x) < Math.PI / 2; i++) {
+        Tick(["RIGHT"]);
+        const v = kart.melon.GetAbsVelocity();
+        kart.melon.origin = { x: kart.melon.origin.x + v.x * dt, y: kart.melon.origin.y + v.y * dt, z: 10 };
+    }
+    const o = kart.melon.origin;
+    assert.ok(Math.atan2(o.y, o.x) >= Math.PI / 2 - 0.05, `got round to the north face, at ${JSON.stringify(o)}`);
+    assert.ok(Math.abs(Math.hypot(o.x, o.y) - 100) < 10, `held about 100 from the corner, got ${Math.hypot(o.x, o.y)}`);
+    for (let i = 0; i < 64 * SIDE_VIEW_EASE_SECONDS + 2; i++) {
+        Tick([]);
+    }
+    const yaw = ((pawn.GetCustomCamera().pose.angles.yaw % 360) + 360) % 360;
+    assert.ok(Math.abs(yaw - 270) < 5, `camera looks south at the north face, got ${yaw}`);
 });
