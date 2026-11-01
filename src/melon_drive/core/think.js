@@ -1,9 +1,8 @@
 import { Instance, CSInputs } from "cs_script/point_script";
-import { DEBUG, Debug } from "./debug.js";
+import { DEBUG, Debug, LogError } from "./debug.js";
 import { HEARTBEAT_INTERVAL } from "../constants/index.js";
 import { karts, EnsureModerator, DropKart } from "./kart-registry.js";
-import { SetUpPlayerKart, EnsurePlayerKarts, HoldPawn } from "../kart/spawn.js";
-import { GetHubSpawnPoint } from "../kart/spawn-points.js";
+import { EnsurePlayerKarts, HoldPawn, DelayKartRebuild } from "../kart/spawn.js";
 import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud, UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, UpdateScoreboardHud, UpdateScoreboardInput, ApplyHubModalState } from "../hud/index.js";
 import { UpdateKart } from "../movement/index.js";
 import { HandleMelonLost } from "../health/index.js";
@@ -33,7 +32,7 @@ export function Think() {
     try {
         EnsurePlayerKarts();
     } catch (err) {
-        Debug(`Think: EnsurePlayerKarts threw: ${err}`);
+        LogError("Think: EnsurePlayerKarts threw", err);
     }
 
     for (const [slot, kart] of karts) {
@@ -100,9 +99,10 @@ export function Think() {
                 );
             }
         } catch (err) {
-            Debug(`Think: slot ${slot} update threw, dropping kart to keep the gamemode alive for everyone else: ${err}`);
+            // EnsurePlayerKarts gives them a new one in the hub (RebuildKart).
+            LogError(`Think: slot ${slot} update threw, dropping kart to keep the gamemode alive for everyone else`, err);
             DropKart(slot, kart);
-            ScheduleKartRebuild(slot, kart.pawn);
+            DelayKartRebuild(slot);
         }
     }
     EnsureModerator();
@@ -135,28 +135,4 @@ export function Think() {
     // own tick rate means some jump presses land on a tick we never check and
     // are silently lost. Same pattern as cs_script_demo's input.js.
     Instance.SetNextThink(Instance.GetGameTime());
-}
-
-/**
- * Gives a player whose kart got dropped by Think's error handler a fresh one
- * — otherwise they'd sit melon-less until the next OnPlayerReset, which on
- * this map practically never comes (see gamemode/index.js). Delayed, not
- * immediate, so an error that keeps recurring rebuilds at most once a second
- * instead of spawning (and dropping) a melon every tick.
- * @param {number} slot @param {any} pawn
- */
-function ScheduleKartRebuild(slot, pawn) {
-    Instance.Delay(1).then(() => {
-        if (karts.has(slot) || !pawn.IsValid()) {
-            return; // already rebuilt elsewhere (e.g. OnPlayerReset), or player gone
-        }
-        try {
-            // The hub, not the intro: this player was already playing.
-            if (SetUpPlayerKart(pawn, GetHubSpawnPoint())) {
-                Debug(`ScheduleKartRebuild: slot ${slot} got a fresh kart`);
-            }
-        } catch (err) {
-            Debug(`ScheduleKartRebuild: slot ${slot} rebuild threw: ${err}`);
-        }
-    });
 }

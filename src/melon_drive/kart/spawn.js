@@ -2,7 +2,7 @@ import { Instance, PointTemplate, CSMoveType, CustomCameraMode } from "cs_script
 import { Debug } from "../core/debug.js";
 import { karts, moderatorSlot, SetModeratorSlot } from "../core/kart-registry.js";
 import { ApplyCameraFollow } from "../camera/index.js";
-import { FacePlayerView } from "./spawn-points.js";
+import { FacePlayerView, GetHubSpawnPoint } from "./spawn-points.js";
 import { GetJoinSpawnPoint } from "./join-spot.js";
 import { GetSpeedHud } from "../hud/layout.js";
 import { ShowMelonPaint } from "./look.js";
@@ -13,6 +13,7 @@ import {
     MELON_MAX_HEALTH,
     MELON_ENGINE_HEALTH,
     INTRO_LOGO_SECONDS,
+    KART_REBUILD_SECONDS,
     WALL_JUMP_CHARGES,
 } from "../constants/index.js";
 
@@ -25,10 +26,15 @@ import {
 // INTRO_LOGO_SECONDS, then spawns their melon at the intro. OnPlayerReset
 // only re-sets-up a player who already has a kart; EnsurePlayerKarts also
 // catches a pawn that lost its chase camera — e.g. the engine finishing a
-// team-join spawn after that callback ran.
+// team-join spawn after that callback ran. A player who loses their kart
+// after the intro gets a new one in the hub, never the logo again: an error
+// dropping the kart every tick once looped them through logo, spawn, logo, …
+// for good.
 
 /** Game time each new player's intro logo ends, by slot — see EnsurePlayerKarts. @type {Map<number, number>} */
 const introLogoEnd = new Map();
+/** Slots through the intro since they connected, each with the game time its next kart rebuild may come — see RebuildKart. @type {Map<number, number>} */
+const nextRebuildTime = new Map();
 
 /**
  * Spawns a fresh melon from the melon_template point_template — shared by
@@ -191,6 +197,9 @@ export function SetUpPlayerKart(pawn, newKartSpawnPoint) {
             return undefined;
         }
     }
+    if (!nextRebuildTime.has(slot)) {
+        nextRebuildTime.set(slot, 0); // through the intro: a lost kart comes back without it
+    }
     // A new pawn ends free look (the old one was flying, the camera is reset).
     SetFreeLook(kart, false);
     kart.pawn = pawn;
@@ -222,7 +231,11 @@ export function EnsurePlayerKarts() {
         const slot = controller.GetPlayerSlot();
         const kart = karts.get(slot);
         if (!kart) {
-            ShowIntroLogoThenSpawn(slot, pawn);
+            if (nextRebuildTime.has(slot)) {
+                RebuildKart(slot, pawn);
+            } else {
+                ShowIntroLogoThenSpawn(slot, pawn);
+            }
         } else if (kart.pawn !== pawn) {
             Debug(`EnsurePlayerKarts: slot ${slot} got a new pawn, moving the kart over`);
             SetUpPlayerKart(pawn, undefined);
@@ -259,6 +272,32 @@ function ShowIntroLogoThenSpawn(slot, pawn) {
     }
 }
 
+/**
+ * A kart for a player who had one already (Think dropped it after an error):
+ * in the hub, no logo, at most every KART_REBUILD_SECONDS.
+ * @param {number} slot @param {any} pawn
+ */
+function RebuildKart(slot, pawn) {
+    const now = Instance.GetGameTime();
+    if (now < (nextRebuildTime.get(slot) ?? 0)) {
+        return;
+    }
+    nextRebuildTime.set(slot, now + KART_REBUILD_SECONDS);
+    if (SetUpPlayerKart(pawn, GetHubSpawnPoint() ?? GetJoinSpawnPoint(pawn))) {
+        Debug(`EnsurePlayerKarts: slot ${slot} got a fresh kart in the hub`);
+    }
+}
+
+/**
+ * Holds back the next RebuildKart for KART_REBUILD_SECONDS — Think, dropping
+ * a kart whose update threw. @param {number} slot
+ */
+export function DelayKartRebuild(slot) {
+    if (nextRebuildTime.has(slot)) {
+        nextRebuildTime.set(slot, Instance.GetGameTime() + KART_REBUILD_SECONDS);
+    }
+}
+
 /** Shows or hides the Melon Racer logo (intro_logo) for one player — also the user menu's "Test Intro". @param {number} slot @param {boolean} visible */
 export function SetIntroLogoVisible(slot, visible) {
     GetSpeedHud()?.SetHasClassForPlayer(slot, "intro_logo", "Hidden", !visible);
@@ -270,6 +309,7 @@ export function SetIntroLogoVisible(slot, visible) {
  * @param {number} slot
  */
 export function ForgetIntroLogo(slot) {
+    nextRebuildTime.delete(slot);
     if (introLogoEnd.delete(slot)) {
         SetIntroLogoVisible(slot, false);
     }

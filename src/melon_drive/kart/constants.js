@@ -9,6 +9,12 @@ export const MELON_TEMPLATE_NAME = "melon_template";
 // than the animation itself (5s).
 export const INTRO_LOGO_SECONDS = 3.2;
 
+// A player who lost their kart after the intro (core/think.js drops one whose
+// update threw) gets a new one in the hub, without the logo, at most this
+// often (seconds) — an error that keeps coming back mustn't spawn and drop a
+// melon every tick.
+export const KART_REBUILD_SECONDS = 1;
+
 // How far above the floor under a spawn entity (hub_spawn, intro_spawn) the
 // melon's origin appears — straight above it, no sideways offset (see
 // PositionAboveFloor in kart/spawn-points.js). Just enough to clear the floor:

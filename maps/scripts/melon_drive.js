@@ -13,6 +13,15 @@ function Debug(text) {
     }
 }
 
+/**
+ * An error the tick loop caught and carried on after — logged whatever DEBUG
+ * says: on a server it's the only trace of what went wrong.
+ * @param {string} text @param {unknown} err
+ */
+function LogError(text, err) {
+    Instance.Msg(`[melon_drive] ERROR ${text}: ${err instanceof Error ? err.stack ?? err.message : err}`);
+}
+
 // Every kart's prediction-line dot entities (see fx/prediction/prediction.js). They sit
 // right on the melon's line of travel, so a trace along it — the prediction
 // line's own, or the wall bounce's — would otherwise hit the first dot
@@ -1094,6 +1103,12 @@ const MELON_TEMPLATE_NAME = "melon_template";
 // picture after 2.85s — keep this a little longer than that, and shorter
 // than the animation itself (5s).
 const INTRO_LOGO_SECONDS = 3.2;
+
+// A player who lost their kart after the intro (core/think.js drops one whose
+// update threw) gets a new one in the hub, without the logo, at most this
+// often (seconds) — an error that keeps coming back mustn't spawn and drop a
+// melon every tick.
+const KART_REBUILD_SECONDS = 1;
 
 // How far above the floor under a spawn entity (hub_spawn, intro_spawn) the
 // melon's origin appears — straight above it, no sideways offset (see
@@ -3636,10 +3651,15 @@ function ChaseCameraFeet(kart) {
 // INTRO_LOGO_SECONDS, then spawns their melon at the intro. OnPlayerReset
 // only re-sets-up a player who already has a kart; EnsurePlayerKarts also
 // catches a pawn that lost its chase camera — e.g. the engine finishing a
-// team-join spawn after that callback ran.
+// team-join spawn after that callback ran. A player who loses their kart
+// after the intro gets a new one in the hub, never the logo again: an error
+// dropping the kart every tick once looped them through logo, spawn, logo, …
+// for good.
 
 /** Game time each new player's intro logo ends, by slot — see EnsurePlayerKarts. @type {Map<number, number>} */
 const introLogoEnd = new Map();
+/** Slots through the intro since they connected, each with the game time its next kart rebuild may come — see RebuildKart. @type {Map<number, number>} */
+const nextRebuildTime = new Map();
 
 /**
  * Spawns a fresh melon from the melon_template point_template — shared by
@@ -3802,6 +3822,9 @@ function SetUpPlayerKart(pawn, newKartSpawnPoint) {
             return undefined;
         }
     }
+    if (!nextRebuildTime.has(slot)) {
+        nextRebuildTime.set(slot, 0); // through the intro: a lost kart comes back without it
+    }
     // A new pawn ends free look (the old one was flying, the camera is reset).
     SetFreeLook(kart, false);
     kart.pawn = pawn;
@@ -3833,7 +3856,11 @@ function EnsurePlayerKarts() {
         const slot = controller.GetPlayerSlot();
         const kart = karts.get(slot);
         if (!kart) {
-            ShowIntroLogoThenSpawn(slot, pawn);
+            if (nextRebuildTime.has(slot)) {
+                RebuildKart(slot, pawn);
+            } else {
+                ShowIntroLogoThenSpawn(slot, pawn);
+            }
         } else if (kart.pawn !== pawn) {
             Debug(`EnsurePlayerKarts: slot ${slot} got a new pawn, moving the kart over`);
             SetUpPlayerKart(pawn, undefined);
@@ -3870,6 +3897,32 @@ function ShowIntroLogoThenSpawn(slot, pawn) {
     }
 }
 
+/**
+ * A kart for a player who had one already (Think dropped it after an error):
+ * in the hub, no logo, at most every KART_REBUILD_SECONDS.
+ * @param {number} slot @param {any} pawn
+ */
+function RebuildKart(slot, pawn) {
+    const now = Instance.GetGameTime();
+    if (now < (nextRebuildTime.get(slot) ?? 0)) {
+        return;
+    }
+    nextRebuildTime.set(slot, now + KART_REBUILD_SECONDS);
+    if (SetUpPlayerKart(pawn, GetHubSpawnPoint() ?? GetJoinSpawnPoint(pawn))) {
+        Debug(`EnsurePlayerKarts: slot ${slot} got a fresh kart in the hub`);
+    }
+}
+
+/**
+ * Holds back the next RebuildKart for KART_REBUILD_SECONDS — Think, dropping
+ * a kart whose update threw. @param {number} slot
+ */
+function DelayKartRebuild(slot) {
+    if (nextRebuildTime.has(slot)) {
+        nextRebuildTime.set(slot, Instance.GetGameTime() + KART_REBUILD_SECONDS);
+    }
+}
+
 /** Shows or hides the Melon Racer logo (intro_logo) for one player — also the user menu's "Test Intro". @param {number} slot @param {boolean} visible */
 function SetIntroLogoVisible(slot, visible) {
     GetSpeedHud()?.SetHasClassForPlayer(slot, "intro_logo", "Hidden", !visible);
@@ -3881,6 +3934,7 @@ function SetIntroLogoVisible(slot, visible) {
  * @param {number} slot
  */
 function ForgetIntroLogo(slot) {
+    nextRebuildTime.delete(slot);
     if (introLogoEnd.delete(slot)) {
         SetIntroLogoVisible(slot, false);
     }
@@ -10521,7 +10575,7 @@ function Think() {
     try {
         EnsurePlayerKarts();
     } catch (err) {
-        Debug(`Think: EnsurePlayerKarts threw: ${err}`);
+        LogError("Think: EnsurePlayerKarts threw", err);
     }
 
     for (const [slot, kart] of karts) {
@@ -10588,9 +10642,10 @@ function Think() {
                 );
             }
         } catch (err) {
-            Debug(`Think: slot ${slot} update threw, dropping kart to keep the gamemode alive for everyone else: ${err}`);
+            // EnsurePlayerKarts gives them a new one in the hub (RebuildKart).
+            LogError(`Think: slot ${slot} update threw, dropping kart to keep the gamemode alive for everyone else`, err);
             DropKart(slot, kart);
-            ScheduleKartRebuild(slot, kart.pawn);
+            DelayKartRebuild(slot);
         }
     }
     EnsureModerator();
@@ -10623,30 +10678,6 @@ function Think() {
     // own tick rate means some jump presses land on a tick we never check and
     // are silently lost. Same pattern as cs_script_demo's input.js.
     Instance.SetNextThink(Instance.GetGameTime());
-}
-
-/**
- * Gives a player whose kart got dropped by Think's error handler a fresh one
- * — otherwise they'd sit melon-less until the next OnPlayerReset, which on
- * this map practically never comes (see gamemode/index.js). Delayed, not
- * immediate, so an error that keeps recurring rebuilds at most once a second
- * instead of spawning (and dropping) a melon every tick.
- * @param {number} slot @param {any} pawn
- */
-function ScheduleKartRebuild(slot, pawn) {
-    Instance.Delay(1).then(() => {
-        if (karts.has(slot) || !pawn.IsValid()) {
-            return; // already rebuilt elsewhere (e.g. OnPlayerReset), or player gone
-        }
-        try {
-            // The hub, not the intro: this player was already playing.
-            if (SetUpPlayerKart(pawn, GetHubSpawnPoint())) {
-                Debug(`ScheduleKartRebuild: slot ${slot} got a fresh kart`);
-            }
-        } catch (err) {
-            Debug(`ScheduleKartRebuild: slot ${slot} rebuild threw: ${err}`);
-        }
-    });
 }
 
 // Player lifecycle (reset, disconnect), the paint triggers (melon_paint) and

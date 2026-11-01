@@ -11,3 +11,12 @@ export function Debug(text) {
         Instance.Msg(`[melon_drive] ${text}`);
     }
 }
+
+/**
+ * An error the tick loop caught and carried on after — logged whatever DEBUG
+ * says: on a server it's the only trace of what went wrong.
+ * @param {string} text @param {unknown} err
+ */
+export function LogError(text, err) {
+    Instance.Msg(`[melon_drive] ERROR ${text}: ${err instanceof Error ? err.stack ?? err.message : err}`);
+}
