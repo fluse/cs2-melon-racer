@@ -3,7 +3,7 @@
 // ready-to-send strings, and the pages A/D step through. Also the stat
 // boards of the user menu's leaderboards and profile (BuildStatBoard), which
 // share its rows and ranks. No cs_script import (test/hud/scoreboard.test.mjs).
-import { SortedStandings, Wins, OrdinalPlace } from "../../race/grand-prix/logic.js";
+import { SortedStandings, Wins, OrdinalPlace, CompareNames } from "../../race/grand-prix/logic.js";
 import { FormatRaceTime } from "../../race/time-trial/logic.js";
 import { FormatStat } from "../../race/stats/logic.js";
 
@@ -101,7 +101,7 @@ function TimeText(time) {
  * @param {{ name: string, best: number | undefined }} a @param {{ name: string, best: number | undefined }} b
  */
 function ByBestTime(a, b) {
-    return (a.best ?? Infinity) - (b.best ?? Infinity) || a.name.localeCompare(b.name);
+    return (a.best ?? Infinity) - (b.best ?? Infinity) || CompareNames(a.name, b.name);
 }
 
 /**
@@ -212,7 +212,7 @@ export function BuildStatBoard({ slide, totals, players, self, maxRows }) {
     const names = new Set([...Object.keys(totals), ...players.map((player) => player.name)]);
     const entries = [...names]
         .map((name) => ({ name, value: totals[name] ?? 0 }))
-        .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+        .sort((a, b) => b.value - a.value || CompareNames(a.name, b.name));
     const ranks = SharedRanks(entries, (a, b) => a.value === b.value);
     return {
         grandPrixMode: false,

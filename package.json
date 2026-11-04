@@ -2,7 +2,7 @@
     "name": "melon_racer",
     "version": "0.7.0",
     "private": true,
-    "description": "Build tooling for the melon_racer CS2 addon's cs_script sources (src/ -> maps/scripts/).",
+    "description": "Build tooling for the melon_racer CS2 addon's cs_script sources (src/ -> maps/scripts/) and HUD layout (src/panorama/ -> panorama/layout/).",
     "type": "module",
     "scripts": {
         "build": "node build.mjs",
@@ -15,6 +15,12 @@
         "clipper-lib": "^6.4.2",
         "earcut": "^3.2.4",
         "opentype.js": "^2.0.0",
+        "postcss": "^8.5.30",
+        "postcss-import": "^17.0.0",
+        "postcss-simple-vars": "^7.0.1",
+        "posthtml": "^0.16.7",
+        "posthtml-expressions": "^1.11.4",
+        "posthtml-modules": "^0.9.1",
         "rollup": "^4.63.3"
     }
 }

@@ -1,0 +1,36 @@
+<!-- Scoreboard in place of CS2's own (see hud/scoreboard.js): shown by
+     the CSS while the engine sets HUD_SCOREBOARD_VISIBLE (Tab held),
+     on a near-opaque backdrop that covers the default scoreboard.
+     Grand Prix standings (points, place in the current/last heat,
+     best time) or, in a time trial (TimeTrial class: no PTS/HEAT
+     columns), the track's best times. SCOREBOARD_ROWS rows, unused
+     ones collapsed (Unused), the viewer's own one marked Self. -->
+<Panel id="scoreboard" class="Scoreboard" hittest="false">
+	<!-- Same build as the user menu: the card under the logo, whose
+	     banner sits on the card's top edge. -->
+	<Panel class="ScoreboardFrame" hittest="false">
+		<Panel class="ScoreboardCard">
+			<Label class="ScoreboardTitle" text="{s:title}" />
+			<Label class="ScoreboardSubtitle" text="{s:subtitle}" />
+			<!-- Time trial with several tracks: hold Tab, A/D page through
+			     them (UpdateScoreboardInput). Collapsed (Unused) otherwise. -->
+			<Label id="score_switch" class="ScoreboardSwitch Unused" text="{s:switcher}" />
+			<Panel class="ScoreRow ScoreHeader">
+				<Label class="ScoreRank" text="POS" />
+				<Label class="ScoreName" text="PLAYER" />
+				<Label class="ScorePoints" text="PTS" />
+				<Label class="ScoreHeat" text="HEAT" />
+				<Label class="ScoreBest" text="{s:best_header}" />
+			</Panel>
+			<each loop="i in range(SCOREBOARD_ROWS)">
+			<Panel id="score_row_{{ i }}" class="ScoreRow Unused">
+				<Label class="ScoreRank" text="{s:rank}" />
+				<Label class="ScoreName" text="{s:name}" />
+				<Label class="ScorePoints" text="{s:points}" />
+				<Label class="ScoreHeat" text="{s:heat}" />
+				<Label class="ScoreBest" text="{s:best}" />
+			</Panel></each>
+		</Panel>
+		<Image class="ScoreboardLogo" src="file://{images}/custom_game/logo_melon_racer.png" />
+	</Panel>
+</Panel>

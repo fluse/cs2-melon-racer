@@ -31,11 +31,6 @@
 
 # Spectator
 
-# Melon Skins
-- Coconut
-- Kiwi
-- paprica
-
 # MelonRacer Coop Edition
 - Schalter Rätsel
 - Physik Rätsel

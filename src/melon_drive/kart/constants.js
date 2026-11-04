@@ -2,12 +2,18 @@
 
 export const MELON_TEMPLATE_NAME = "melon_template";
 
-// How long the Melon Racer logo (intro_logo in speedometer.xml) shows after
+// How long the Melon Racer logo (intro_logo in melon_racer.xml) shows after
 // a player picks a team, before their melon spawns at the intro. Its
-// animation (.IntroLogoImage in speedometer.css) has the logo out of the
+// animation (.IntroLogoImage in melon_racer.css) has the logo out of the
 // picture after 2.85s — keep this a little longer than that, and shorter
 // than the animation itself (5s).
 export const INTRO_LOGO_SECONDS = 3.2;
+
+// A player who lost their kart after the intro (core/think.js drops one whose
+// update threw) gets a new one in the hub, without the logo, at most this
+// often (seconds) — an error that keeps coming back mustn't spawn and drop a
+// melon every tick.
+export const KART_REBUILD_SECONDS = 1;
 
 // How far above the floor under a spawn entity (hub_spawn, intro_spawn) the
 // melon's origin appears — straight above it, no sideways offset (see
@@ -53,7 +59,8 @@ export const SAVE_DATA_PLAYER_SETTINGS_KEY = "playerSettings";
 // switch material groups, only SetModel. Each one has to be used somewhere
 // in the .vmap too (the default by melon_template, the others e.g. by a
 // prop in the hub), or the map doesn't ship it (test/map/map-skins.test.mjs).
-// The key is the button's: usermenu_skin_<key> in speedometer.xml, in this
+// The key is the button's: usermenu_skin_<key> in melon_racer.xml (built
+// from this list, src/panorama/melon_racer/user-menu/column-settings.xml), in this
 // order (pages of MELON_SKINS_PER_PAGE) — sorted by MELON_SKIN_LEVELS, the
 // free ones first (test/race/level.test.mjs).
 /** @type {Record<string, string>} */
@@ -61,29 +68,41 @@ export const MELON_SKINS = {
     default: "models/melon_racer/melon/melon.vmdl",
     honey: "models/melon_racer/melon/melon_honey.vmdl",
     camo: "models/melon_racer/melon/melon_camo.vmdl",
+    kiwi: "models/melon_racer/melon/melon_kiwi.vmdl",
+    paprika: "models/melon_racer/melon/melon_paprika.vmdl",
     strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
+    coconut: "models/melon_racer/melon/melon_coconut.vmdl",
+    bald: "models/melon_racer/melon/melon_bald.vmdl",
+    eye: "models/melon_racer/melon/melon_eye.vmdl",
     football: "models/melon_racer/melon/melon_football.vmdl",
     golf: "models/melon_racer/melon/melon_golf.vmdl",
     pineapple: "models/melon_racer/melon/melon_pineapple.vmdl",
     zebra: "models/melon_racer/melon/melon_zebra.vmdl",
     pumpkin: "models/melon_racer/melon/melon_pumpkin.vmdl",
+    disco: "models/melon_racer/melon/melon_disco.vmdl",
     gold: "models/melon_racer/melon/melon_gold.vmdl",
 };
 export const MELON_SKIN_DEFAULT = "default";
 // Every skin's name as the user menu shows it: under its button in the skin
-// grid (static text in speedometer.xml) and in the profile (hud/profile/) —
+// grid (built into melon_racer.xml) and in the profile (hud/profile/) —
 // test/hud/profile.test.mjs checks the two agree.
 /** @type {Record<string, string>} */
 export const MELON_SKIN_NAMES = {
     default: "Melon",
     honey: "Honey Melon",
     camo: "Camo",
+    kiwi: "Kiwi",
+    paprika: "Paprika",
     strawberry: "Strawberry",
+    coconut: "Coconut",
+    bald: "Bald Head",
+    eye: "Eyeball",
     football: "Football",
     golf: "Golf",
     pineapple: "Pineapple",
     zebra: "Zebra",
     pumpkin: "Pumpkin",
+    disco: "Disco Ball",
     gold: "Gold",
 };
 // The level (race/level/) a player needs before they can pick a skin; a
@@ -94,17 +113,23 @@ export const MELON_SKIN_LEVELS = {
     default: 1,
     honey: 1,
     camo: 1,
+    kiwi: 1,
+    paprika: 1,
     strawberry: 2,
+    coconut: 2,
+    bald: 3,
+    eye: 4,
     football: 5,
     golf: 7,
     pineapple: 10,
     zebra: 14,
     pumpkin: 18,
+    disco: 22,
     gold: 25,
 };
 // Skins per page of the user menu's skin grid (3 x 3): with more, ◀ ▶ next to
 // the MELON title page through them, in MELON_SKINS order. One panel per page
-// in speedometer.xml, usermenu_skinpage_<page> (test/hud/skin-pages.test.mjs).
+// in melon_racer.xml, usermenu_skinpage_<page>, built from MELON_SKINS (test/hud/skin-pages.test.mjs).
 export const MELON_SKINS_PER_PAGE = 9;
 
 // The frozen pawn (CSMoveType.NOCLIP: non-solid, but WASD still flies it)

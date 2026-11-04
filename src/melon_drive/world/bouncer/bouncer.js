@@ -3,7 +3,7 @@
 // counted on the script's clock. The map is searched for bouncers every
 // BOUNCER_SCAN_SECONDS, so one that spawned after the script's first look
 // (or was respawned by a round restart) still starts.
-import { Instance } from "cs_script/point_script";
+import { Instance, Console } from "cs_script/point_script";
 import { BOUNCER_CLASS, BOUNCER_SCAN_SECONDS } from "../../constants/index.js";
 import { IsBouncerModel, BouncerStartDelay, BouncerHoldInputs, BouncerSwingInputs } from "./logic.js";
 
@@ -52,7 +52,7 @@ function ScanBouncers(now) {
     }
     if (added) {
         const waits = [...bouncers.values()].filter((b) => !b.started).map((b) => `${(b.startAt - now).toFixed(2)}s`);
-        Instance.Msg(`[melon_drive] bouncers: ${bouncers.size} found, ${added} new, swinging in ${waits.join(", ")}`);
+        Console.Log(`[melon_drive] bouncers: ${bouncers.size} found, ${added} new, swinging in ${waits.join(", ")}`);
     }
 }
 

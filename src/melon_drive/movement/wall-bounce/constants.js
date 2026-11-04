@@ -81,12 +81,12 @@ export const PERFECT_SPARK_TEMPLATE_NAME = "perfect_hit_particle_template";
 // Lower: cleaned up sooner; below the .vpcf's own duration the spark is
 //   cut off mid-play.
 export const PERFECT_SPARK_LIFETIME = 2;
-// Bounce feedback panel (bounce_panel in speedometer.xml, see
+// Bounce feedback panel (bounce_panel in melon_racer.xml, see
 // UpdateBounceHud): shown for this long after each wall bounce.
 export const BOUNCE_HUD_SECONDS = 1.5;
 // Angle scale: 0°..90° split into this many equal segments
 // ("bounce_angle_seg_0".."_{N-1}"), 10° each — the one containing 45° is
-// styled as the target in speedometer.css, the one actually hit gets "Hit".
+// styled as the target in melon_racer.css, the one actually hit gets "Hit".
 export const BOUNCE_ANGLE_SEGMENTS = 9;
 // Jump-timing bar ("bounce_jump_seg_0".."_{N-1}"), filled by how well the
 // jump was timed (1 = same tick as the hit).
@@ -95,13 +95,14 @@ export const BOUNCE_JUMP_SEGMENTS = 5;
 // (angleFactor, 1 = exact). First match wins — keep sorted high to low,
 // last entry is the catch-all. speedMultiplier is what a bounce with that
 // rating does to the melon's speed (before jump timing). cssClass colors the panel; color is the same
-// accent for the in-world prediction line (see fx/prediction/prediction.js) — keep the two
-// in sync with speedometer.css's .Rating* rules.
+// accent for the in-world prediction line (see fx/prediction/prediction.js), and the HUD's
+// .Rating* rules take it from here ($rating-perfect … in src/panorama/melon_racer/bounce-panel.css).
+// PERFECT is the HUD's and the map's gold (checkpoint gold, docs/GAME_CI.md).
 // PERFECT counts within this many degrees either side of
 // WALL_BOUNCE_OPTIMAL_ANGLE (was 4.5°, then 6.5°).
 export const PERFECT_BOUNCE_TOLERANCE = 8.5; // degrees
 export const BOUNCE_RATINGS = [
-    { minAngleFactor: 1 - PERFECT_BOUNCE_TOLERANCE / WALL_BOUNCE_ANGLE_FALLOFF, label: "PERFECT", speedMultiplier: 1.35, cssClass: "RatingPerfect", color: { r: 255, g: 224, b: 102, a: 255 } },
+    { minAngleFactor: 1 - PERFECT_BOUNCE_TOLERANCE / WALL_BOUNCE_ANGLE_FALLOFF, label: "PERFECT", speedMultiplier: 1.35, cssClass: "RatingPerfect", color: { r: 255, g: 202, b: 79, a: 255 } },
     { minAngleFactor: 0.7, label: "GOOD", speedMultiplier: 1.1, cssClass: "RatingGood", color: { r: 102, g: 221, b: 102, a: 255 } },
     { minAngleFactor: 0.4, label: "BAD", speedMultiplier: 0.5, cssClass: "RatingBad", color: { r: 102, g: 170, b: 255, a: 255 } },
     { minAngleFactor: 0, label: "MISS", speedMultiplier: 0.3, cssClass: "RatingMiss", color: { r: 255, g: 102, b: 102, a: 255 } },

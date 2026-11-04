@@ -10,7 +10,7 @@ import { MELON_SKINS, PROFILE_UPDATE_SECONDS, STAT_SLIDES, XP_BAR_SEGMENTS, HUD_
 const PANEL = "usermenu_profile";
 
 /**
- * The user menu's profile (usermenu_profile in speedometer.xml, top of the
+ * The user menu's profile (usermenu_profile in melon_racer.xml, top of the
  * right column): the player's own melon big — one image per skin,
  * "usermenu_profile_skin_<key>", all but theirs Hidden —, their name and
  * skin name, their level and XP with a bar ("usermenu_profile_xp_<i>", the

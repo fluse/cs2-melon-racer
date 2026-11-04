@@ -1,5 +1,5 @@
 // Pure rules of the free-look drone (no engine calls) — see free-look.js.
-import { DRONE_RESPONSE, DRONE_GROUND_NORMAL_Z, DRONE_LAND_SECONDS, DRONE_LAND_MAX_SPEED, DRONE_YAW_RATE, DRONE_MAX_TILT, DRONE_CRUISE_TILT, DRONE_TILT_RATE, DRONE_LASER_FORWARD, DRONE_LASER_UP, DRONE_LASER_LENGTH, DRONE_LASER_SEGMENT } from "./constants.js";
+import { DRONE_RADIUS, DRONE_BOTTOM, DRONE_TOP, DRONE_RESPONSE, DRONE_GROUND_NORMAL_Z, DRONE_LAND_SECONDS, DRONE_LAND_MAX_SPEED, DRONE_YAW_RATE, DRONE_MAX_TILT, DRONE_CRUISE_TILT, DRONE_TILT_RATE, DRONE_LASER_FORWARD, DRONE_LASER_UP, DRONE_LASER_LENGTH, DRONE_LASER_SEGMENT } from "./constants.js";
 
 /** @typedef {{ x: number, y: number, z: number }} Vec */
 
@@ -55,6 +55,56 @@ export function ClipVelocity(velocity, normal) {
         return { ...velocity };
     }
     return { x: velocity.x - normal.x * into, y: velocity.y - normal.y * into, z: velocity.z - normal.z * into };
+}
+
+/** @typedef {{ center: Vec, axes: Vec[], half: number[] }} Box an info_visibility_box (dev/visibility-boxes.js) */
+
+const Dot = (/** @type {Vec} */ a, /** @type {Vec} */ b) => a.x * b.x + a.y * b.y + a.z * b.z;
+
+/**
+ * The box a drone starting at `point` is kept in: of the `boxes` round that
+ * point, the smallest — undefined outside all of them (no limit).
+ * @param {Box[]} boxes @param {Vec} point @returns {Box | undefined}
+ */
+export function DroneBoundsAt(boxes, point) {
+    const offset = (/** @type {Box} */ box) => ({ x: point.x - box.center.x, y: point.y - box.center.y, z: point.z - box.center.z });
+    return boxes
+        .filter((box) => box.axes.every((axis, i) => Math.abs(Dot(offset(box), axis)) <= box.half[i]))
+        .sort((a, b) => a.half[0] * a.half[1] * a.half[2] - b.half[0] * b.half[1] * b.half[2])[0];
+}
+
+/**
+ * `position` kept inside `box` with all of the drone in it (DRONE_RADIUS to
+ * each side, DRONE_BOTTOM down, DRONE_TOP up), and `velocity` without its
+ * part out through a side it's held at — it slides along the box like along
+ * a wall. A box too small for the drone holds it in its middle.
+ * @param {Box} box @param {Vec} position @param {Vec} velocity
+ * @returns {{ position: Vec, velocity: Vec }}
+ */
+export function KeepInBounds(box, position, velocity) {
+    let p = { ...position }, v = { ...velocity };
+    box.axes.forEach((axis, i) => {
+        // How far the drone reaches along +axis and -axis from its position.
+        const sideways = DRONE_RADIUS * (Math.abs(axis.x) + Math.abs(axis.y));
+        const plus = sideways + (axis.z > 0 ? DRONE_TOP * axis.z : -DRONE_BOTTOM * axis.z);
+        const minus = sideways + (axis.z > 0 ? DRONE_BOTTOM * axis.z : -DRONE_TOP * axis.z);
+        let lo = -box.half[i] + minus, hi = box.half[i] - plus;
+        if (lo > hi) {
+            lo = hi = (lo + hi) / 2;
+        }
+        const along = Dot({ x: p.x - box.center.x, y: p.y - box.center.y, z: p.z - box.center.z }, axis);
+        const held = Math.max(lo, Math.min(hi, along));
+        if (held === along) {
+            return;
+        }
+        const shift = held - along;
+        p = { x: p.x + axis.x * shift, y: p.y + axis.y * shift, z: p.z + axis.z * shift };
+        const out = Dot(v, axis);
+        if ((held === hi && out > 0) || (held === lo && out < 0)) {
+            v = { x: v.x - axis.x * out, y: v.y - axis.y * out, z: v.z - axis.z * out };
+        }
+    });
+    return { position: p, velocity: v };
 }
 
 /**

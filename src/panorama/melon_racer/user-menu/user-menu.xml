@@ -1,0 +1,53 @@
+<!-- Press USE to toggle: a general-purpose settings/actions menu, not
+     tied to any single map trigger (see UpdateUserMenu/SetUserMenuOpen
+     and the "usermenu_*" buttonId handling in hud/inputs.js). One card
+     under the logo: ACTIONS (big buttons) on the left, SETTINGS (toggle
+     rows with an ON/OFF pill, grouped) on the right; add a new setting
+     as another UserMenuToggle in its group. The logo is last in the
+     wrapper so it draws over the card's top edge; icons come from
+     tools/images/make-icons.mjs. -->
+<Panel id="user_menu" class="UserMenu Hidden" hittest="false">
+	<!-- Full-screen holo scanlines behind the menu (see
+	     .UserMenuScanlines): 40 rows x 10 = 400 lines, then the
+	     sweeping glow band over them. -->
+	<Panel class="UserMenuScanlines" hittest="false">
+		<each loop="row in range(40)">
+		<each loop="line in range(10)"><Panel class="UserMenuScanline" hittest="false" /> </each></each>
+	</Panel>
+	<Panel class="UserMenuScanBar" hittest="false" />
+
+	<Panel class="UserMenuFrame" hittest="false">
+		<Panel class="UserMenuCard">
+			<!-- Left: what to do now (big buttons); then, each after a gap and
+			     a divider: settings, as toggle rows grouped by topic, and the
+			     developer aids. -->
+			<!-- The columns; the developer "Camera Settings" button swaps them for
+			     usermenu_camera_page / usermenu_physics_page / usermenu_triggers_page below
+			     (SetUserMenuPage in hud/user-menu.js; Hidden on each). -->
+			<Panel id="usermenu_main_page" class="UserMenuColumns">
+				<module href="column-actions.xml" />
+
+				<Panel class="UserMenuDivider" />
+
+				<module href="column-settings.xml" />
+
+				<Panel class="UserMenuDivider" />
+
+				<module href="column-profile.xml" />
+			</Panel>
+
+			<module href="page-camera.xml" />
+
+			<module href="page-physics.xml" />
+
+			<module href="page-triggers.xml" />
+
+			<module href="page-leaderboards.xml" />
+		</Panel>
+
+		<Image class="UserMenuLogo" src="file://{images}/custom_game/logo_melon_racer.png" />
+		<Button id="usermenu_close_button" class="UserMenuCloseButton">
+			<Label class="UserMenuCloseIcon" text="✕" />
+		</Button>
+	</Panel>
+</Panel>

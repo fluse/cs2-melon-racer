@@ -7,7 +7,10 @@
 // up, duck down, attack faster — with inertia, leaning into its turns
 // (drone-logic.js). It runs into the world — a box trace
 // along every move, sliding along what it hits — but flies through melons,
-// players and other drones (the model has no collision at all). The chase
+// players and other drones (the model has no collision at all) — and it
+// stays inside the info_visibility_box it starts in (the smallest round the
+// melon; none: no limit), so it can't fly out of the area that's drawn
+// (VISIBILITY_BOXES, read from the map by build-map-data.mjs). The chase
 // camera follows the drone; the pawn stays held at its anchor as usual.
 // The melon waits where it was, frozen (UpdateKart skips it; physics motion
 // off), and switching back removes the drone and puts the chase camera
@@ -15,14 +18,15 @@
 // its laser pointer (optional, DRONE_LASER_TEMPLATE_NAME): a beam from the
 // camera's recording light along the pilot's view to the first wall, at
 // most DRONE_LASER_LENGTH long, laid from glowing rod segments.
-import { Instance, CSInputs, CustomCameraMode } from "cs_script/point_script";
+import { Instance, Console, CSInputs, CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "../core/debug.js";
 import { GetSpeedHud } from "../hud/layout.js";
 import { karts } from "../core/kart-registry.js";
 import { ApplyCameraFollow } from "../camera/index.js";
 import { SpawnFromTemplate } from "../fx/particles.js";
 import { TraceBox, TraceLine } from "../core/trace.js";
-import { DroneWishVelocity, StepDroneVelocity, IsDroneOnFloor, StepDroneStillSeconds, IsDroneLanded, DroneRotorInputs, StepDroneYaw, ClipVelocity, DroneTargetTilt, StepDroneTilt, DroneLaserRay, ViewForward, LaserSegments, DRONE_LASER_SEGMENTS } from "./drone-logic.js";
+import { VISIBILITY_BOXES } from "./visibility-boxes.js";
+import { DroneBoundsAt, KeepInBounds, DroneWishVelocity, StepDroneVelocity, IsDroneOnFloor, StepDroneStillSeconds, IsDroneLanded, DroneRotorInputs, StepDroneYaw, ClipVelocity, DroneTargetTilt, StepDroneTilt, DroneLaserRay, ViewForward, LaserSegments, DRONE_LASER_SEGMENTS } from "./drone-logic.js";
 import {
     DRONE_TEMPLATE_NAME, DRONE_START_HEIGHT, DRONE_SPEED, DRONE_FAST_SPEED, DRONE_RADIUS, DRONE_BOTTOM, DRONE_TOP, DRONE_GROUND_DISTANCE, DRONE_TAKEOFF_SPEED, DRONE_TAKEOFF_SECONDS,
     DRONE_CAMERA_DISTANCE, DRONE_CAMERA_HEIGHT, DRONE_CAMERA_PIVOT, CAMERA_OFFSET_RETURN_STRENGTH,
@@ -89,18 +93,21 @@ export function SetFreeLook(kart, on) {
 }
 
 /**
- * A fresh drone DRONE_START_HEIGHT above the melon, facing the view, its
+ * A fresh drone DRONE_START_HEIGHT above the melon (kept inside the melon's
+ * info_visibility_box, DroneBoundsAt — its limits from now on), facing the view, its
  * rotors spinning, the chase camera on it. False (and a console message)
  * without the template in the map.
  * @param {Kart} kart
  */
 function SpawnDrone(kart) {
     const melon = kart.melon.GetAbsOrigin();
-    const position = { x: melon.x, y: melon.y, z: melon.z + DRONE_START_HEIGHT };
+    const bounds = DroneBoundsAt(VISIBILITY_BOXES, melon);
+    const above = { x: melon.x, y: melon.y, z: melon.z + DRONE_START_HEIGHT };
+    const position = bounds ? KeepInBounds(bounds, above, { x: 0, y: 0, z: 0 }).position : above;
     const angles = { pitch: 0, yaw: kart.pawn.GetEyeAngles().yaw, roll: 0 };
     const entities = SpawnFromTemplate(DRONE_TEMPLATE_NAME, position, angles, { warn: true });
     if (entities.length === 0) {
-        Instance.Msg(`[melon_drive] free look needs a point_template "${DRONE_TEMPLATE_NAME}" with the drone prop_dynamic (models/melon_racer/drone/drone.vmdl) — staying off`);
+        Console.Log(`[melon_drive] free look needs a point_template "${DRONE_TEMPLATE_NAME}" with the drone prop_dynamic (models/melon_racer/drone/drone.vmdl) — staying off`);
         return false;
     }
     const parts = [...entities];
@@ -112,14 +119,14 @@ function SpawnDrone(kart) {
     }
     const body = parts.find((entity) => entity.GetClassName() === "prop_dynamic") ?? parts[0];
     if (!body) {
-        Instance.Msg(`[melon_drive] "${DRONE_TEMPLATE_NAME}" has no drone prop_dynamic — staying off`);
+        Console.Log(`[melon_drive] "${DRONE_TEMPLATE_NAME}" has no drone prop_dynamic — staying off`);
         for (const entity of entities) {
             entity.Remove();
         }
         return false;
     }
     const laser = SpawnLaser(position);
-    kart.drone = { entities: [...entities, ...laser], parts, body, laser, position, velocity: { x: 0, y: 0, z: 0 }, tilt: { pitch: 0, roll: 0 }, yaw: angles.yaw, landed: false, stillSeconds: 0 };
+    kart.drone = { entities: [...entities, ...laser], parts, body, laser, bounds, position, velocity: { x: 0, y: 0, z: 0 }, tilt: { pitch: 0, roll: 0 }, yaw: angles.yaw, landed: false, stillSeconds: 0 };
     const camera = kart.pawn.GetCustomCamera();
     camera.SetMode(CustomCameraMode.FOLLOW_POSITION);
     camera.SetFollowConfig({
@@ -130,6 +137,10 @@ function SpawnDrone(kart) {
         cameraOffsetReturnStrength: CAMERA_OFFSET_RETURN_STRENGTH,
     });
     kart.appliedFollowKey = undefined; // the melon's chase camera is written anew when it's back
+    // Always said: a box moved in Hammer reaches the script only with a build (build-map-data.mjs).
+    Console.Log(bounds
+        ? `[melon_drive] drone mode: kept inside the info_visibility_box at ${JSON.stringify(bounds.center)} (half size ${bounds.half.join(" x ")})`
+        : `[melon_drive] drone mode: the melon at ${JSON.stringify(melon)} is in none of the ${VISIBILITY_BOXES.length} info_visibility_boxes the script knows — no limit (moved one in Hammer? run npm run build)`);
     return true;
 }
 
@@ -226,7 +237,10 @@ export function UpdateDrone(kart, dt) {
     const accel = dt > 0 && !parked
         ? { x: (drone.velocity.x - before.x) / dt, y: (drone.velocity.y - before.y) / dt, z: (drone.velocity.z - before.z) / dt }
         : { x: 0, y: 0, z: 0 };
-    const moved = MoveDrone(kart, drone.position, drone.velocity, dt);
+    let moved = MoveDrone(kart, drone.position, drone.velocity, dt);
+    if (drone.bounds) {
+        moved = KeepInBounds(drone.bounds, moved.position, moved.velocity); // the edge of its info_visibility_box is a wall too
+    }
     drone.position = moved.position;
     drone.velocity = moved.velocity;
     // On the ground it doesn't turn with the view, in the air it swings back to it.

@@ -25,6 +25,7 @@ import { Instance } from "cs_script/point_script";
 //   fx/        particles, boost trail, guide line
 //   dev/       debug views
 //   world/     map entities kept running on their own (movers, spike springs, ball pits, ball spawner, bouncers)
+//   tutorial/  the tutorial stations: steps explained and checked, ghost melons
 // Tunables: each folder's constants.js, all re-exported by constants/index.js.
 
 import { Debug } from "./core/debug.js";
@@ -37,6 +38,7 @@ import { phase, activeTrackId, phaseEndTime, graceEndTime, RestoreRaceFlowSnapsh
 import { RegisterHudInputs } from "./hud/index.js";
 import { RegisterMovementInputs } from "./movement/index.js";
 import { RegisterAttackDebug } from "./dev/index.js";
+import { RegisterTutorialInputs } from "./tutorial/index.js";
 import { movers, RestoreMovers, RegisterMoverInputs, RegisterSpikeSpringInputs, RegisterBallPitInputs, RegisterBallSpawnerInputs, spawnedBalls, RestoreSpawnedBalls, RegisterBouncerInputs, bouncers, RestoreBouncers } from "./world/index.js";
 
 Instance.SetThink(Think);
@@ -80,3 +82,4 @@ RegisterSpikeSpringInputs(); // OnRoundStart: look the spike springs up again
 RegisterBallPitInputs(); // ball_pit_enter/ball_pit_leave
 RegisterBallSpawnerInputs(); // OnRoundStart: the spawned balls are gone
 RegisterBouncerInputs(); // OnRoundStart: start the bouncers again, at new random points
+RegisterTutorialInputs(); // tutorial_enter/tutorial_leave/tutorial_goal

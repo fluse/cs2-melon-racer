@@ -104,13 +104,21 @@ function RespawnDestroyedMelon(slot, kart) {
 }
 
 /**
+ * What broke a melon: an impact (a crash, a hard landing), a wall bounce's
+ * damage, the attack boost running the health out, a kill trigger, a spike
+ * spring, the engine destroying it, the user menu's Test Break.
+ * @typedef {"impact" | "wall" | "boost" | "trigger" | "spikes" | "lost" | "test"} BreakCause
+ */
+
+/**
  * Breaks a melon on the spot, whatever its health — a kill trigger, a spike
  * spring. Broken or race-locked melons (countdown, finished) are left alone.
  * @param {import("../../core/kart-registry.js").Kart} kart
  * @param {string} reason for the debug log
+ * @param {BreakCause} [cause] what broke it (the tutorial's crash station asks)
  * @returns {boolean} whether it broke
  */
-export function BreakKartNow(kart, reason) {
+export function BreakKartNow(kart, reason, cause = "trigger") {
     if (kart.breaking || kart.locked) {
         return false;
     }
@@ -119,19 +127,21 @@ export function BreakKartNow(kart, reason) {
     const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
     kart.health = 0;
     Debug(`BreakKartNow: slot ${slot} broken by ${reason}`);
-    BreakMelon(slot, kart, speed > 0 ? velocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+    BreakMelon(slot, kart, speed > 0 ? velocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1), true, cause);
     return true;
 }
 
 /**
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed
  * @param {boolean} [crash] counts toward the player's crashes stat (not the user menu's "Test Break")
+ * @param {BreakCause} [cause] what broke it, left in kart.lastBreak (the tutorial's crash station asks)
  */
-export function BreakMelon(slot, kart, impactDir, impactSpeed, crash = true) {
+export function BreakMelon(slot, kart, impactDir, impactSpeed, crash = true, cause = "impact") {
     if (kart.breaking) {
         return; // already broken and counting down to its respawn
     }
     kart.breaking = true;
+    kart.lastBreak = { time: Instance.GetGameTime(), cause };
     if (crash) {
         CountStat(kart, "crashes");
     }
@@ -182,6 +192,7 @@ export function HandleMelonLost(slot, kart) {
         return; // already mid-break/respawn over this same loss
     }
     kart.breaking = true;
+    kart.lastBreak = { time: Instance.GetGameTime(), cause: "lost" };
     kart.health = 0;
     CountStat(kart, "crashes");
     const breakPosition = kart.lastKnownPosition ?? kart.checkpointPosition;

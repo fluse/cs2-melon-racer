@@ -12,14 +12,16 @@ const { karts, SetModeratorSlot } = registry;
 const { Think } = await import("../../src/melon_drive/core/think.js");
 const { SetUpPlayerKart } = await import("../../src/melon_drive/kart/spawn.js");
 const { GetIntroSpawnPoint } = await import("../../src/melon_drive/kart/spawn-points.js");
-const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME } = await import("../../src/melon_drive/constants/index.js");
+const { MELON_TEMPLATE_NAME, HUB_SPAWN_NAME, INTRO_SPAWN_NAME, KART_REBUILD_SECONDS } = await import("../../src/melon_drive/constants/index.js");
 
 const HUB = { x: 250, y: -520, z: 16 };
 const INTRO = { x: -2000, y: -900, z: 24 };
 
 /** @param {number} slot */
 function Join(slot) {
-    const kart = SetUpPlayerKart(world.add(new CSPlayerPawn({ slot })), GetIntroSpawnPoint());
+    const pawn = world.add(new CSPlayerPawn({ slot }));
+    world.playerPawns.push(pawn);
+    const kart = SetUpPlayerKart(pawn, GetIntroSpawnPoint());
     assert.ok(kart, `setup: kart for slot ${slot}`);
     return kart;
 }
@@ -47,11 +49,13 @@ test("every tick schedules the next one", () => {
     assert.equal(ThinkAt(1.02), 1);
 });
 
-test("one kart's update throwing drops only that kart, and it gets a fresh one at the hub a second later", async () => {
+test("one kart's update throwing drops only that kart, and it gets a fresh one at the hub a second later", () => {
     const broken = Join(0);
     const fine = Join(1);
     const oldMelon = broken.melon;
+    const wasInputJustPressed = broken.pawn.WasInputJustPressed;
     broken.pawn.WasInputJustPressed = () => {
+        broken.pawn.WasInputJustPressed = wasInputJustPressed; // once
         throw new Error("boom");
     };
 
@@ -61,9 +65,10 @@ test("one kart's update throwing drops only that kart, and it gets a fresh one a
     assert.equal(karts.get(1), fine, "the other player keeps their kart");
     assert.deepEqual(fine.lastKnownPosition, fine.melon.GetAbsOrigin(), "…and was updated this tick");
     assert.equal(registry.moderatorSlot, 1, "the moderator passes on at once");
-    assert.ok(world.delays.includes(1), "the rebuild waits a second, so a recurring error can't respawn every tick");
+    ThinkAt(1 + KART_REBUILD_SECONDS / 2);
+    assert.equal(karts.has(0), false, "the rebuild waits, so a recurring error can't respawn every tick");
 
-    await new Promise((resolve) => setImmediate(resolve));
+    ThinkAt(1 + KART_REBUILD_SECONDS);
     const rebuilt = karts.get(0);
     assert.ok(rebuilt, "rebuilt");
     assert.notEqual(rebuilt, broken);

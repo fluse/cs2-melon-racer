@@ -270,7 +270,7 @@ bounces are skipped.
   scrapes as plain physics.
 - HUD: the speed panel's km/h (bottom center) gets `Boosted` while above `MAX_SPEED` and a short
   `PerfectBounce` flash after a bounce with angle closeness ≥
-  `PERFECT_BOUNCE_ANGLE_FACTOR` (`speedometer.css`). Separately, a
+  `PERFECT_BOUNCE_ANGLE_FACTOR` (`src/panorama/melon_racer/speed-panel.css`). Separately, a
   `bounce_panel` in the bottom-right HUD corner (not centered: below the crosshair it would cover the track), shows for `BOUNCE_HUD_SECONDS` after
   each bounce: a rating word by angle closeness (`BOUNCE_RATINGS`:
   PERFECT/GOOD/BAD/MISS), the exact angle hit, a 0°–90° scale in 10°
@@ -291,7 +291,7 @@ bounces are skipped.
   wall, then on along the direction it would bounce off in, colored by the
   rating that hit would get at the current angle (`BOUNCE_RATINGS[].color`,
   same colors as the HUD panel; white = no wall in range). Uses the same
-  angle math as the bounce, so steer until it turns yellow (PERFECT).
+  angle math as the bounce, so steer until it turns gold (PERFECT).
   **Off by default**, switched on/off per player in the user menu's
   "GUIDE LINE" section (above "COLLISION DEBUG"; `kart.predictionLine`) — only
   that player's own melon gets a line. `PREDICTION_ENABLED` stays the
@@ -475,9 +475,9 @@ run by `race/heat/`):
    (61.8% from the top); the next one falling in knocks it
    down out of the picture at the bottom; GO doesn't fall — it appears in
    the 1's place, small, and grows huge while fading out
-   (`countdown_panel` in `speedometer.xml`, one Label per number with an
+   (`countdown_panel` in `melon_racer.xml`, one Label per number with an
    `In`/`Out` class; rule `CountdownStep`/`CountdownNumberState` in
-   `race/heat/logic.js`, animations in `speedometer.css`). `COUNTDOWN_SECONDS`
+   `race/heat/logic.js`, animations in `src/panorama/melon_racer/countdown.css`). `COUNTDOWN_SECONDS`
    in `race/constants.js` controls the length — there are only numbers for
    3..1, so a longer countdown shows nothing until 3.
 4. **RACING** — normal driving, existing checkpoint/lap logic, plus a
@@ -643,7 +643,7 @@ and `camera/follow/follow.js` (`test/race/spectate-flow.test.mjs`).
 
 CS2's own scoreboard knows nothing of points or times, and a custom HUD
 can't replace it — so the custom one covers it: `#scoreboard` in
-`speedometer.xml` shows while the engine sets `HUD_SCOREBOARD_VISIBLE`
+`melon_racer.xml` shows while the engine sets `HUD_SCOREBOARD_VISIBLE`
 (Tab held), full screen on a near-opaque backdrop (pure CSS, the script
 can't tell whether Tab is held). What it shows, per viewer
 (`hud/scoreboard/logic.js`, `test/hud/scoreboard.test.mjs`):
@@ -719,8 +719,8 @@ included; the viewer's own row is outlined in gold and takes the last row
 if they're further down. The tab and track picked stay while the player is
 connected, and the menu reopens on the page it was closed on. Rebuilt every
 `LEADERBOARD_UPDATE_SECONDS` while the page is open; "Back" returns to the
-columns. A new stat needs its tab button (`lb_tab_<key>`) in
-`speedometer.xml`. Constants: `hud/leaderboards/constants.js`; rules:
+columns. A new stat's tab button (`lb_tab_<key>`, its `tab` text) is built
+from `STAT_SLIDES` into the HUD layout. Constants: `hud/leaderboards/constants.js`; rules:
 `hud/leaderboards/logic.js` (rows and ranks from `hud/scoreboard/logic.js`),
 applied by `hud/leaderboards/leaderboards.js` (`test/hud/leaderboards.test.mjs`).
 
@@ -744,9 +744,11 @@ for anything before leveling existed** (decided): everyone starts at level 1.
 - **Slow on purpose** (decided): from level L to L+1 takes `LEVEL_XP_BASE` +
   `LEVEL_XP_STEP` × (L − 1) XP (150, 225, 300, …) — level 3 in about half an
   hour, level 25 (the last skin) after some 20–30 hours of racing.
-- **Skins by level** (`MELON_SKIN_LEVELS`, `kart/constants.js`): **three free
-  from the start** (decided) — Melon, Honey Melon, Camo —, then Strawberry 2,
-  Football 5, Golf 7, Pineapple 10, Zebra 14, Pumpkin 18, Gold 25. A locked
+- **Skins by level** (`MELON_SKIN_LEVELS`, `kart/constants.js`): **five free
+  from the start** (decided) — Melon, Honey Melon, Camo, Kiwi, Paprika —, then
+  Strawberry 2, Coconut 2, Bald Head 3, Eyeball 4, Football 5, Golf 7,
+  Pineapple 10, Zebra 14, Pumpkin 18, Disco Ball 22 (decided: a prize, next
+  to Gold), Gold 25. A locked
   skin shows in the grid dimmed under a padlock with "LV 12" in place of its
   name; clicking it does nothing. A saved skin that's locked (the levels
   were raised) drives as the default until it's reached again.
@@ -783,9 +785,9 @@ name, level and skin name, the XP towards the next level ("Leveling"), and one t
 and values as the leaderboards) with their all-time rank on it ("#3",
 saved players included, ties shared; no rank while the total is 0).
 Rebuilt every `PROFILE_UPDATE_SECONDS` while the menu shows its columns.
-A new stat needs its tile (`usermenu_profile_stat_<key>`), a new skin its
-image (`usermenu_profile_skin_<key>`) and name (`MELON_SKIN_NAMES`) in
-`speedometer.xml`. Constants: `hud/profile/constants.js`; rules:
+A stat's tile (`usermenu_profile_stat_<key>`, its `label`) and a skin's image
+(`usermenu_profile_skin_<key>`) are built from `STAT_SLIDES` and
+`MELON_SKINS` into the HUD layout. Constants: `hud/profile/constants.js`; rules:
 `hud/profile/logic.js`, applied by `hud/profile/profile.js`
 (`test/hud/profile.test.mjs`).
 
@@ -804,7 +806,7 @@ this: the moderator gets it the same way anyone reaches the hub's "start"
 modal — by standing in `hub_start_trigger`. While a heat is running, a
 non-moderator standing there sees the "Grand Prix in progress…" message;
 the moderator sees a "Cancel Grand Prix" button instead
-(`hub_abort_button` in `speedometer.xml`, toggled via the `IsModerator` HUD
+(`hub_abort_button` in `melon_racer.xml`, toggled via the `IsModerator` HUD
 class). Clicking it runs the same `ReturnAllToHub` + reset-to-`HUB` path a
 heat normally takes when it finishes on its own, just triggered early
 instead of after the last track's `BREAK`.
@@ -1068,6 +1070,15 @@ Switching it on or off closes the menu.
   `DRONE_TOP` up) along every move, so it lands on its skids, sliding along walls, floors and ceilings — but
   flies **through melons**, players and other drones (the model has no
   collision at all).
+- **Limits** (decided): the drone stays inside the `info_visibility_box`
+  it starts in — the smallest one round the melon — so it can't fly out of
+  the area that's drawn; its edge stops it like a wall, the drone sliding
+  along it. Starting outside every box, there's no limit. The script can't
+  read the boxes from the engine: `build-map-data.mjs` (run by `npm run
+  build`) reads them from the .vmap into `dev/visibility-boxes.js`, so a
+  box moved in Hammer needs a build or a running `npm run watch` (it
+  rebuilds on every .vmap save; `test/dev/drone-bounds.test.mjs` fails
+  until then). `DroneBoundsAt`/`KeepInBounds` in `dev/drone-logic.js`.
 - **Landing:** on a floor (within `DRONE_GROUND_DISTANCE` under its
   skids) and **standing still there for `DRONE_LAND_SECONDS` (0.5 s)**
   (decided; slower than `DRONE_LAND_MAX_SPEED`, moving starts it over) — until
@@ -1225,10 +1236,13 @@ corrected by a teleport right after `ForceSpawn`). Keep that drop short: a
 long fall lands hard enough for the engine to destroy the melon on impact.
 
 - Picking a team first shows the Melon Racer logo
-  (`logo_melon_racer.png`, `intro_logo` in `speedometer.xml`, full screen
+  (`logo_melon_racer.png`, `intro_logo` in `melon_racer.xml`, full screen
   over a solid dark green backdrop, nothing of the world showing through) for `INTRO_LOGO_SECONDS`, the player's own body
   already frozen and hidden behind it; only then does the melon spawn
   (`ShowIntroLogoThenSpawn` in `kart/spawn.js`). Reconnecting shows it again.
+  Only then: a kart dropped later (its tick update threw) comes back at
+  `hub_spawn` without the logo, at most every `KART_REBUILD_SECONDS`
+  (`RebuildKart`) — it used to loop logo → spawn → error → logo for good.
 - A player's very first melon (first join, i.e. no kart entry yet) appears
   at the `info_player_start` named `intro_spawn` — the tutorial area —
   facing that entity's own angles. It's also that new kart's respawn point
@@ -1308,19 +1322,23 @@ by `kart/look.js`.
 ## Melon skins (implemented)
 
 Each player picks a **skin** for their melon in the user menu (SETTINGS →
-MELON, decided): Melon (the default), Honey Melon, Camo, Strawberry,
-Football, Golf (dimples only in the normal map, so they show in the light
-and reflections), Pineapple, Zebra, Pumpkin (a carved face that glows from
-inside), Gold — **sorted by the level that unlocks them** (decided, the free
+MELON, decided): Melon (the default), Honey Melon, Camo, Kiwi (the top end
+cut off: green flesh, black seeds), Paprika (a glossy red bell pepper),
+Strawberry, Coconut (fibrous husk, three eyes), Bald Head (a shiny scalp, a
+cartoon face, ears, a stubble horseshoe), Eyeball (a blue iris under a
+bulging cornea, red veins round the back), Football, Golf (dimples only in
+the normal map, so they show in the light and reflections), Pineapple,
+Zebra, Pumpkin (a carved face that glows from inside), Disco Ball
+(silver mirror tiles, each a facet of its own: it sparkles in the light), Gold — **sorted by the level that unlocks them** (decided, the free
 ones first; `test/race/level.test.mjs`), three per row, a preview and a name per button, the current one
 outlined; most are **locked until a level** ("Leveling"). **Paged** (decided): `MELON_SKINS_PER_PAGE` (9, a 3 × 3 grid) per
 page in `MELON_SKINS` order, ◀ ▶ right-aligned next to the MELON title with
 the page indicator between them ("1 / 2"), wrapping around — shown only with
 more than one page. The menu opens on the page with the player's skin, or
 the one they paged to (kept while connected). Every page has all nine places
-(empty ones as placeholders), so the menu's height doesn't change; a new skin
-goes into the last page's panel in `speedometer.xml`, a new page's panel
-when that's full (`test/hud/skin-pages.test.mjs`). Saved per player name in the addon's save data like "Start in
+(empty ones as placeholders), so the menu's height doesn't change; the pages
+are built from `MELON_SKINS` and `MELON_SKIN_NAMES` into the HUD layout
+(`skinPages` in `src/panorama/melon_racer/locals.mjs`, `test/hud/skin-pages.test.mjs`). Saved per player name in the addon's save data like "Start in
 Tutorial" (`SAVE_DATA_PLAYER_SETTINGS_KEY`), so every later join gets it.
 A skin is a whole model (`MELON_SKINS`, `kart/constants.js`): the same
 mesh, collision and break pieces with another material, swapped by
@@ -1469,6 +1487,13 @@ camera looks, Hammer yaw; defaults `SIDE_VIEW_*`). Inside:
 - The melon stays on the plane it entered on: speed towards/away from the
   camera is dropped every tick and a drift pulled back
   (`SIDE_VIEW_PLANE_PULL`).
+- **Corner zones** (`side_view_corner_<from>_<to>[_<distance>[_<height>]]`,
+  decided): for a 2D course round the outside of a building, the camera
+  turns round the corner with the melon instead of cutting from one side's
+  view to the next — looking at the corner (the trigger's origin) from the
+  melon, kept between the two sides' yaws, so it starts and ends exactly on
+  them; A/D drive round it and the melon is held at its distance from the
+  corner (`CornerYaw`, `SideViewDepth` in `zones/side-view/logic.js`).
 - Leaving, the player's view is turned the way the melon faced on screen,
   so driving carries on in that direction behind the chase camera.
   Teleported out instead (hub, checkpoint, teleporter — a jump of more than
@@ -1610,6 +1635,73 @@ arm's geometry and timing shared with the generator); rules:
 `world/catapult/logic.js`, applied by `world/catapult/catapult.js` and
 `movement/driving/drive.js` (`test/world/catapult.test.mjs`). Details for
 mappers: [Mapping API: catapults](docs/mapping-api/24-catapults.md).
+
+## Tutorial stations (implemented, next to the old tutorial)
+
+A second tutorial, meant to replace the old one (`intro_spawn`) once it's
+approved (decided: **next to it** until then — reached through the user
+menu's DEVELOPER "Test Triggers" page, "Tutorial Stations", which sends the
+melon to `tutorial_entrance`). **Stations, not a forced path** (decided):
+six rooms in a row, `tutorial_station_<id>` triggers, visited freely in
+any order; **English** like the rest of the HUD (decided). Order (decided):
+
+1. **Driving** — W, S, round a post (W held, the view turned 360°: steering
+   by looking), a slalom through three gates, jumping (a hurdle). **No
+   strafing** (decided: A/D only push weakly sideways, `STRAFE_ACCEL` 0.4×
+   forward — not worth a step).
+2. **Boost & heal** — boost, its health cost, refilling in the heal gate, momentum.
+3. **Walls** — a wall jump (at a glowing spot on the wall), one rated GOOD
+   or better at 45° (a dashed guide line on the floor into the wall), then
+   climbing with wall jumps only (decided: no lift zone — one way up, not
+   two that look alike): a shaft 64 wide, a jump recharge zone, a shelf 224
+   up with the way on to station 4. Wall-bounce steps (in at 45°, a timed jump) are
+   put in front only while `WALL_BOUNCE_ENABLED`.
+4. **Crashes** — boosting until it breaks, a wall too fast, a fall too far
+   onto a flat floor (slopes are safe); then where it respawns.
+5. **Menu** — open it (E), pick a skin, the level, leaderboards, drone mode.
+6. **Races** — time trials, R and Tab, the Grand Prix, its rules; the exit
+   gate (`hub_teleport`) to the hub.
+
+**Every step is checked** (decided): a card on the left of the HUD
+(`tutorial_panel`) shows the station, its steps (done ones gold), how to do
+the current one — help text, the keys to press lit on a small keyboard and
+pressed in a loop, an animated diagram (look-to-steer slalom, the health
+bar draining/filling, momentum, wall jump, 45°, climbing, crash, fall, the
+menu with the column to look at) — and a progress bar. The script reads
+what the player does (inputs, speed, health, boost, heal zone, momentum
+steps, wall jumps and their rating, bounces, what broke the melon
+(`BreakCause`: boost, impact, wall, trigger, …), the user menu's state,
+skin and drone mode) and the station's goal triggers. Explanations no
+check can catch (Tab is CSS-only) are "read" steps on a timer. After the
+last step "STATION COMPLETE", `XP_TUTORIAL_STATION` XP the first time, and
+the next unfinished station. Finished stations are saved per player name
+(`SAVE_DATA_TUTORIAL_KEY`) and gold in the card's station row.
+
+**A section per step** (decided): every step has its own stretch of its
+room, in step order — a glowing line across the floor and, lying on the
+floor just past it, the step's number and text (the generator reads them from
+`TUTORIAL_STATIONS`), the same number as on the HUD card. A goal reached
+on an earlier step still counts. The rooms are in two halls side by side
+(1–3, 4–6), joined by teleporters. The climbing shaft is 64 wide: a
+wall jump (240 up, 160 off the wall) reaches the far wall at the top of its
+hop.
+
+**Two glow colors** (decided): green is guidance (floor marks, gates, the edges to land on), blue is architecture (the walls' plinth edges, pillar strips, doorways), so a glance tells what's an instruction.
+
+**Guides in the world:** non-solid glowing chevrons and the 45° dashed
+line on the floor, glowing gate posts, world text over every door, and
+**ghost melons** — see-through melons the script drives along a path of
+`info_target`s over and over (the slalom and hurdle, in at 45° and off the
+wall, into the crash wall). Entering a station makes its `tutorial_spawn_<id>`
+the respawn point, so a crash starts the station over there.
+
+Map side: `tools/maps/make-tutorial-prefab.mjs` →
+`maps/prefabs/tutorial_stations_course.vmap` (blockout, triggers, spawns,
+ghosts), placed in `maps/prefabs/tutorial_stations.vmap`. Constants and
+steps: `tutorial/constants.js`; rules: `tutorial/logic.js` (+ ghost path
+`tutorial/ghost-logic.js`), applied by `tutorial/tutorial.js`,
+`tutorial/ghost.js` and `hud/tutorial-panel.js` (`test/tutorial/tutorial.test.mjs`).
+Details for mappers: [Mapping API: tutorial stations](docs/mapping-api/25-tutorial-stations.md).
 
 ## Open design questions (not yet decided — ask before assuming)
 

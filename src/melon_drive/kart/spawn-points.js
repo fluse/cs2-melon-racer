@@ -106,6 +106,15 @@ function FindSharedSpawnPoint(name, trigger, maxDistance) {
     };
 }
 
+/**
+ * Spawn point of the entity named `name` (on the floor under it, facing its
+ * yaw), undefined without one — e.g. a tutorial station's tutorial_spawn_<id>.
+ * @param {string} name
+ */
+export function GetNamedSpawnPoint(name) {
+    return FindSpawnPoint(name);
+}
+
 /** Where karts go in the hub: the hub_spawn info_player_start, facing hub_spawn_facing. */
 export function GetHubSpawnPoint() {
     const spawn = FindSpawnPoint(HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME);

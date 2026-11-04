@@ -142,6 +142,46 @@ bit of room above for jumps.
 | `SIDE_VIEW_CAMERA_HEIGHT_SMOOTH_SECONDS` | 0.15 s | the same for its height, without aiming ahead | `camera/side-view/constants.js` |
 | `SIDE_VIEW_TELEPORT_CUT_SECONDS` | 0.25 s | leaving within this long after a teleport cuts back instead of swinging | `camera/side-view/constants.js` |
 
+## Corner zones
+
+A side view that **turns round a corner**: for a 2D course running round
+the outside of a building, one side view per face and a corner zone at each
+corner between them. As the melon goes round the corner, the camera turns
+from the side view before to the one after, always looking at the corner
+from the melon's side; A/D drive round it, and the melon is held at the
+distance from the corner it entered at (a quarter circle round the corner
+instead of a plane). Everything else is a side view's.
+
+| Setting | Value |
+|---|---|
+| Class | `trigger_multiple` ([standard setup](01-conventions.md#3-every-melon-trigger-is-set-up-the-same-way)) |
+| Name | `side_view_corner_<from>_<to>[_<distance>[_<height>]]` |
+| Pattern | `^side_view_corner_(-?\d+(?:\.\d+)?)_(-?\d+(?:\.\d+)?)(?:_(\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?)?$` |
+| **Origin** | **on the building's corner** (its pivot in Hammer, at any height) — the camera turns round it |
+| `OnStartTouch` | → `melon_drive_script` → `RunScriptInput` → `side_view_enter` |
+| `OnEndTouch` | → `melon_drive_script` → `RunScriptInput` → `side_view_leave` |
+
+`<from>` and `<to>` are the yaws of the side views either side, e.g. a
+course going round a building's north-east corner from its east face
+(`side_view_180`, looking west) to its north face (`side_view_270`, looking
+south): `side_view_corner_180_270`. The turn goes the short way round, so
+either direction of travel works with the same name. Distance and height
+default like a side view's; give them the same values as the side views
+either side, or the camera jumps.
+
+| Name | Example | Camera |
+|---|---|---|
+| `side_view_corner_<from>_<to>` | `side_view_corner_180_270` | turns from looking west to looking south, 300 away, 40 above |
+| `side_view_corner_<from>_<to>_<distance>_<height>` | `side_view_corner_0_-90_500_60` | from looking east to looking south, 500 away, 60 above |
+
+- **Cover the whole corner**: the trigger fills the square outside the
+  corner, out from both faces' lines, and overlaps the two side views'
+  zones a little. On a face's line the corner's yaw is exactly that side's,
+  so the turn starts and ends without a jump; short of the arc (still
+  beside a face) the camera holds that face's yaw.
+- The side views either side end at the corner's lines (or overlap the
+  corner zone): the zone entered last counts.
+
 ## Depth zones
 
 A small area inside a side-view zone where the melon may also move in

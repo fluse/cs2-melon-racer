@@ -1,5 +1,5 @@
 // The scoreboard's rules (hud/scoreboard/logic.js): which board a viewer
-// sees, its rows and ranks — and that speedometer.xml has every panel
+// sees, its rows and ranks — and that melon_racer.xml has every panel
 // hud/scoreboard/scoreboard.js fills in.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -94,6 +94,21 @@ test("time trial board: saved best times (players who left too), fastest first, 
     ]);
 });
 
+test("both boards sort names without localeCompare (it throws on a dedicated server: no ICU data)", (t) => {
+    t.mock.method(String.prototype, "localeCompare", () => {
+        throw new RangeError("Internal error. Icu error.");
+    });
+    const players = [C, A, B];
+    const timeTrial = BuildScoreboard({
+        grandPrix: undefined, grandPrixMode: false, boardTrackId: 1,
+        players, self: C, bestTimes: { Ben: 31, Anna: 31 }, maxRows: SCOREBOARD_ROWS,
+    });
+    assert.deepEqual(timeTrial.rows.map((r) => r.name), ["Anna", "Ben", "Cleo"]);
+    const gp = NewGrandPrix([C, A, B], 1);
+    const grandPrix = BuildScoreboard({ grandPrix: gp, grandPrixMode: true, boardTrackId: 1, players, self: C, bestTimes: {}, maxRows: SCOREBOARD_ROWS });
+    assert.deepEqual(grandPrix.rows.map((r) => r.name), ["Anna", "Ben", "Cleo"]);
+});
+
 test("more players than rows: the viewer's own row takes the last one", () => {
     /** @type {Record<string, number>} */
     const bestTimes = {};
@@ -108,10 +123,10 @@ test("more players than rows: the viewer's own row takes the last one", () => {
     assert.equal(board.rows[0].name, "P00");
 });
 
-const layout = readFileSync(new URL("../../panorama/layout/custom_game/speedometer.xml", import.meta.url), "utf8");
-const css = readFileSync(new URL("../../panorama/styles/custom_game/speedometer.css", import.meta.url), "utf8");
+const layout = readFileSync(new URL("../../panorama/layout/custom_game/melon_racer.xml", import.meta.url), "utf8");
+const css = readFileSync(new URL("../../panorama/styles/custom_game/melon_racer.css", import.meta.url), "utf8");
 
-test("speedometer.xml has the scoreboard and SCOREBOARD_ROWS rows, each with every column", () => {
+test("melon_racer.xml has the scoreboard and SCOREBOARD_ROWS rows, each with every column", () => {
     assert.match(layout, /<Panel id="scoreboard"/);
     for (const variable of ["title", "subtitle", "best_header"]) {
         assert.ok(layout.includes(`{s:${variable}}`), variable);

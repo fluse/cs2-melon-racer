@@ -1,0 +1,35 @@
+<!-- Speed panel, bottom center: the km/h readout over the health bar —
+     pure CSS, no images: a container that is only a white outline, inside
+     it the fill bar of HEALTH_BAR_SEGMENTS white pieces in a row, emptying
+     right to left — each piece transparent until the script makes it
+     white with an "On" class (UpdateHealthHud) — and the wall-jump dots right of it.
+     Every toggled panel gets exactly one class ("On") and starts without
+     it: several different classes toggled on one panel never showed
+     in-game. Flat on purpose: inside a panel turned with a CSS 3D
+     transform, class changes from script never showed either. -->
+<Panel id="speed_bottom" class="SpeedBottom">
+	<Panel class="SpeedRow">
+		<!-- as wide as the dots on the right, so the speed panel stays centered -->
+		<Panel class="SpeedRowSpacer" />
+		<Panel id="speed_panel" class="SpeedPanel">
+			<Panel class="SpeedReadout">
+				<Label id="speed_value" class="SpeedValue" text="{s:speed}" />
+			</Panel>
+			<!-- the container is the white outline; inside it the fill bar, emptying right to left -->
+			<Panel id="health_bar" class="HealthBar">
+				<Panel id="health_fill" class="HealthFill">
+					<each loop="i in range(HEALTH_BAR_SEGMENTS)">
+					<Panel id="health_seg_{{ i }}" class="HealthSeg" /></each>
+				</Panel>
+			</Panel>
+		</Panel>
+		<!-- Wall-jump charges: one dot per WALL_JUMP_CHARGES, stacked bottom
+		     up (the last one, dot 0, at the bottom). Each dot is a white outline
+		     (JumpDot) with a fill inside (jump_dot_<i>), transparent until the
+		     script puts "On" on it once that charge is ready (UpdateJumpHud). -->
+		<Panel id="jump_bar" class="JumpDots">
+			<each loop="i in range(WALL_JUMP_CHARGES).reverse()">
+			<Panel class="JumpDot"><Panel id="jump_dot_{{ i }}" class="JumpDotFill" /></Panel></each>
+		</Panel>
+	</Panel>
+</Panel>

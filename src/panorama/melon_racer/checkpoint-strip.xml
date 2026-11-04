@@ -1,0 +1,25 @@
+<!-- Checkpoint strip, top center: start flag, one numbered circle per
+     checkpoint (CHECKPOINT_HUD_SLOTS of them — unused ones get the
+     Unused class, a longer track shows a moving window with "…" at the
+     cut-off ends), finish flag. States: Reached / Next / pending (no
+     class). The lap row only shows on tracks with more than one lap. -->
+<Panel id="checkpoint_panel" class="CheckpointStrip Hidden">
+	<Panel class="StripRow">
+		<Image id="cp_start" class="StripFlag Reached" src="file://{images}/custom_game/icons/track-start.png" />
+		<Label id="cp_more_before" class="StripMore Hidden" text="…" />
+		<each loop="i in range(CHECKPOINT_HUD_SLOTS)">
+		<Panel id="cp_link_{{ i }}" class="StripLink" />
+		<Panel id="cp_slot_{{ i }}" class="StripCheckpoint">
+			<Label class="StripNumber" text="{s:n}" />
+		</Panel></each>
+		<Label id="cp_more_after" class="StripMore Hidden" text="…" />
+		<Panel id="cp_link_finish" class="StripLink" />
+		<Image id="cp_finish" class="StripFlag" src="file://{images}/custom_game/icons/track-finish.png" />
+	</Panel>
+	<Panel id="lap_row" class="StripLapRow">
+		<Label class="LapUnit" text="LAP" />
+		<Label id="lap_current" class="LapCurrent" text="{s:lap_current}" />
+		<Label class="LapSlash" text="/" />
+		<Label id="lap_total" class="LapTotal" text="{s:lap_total}" />
+	</Panel>
+</Panel>

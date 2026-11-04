@@ -58,6 +58,18 @@ export class Mesh {
     }
 
     /**
+     * One flat convex polygon (3D points, counter-clockwise seen from its
+     * front) with its own texcoords, one per point — a fan of flat-shaded
+     * triangles, for textures that must sit a certain way on it (a window).
+     */
+    Face(points, uvs, part) {
+        const n = V3.Unit(points.reduce((s, p, i) => V3.Add(s, V3.Cross(p, points[(i + 1) % points.length])), [0, 0, 0]));
+        const ni = this.#Add(this.vn, n);
+        const corners = points.map((p, i) => [this.#Add(this.v, p), this.#Add(this.vt, uvs[i]), ni]);
+        for (let i = 1; i + 1 < corners.length; i++) this.#Part(part).push([corners[0], corners[i], corners[i + 1]]);
+    }
+
+    /**
      * Flat 2D shapes ({ outer, holes }) at depth d along `axis`, facing +axis
      * (facing -1: -axis) — one side only, e.g. a decal-like layer on a cap.
      */
@@ -264,6 +276,30 @@ export const V3 = {
     Cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
     Unit: a => a.map(n => n / Math.hypot(...a)),
 };
+
+/** A flat-shaded box into `mesh` round `c` along the unit axes ax, ay, az (right-handed), `h` its half sizes. */
+export function Box(mesh, c, [ax, ay, az], h, part) {
+    const axes = [ax, ay, az];
+    const At = s => axes.reduce((p, a, k) => V3.Add(p, V3.Scale(a, s[k] * h[k])), c);
+    for (const [i, j, k] of [[1, 2, 0], [2, 0, 1], [0, 1, 2]]) {
+        for (const sign of [1, -1]) {
+            const quad = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([si, sj]) => { const s = [0, 0, 0]; s[i] = si; s[j] = sj; s[k] = sign; return At(s); });
+            if (sign < 0) quad.reverse();
+            mesh.Tri(quad[0], quad[1], quad[2], part);
+            mesh.Tri(quad[0], quad[2], quad[3], part);
+        }
+    }
+}
+/** A flat-shaded box from corner `lo` to corner `hi`, along the world axes. */
+export const AxisBox = (mesh, lo, hi, part) => Box(mesh, V3.Scale(V3.Add(lo, hi), 0.5), [[1, 0, 0], [0, 1, 0], [0, 0, 1]], V3.Scale(V3.Sub(hi, lo), 0.5), part);
+/** A flat-shaded beam `w` x `t` from a to b, its `t` side facing `up` as far as it can. */
+export function Beam(mesh, a, b, w, t, part, up = [0, 0, 1]) {
+    const ax = V3.Unit(V3.Sub(b, a));
+    let side = V3.Cross(up, ax);
+    if (Math.hypot(...side) < 1e-6) side = V3.Cross([1, 0, 0], ax);
+    const ay = V3.Unit(side), az = V3.Cross(ax, ay);
+    Box(mesh, V3.Scale(V3.Add(a, b), 0.5), [ax, ay, az], [Math.hypot(...V3.Sub(b, a)) / 2, w / 2, t / 2], part);
+}
 
 /**
  * A helix's centerline around the Z axis through (x, y): from z0 to z1 in

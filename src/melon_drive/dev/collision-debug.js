@@ -5,7 +5,7 @@
 // code in contact.js/drive.js/jump.js only hands its results to the
 // Record*/Log*/Draw* functions here, so none of this lives in the gameplay
 // code itself. Debug draws only show in dev environments (tools mode).
-import { Instance } from "cs_script/point_script";
+import { Instance, Console } from "cs_script/point_script";
 import { WALL_JUMP_CONTACT_RADIUS, GROUND_CONTACT_DISTANCE, GROUND_MAX_APPROACH_SPEED, WALL_JUMP_MAX_APPROACH_SPEED } from "../constants/index.js";
 import { FloorPlaneDistance } from "../movement/contact/logic.js";
 
@@ -100,7 +100,7 @@ export function LogJumpPress(slot, kart, now, grounded, groundJump, timingPress)
     const d = kart.contactDebug;
     const groundAge = kart.lastGroundedTime === undefined ? "never" : `${(now - kart.lastGroundedTime).toFixed(3)}s ago`;
     const wallAge = kart.lastWallContact === undefined ? "never" : `${(now - kart.lastWallContact.time).toFixed(3)}s ago`;
-    Instance.Msg(
+    Console.Log(
         `[collision debug] slot ${slot} jump pressed: grounded=${grounded} groundJump=${groundJump} ` +
             `(ground contact ${groundAge}, ${d?.support ?? "—"}, floor: ${d?.floorText ?? "—"}) ` +
             `wall contact ${wallAge} (${d?.wallText ?? "—"}) wallCharge=${(kart.wallJumpCharge ?? 1).toFixed(2)} wallTiming=${timingPress}`
@@ -117,7 +117,7 @@ export function LogBufferedGroundJump(slot, kart, pressedAgo) {
         return;
     }
     const d = kart.contactDebug;
-    Instance.Msg(
+    Console.Log(
         `[collision debug] slot ${slot} buffered ground jump, pressed ${pressedAgo.toFixed(3)}s before (${d?.support ?? "—"}, floor: ${d?.floorText ?? "—"})`
     );
 }
@@ -131,7 +131,7 @@ export function LogWallJumpVerdict(slot, kart, blockedBy, inLift) {
     if (!IsCollisionDebugOn(kart)) {
         return;
     }
-    Instance.Msg(`[collision debug] slot ${slot} wall jump: ${blockedBy === null ? "YES" : `no — ${blockedBy}`}${inLift ? " (in lift zone)" : " (not in a lift zone)"}`);
+    Console.Log(`[collision debug] slot ${slot} wall jump: ${blockedBy === null ? "YES" : `no — ${blockedBy}`}${inLift ? " (in lift zone)" : " (not in a lift zone)"}`);
 }
 
 // Colors — see the legend in GAMEPLAY.md's "Jumping".

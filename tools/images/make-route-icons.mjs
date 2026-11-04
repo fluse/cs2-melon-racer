@@ -2,7 +2,7 @@
 // one picture per track, panorama/images/custom_game/routes/route_<trackId>.png,
 // an icon that fits the route's name, in a racing look (slanted, speed
 // lines) — an aqueduct for "Canals", a truss bridge for "Bridge", a melon
-// wedge for "Side Slice", a checkered flag for any
+// wedge for "Side Slice", a lighthouse for "Lighthouse", a checkered flag for any
 // other (ROUTE_ICONS below: add a keyword and shapes for a new one). Also
 // writes the route names (src/melon_drive/hud/hub-modal/routes.js), taken
 // from the route prefab's file name in maps/melon_racer.vmap:
@@ -21,7 +21,7 @@ const MAP = fileURLToPath(new URL("../../maps/melon_racer.vmap", import.meta.url
 const OUT_DIR = new URL("../../panorama/images/custom_game/routes/", import.meta.url);
 const NAMES_FILE = new URL("../../src/melon_drive/hud/hub-modal/routes.js", import.meta.url);
 
-// The picture fills the card's image box (.HeatMapBox in speedometer.css);
+// The picture fills the card's image box (.HeatMapBox in melon_racer.css);
 // the icon's 100x100 grid sits centered in it at ICON_SIZE px.
 const WIDTH = 320;
 const HEIGHT = 176;
@@ -67,6 +67,9 @@ const FLESH = [255, 90, 95];
 const SEED = [30, 24, 24];
 const WHITE = [255, 255, 255];
 const DARK = [20, 24, 20];
+const RED = [220, 52, 52];
+const LIGHT = [255, 214, 90];
+const BEAM = [255, 240, 170];
 
 /** Filled polygon (even-odd), corners in order. */
 const polygon = (...pts) => (x, y) => {
@@ -134,6 +137,30 @@ const SLICE = (() => {
     ];
 })();
 
+/**
+ * Lighthouse: a tapering red and white striped tower on a rock, the gallery,
+ * the glowing lantern under a red dome, its beam shining ahead (right).
+ */
+const LIGHTHOUSE = (() => {
+    const tower = polygon([39, 84], [61, 84], [56, 40], [44, 40]);
+    const bands = union(rect(0, 46, 100, 55), rect(0, 64, 100, 73));
+    const beam = polygon([54, 28], [100, 14], [100, 42]);
+    const dome = polygon([42, 22], [58, 22], [50, 13]);
+    const water = union(line(4, 90, 26, 90, 1.8), line(74, 90, 96, 90, 1.8), line(10, 96, 34, 96, 1.4), line(66, 96, 90, 96, 1.4));
+    return [
+        [beam, BEAM],
+        [water, WATER],
+        [polygon([28, 92], [34, 84], [44, 80], [58, 80], [68, 85], [72, 92]), STONE_DARK],
+        [tower, WHITE],
+        [intersect(tower, bands), RED],
+        [rect(44, 22, 56, 36), LIGHT],
+        [union(line(47.5, 23, 47.5, 35, 0.8), line(52.5, 23, 52.5, 35, 0.8)), DARK],
+        [rect(39, 36, 61, 41), STONE],
+        [dome, RED],
+        [line(50, 13, 50, 8, 1), DARK],
+    ];
+})();
+
 /** Any other route: a checkered flag on a pole. */
 const FLAG = (() => {
     const cloth = rect(30, 20, 82, 56);
@@ -157,6 +184,7 @@ const ROUTE_ICONS = [
     [/canal/i, CANALS],
     [/bridge/i, BRIDGE],
     [/slice/i, SLICE],
+    [/lighthouse/i, LIGHTHOUSE],
     [/./, FLAG],
 ];
 

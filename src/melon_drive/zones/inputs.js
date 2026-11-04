@@ -20,7 +20,7 @@ import { RegisterTeleportInput } from "./teleport/inputs.js";
 /**
  * @param {string} enterInput @param {string} leaveInput
  * @param {import("./registry.js").ZoneKind} kind
- * @param {(triggerName: string) => any} valueFromName @param {string} unit for the debug log
+ * @param {(triggerName: string, trigger: any) => any} valueFromName @param {string} unit for the debug log
  * @param {(kart: import("../core/kart-registry.js").Kart) => void} [onEnter] e.g. an effect on entering
  */
 function RegisterZone(enterInput, leaveInput, kind, valueFromName, unit, onEnter) {
@@ -30,7 +30,7 @@ function RegisterZone(enterInput, leaveInput, kind, valueFromName, unit, onEnter
             Debug(`${enterInput}: activator wasn't a tracked melon, ignoring`);
             return;
         }
-        const value = valueFromName(caller.GetEntityName());
+        const value = valueFromName(caller.GetEntityName(), caller);
         EnterZone(kart, kind, caller, value);
         onEnter?.(kart);
         Debug(`${enterInput}: slot ${kart.pawn.GetPlayerController()?.GetPlayerSlot()} in "${caller.GetEntityName()}" (${typeof value === "object" ? JSON.stringify(value) : value} ${unit})`);
@@ -52,7 +52,8 @@ export function RegisterZoneInputs() {
     // Camera zones — see CAMERA_ZONE_* in camera-zone/constants.js. Read by the zone camera (camera/zone-zoom/).
     RegisterZone("camera_enter", "camera_leave", "cameraZones", CameraZoneFromName, "extra back/up");
     // Side-view zones — see side-view/constants.js. Read by UpdateKart (2D driving) and the side camera (camera/side-view/).
-    RegisterZone("side_view_enter", "side_view_leave", "sideViews", SideViewFromName, "yaw/distance/height");
+    // A corner zone (side_view_corner_…) turns round the trigger's own origin.
+    RegisterZone("side_view_enter", "side_view_leave", "sideViews", (name, trigger) => SideViewFromName(name, trigger.GetAbsOrigin()), "yaw/distance/height");
     // Side-view depth zones — inside a side view, W/S move the melon towards/away from the camera. Read by UpdateKart.
     RegisterZone("side_view_depth_enter", "side_view_depth_leave", "sideViewDepths", () => 1, "(side-view depth)");
     // Jump pads — see jump-pad/constants.js. Read by jump-pad/jump-pad.js (launch, no damage).

@@ -71,10 +71,10 @@ test("a Grand Prix earns clearly more than time trials: every heat finish beats 
     assert.ok(GrandPrixXp(99) > XP_TIME_TRIAL_FINISH + XP_NEW_BEST);
 });
 
-test("skins: three free from the start, the default among them; each locked one needs a level", () => {
+test("skins: five free from the start, the default among them; each locked one needs a level", () => {
     assert.deepEqual(Object.keys(MELON_SKIN_LEVELS).sort(), Object.keys(MELON_SKINS).sort(), "a level for every skin, no other");
     const free = Object.keys(MELON_SKINS).filter((skin) => IsSkinUnlocked(skin, 1));
-    assert.equal(free.length, 3);
+    assert.equal(free.length, 5);
     assert.ok(free.includes(MELON_SKIN_DEFAULT));
     for (const skin of Object.keys(MELON_SKINS)) {
         if (SkinUnlockLevel(skin) > 1) {
@@ -232,7 +232,7 @@ test("XP notifier: shown for a reward (adding up), not for the time on the serve
 });
 
 test("the layout has one XP notifier segment pair per XP_BAR_SEGMENTS", () => {
-    const xml = readFileSync(new URL("../../panorama/layout/custom_game/speedometer.xml", import.meta.url), "utf8");
+    const xml = readFileSync(new URL("../../panorama/layout/custom_game/melon_racer.xml", import.meta.url), "utf8");
     for (let i = 0; i < XP_BAR_SEGMENTS; i++) {
         assert.ok(xml.includes(`id="xpgain_old_${i}"`) && xml.includes(`id="xpgain_new_${i}"`), `segment ${i}`);
     }

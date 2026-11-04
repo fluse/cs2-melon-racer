@@ -12,6 +12,13 @@
 //   side_view_<yaw>_<distance>            ... from <distance> units away
 //   side_view_<yaw>_<distance>_<height>   ... and <height> units above the melon's center,
 //                                         looking down at it (negative: from below)
+//   side_view_corner_<from>_<to>[_<distance>[_<height>]]
+//                                         a corner zone round the outside of a building's corner:
+//                                         the camera turns from <from> to <to> (yaws, the two
+//                                         side views either side) as the melon goes round the
+//                                         trigger's origin (put on the corner), looking at the
+//                                         corner from the melon's side; A/D drive round it and
+//                                         the melon is held at its distance from the corner
 // Any other name: SIDE_VIEW_DEFAULT_YAW, SIDE_VIEW_DISTANCE, SIDE_VIEW_HEIGHT.
 // Overlapping zones: the one entered last counts.
 // Only A/D drive (decided) — W/S do nothing, except inside a side-view depth
@@ -22,6 +29,7 @@
 // the melon isn't held on its plane, and leaving it the plane is wherever the
 // melon is then. Outside a side view it does nothing.
 export const SIDE_VIEW_NAME_PATTERN = /^side_view_(-?\d+(?:\.\d+)?)(?:_(\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?)?$/;
+export const SIDE_VIEW_CORNER_NAME_PATTERN = /^side_view_corner_(-?\d+(?:\.\d+)?)_(-?\d+(?:\.\d+)?)(?:_(\d+(?:\.\d+)?)(?:_(-?\d+(?:\.\d+)?))?)?$/;
 export const SIDE_VIEW_DEFAULT_YAW = 90; // degrees, for a zone without values in its name
 // How far from the melon the camera sits, without a distance in the name.
 // Higher: more of the level in view, the melon gets smaller on screen.

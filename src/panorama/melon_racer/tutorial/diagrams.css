@@ -1,0 +1,530 @@
+/* The tutorial card's animated diagrams (diagrams.xml): small looping scenes,
+   360 x 110, of plain panels placed by their margins and moved only by the
+   animations below (a resting transform would block them in Panorama). */
+.TutorialDiagrams {
+    width: 360px;
+    height: 110px;
+    margin-top: 10px;
+    background-color: $(black)55;
+    border-radius: 4px;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.TutorialDiagram {
+    width: 100%;
+    height: 100%;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.DgCaption {
+    horizontal-align: right;
+    vertical-align: bottom;
+    margin: 0px 8px 4px 0px;
+    font-size: $font-mini;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: $text-dim;
+}
+
+/* The melon: a lime dot. */
+.DgMelon {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background-color: $lime;
+    border: 1px solid $white;
+}
+
+.DgFloor {
+    width: 100%;
+    height: 4px;
+    margin-top: 96px;
+    background-color: $mint;
+}
+
+.DgWallRight {
+    width: 8px;
+    height: 100px;
+    horizontal-align: right;
+    margin-right: 40px;
+    background-color: $mint;
+}
+
+.DgWallRed {
+    background-color: $red;
+}
+
+.DgSpark,
+.DgPiece {
+    width: 6px;
+    height: 6px;
+    background-color: $gold;
+    opacity: 0;
+}
+
+/* --- look: three gates, the melon weaving through them --- */
+.DgGate {
+    width: 6px;
+    height: 26px;
+    background-color: $lime;
+}
+
+.DgGate1 { margin: 20px 0px 0px 90px; }
+.DgGate2 { margin: 56px 0px 0px 170px; }
+.DgGate3 { margin: 20px 0px 0px 250px; }
+
+.DgLookMelon {
+    margin: 30px 0px 0px 20px;
+    animation-name: DgLook;
+    animation-duration: 3s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+.DgLookMouse {
+    width: 24px;
+    height: 24px;
+    margin: 80px 0px 0px 40px;
+    animation-name: DgLookMouse;
+    animation-duration: 3s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+@keyframes 'DgLook' {
+    0% { transform: translate3d(0px, 0px, 0px); }
+    25% { transform: translate3d(76px, 4px, 0px); }
+    50% { transform: translate3d(156px, 34px, 0px); }
+    75% { transform: translate3d(236px, 4px, 0px); }
+    95% { transform: translate3d(310px, 10px, 0px); }
+    100% { transform: translate3d(310px, 10px, 0px); }
+}
+
+@keyframes 'DgLookMouse' {
+    0% { transform: translateX(0px); }
+    25% { transform: translateX(30px); }
+    50% { transform: translateX(-10px); }
+    75% { transform: translateX(30px); }
+    100% { transform: translateX(0px); }
+}
+
+/* --- circle: the melon circling a post clockwise, the mouse sliding right --- */
+.DgPost {
+    width: 12px;
+    height: 12px;
+    margin: 43px 0px 0px 175px;
+    background-color: $lime;
+}
+
+.DgCircleMelon {
+    margin: 7px 0px 0px 173px;
+    animation-name: DgCircle;
+    animation-duration: 3s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+@keyframes 'DgCircle' {
+    0% { transform: translate3d(0px, 0px, 0px); }
+    8% { transform: translate3d(19px, 5px, 0px); }
+    17% { transform: translate3d(33px, 17px, 0px); }
+    25% { transform: translate3d(38px, 34px, 0px); }
+    33% { transform: translate3d(33px, 51px, 0px); }
+    42% { transform: translate3d(19px, 63px, 0px); }
+    50% { transform: translate3d(0px, 68px, 0px); }
+    58% { transform: translate3d(-19px, 63px, 0px); }
+    67% { transform: translate3d(-33px, 51px, 0px); }
+    75% { transform: translate3d(-38px, 34px, 0px); }
+    83% { transform: translate3d(-33px, 17px, 0px); }
+    92% { transform: translate3d(-19px, 5px, 0px); }
+    100% { transform: translate3d(0px, 0px, 0px); }
+}
+
+.DgCircleMouse {
+    width: 24px;
+    height: 24px;
+    margin: 80px 0px 0px 40px;
+    animation-name: DgCircleMouse;
+    animation-duration: 3s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+@keyframes 'DgCircleMouse' {
+    0% { transform: translateX(0px); }
+    90% { transform: translateX(60px); }
+    100% { transform: translateX(0px); }
+}
+
+/* --- drain / heal: a 10-segment health bar --- */
+.DgBar {
+    width: 300px;
+    height: 22px;
+    margin: 34px 0px 0px 30px;
+    flow-children: right;
+}
+
+.DgBarSegment {
+    width: 27px;
+    height: 22px;
+    margin-right: 3px;
+    background-color: $green;
+    animation-duration: 4s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+/* Segment i goes out at 10 % * (9 - i): the bar drains from the right. */
+.DgDrain9 { animation-name: DgDrain9; }
+.DgDrain8 { animation-name: DgDrain8; }
+.DgDrain7 { animation-name: DgDrain7; }
+.DgDrain6 { animation-name: DgDrain6; }
+.DgDrain5 { animation-name: DgDrain5; }
+.DgDrain4 { animation-name: DgDrain4; }
+.DgDrain3 { animation-name: DgDrain3; }
+.DgDrain2 { animation-name: DgDrain2; }
+.DgDrain1 { animation-name: DgDrain1; }
+.DgDrain0 { animation-name: DgDrain0; }
+
+@keyframes 'DgDrain9' { 0% { opacity: 1; } 8% { opacity: 0.1; } 92% { opacity: 0.1; } 100% { opacity: 1; } }
+@keyframes 'DgDrain8' { 0% { opacity: 1; } 8% { opacity: 1; } 16% { opacity: 0.1; } 92% { opacity: 0.1; } 100% { opacity: 1; } }
+@keyframes 'DgDrain7' { 0% { opacity: 1; } 16% { opacity: 1; } 24% { opacity: 0.1; } 92% { opacity: 0.1; } 100% { opacity: 1; } }
+@keyframes 'DgDrain6' { 0% { opacity: 1; } 24% { opacity: 1; } 32% { opacity: 0.1; } 92% { opacity: 0.1; } 100% { opacity: 1; } }
+@keyframes 'DgDrain5' { 0% { opacity: 1; } 32% { opacity: 1; } 40% { opacity: 0.1; } 92% { opacity: 0.1; } 100% { opacity: 1; } }
+@keyframes 'DgDrain4' { 0% { opacity: 1; } 40% { opacity: 1; } 48% { opacity: 0.1; } 92% { opacity: 0.1; } 100% { opacity: 1; } }
+@keyframes 'DgDrain3' { 0% { opacity: 1; } 48% { opacity: 1; } 56% { opacity: 0.1; } 92% { opacity: 0.1; } 100% { opacity: 1; } }
+@keyframes 'DgDrain2' { 0% { opacity: 1; } 56% { opacity: 1; } 64% { opacity: 0.1; } 92% { opacity: 0.1; } 100% { opacity: 1; } }
+@keyframes 'DgDrain1' { 0% { opacity: 1; } 64% { opacity: 1; } 72% { opacity: 0.1; } 92% { opacity: 0.1; } 100% { opacity: 1; } }
+@keyframes 'DgDrain0' { 0% { opacity: 1; } 72% { opacity: 1; } 80% { opacity: 0.1; } 92% { opacity: 0.1; } 100% { opacity: 1; } }
+
+/* Heal: segment i lights at 8 % * i, from the left. */
+.DgFill0 { animation-name: DgFill0; }
+.DgFill1 { animation-name: DgFill1; }
+.DgFill2 { animation-name: DgFill2; }
+.DgFill3 { animation-name: DgFill3; }
+.DgFill4 { animation-name: DgFill4; }
+.DgFill5 { animation-name: DgFill5; }
+.DgFill6 { animation-name: DgFill6; }
+.DgFill7 { animation-name: DgFill7; }
+.DgFill8 { animation-name: DgFill8; }
+.DgFill9 { animation-name: DgFill9; }
+
+@keyframes 'DgFill0' { 0% { opacity: 1; } 100% { opacity: 1; } }
+@keyframes 'DgFill1' { 0% { opacity: 0.1; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0.1; } }
+@keyframes 'DgFill2' { 0% { opacity: 0.1; } 16% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0.1; } }
+@keyframes 'DgFill3' { 0% { opacity: 0.1; } 16% { opacity: 0.1; } 24% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0.1; } }
+@keyframes 'DgFill4' { 0% { opacity: 0.1; } 24% { opacity: 0.1; } 32% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0.1; } }
+@keyframes 'DgFill5' { 0% { opacity: 0.1; } 32% { opacity: 0.1; } 40% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0.1; } }
+@keyframes 'DgFill6' { 0% { opacity: 0.1; } 40% { opacity: 0.1; } 48% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0.1; } }
+@keyframes 'DgFill7' { 0% { opacity: 0.1; } 48% { opacity: 0.1; } 56% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0.1; } }
+@keyframes 'DgFill8' { 0% { opacity: 0.1; } 56% { opacity: 0.1; } 64% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0.1; } }
+@keyframes 'DgFill9' { 0% { opacity: 0.1; } 64% { opacity: 0.1; } 72% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0.1; } }
+
+.DgCross {
+    width: 30px;
+    height: 30px;
+    margin: 66px 0px 0px 165px;
+    animation-name: TutorialPulse;
+    animation-duration: 1s;
+    animation-iteration-count: infinite;
+}
+
+.DgCrossH {
+    width: 30px;
+    height: 10px;
+    vertical-align: center;
+    background-color: $lime;
+}
+
+.DgCrossV {
+    width: 10px;
+    height: 30px;
+    horizontal-align: center;
+    background-color: $lime;
+}
+
+/* --- momentum: a speed track, the top mark stepping right, the needle chasing it --- */
+.DgTrack {
+    width: 300px;
+    height: 4px;
+    margin: 52px 0px 0px 30px;
+    background-color: $(white)44;
+}
+
+.DgTopMark {
+    width: 4px;
+    height: 30px;
+    margin: 39px 0px 0px 230px;
+    background-color: $gold;
+    animation-name: DgTopMark;
+    animation-duration: 6s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+.DgNeedle {
+    width: 10px;
+    height: 22px;
+    margin: 43px 0px 0px 30px;
+    background-color: $lime;
+    animation-name: DgNeedle;
+    animation-duration: 6s;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+}
+
+@keyframes 'DgTopMark' {
+    0% { transform: translateX(0px); }
+    25% { transform: translateX(0px); }
+    27% { transform: translateX(25px); }
+    55% { transform: translateX(25px); }
+    57% { transform: translateX(50px); }
+    90% { transform: translateX(50px); }
+    100% { transform: translateX(0px); }
+}
+
+@keyframes 'DgNeedle' {
+    0% { transform: translateX(0px); }
+    25% { transform: translateX(198px); }
+    38% { transform: translateX(150px); }
+    55% { transform: translateX(223px); }
+    68% { transform: translateX(175px); }
+    85% { transform: translateX(248px); }
+    100% { transform: translateX(0px); }
+}
+
+/* --- wall jump, side view: up and at the wall, touch, off it and higher --- */
+.DgWallJumpMelon {
+    margin: 82px 0px 0px 120px;
+    animation-name: DgWallJump;
+    animation-duration: 2.4s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+.DgWallJumpSpark {
+    width: 12px;
+    height: 12px;
+    margin: 40px 0px 0px 300px;
+    animation-name: DgWallJumpSpark;
+    animation-duration: 2.4s;
+    animation-iteration-count: infinite;
+}
+
+@keyframes 'DgWallJump' {
+    0% { transform: translate3d(0px, 0px, 0px); }
+    20% { transform: translate3d(90px, -40px, 0px); }
+    35% { transform: translate3d(164px, -40px, 0px); }
+    55% { transform: translate3d(110px, -78px, 0px); }
+    80% { transform: translate3d(40px, 0px, 0px); }
+    100% { transform: translate3d(0px, 0px, 0px); }
+}
+
+@keyframes 'DgWallJumpSpark' {
+    0% { opacity: 0; }
+    34% { opacity: 0; }
+    36% { opacity: 1; }
+    48% { opacity: 0; }
+    100% { opacity: 0; }
+}
+
+/* --- 45 degrees, top-down: wall along the top, guide dots at 45 deg, the melon in and out --- */
+.DgWallTop {
+    width: 100%;
+    height: 8px;
+    margin-top: 8px;
+    background-color: $mint;
+}
+
+.DgGuide {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: $gold;
+}
+
+/* Every 14 px right and up: 45 degrees, ending at the wall. */
+.DgGuideIn0 { margin: 92px 0px 0px 90px; }
+.DgGuideIn1 { margin: 78px 0px 0px 104px; }
+.DgGuideIn2 { margin: 64px 0px 0px 118px; }
+.DgGuideIn3 { margin: 50px 0px 0px 132px; }
+.DgGuideIn4 { margin: 36px 0px 0px 146px; }
+.DgGuideIn5 { margin: 22px 0px 0px 160px; }
+
+.DgAngleMelon {
+    margin: 88px 0px 0px 86px;
+    animation-name: DgAngle;
+    animation-duration: 2.6s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+@keyframes 'DgAngle' {
+    0% { transform: translate3d(0px, 0px, 0px); }
+    45% { transform: translate3d(76px, -76px, 0px); }
+    90% { transform: translate3d(176px, 0px, 0px); }
+    100% { transform: translate3d(176px, 0px, 0px); }
+}
+
+.DgAngleLabel {
+    margin: 26px 0px 0px 182px;
+    font-size: $font-strong;
+    font-weight: bold;
+    color: $gold;
+}
+
+/* --- climb, side view: two walls, a ledge at the top, the melon zigzagging up --- */
+.DgClimbWallLeft {
+    width: 8px;
+    height: 100%;
+    margin-left: 140px;
+    background-color: $mint;
+}
+
+.DgClimbWallRight {
+    width: 8px;
+    height: 100%;
+    margin-left: 212px;
+    background-color: $mint;
+}
+
+.DgLedge {
+    width: 60px;
+    height: 6px;
+    margin: 16px 0px 0px 220px;
+    background-color: $gold;
+}
+
+.DgClimbMelon {
+    margin: 88px 0px 0px 150px;
+    animation-name: DgClimb;
+    animation-duration: 3s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+@keyframes 'DgClimb' {
+    0% { transform: translate3d(0px, 0px, 0px); }
+    20% { transform: translate3d(46px, -22px, 0px); }
+    40% { transform: translate3d(0px, -44px, 0px); }
+    60% { transform: translate3d(46px, -66px, 0px); }
+    80% { transform: translate3d(80px, -82px, 0px); }
+    100% { transform: translate3d(80px, -82px, 0px); }
+}
+
+/* --- crash: fast into the red wall, the pieces flying back --- */
+.DgCrashMelon {
+    margin: 82px 0px 0px 20px;
+    animation-name: DgCrash;
+    animation-duration: 2.4s;
+    animation-timing-function: ease-in;
+    animation-iteration-count: infinite;
+}
+
+@keyframes 'DgCrash' {
+    0% { transform: translateX(0px); opacity: 1; }
+    40% { transform: translateX(278px); opacity: 1; }
+    42% { transform: translateX(278px); opacity: 0; }
+    100% { transform: translateX(278px); opacity: 0; }
+}
+
+.DgCrashPiece0 { margin: 84px 0px 0px 296px; animation-name: DgPieceA; animation-duration: 2.4s; animation-iteration-count: infinite; }
+.DgCrashPiece1 { margin: 88px 0px 0px 296px; animation-name: DgPieceB; animation-duration: 2.4s; animation-iteration-count: infinite; }
+.DgCrashPiece2 { margin: 90px 0px 0px 296px; animation-name: DgPieceC; animation-duration: 2.4s; animation-iteration-count: infinite; }
+
+/* The pieces: nothing until the hit at 40 %, then out and fading. */
+@keyframes 'DgPieceA' { 0% { opacity: 0; transform: translate3d(0px, 0px, 0px); } 40% { opacity: 0; transform: translate3d(0px, 0px, 0px); } 42% { opacity: 1; } 70% { opacity: 0; transform: translate3d(-40px, -30px, 0px); } 100% { opacity: 0; transform: translate3d(-40px, -30px, 0px); } }
+@keyframes 'DgPieceB' { 0% { opacity: 0; transform: translate3d(0px, 0px, 0px); } 40% { opacity: 0; transform: translate3d(0px, 0px, 0px); } 42% { opacity: 1; } 70% { opacity: 0; transform: translate3d(-55px, -6px, 0px); } 100% { opacity: 0; transform: translate3d(-55px, -6px, 0px); } }
+@keyframes 'DgPieceC' { 0% { opacity: 0; transform: translate3d(0px, 0px, 0px); } 40% { opacity: 0; transform: translate3d(0px, 0px, 0px); } 42% { opacity: 1; } 70% { opacity: 0; transform: translate3d(-30px, 4px, 0px); } 100% { opacity: 0; transform: translate3d(-30px, 4px, 0px); } }
+
+/* --- fall: off the tower, flat onto the floor --- */
+.DgTower {
+    width: 80px;
+    height: 80px;
+    margin: 16px 0px 0px 40px;
+    background-color: $(mint)88;
+}
+
+.DgFallMelon {
+    margin: 2px 0px 0px 60px;
+    animation-name: DgFall;
+    animation-duration: 2.4s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+@keyframes 'DgFall' {
+    0% { transform: translate3d(0px, 0px, 0px); opacity: 1; }
+    15% { transform: translate3d(60px, 0px, 0px); opacity: 1; }
+    25% { transform: translate3d(90px, 12px, 0px); opacity: 1; }
+    40% { transform: translate3d(110px, 80px, 0px); opacity: 1; }
+    42% { transform: translate3d(110px, 80px, 0px); opacity: 0; }
+    100% { transform: translate3d(110px, 80px, 0px); opacity: 0; }
+}
+
+.DgFallPiece0 { margin: 86px 0px 0px 172px; animation-name: DgPieceA; animation-duration: 2.4s; animation-iteration-count: infinite; }
+.DgFallPiece1 { margin: 88px 0px 0px 176px; animation-name: DgPieceD; animation-duration: 2.4s; animation-iteration-count: infinite; }
+.DgFallPiece2 { margin: 90px 0px 0px 170px; animation-name: DgPieceC; animation-duration: 2.4s; animation-iteration-count: infinite; }
+
+@keyframes 'DgPieceD' { 0% { opacity: 0; transform: translate3d(0px, 0px, 0px); } 40% { opacity: 0; transform: translate3d(0px, 0px, 0px); } 42% { opacity: 1; } 70% { opacity: 0; transform: translate3d(40px, -24px, 0px); } 100% { opacity: 0; transform: translate3d(40px, -24px, 0px); } }
+
+/* --- the user menu, sketched: the part to look at outlined in gold, pulsing --- */
+.DgMenuFrame {
+    width: 280px;
+    height: 94px;
+    horizontal-align: center;
+    vertical-align: center;
+    padding: 6px;
+    flow-children: right;
+    border: 1px solid $panel-border;
+    background-color: $(panel)ee;
+}
+
+.DgMenuColumn {
+    width: 84px;
+    height: 100%;
+    margin-right: 6px;
+    border: 1px solid $(white)33;
+}
+
+.DgMenuRight {
+    width: 84px;
+    height: 100%;
+    flow-children: down;
+}
+
+.DgMenuRight > .DgMenuColumn {
+    width: 84px;
+    height: 38px;
+    margin: 0px 0px 6px 0px;
+}
+
+.DgMenuLabel {
+    horizontal-align: center;
+    margin-top: 4px;
+    font-size: $font-mini;
+    font-weight: bold;
+    color: $text-dim;
+}
+
+.DgMenuActions .DgMenuColActions,
+.DgMenuSettings .DgMenuColSettings,
+.DgMenuProfile .DgMenuColProfile {
+    border: 2px solid $gold;
+    background-color: $(gold)26;
+    animation-name: TutorialPulse;
+    animation-duration: 1s;
+    animation-iteration-count: infinite;
+}
+
+.DgMenuActions .DgMenuColActions .DgMenuLabel,
+.DgMenuSettings .DgMenuColSettings .DgMenuLabel,
+.DgMenuProfile .DgMenuColProfile .DgMenuLabel {
+    color: $gold;
+}

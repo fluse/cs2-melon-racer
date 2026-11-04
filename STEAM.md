@@ -22,6 +22,8 @@ easier to find in search.)
 ## Description (English — default language)
 
 ```
+[img]https://file.garden/amNH3m_olG_QbqT3/workshop_banner.png[/img]
+
 [h1]Melon Racer — Get ready to roll![/h1]
 
 [b]No guns. No bullets. Just you, a watermelon, and the track.[/b]
@@ -122,6 +124,8 @@ top to "German" → paste the title and this text. German Steam users then see
 the German version automatically.
 
 ```
+[img]https://file.garden/amNH3m_olG_QbqT3/workshop_banner.png[/img]
+
 [h1]🍉 Melon Racer — Get ready to roll![/h1]
 
 [b]Keine Waffen. Keine Kugeln. Nur du, eine Wassermelone und die Strecke.[/b]

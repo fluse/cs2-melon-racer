@@ -49,7 +49,7 @@ import { ApplyHealing } from "../../health/heal/index.js";
 import { CurrentWallRules, CurrentSideView, InSideViewDepthZone, InWater, InJumpRechargeZone, CurrentGravityZone } from "../../zones/registry.js";
 import { ChargeInRechargeZone } from "../../zones/jump-recharge/logic.js";
 import { KeepRollingSpeed } from "../../zones/gravity/logic.js";
-import { SideViewAxes, InitialFacing, SideViewInput, SideViewDepthInput, PlaneDepth, KeepOnPlane } from "../../zones/side-view/logic.js";
+import { SideViewAxes, ResolveSideView, SideViewDepth, InitialFacing, SideViewInput, SideViewDepthInput, KeepOnPlane } from "../../zones/side-view/logic.js";
 import { PodiumHoldActive, PodiumHoldVelocity } from "../../race/podium/logic.js";
 
 /** @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {number} dt */
@@ -264,7 +264,7 @@ export function UpdateKart(slot, kart, dt) {
     if (boost.boosting && kart.health <= 0) {
         Debug(`slot ${slot}: boosted until the health ran out`);
         const speed = Math.hypot(currentVelocity.x, currentVelocity.y, currentVelocity.z);
-        BreakMelon(slot, kart, speed > 0 ? currentVelocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+        BreakMelon(slot, kart, speed > 0 ? currentVelocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1), true, "boost");
         return;
     }
 
@@ -460,7 +460,8 @@ export function UpdateKart(slot, kart, dt) {
  * the view and the plane moves with the melon (`free`), so leaving the
  * depth zone holds it on the plane it's on then.
  * undefined outside one. Entering a (new) zone starts on the plane the melon
- * is on, facing the way it moves.
+ * is on, facing the way it moves. In a corner zone the screen axis turns
+ * round the corner and the "plane" is a circle round it.
  * @param {import("../../core/kart-registry.js").Kart} kart
  * @param {{ x: number, y: number, z: number }} origin @param {{ x: number, y: number, z: number }} velocity
  * @param {number} forwardInput @param {number} strafeInput
@@ -470,9 +471,11 @@ function SideViewDriving(kart, origin, velocity, forwardInput, strafeInput) {
     if (!zone) {
         return undefined; // kart.sideViewDrive stays: the camera turns the view along its facing on the way out
     }
-    const { view, right } = SideViewAxes(zone.yaw);
+    // A corner zone turns its axes round the corner as the melon goes round it.
+    const { view, right } = SideViewAxes(ResolveSideView(zone, origin).yaw);
+    const depth = SideViewDepth(zone, origin, view);
     if (kart.sideViewDrive?.zone !== zone) {
-        kart.sideViewDrive = { zone, plane: PlaneDepth(origin, view), facing: InitialFacing(velocity, right) };
+        kart.sideViewDrive = { zone, plane: depth, facing: InitialFacing(velocity, right, kart.sideViewDrive?.facing) };
     }
     const input = SideViewInput(strafeInput, kart.sideViewDrive.facing);
     kart.sideViewDrive.facing = input.facing;
@@ -480,7 +483,7 @@ function SideViewDriving(kart, origin, velocity, forwardInput, strafeInput) {
     // melon is (it may have rested in the zone, skipping this).
     const free = InSideViewDepthZone(kart);
     if (free || kart.sideViewDrive.free) {
-        kart.sideViewDrive.plane = PlaneDepth(origin, view);
+        kart.sideViewDrive.plane = depth;
     }
     kart.sideViewDrive.free = free;
     const dir = input.axis !== 0 ? Math.sign(input.axis) : input.facing;
@@ -490,6 +493,6 @@ function SideViewDriving(kart, origin, velocity, forwardInput, strafeInput) {
         depthInput: SideViewDepthInput(forwardInput, free),
         free,
         view,
-        depthError: kart.sideViewDrive.plane - PlaneDepth(origin, view),
+        depthError: kart.sideViewDrive.plane - depth,
     };
 }

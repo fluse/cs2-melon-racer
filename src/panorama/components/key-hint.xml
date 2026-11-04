@@ -1,0 +1,17 @@
+<!-- A key hint in the bottom left corner (.KeyHint): a keycap with the key
+     written on it, or a mouse with the button marked, and what it does.
+       key    the key on the cap ("R", "SPACE")
+       mouse  instead of key: the mouse button, icons/mouse-<mouse>.png ("left", "right")
+       text   what it does
+       wide   optional: "true" for a wide cap (.KeyCapWide), for longer key names
+       id     optional: the hint's id, for the script to toggle it
+       extra  optional: more classes on the hint ("Hidden") -->
+<Panel id="{{ typeof id === 'string' ? id : '' }}" class="KeyHint{{ typeof extra === 'string' ? ' ' + extra : '' }}">
+	<if condition="typeof mouse === 'string'">
+		<Image class="KeyHintMouse" src="file://{images}/custom_game/icons/mouse-{{ mouse }}.png" />
+	</if>
+	<else>
+		<Panel class="KeyCap{{ typeof wide === 'string' ? ' KeyCapWide' : '' }}"><Label class="KeyCapLetter" text="{{ key }}" /></Panel>
+	</else>
+	<Label class="KeyHintText" text="{{ text }}" />
+</Panel>

@@ -11,7 +11,7 @@
 // - "Start Active" alone doesn't reliably play an info_particle_system
 //   spawned later from a point_template — it's started explicitly
 //   (StartParticles).
-import { Instance, PointTemplate } from "cs_script/point_script";
+import { Instance, Console, PointTemplate } from "cs_script/point_script";
 import { Debug } from "../core/debug.js";
 
 /**
@@ -25,7 +25,7 @@ import { Debug } from "../core/debug.js";
  * @returns {any[]} empty if nothing spawned
  */
 export function SpawnFromTemplate(templateName, position, angles, { warn = false } = {}) {
-    const report = warn ? (/** @type {string} */ text) => Instance.Msg(`[melon_drive] ${text}`) : Debug;
+    const report = warn ? (/** @type {string} */ text) => Console.Log(`[melon_drive] ${text}`) : Debug;
     const template = Instance.FindEntityByName(templateName);
     if (!template) {
         report(`SpawnFromTemplate: no point_template named "${templateName}" in the map`);
@@ -35,7 +35,9 @@ export function SpawnFromTemplate(templateName, position, angles, { warn = false
         report(`SpawnFromTemplate: "${templateName}" is a ${template.GetClassName()}, not a point_template`);
         return [];
     }
-    const spawned = template.ForceSpawn(position, angles) ?? [];
+    // No angles given: the template's own (zero) — passing undefined makes
+    // the engine log "bad value for argument 1 (angle)" on every spawn.
+    const spawned = template.ForceSpawn(position, angles ?? { pitch: 0, yaw: 0, roll: 0 }) ?? [];
     if (spawned.length === 0) {
         report(`SpawnFromTemplate: ForceSpawn of "${templateName}" returned nothing — check its Template01.. entries in Hammer`);
     }

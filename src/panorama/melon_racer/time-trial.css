@@ -1,0 +1,65 @@
+/* Time trial, top left: big run clock, the player's best below it, and
+   the finish time for a few seconds after a run (see time-trial.js). Shown
+   while the kart is on a track (script toggles "Hidden"). */
+.RunPanel {
+    horizontal-align: left;
+    vertical-align: top;
+    margin-top: 32px;
+    margin-left: 40px;
+
+    flow-children: down;
+
+    transition-property: opacity;
+    transition-duration: .15s;
+    opacity: 1;
+
+    &.Hidden {
+        opacity: 0;
+    }
+}
+
+.RunTime {
+    font-size: $font-display;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: $white;
+    text-shadow: 3px 3px 4px $(black)cc;
+}
+
+.RunBestRow {
+    flow-children: right;
+    margin-top: -4px;
+}
+
+.RunBestUnit {
+    font-size: $font-kicker;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: $text-dim;
+    margin-right: 8px;
+    vertical-align: center;
+}
+
+.RunBest {
+    font-size: $font-title;
+    font-weight: bold;
+    color: #9fe8ff;
+    text-shadow: 2px 2px 3px $(black)cc;
+}
+
+.RunResult {
+    margin-top: 6px;
+    font-size: $font-large;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: $white;
+    text-shadow: 2px 2px 3px $(black)cc;
+
+    &.NewBest {
+        color: $gold;
+    }
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}

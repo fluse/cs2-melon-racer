@@ -9,7 +9,7 @@ import { Instance, CustomCameraMode } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { ApplyCameraFollow, ZonedFollowOffset } from "../follow/follow.js";
 import { StepSideViewBlend, SideViewPose, StepSideViewFocus, ChaseCameraPose, BlendPose, IsTeleportJump, CutsSideViewExit } from "./logic.js";
-import { SideViewAxes } from "../../zones/side-view/logic.js";
+import { SideViewAxes, ResolveSideView } from "../../zones/side-view/logic.js";
 import { ViewAnglesFacing } from "../../zones/teleport/logic.js";
 // Straight from zones/registry.js, not zones/index.js: that one also loads
 // zones/inputs.js, which reaches kart/ and health/ — and both import camera/.
@@ -52,7 +52,7 @@ export function UpdateSideViewCamera(kart, dt) {
         return;
     }
     if (!zone && kart.sideViewZone) {
-        LookAlongTravel(kart, kart.sideViewZone);
+        LookAlongTravel(kart, ResolveSideView(kart.sideViewZone, origin));
     }
     if (zone) {
         kart.sideViewZone = zone;
@@ -71,11 +71,12 @@ export function UpdateSideViewCamera(kart, dt) {
         }
         return;
     }
-    const sideView = kart.sideViewZone ?? kart.sideViewLast;
-    if (!sideView) {
+    const zoneView = kart.sideViewZone ?? kart.sideViewLast;
+    if (!zoneView) {
         return;
     }
-    kart.sideViewLast = sideView; // swinging back out: from the zone just left
+    kart.sideViewLast = zoneView; // swinging back out: from the zone just left
+    const sideView = ResolveSideView(zoneView, origin); // a corner zone turns with the melon
     const camera = kart.pawn.GetCustomCamera();
     if (camera.GetMode() !== CustomCameraMode.CONTROLLED) {
         camera.SetMode(CustomCameraMode.CONTROLLED);

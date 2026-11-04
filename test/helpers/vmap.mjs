@@ -370,3 +370,18 @@ export function ReadVmapEntityOrigins(path) {
     WalkVmap(path, (kv, t, files) => result.push({ ...kv, origin: t.origin, files }));
     return result;
 }
+
+/**
+ * Like ReadVmapEntityOrigins, plus each entity's world `rotation` (a 3x3
+ * matrix, its columns the entity's own x, y, z axes in the world) and
+ * `scale` — for entities with a size of their own (an info_visibility_box's
+ * box_size), turned and scaled with every prefab they sit in.
+ * @param {string} path
+ * @returns {Array<Record<string, any> & { origin: number[], rotation: number[][], scale: number[], files: string[] }>}
+ */
+export function ReadVmapEntityTransforms(path) {
+    /** @type {Array<Record<string, any> & { origin: number[], rotation: number[][], scale: number[], files: string[] }>} */
+    const result = [];
+    WalkVmap(path, (kv, t, files) => result.push({ ...kv, origin: t.origin, rotation: t.rotation, scale: t.scale, files }));
+    return result;
+}

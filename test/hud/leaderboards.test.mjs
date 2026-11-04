@@ -1,5 +1,5 @@
 // The user menu's leaderboards page: its rules (hud/leaderboards/logic.js —
-// which tabs, which track, the board a tab shows), that speedometer.xml has
+// which tabs, which track, the board a tab shows), that melon_racer.xml has
 // every tab and row hud/leaderboards/leaderboards.js fills in, and the page
 // against the fake engine (opened from ACTIONS, tabs, ◀ ▶ through the tracks).
 import "../helpers/register-cs-script.mjs";
@@ -72,8 +72,8 @@ test("more players than LEADERBOARD_ROWS: the viewer's own row takes the last on
     assert.deepEqual(board.rows.at(-1), { rank: String(names.length), name: self.name, value: FormatStat(STAT_SLIDES[0], totals[self.name]), self: true });
 });
 
-test("speedometer.xml has a button for every tab and every row", () => {
-    const layout = readFileSync(new URL("../../panorama/layout/custom_game/speedometer.xml", import.meta.url), "utf8");
+test("melon_racer.xml has a button for every tab and every row", () => {
+    const layout = readFileSync(new URL("../../panorama/layout/custom_game/melon_racer.xml", import.meta.url), "utf8");
     const ids = new Set([...layout.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
     const wanted = [...LeaderboardTabs().map((tab) => `lb_tab_${tab}`), ...Array.from({ length: LEADERBOARD_ROWS }, (_, i) => `lb_row_${i}`)];
     assert.deepEqual(wanted.filter((id) => !ids.has(id)), []);

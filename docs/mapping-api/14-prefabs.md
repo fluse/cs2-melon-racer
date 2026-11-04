@@ -18,12 +18,14 @@ never knows whether an entity came from a prefab.
 | `route_canals.vmap` | `melon_racer.vmap` | track 1 with its checkpoints, zones and gates | — |
 | `route_bridge.vmap` | `melon_racer.vmap` | track 2 with its checkpoints, zones and gates | — |
 | `route_side_slice.vmap` | `melon_racer.vmap` | track 3, a 2D section: `start_3`, `start_spawn`, `finish_3` (built in, not gate prefabs) and two [side-view zones](11-camera-zones.md#side-view-zones) | — |
+| `route_glasshouse.vmap` | `melon_racer.vmap` | track 6, a 2D jump & run up round a greenhouse tower: `glasshouse_course.vmap` placed in it (the route file itself is for lighting and decoration) | — |
+| `glasshouse_course.vmap` | `route_glasshouse.vmap` | **generated** by `tools/maps/make-glasshouse-prefab.mjs`, overwritten on every run — don't edit it in Hammer: the tower's blockout, `start_6`, `start_spawn_6`, `checkpoint_6_1` … `_3` with their spawns, `finish_6`, four [side-view zones](11-camera-zones.md#side-view-zones), three [corner zones](11-camera-zones.md#corner-zones), three [lift zones](10-lift-zones.md), a [respawn trigger](08-kill-triggers.md#respawn-trigger) over the plaza and `tp_dest_glasshouse` (the way in, for a [teleporter](07-teleporters.md)) | — |
 | `route_tutorial.vmap` | `melon_racer.vmap` | the tutorial area: [`intro_spawn`](02-core-entities.md#spawn-points), [paint triggers](06-paint-triggers.md), [lift zones](10-lift-zones.md), a [camera zone](11-camera-zones.md), water, the [checkpoint teleporters](07-teleporters.md#name-variants) and the [`hub_teleport`](05-hub.md#sending-melons-to-the-hub) back to the hub | — |
 | `start_gate.vmap` | a route | a track's [start line](#start-gate): start trigger, `start_spawn`, full-heal zone | `track` = `start_<trackId>[_laps<M>]` |
 | `checkpoint_gate.vmap` | a route | a [checkpoint](#checkpoint-gate): checkpoint trigger, `checkpoint_spawn` | `checkpoint` = `checkpoint_<trackId>_<index>` |
 | `jump_pad.vmap` | a route | a [jump pad](#jump-pad): pad trigger (`jump_pad_enter`/`jump_pad_leave`) and its two marker particle systems | `jump_pad_high_far` = `jump_pad_<up>[_<forward>]` (optional) |
 | `finish_gate.vmap` | a route | a track's [finish line](#finish-gate): finish trigger | `track` = `finish_<trackId>` |
-| `heal_gate.vmap` | a route | a [full-heal](09-heal-zones.md#full-heal-zone) gate: `heal_zone_full` (`heal_enter`/`heal_leave`) | — |
+| `heal_gate.vmap` | a route | a [full-heal](09-heal-zones.md#full-heal-zone) gate: `heal_zone_full` (`heal_enter`/`heal_leave`), its frame the [heal gate model](09-heal-zones.md#heal-gate-model) | — |
 | `obstacle_mover.vmap` | a route | an [obstacle mover](#obstacle-mover): a [mover](16-movers.md) and a [kill trigger](08-kill-triggers.md#kill-trigger) riding along on it | `Mover Name` = `mover_<anything>`, plus direction, distance, speed, kill on/off |
 | `spike_spring.vmap` | — (to be built) | a [spike spring](#spike-spring): the trap's `prop_dynamic` and the floor around its hole | `Spike Spring Name` = `spike_spring[_<words>][_<down>_<up>][_offset<seconds>]` (optional) |
 | `refill_jumps.vmap` | — (not placed yet) | a [jump recharge zone](#refill-jumps): trigger (`jump_recharge_enter`/`jump_recharge_leave`) and its marker particles | — |
@@ -97,6 +99,7 @@ Override `track` with the start trigger's name: `start_2`, `start_1_laps3`,
 
 Override `checkpoint` with the trigger's name: `checkpoint_2_3`, … Details:
 [Tracks: checkpoint gate prefab](04-tracks.md#checkpoint-gate-prefab).
+Its frame: the [inflatable checkpoint arch](#gate-models).
 
 ## Jump pad
 
@@ -123,6 +126,32 @@ Override `track` with `finish_<trackId>`, e.g. `finish_2`. On a loop track
 place a finish gate on the start line, overlapping the start gate. Never add
 `finish_line` to the start gate itself — see
 [Tracks: finish gate prefab](04-tracks.md#finish-gate-prefab).
+Its frame: the [inflatable finish arch](#gate-models).
+
+## Gate models
+
+The checkpoint and finish gates' frames are inflatable arches like the
+hub's route gates (`tools/models/make-race-gate-model.mjs`), both as wide as
+the checkpoint trigger and flattened so they don't stand too high: straight
+legs, then an arch only 62 high over its shoulders. A sign on the top,
+front and back, says which gate it is; the holo panel fills the opening.
+
+| Setting | `gate_checkpoint` | `gate_finish` |
+|---|---|---|
+| Entity | `prop_static`, `models/melon_racer/race_gate/gate_checkpoint.vmdl` | `prop_static`, `models/melon_racer/race_gate/gate_finish.vmdl` |
+| Prefab | `checkpoint_gate.vmap`, at `4 0 0`, yaw 0 — in place of the poles, beam and holo brush | `finish_gate.vmap`, on the floor under the trigger, yaw 0 — in place of the bars and holo brush |
+| Render Color | tints the vinyl: checkpoint gold `255 202 79` ([GAME_CI](../GAME_CI.md)) | tints the vinyl: white `255 255 255` |
+| Sign | CHECKPOINT, gold edge | FINISH between checkered blocks |
+| Holo panel | `holo_checkpoint.vmat` | `holo_zigzag.vmat` |
+
+Both: origin on the floor in the opening's middle, the melon driving
+through along X. Opening 216 wide (y ±108), 107 high under the top, its
+full height up to 60 at the legs; 292 wide over the feet, 137 high; guy
+ropes 40 out front and back, a blower 43 behind the right foot. Solid:
+tube, feet, blower — not the holo panel, ropes or sign.
+
+The finish trigger is narrower than the arch: widen it to fill the
+opening (y ±108, ~100 high), like the checkpoint trigger.
 
 ## Obstacle mover
 

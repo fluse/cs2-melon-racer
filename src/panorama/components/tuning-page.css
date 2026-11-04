@@ -1,0 +1,32 @@
+/* The developer pages (camera, physics, test triggers) swap places with the
+   columns (one Hidden class each, set by SetUserMenuPage in
+   hud/user-menu.js). All are built from the same Tuning* rows. */
+.UserMenuColumns.Hidden {
+    visibility: collapse;
+}
+
+.TuningPage {
+    width: 100%;
+    flow-children: down;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.TuningIntro {
+    margin-top: 6px;
+    font-size: $font-kicker;
+    color: $text-dim;
+}
+
+.TuningFooter {
+    width: 100%;
+    margin-top: 28px;
+    flow-children: right;
+}
+
+.TuningFooterButton {
+    width: 260px;
+    margin-right: 12px;
+}

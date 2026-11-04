@@ -1,0 +1,19 @@
+<!-- Developer physics page (dev/physics-tuning.js): every melon's physics, server-wide,
+     each in percent of its default, PHYSICS_TUNING_MIN..MAX, with − / + (big
+     and fine) and a clickable scale (one segment per PHYSICS_TUNING_SCALE_STEP,
+     lit up to the value — "On"). Values are logged to the console. One row
+     per PHYSICS_TUNING_KEYS key, its id part as in ROWS (dev/physics-tuning.js). -->
+<module href="../../components/tuning-page.xml" page="physics" prefix="phytune" reset="true"
+	title="PHYSICS SETTINGS"
+	intro="All melons on the server, in percent of the default, until the map restarts. Anyone can change them. Each change is logged to the console.">
+	<module href="../../components/tuning-row.xml" key="phytune_maxspeed" steps="phytune" segments="{{ physicsSegments }}" extra="TuningRowCompact"
+		name="MAX SPEED" help="top speed without boost (default {s:phytune_maxspeed_default})" />
+	<module href="../../components/tuning-row.xml" key="phytune_accel" steps="phytune" segments="{{ physicsSegments }}" extra="TuningRowCompact"
+		name="ACCELERATION" help="W / S / A / D (default {s:phytune_accel_default})" />
+	<module href="../../components/tuning-row.xml" key="phytune_jump" steps="phytune" segments="{{ physicsSegments }}" extra="TuningRowCompact"
+		name="JUMP" help="ground jump, upward speed (default {s:phytune_jump_default})" />
+	<module href="../../components/tuning-row.xml" key="phytune_boost" steps="phytune" segments="{{ physicsSegments }}" extra="TuningRowCompact"
+		name="BOOST" help="attack boost push and speed above max (default {s:phytune_boost_default})" />
+	<module href="../../components/tuning-row.xml" key="phytune_gravity" steps="phytune" segments="{{ physicsSegments }}" extra="TuningRowCompact"
+		name="GRAVITY" help="pull downwards (default {s:phytune_gravity_default})" />
+</module>

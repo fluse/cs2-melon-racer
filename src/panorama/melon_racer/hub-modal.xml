@@ -1,0 +1,58 @@
+<!-- Hub "start the Grand Prix" window: shown while a kart is standing in
+     hub_start_trigger (hud/hub-modal/). The heats it runs — a card per
+     track, "hub_heat_<trackId>" up to MAX_TRACKS, with the route's
+     icon from tools/images/make-route-icons.mjs — and who rides
+     along (HUB_RACER_ROWS chips, the viewer's own marked Self, "+N MORE"
+     for the rest). While a heat runs (WaitingForOthers) only a waiting
+     message, or for the moderator (IsModerator) the abort button.
+     While it's calling the others (Starting, GATHERING) the seconds
+     left in place of the start button (hub_starting). -->
+<Panel id="hub_modal" class="HubModal Hidden">
+	<!-- Same build as the user menu: the card under the logo, whose
+	     banner sits on the card's top edge; the close button after
+	     both, in the card's corner. -->
+	<Panel class="HubCard">
+		<Label class="HubKicker" text="GRAND PRIX" />
+		<Label class="HubTitle" text="Ready to race?" />
+		<Panel id="hub_heats" class="HubSection">
+			<Label class="HubSectionTitle" text="{s:title}" />
+			<Panel class="HeatCards">
+				<each loop="t in range(MAX_TRACKS)">
+				<Panel id="hub_heat_{{ t + 1 }}" class="HeatCard Unused">
+					<Panel class="HeatMapBox">
+						<Image class="HeatMap" src="file://{images}/custom_game/routes/route_{{ t + 1 }}.png" />
+						<Label class="HeatBadge" text="{s:heat}" />
+					</Panel>
+					<Label class="HeatName" text="{s:name}" />
+					<Label class="HeatInfo" text="{s:info}" />
+				</Panel></each>
+			</Panel>
+		</Panel>
+		<Panel id="hub_racers" class="HubSection">
+			<Label class="HubSectionTitle" text="{s:title}" />
+			<Panel class="HubRacerChips">
+				<each loop="i in range(HUB_RACER_ROWS)">
+				<Panel id="hub_racer_{{ i }}" class="HubRacerChip Unused">
+					<Label class="HubRacerName" text="{s:name}" />
+				</Panel></each>
+				<Label id="hub_racers_more" class="HubRacersMore Unused" text="{s:more}" />
+			</Panel>
+		</Panel>
+		<Button id="hub_start_button" class="HubStartButton">
+			<Label text="START GRAND PRIX" />
+		</Button>
+		<Label id="hub_starting" class="HubStartingLabel" text="GRAND PRIX STARTS IN {s:seconds}" />
+		<Label class="HubWaitingLabel" text="Grand Prix in progress…" />
+		<!-- Follow the running Grand Prix (race/spectate/) — everyone outside it. -->
+		<Button id="hub_watch_button" class="HubWatchButton">
+			<Label text="WATCH GRAND PRIX" />
+		</Button>
+		<Button id="hub_abort_button" class="HubAbortButton">
+			<Label text="Cancel Grand Prix" />
+		</Button>
+	</Panel>
+	<Image class="HubLogo" src="file://{images}/custom_game/logo_melon_racer.png" />
+	<Button id="hub_close_button" class="HubCloseButton">
+		<Label class="HubCloseIcon" text="✕" />
+	</Button>
+</Panel>

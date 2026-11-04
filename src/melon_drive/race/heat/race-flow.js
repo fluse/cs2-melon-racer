@@ -1,4 +1,4 @@
-import { Instance, CSInputs } from "cs_script/point_script";
+import { Instance, CSInputs, Console } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { GetTrackConfig, GetTrackOrder } from "../track-config.js";
 import { karts } from "../../core/kart-registry.js";
@@ -18,9 +18,10 @@ import {
     DNF_WARNING_SECONDS,
     HUD_RESEND_SECONDS,
     XP_REASON_HEAT,
+    TUTORIAL_ENTRANCE_NAME,
 } from "../../constants/index.js";
 import { SetIntroLogoVisible } from "../../kart/spawn.js";
-import { GetHubSpawnPoint, GetIntroSpawnPoint, GetJoinGrandPrixSpawnPoint, GetStartSpawnPoint, FacePlayerView } from "../../kart/spawn-points.js";
+import { GetHubSpawnPoint, GetIntroSpawnPoint, GetJoinGrandPrixSpawnPoint, GetStartSpawnPoint, GetNamedSpawnPoint, FacePlayerView } from "../../kart/spawn-points.js";
 import { RestoreFullHealth } from "../../health/heal/index.js";
 import { StartRun, CancelRun } from "../time-trial/time-trial.js";
 import { BreakCountdownValue, BreakCountdownLabels, CountdownStep, CountdownNumberState, WatchProgress, DnfSecondsLeft, DnfWarningValue, GatherSecondsValue } from "./logic.js";
@@ -49,9 +50,9 @@ export let phaseEndTime = 0;
  * heat's first finisher; undefined before that. */
 export let graceEndTime = undefined;
 
-/** The countdown's numbers in countdown_panel (speedometer.xml), in order —
+/** The countdown's numbers in countdown_panel (melon_racer.xml), in order —
  * index = CountdownStep. Each gets "In" or "Out" (CountdownNumberState),
- * which plays its fall in / knock out animation (speedometer.css).
+ * which plays its fall in / knock out animation (melon_racer.css).
  */
 const COUNTDOWN_NUMBER_IDS = ["count_3", "count_2", "count_1", "count_go"];
 
@@ -367,7 +368,7 @@ export function BeginHeat(trackId) {
 }
 
 /**
- * Shows or hides the big "FINISH" image (finish_image in speedometer.xml)
+ * Shows or hides the big "FINISH" image (finish_image in melon_racer.xml)
  * and the place under it ("1ST · +10 PTS", finish_place — set by FinishKart)
  * for one player. @param {number | undefined} slot @param {boolean} visible
  */
@@ -467,6 +468,22 @@ export function ReturnAllToHub(returning) {
  */
 export function SendKartToTutorial(kart) {
     SendKartsOutOfRace([kart], GetIntroSpawnPoint(), "tutorial");
+}
+
+/**
+ * The user menu's developer "Tutorial Stations": like "Play Tutorial", to the
+ * tutorial stations' entrance (TUTORIAL_ENTRANCE_NAME). Returns whether the
+ * map has one.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+export function SendKartToTutorialStations(kart) {
+    const spawn = GetNamedSpawnPoint(TUTORIAL_ENTRANCE_NAME);
+    if (!spawn) {
+        Console.Log(`[melon_drive] Tutorial Stations: no "${TUTORIAL_ENTRANCE_NAME}" in the map — place the tutorial_stations prefab`);
+        return false;
+    }
+    SendKartsOutOfRace([kart], spawn, "tutorial stations");
+    return true;
 }
 
 /**

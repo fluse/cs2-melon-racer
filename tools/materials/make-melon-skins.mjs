@@ -1,6 +1,6 @@
-// Generates the melon skins — `node tools/materials/make-melon-skins.mjs`: a skin is
+// Generates the melon skins — `node tools/materials/make-melon-skins.mjs [<skin>]`: a skin is
 // one plain surface (gold) or painted by place on the melon's 3D surface
-// (football, golf, honey, camo — see WriteSurfacePng), so shapes and
+// (football, golf, honey, camo, coconut, kiwi, paprika, disco — see WriteSurfacePng), so shapes and
 // noise run on across the texture's two discs without a seam; camo also
 // keeps the rind's light and shade from the melon's own texture
 // (melon_default_color.png, decompiled from CS2's watermelon). Per skin it writes
@@ -725,6 +725,380 @@ const SKINS = {
         return VmatText({ texture: `${MAT_DIR}/melon_zebra_color.png`, roughness: `${MAT_DIR}/melon_zebra_rough.png`,
             normal: `${MAT_DIR}/melon_zebra_normal.png`, tint: 0, generator: GENERATOR });
     },
+    // Coconut in its husk: coarse brown fibers running along the melon
+    // (streaky noise, slow along the axis, fast around it) in dark brown,
+    // brown and tan, three faint ridges from end to end, and at the top end
+    // (along > 0) the three dark "eyes" round a bare patch of shell. Hairy
+    // grain in the normal map, matt all over.
+    coconut: () => {
+        const DARK = hex("#3A2212"), BROWN = hex("#6A4325"), TAN = hex("#A27A4C"), SHELL = hex("#4A2E1A"), EYE = hex("#1C110A");
+        const RIDGES = 3, RIDGE_HEIGHT = 0.08;      // ridges along the melon, units
+        const FIBER_HEIGHT = 0.03;                  // the fibers' relief, units
+        const EYE_RING = 0.75, EYE_RADIUS = 0.32;   // the eyes' distance from the axis, their size, units
+        const PATCH_RADIUS = 1.35;                  // the bare shell round the eyes, units
+        /** Fibers: 0..1 streaks along the melon, two scales mixed. @param {number[]} p */
+        const Fiber = p => {
+            const coarse = ValueNoise3(p.map((v, k) => v * (k === mesh.axis ? 1.2 : 9)), 201);
+            const fine = ValueNoise3(p.map((v, k) => v * (k === mesh.axis ? 3 : 26)), 203);
+            return clamp01(0.6 * coarse + 0.4 * fine);
+        };
+        /** The top end: "eye", "patch" (with `fade` 0 inside … 1 at its edge) or null. */
+        const Top = place => {
+            if (place.along <= 0 || place.radius > PATCH_RADIUS) return null;
+            for (let i = 0; i < 3; i++) {
+                const a = i * 2 * Math.PI / 3;
+                const x = place.radius * Math.cos(place.angle) - EYE_RING * Math.cos(a), y = place.radius * Math.sin(place.angle) - EYE_RING * Math.sin(a);
+                if (Math.hypot(x, y) < EYE_RADIUS) return { part: "eye" };
+            }
+            return { part: "patch", fade: smoothstep(PATCH_RADIUS * 0.6, PATCH_RADIUS, place.radius) };
+        };
+        const Ridge = place => Math.max(0, Math.cos(place.angle * RIDGES)) ** 6;
+        WriteSurfacePng(`${MAT_DIR}/melon_coconut_color.png`, SIZE, 2, on => {
+            if (!on) return BROWN;
+            const f = Fiber(on.position);
+            let color = f < 0.5 ? mix(DARK, BROWN, f / 0.5) : mix(BROWN, TAN, (f - 0.5) / 0.5);
+            color = mix(color, DARK, clamp01((Fractal3(scale(on.position, 0.3), 205) - 0.45) / 0.3) * 0.4);
+            const top = Top(on);
+            if (top?.part === "eye") return EYE;
+            if (top) color = mix(SHELL, color, top.fade);
+            return color;
+        });
+        WriteSurfacePng(`${MAT_DIR}/melon_coconut_normal.png`, SIZE, 1, (on, u, v) => BumpNormal(on, u, v, p => {
+            const place = Place(p);
+            const top = Top(place);
+            if (top?.part === "eye") return -0.06;
+            const ridge = RIDGE_HEIGHT * Ridge(place) * clamp01(place.radius / 2);
+            return ridge + FIBER_HEIGHT * Fiber(p) * (top ? top.fade : 1);
+        }), { frames: true });
+        WriteAddonFile(`${MAT_DIR}/melon_coconut_rough.png`, SolidPng([0, 0, 0].map(() => byte(0.9))));
+        return VmatText({ texture: `${MAT_DIR}/melon_coconut_color.png`, roughness: `${MAT_DIR}/melon_coconut_rough.png`,
+            normal: `${MAT_DIR}/melon_coconut_normal.png`, tint: 0, generator: GENERATOR });
+    },
+    // Kiwi: olive brown fuzzy skin (mottled, fine fuzz as speckles and grain)
+    // with a small stem scar at the bottom end — and the top end cut off: the
+    // slice shows the bright green flesh with faint rays, a ring of black
+    // seeds round the cream core, the skin as a thin rim. The cut is painted
+    // (the mesh stays round), glossy and wet.
+    kiwi: () => {
+        // The skin a light olive, greener than the coconut's dark fibers.
+        const SKIN = hex("#9C8546"), SKIN_DARK = hex("#7A6634"), FUZZ = hex("#C2AE74"), SCAR = hex("#4A3A1C");
+        const FLESH = hex("#78B42A"), FLESH_LIGHT = hex("#A8D25A"), FLESH_EDGE = hex("#5E9420"), CORE = hex("#F1EEC4"), SEED = hex("#14110C");
+        const CUT = 0.4;                                // the cut face: along beyond this — big, so the green reads from every side
+        const SEEDS = 30, SEED_RING = 0.33;             // seeds round the core, at this share of the cut's radius
+        const SEED_LENGTH = 0.07, SEED_WIDTH = 0.025;   // half-axes, shares of the cut's radius
+        const CORE_RADIUS = 0.2, RIM = 0.06;            // shares of the cut's radius
+        const SCAR_RADIUS = 0.3;                        // units
+        const FUZZ_HEIGHT = 0.015;                      // units
+        const sideRadius = (mesh.halfExtents[mesh.side[0]] + mesh.halfExtents[mesh.side[1]]) / 2;
+        const cutRadius = sideRadius * Math.sqrt(1 - CUT * CUT);
+        /** The cut face at a place: "core", "seed", "flesh" (with `t` 0 middle … 1 edge, `ray`) or "rim"; null off it. */
+        const Cut = place => {
+            if (place.along < CUT) return null;
+            const t = place.radius / cutRadius;
+            if (t > 1 - RIM) return { part: "rim" };
+            if (t < CORE_RADIUS) return { part: "core", t };
+            const sector = place.angle * SEEDS / (2 * Math.PI);
+            const across = (sector - Math.round(sector)) * 2 * Math.PI / SEEDS * t; // arc from the nearest seed's ray, in cut radii
+            // Seeds stagger in and out a little along their ring.
+            const ring = SEED_RING + 0.05 * (Hash(Math.round(sector), 3, 211) - 0.5);
+            if (((t - ring) / SEED_LENGTH) ** 2 + (across / SEED_WIDTH) ** 2 < 1) return { part: "seed" };
+            return { part: "flesh", t, ray: 0.5 + 0.5 * Math.cos(place.angle * 90 + Math.sin(place.angle * 7) * 3) };
+        };
+        const Fuzz = p => ValueNoise3(scale(p, 22), 213);
+        WriteSurfacePng(`${MAT_DIR}/melon_kiwi_color.png`, SIZE, 2, on => {
+            if (!on) return SKIN;
+            const cut = Cut(on);
+            if (cut?.part === "core") return mix(CORE, FLESH_LIGHT, smoothstep(0.6, 1, cut.t / CORE_RADIUS) * 0.7);
+            if (cut?.part === "seed") return SEED;
+            if (cut?.part === "rim") return SKIN_DARK;
+            if (cut) {
+                // Lighter round the seeds, deeper towards the skin, faint rays.
+                let color = mix(FLESH_LIGHT, FLESH, smoothstep(CORE_RADIUS, 0.5, cut.t));
+                color = mix(color, FLESH_EDGE, smoothstep(0.75, 1 - RIM, cut.t) * 0.7);
+                return mix(color, FLESH_LIGHT, cut.ray * 0.25 * smoothstep(0.4, 0.6, cut.t));
+            }
+            if (on.along < 0 && on.radius < SCAR_RADIUS) return SCAR;
+            // Even, fine fuzz — no blotches or streaks (that read as coconut).
+            const color = mix(SKIN, SKIN_DARK, Fractal3(scale(on.position, 0.25), 215) * 0.3);
+            return mix(color, FUZZ, smoothstep(0.5, 0.85, Fuzz(on.position)) * 0.35);
+        });
+        WriteSurfacePng(`${MAT_DIR}/melon_kiwi_normal.png`, SIZE, 1, (on, u, v) => BumpNormal(on, u, v, p => {
+            const cut = Cut(Place(p));
+            if (cut) return cut.part === "seed" ? 0.02 : 0;
+            return FUZZ_HEIGHT * Fuzz(p);
+        }), { frames: true });
+        WriteSurfacePng(`${MAT_DIR}/melon_kiwi_rough.png`, SIZE, 1, on => {
+            // The skin dry and fuzzy, the cut flesh wet.
+            const cut = on && Cut(on);
+            const r = !cut ? 0.85 : cut.part === "rim" ? 0.8 : cut.part === "seed" ? 0.3 : 0.2;
+            return [r, r, r];
+        });
+        return VmatText({ texture: `${MAT_DIR}/melon_kiwi_color.png`, roughness: `${MAT_DIR}/melon_kiwi_rough.png`,
+            normal: `${MAT_DIR}/melon_kiwi_normal.png`, tint: 0, generator: GENERATOR });
+    },
+    // Red bell pepper: glossy red in LOBES soft bulges along the melon,
+    // creased grooves between them (deeper and darker towards the ends), a
+    // faint wavy unevenness; at the top end (along > 0) a green star-shaped
+    // calyx round a thick stem, sunk in a little.
+    paprika: () => {
+        const RED = hex("#C8101A"), DEEP = hex("#7E0710"), CREST = hex("#E8343A");
+        const STEM = hex("#4E7A2A"), STEM_DARK = hex("#33561A"), CALYX = hex("#3F6B22");
+        const LOBES = 4, LOBE_DEPTH = 0.22;              // bulges round the melon, how deep the creases (units)
+        const STEM_RADIUS = 0.45, CALYX_RADIUS = 1.5, CALYX_POINTS = 5; // units from the axis at the top end
+        /** 1 on a lobe's crest … 0 in a crease. */
+        const Lobe = place => Math.abs(Math.cos(place.angle * LOBES / 2)) ** 0.45;
+        /** The top end: "stem", "calyx" or null. */
+        const Top = place => {
+            if (place.along <= 0 || place.radius > CALYX_RADIUS) return null;
+            if (place.radius < STEM_RADIUS) return "stem";
+            const frac = place.angle * CALYX_POINTS / (2 * Math.PI) - Math.round(place.angle * CALYX_POINTS / (2 * Math.PI));
+            const reach = STEM_RADIUS + (CALYX_RADIUS - STEM_RADIUS) * (1 - 2 * Math.abs(frac)) ** 1.2;
+            return place.radius < reach ? "calyx" : null;
+        };
+        const Depth = place => LOBE_DEPTH * (0.6 + 0.6 * Math.abs(place.along)) * clamp01(place.radius / 1.5);
+        WriteSurfacePng(`${MAT_DIR}/melon_paprika_color.png`, SIZE, 2, on => {
+            if (!on) return RED;
+            const top = Top(on);
+            if (top === "stem") return mix(STEM, STEM_DARK, Fractal3(scale(on.position, 3), 221) * 0.6);
+            if (top === "calyx") return mix(CALYX, STEM_DARK, Fractal3(scale(on.position, 2), 223) * 0.5);
+            const lobe = Lobe(on);
+            let color = mix(DEEP, RED, lerp(0.15, 1, lobe) ** (0.6 + 0.6 * Math.abs(on.along)));
+            color = mix(color, CREST, lobe ** 6 * 0.35);
+            return mix(color, DEEP, clamp01((Fractal3(scale(on.position, 0.35), 225) - 0.5) / 0.3) * 0.25);
+        });
+        WriteSurfacePng(`${MAT_DIR}/melon_paprika_normal.png`, SIZE, 1, (on, u, v) => BumpNormal(on, u, v, p => {
+            const place = Place(p);
+            const top = Top(place);
+            if (top === "stem") return 0.2;
+            if (top === "calyx") return 0.05;
+            // The skin sinks in round the stem, like a real pepper's shoulders.
+            const shoulder = place.along > 0 ? -0.1 * (1 - smoothstep(CALYX_RADIUS, CALYX_RADIUS + 1, place.radius)) : 0;
+            return Depth(place) * Lobe(place) + 0.03 * Fractal3(scale(p, 0.8), 227) + shoulder;
+        }), { frames: true });
+        WriteSurfacePng(`${MAT_DIR}/melon_paprika_rough.png`, SIZE, 1, on => {
+            const r = on && Top(on) ? 0.6 : 0.12;
+            return [r, r, r];
+        });
+        return VmatText({ texture: `${MAT_DIR}/melon_paprika_color.png`, roughness: `${MAT_DIR}/melon_paprika_rough.png`,
+            normal: `${MAT_DIR}/melon_paprika_normal.png`, tint: 0, generator: GENERATOR });
+    },
+    // Disco ball: small square mirror tiles in rows round the melon (by
+    // latitude on the egg squashed round, each row as many tiles as fit),
+    // dark grout between them. Each tile is a flat facet — the normal map
+    // turns it to the tile middle's normal, tilted a little at random — so
+    // the reflections break up tile by tile: the sparkle comes from the
+    // light alone, each tile catching it at its own angle while the melon
+    // rolls. No colors, only silver. A pure metal is mostly dark, so the
+    // mirrors glow faintly (self-illum mask, not the grout).
+    disco: () => {
+        const SILVER = [hex("#C9CDD4"), hex("#B4B9C2"), hex("#DDE0E5")], GROUT = hex("#202226");
+        const TILE = 0.85;          // a tile's side, units
+        const GROUT_WIDTH = 0.07;   // units, half on each side of a joint
+        const TILT = 0.18;          // the tiles' random tilt (radians, about): more tilt, more glints
+        const GLOW_BRIGHTNESS = 0.15; // the mirrors' faint glow, like gold's
+        const meanRadius = (mesh.halfExtents[0] + mesh.halfExtents[1] + mesh.halfExtents[2]) / 3;
+        const rowHeight = TILE / meanRadius; // radians of latitude
+        const rows = Math.round(Math.PI / rowHeight);
+        const [s0, s1] = mesh.side;
+        /** The tile at a place: its `id`, `grout` true in a joint, `normal` its facet's (from the middle, tilted). @param {number[]} p */
+        const Tile = p => {
+            const dir = normalize(p.map((v, k) => v / mesh.halfExtents[k]));
+            const lat = Math.asin(Math.max(-1, Math.min(1, dir[mesh.axis])));
+            const lon = Math.atan2(dir[s1], dir[s0]);
+            const row = Math.min(rows - 1, Math.floor((lat + Math.PI / 2) / Math.PI * rows));
+            const latMid = -Math.PI / 2 + (row + 0.5) * Math.PI / rows;
+            const count = Math.max(1, Math.round(2 * Math.PI * Math.cos(latMid) * meanRadius / TILE));
+            const width = 2 * Math.PI / count;
+            // Every other row shifted half a tile, like laid tiles.
+            const shift = (row % 2) * width / 2;
+            const col = ((Math.floor((lon + Math.PI + shift) / width) % count) + count) % count;
+            const lonMid = -Math.PI + (col + 0.5) * width - shift;
+            // The distance to the nearest joint, units.
+            const inRow = ((lat + Math.PI / 2) / Math.PI * rows - row - 0.5) * rowHeight * meanRadius;
+            const inCol = (((lon + Math.PI + shift) / width) % 1 - 0.5) * width * Math.cos(lat) * meanRadius;
+            const toJoint = Math.min(rowHeight * meanRadius / 2 - Math.abs(inRow), count > 1 ? width * Math.cos(lat) * meanRadius / 2 - Math.abs(inCol) : Infinity);
+            const id = row * 4096 + col;
+            const mid = [0, 0, 0];
+            mid[mesh.axis] = Math.sin(latMid);
+            mid[s0] = Math.cos(latMid) * Math.cos(lonMid);
+            mid[s1] = Math.cos(latMid) * Math.sin(lonMid);
+            const point = mid.map((v, k) => v * mesh.halfExtents[k]);
+            const jitter = [0, 1, 2].map(k => (Hash(id, k, 231) - 0.5) * 2 * TILT);
+            const normal = normalize(point.map((v, k) => v / mesh.halfExtents[k] ** 2 / Math.hypot(...point.map((w, j) => w / mesh.halfExtents[j] ** 2)) + jitter[k]));
+            return { id, grout: toJoint < GROUT_WIDTH, normal };
+        };
+        WriteSurfacePng(`${MAT_DIR}/melon_disco_color.png`, SIZE, 2, on => {
+            if (!on) return SILVER[0];
+            const tile = Tile(on.position);
+            if (tile.grout) return GROUT;
+            return SILVER[Math.floor(Hash(tile.id, 5, 237) * SILVER.length)];
+        });
+        WriteSurfacePng(`${MAT_DIR}/melon_disco_glow.png`, SIZE, 1, on => {
+            const g = on && !Tile(on.position).grout ? 1 : 0;
+            return [g, g, g];
+        });
+        WriteSurfacePng(`${MAT_DIR}/melon_disco_normal.png`, SIZE, 1, on => {
+            if (!on) return [0.5, 0.5, 1];
+            const tile = Tile(on.position);
+            const n = tile.grout ? on.normal : tile.normal;
+            return [dot(n, on.right), dot(n, on.up), dot(n, on.normal)].map(c => c * 0.5 + 0.5);
+        }, { frames: true });
+        WriteSurfacePng(`${MAT_DIR}/melon_disco_rough.png`, SIZE, 1, on => {
+            const r = on && Tile(on.position).grout ? 0.9 : 0.08;
+            return [r, r, r];
+        });
+        return VmatText({ texture: `${MAT_DIR}/melon_disco_color.png`, roughness: `${MAT_DIR}/melon_disco_rough.png`,
+            normal: `${MAT_DIR}/melon_disco_normal.png`, metalness: 1, glow: GLOW_BRIGHTNESS, glowMask: `${MAT_DIR}/melon_disco_glow.png`,
+            tint: 0, generator: GENERATOR });
+    },
+    // Bald head: the top end (along > 0) is the crown, a shiny scalp; on the
+    // laces' side a cartoon face — eyebrows, eyes, a nose (a bump in the
+    // normal map), rosy cheeks, a smile — with forehead wrinkles above it,
+    // ears at the sides (raised), and round the back and sides of the lower
+    // half a horseshoe of shaved stubble. All measured in units on the melon
+    // (`x` across from the face's middle line, `y` along, up = the crown),
+    // divided by FACE_SCALE.
+    bald: () => {
+        const SKIN = hex("#E7B08A"), SKIN_DARK = hex("#C98E68"), SCALP = hex("#F0BE98"), BLUSH = hex("#E88F80");
+        const BROW = hex("#4A3020"), WHITE = hex("#F6F3EE"), PUPIL = hex("#1E140E"), LIP = hex("#9E4A3E"), STUBBLE = hex("#5A4A40");
+        const EAR_INNER = hex("#C2856A");
+        const EYE = { x: 1.55, y: 0.5, rx: 0.7, ry: 0.48, pupil: 0.27 };
+        const BROW_LINE = { y: 1.35, half: 0.75, thick: 0.17, arch: 0.25 };
+        const NOSE = { y: -0.35, rx: 0.55, ry: 1.0, height: 0.45 };
+        const MOUTH = { y: -1.85, half: 1.3, curve: 0.18, thick: 0.11 };
+        const EAR = { y: 0.1, rx: 0.75, ry: 1.5, height: 0.35 };
+        const FACE_SCALE = 1.8;                  // every measure above and below is in face units, this many units on the melon
+        const STUBBLE_BAND = [-2.6, -0.3];      // y, the horseshoe's bottom and top
+        const WRINKLES = [2.2, 2.6, 3.0];        // y of the forehead lines
+        /** The face's coordinates at a place: x across, y along (units). */
+        const Face = place => ({ x: place.radius * place.angle / FACE_SCALE, y: place.along * place.halfLength / FACE_SCALE });
+        /** What's at a place: "brow", "eyeWhite", "pupil", "mouth", "ear" (with `inner`), "stubble" or "skin". */
+        const Part = place => {
+            const { x, y } = Face(place);
+            const front = Math.abs(place.angle) < Math.PI / 2.4;
+            if (front) {
+                const ex = Math.abs(x) - EYE.x, ey = y - EYE.y;
+                const eye = (ex / EYE.rx) ** 2 + (ey / EYE.ry) ** 2;
+                // Pupils look a little inwards and up.
+                if (Math.hypot(ex + 0.1, ey - 0.05) < EYE.pupil) return { part: "pupil" };
+                if (eye < 1) return { part: "eyeWhite" };
+                const bx = Math.abs(x) - EYE.x;
+                if (Math.abs(bx) < BROW_LINE.half && Math.abs(y - BROW_LINE.y - BROW_LINE.arch * (1 - (bx / BROW_LINE.half) ** 2)) < BROW_LINE.thick) return { part: "brow" };
+                if (Math.abs(x) < MOUTH.half && Math.abs(y - (MOUTH.y + MOUTH.curve * x * x)) < MOUTH.thick * (1 - 0.5 * (x / MOUTH.half) ** 2)) return { part: "mouth" };
+            }
+            // The ears, at the sides.
+            const side = Math.abs(place.angle) - Math.PI / 2;
+            const ex = place.radius * side / FACE_SCALE, ey = y - EAR.y;
+            const ear = (ex / EAR.rx) ** 2 + (ey / EAR.ry) ** 2;
+            if (ear < 1) return { part: "ear", inner: ear < 0.45 && ex > -0.2, ear };
+            if (Math.abs(place.angle) > 1.15 && y > STUBBLE_BAND[0] && y < STUBBLE_BAND[1]) return { part: "stubble" };
+            return { part: "skin" };
+        };
+        WriteSurfacePng(`${MAT_DIR}/melon_bald_color.png`, SIZE, 2, on => {
+            if (!on) return SKIN;
+            const at = Part(on);
+            if (at.part === "pupil") return PUPIL;
+            if (at.part === "eyeWhite") return WHITE;
+            if (at.part === "brow") return BROW;
+            if (at.part === "mouth") return LIP;
+            const { x, y } = Face(on);
+            let color = mix(SKIN, SKIN_DARK, Fractal3(scale(on.position, 0.4), 241) * 0.35);
+            color = mix(color, SCALP, smoothstep(0.5, 2.8, y) * 0.6);
+            if (at.part === "ear") return mix(color, EAR_INNER, at.inner ? 0.7 : 0.15);
+            if (Math.abs(on.angle) < Math.PI / 2.4) {
+                color = mix(color, BLUSH, Math.exp(-((Math.abs(x) - 2.3) ** 2 + (y + 0.9) ** 2) / 0.5) * 0.45);
+                color = mix(color, BLUSH, Math.exp(-(x * x / NOSE.rx ** 2 + (y - NOSE.y + 0.6) ** 2 / 0.3)) * 0.25);
+            }
+            if (at.part === "stubble") {
+                // Shaved hair: dark dots, thinning out towards the band's edges.
+                const edge = smoothstep(STUBBLE_BAND[1], STUBBLE_BAND[1] - 0.8, y) * smoothstep(STUBBLE_BAND[0], STUBBLE_BAND[0] + 0.8, y) * smoothstep(1.15, 1.6, Math.abs(on.angle));
+                const dots = smoothstep(0.45, 0.75, ValueNoise3(scale(on.position, 30), 243));
+                color = mix(color, STUBBLE, edge * (0.35 + 0.5 * dots));
+            }
+            return color;
+        });
+        WriteSurfacePng(`${MAT_DIR}/melon_bald_normal.png`, SIZE, 1, (on, u, v) => BumpNormal(on, u, v, p => {
+            const place = Place(p);
+            const at = Part(place);
+            const { x, y } = Face(place);
+            let h = 0;
+            if (Math.abs(place.angle) < Math.PI / 2.4) {
+                h += NOSE.height * Math.exp(-(x * x / NOSE.rx ** 2 + (y - NOSE.y) ** 2 / NOSE.ry ** 2) * 2);
+                for (const w of WRINKLES) h -= 0.03 * Math.exp(-((y - w - 0.1 * x * x / 4) ** 2) / 0.01) * smoothstep(2.4, 1.2, Math.abs(x));
+                h += 0.08 * Math.exp(-((Math.abs(x) - EYE.x) ** 2 / 0.8 + (y - EYE.y) ** 2 / 0.4)); // eyeballs under the lids
+            }
+            if (at.part === "ear") h += EAR.height * Math.sqrt(1 - at.ear) - (at.inner ? 0.12 : 0);
+            if (at.part === "mouth") h -= 0.04;
+            return h * FACE_SCALE;
+        }), { frames: true });
+        WriteSurfacePng(`${MAT_DIR}/melon_bald_rough.png`, SIZE, 1, on => {
+            if (!on) return [0.4, 0.4, 0.4];
+            const at = Part(on);
+            // The scalp shines, the face less, eyes wet, stubble matt.
+            const r = at.part === "eyeWhite" || at.part === "pupil" ? 0.1 : at.part === "stubble" ? 0.75 : at.part === "brow" ? 0.85
+                : lerp(0.45, 0.18, smoothstep(0, 2.2, Face(on).y));
+            return [r, r, r];
+        });
+        return VmatText({ texture: `${MAT_DIR}/melon_bald_color.png`, roughness: `${MAT_DIR}/melon_bald_rough.png`,
+            normal: `${MAT_DIR}/melon_bald_normal.png`, tint: 0, generator: GENERATOR });
+    },
+    // Eyeball: a white, wet sclera with red veins creeping in from the back,
+    // and on the laces' side the iris — blue fibers round a black pupil, a
+    // dark limbal ring at its edge, a lighter collarette — under a glassy
+    // cornea that bulges out (normal map). Distances on the surface from the
+    // iris' middle, units.
+    eye: () => {
+        const SCLERA = hex("#F5F2EC"), SCLERA_BACK = hex("#EFD3CB"), VEIN = hex("#B8242A");
+        const IRIS = hex("#2E78B8"), IRIS_INNER = hex("#86C3E2"), IRIS_DARK = hex("#163F6A"), COLLARETTE = hex("#D9C97A");
+        const LIMBUS = hex("#0F2238"), PUPIL = hex("#060708");
+        const IRIS_RADIUS = 3.6, PUPIL_RADIUS = 1.4, COLLARETTE_RADIUS = 2.1, LIMBUS_WIDTH = 0.4;
+        const CORNEA_RADIUS = 4.0, CORNEA_HEIGHT = 0.45;
+        const VEIN_START = 5.5;           // veins only further out than this
+        /** Distance from the iris' middle over the surface, and the angle round it. */
+        const Polar = place => {
+            const x = place.radius * place.angle, y = place.along * place.halfLength;
+            return { d: Math.hypot(x, y), theta: Math.atan2(y, x) };
+        };
+        /** The veins' strength at a place: 0 none … 1 a vein. @param {number[]} p @param {number} d */
+        const Vein = (p, d) => {
+            const warp = [251, 252, 253].map(seed => (Fractal3(scale(p, 0.4), seed) - 0.5) * 1.2);
+            const q = p.map((v, k) => v * 0.45 + warp[k]);
+            const main = 1 - smoothstep(0.015, 0.045, CellEdge(q, 255));
+            const fine = (1 - smoothstep(0.015, 0.035, CellEdge(scale(q, 2.3), 257))) * 0.4;
+            // Only some of the net shows: a few veins, not a web.
+            const some = smoothstep(0.5, 0.65, Fractal3(scale(p, 0.35), 261));
+            return Math.max(main, fine) * some * smoothstep(VEIN_START, VEIN_START + 4, d);
+        };
+        WriteSurfacePng(`${MAT_DIR}/melon_eye_color.png`, SIZE, 2, on => {
+            if (!on) return SCLERA;
+            const { d, theta } = Polar(on);
+            if (d < PUPIL_RADIUS) return PUPIL;
+            if (d < IRIS_RADIUS) {
+                // Radial fibers, lighter towards the pupil, the collarette ring, a dark limbal ring.
+                const fiber = 0.5 + 0.5 * Math.cos(theta * 70 + Math.sin(theta * 9) * 2) * (0.6 + 0.4 * ValueNoise3(scale(on.position, 6), 259));
+                let color = mix(IRIS_INNER, IRIS, smoothstep(PUPIL_RADIUS, IRIS_RADIUS * 0.8, d));
+                color = mix(color, IRIS_DARK, fiber * 0.45);
+                color = mix(color, COLLARETTE, Math.exp(-((d - COLLARETTE_RADIUS) ** 2) / 0.03) * 0.5 * (0.5 + fiber * 0.5));
+                return mix(color, LIMBUS, smoothstep(IRIS_RADIUS - LIMBUS_WIDTH, IRIS_RADIUS, d));
+            }
+            let color = mix(SCLERA, SCLERA_BACK, smoothstep(7, 16, d) * 0.6);
+            // A soft shadow round the iris, where the cornea meets the white.
+            color = mix(color, SCLERA_BACK, Math.exp(-((d - IRIS_RADIUS) ** 2) / 0.08) * 0.4);
+            return mix(color, VEIN, Vein(on.position, d) * 0.85);
+        });
+        WriteSurfacePng(`${MAT_DIR}/melon_eye_normal.png`, SIZE, 1, (on, u, v) => BumpNormal(on, u, v, p => {
+            const { d } = Polar(Place(p));
+            const cornea = d < CORNEA_RADIUS ? CORNEA_HEIGHT * Math.sqrt(1 - (d / CORNEA_RADIUS) ** 2) : 0;
+            return cornea + 0.01 * Vein(p, d);
+        }), { frames: true });
+        WriteSurfacePng(`${MAT_DIR}/melon_eye_rough.png`, SIZE, 1, on => {
+            // The cornea glassy, the white wet.
+            const r = on && Polar(on).d < CORNEA_RADIUS ? 0.03 : 0.15;
+            return [r, r, r];
+        });
+        return VmatText({ texture: `${MAT_DIR}/melon_eye_color.png`, roughness: `${MAT_DIR}/melon_eye_rough.png`,
+            normal: `${MAT_DIR}/melon_eye_normal.png`, tint: 0, generator: GENERATOR });
+    },
     // Yellow honey melon: golden yellow rind under a cream-white net of
     // cracks — cells stretched along the melon, wobbly, with a finer, fainter
     // net between — raised a little (normal map, so it catches the light);
@@ -863,9 +1237,15 @@ function WritePreview(name, colorPath, { metal = false, normalPath, glowPath } =
     }));
 }
 
-WriteRindNormal();
-WritePreview("default", `${MAT_DIR}/melon_default_color.png`, { normalPath: RIND_NORMAL });
-for (const [name, make] of Object.entries(SKINS)) {
+// `node tools/materials/make-melon-skins.mjs <skin>` writes only that one (and
+// skips the plain melon's rind normal and preview); no argument: all of them.
+const only = process.argv[2];
+if (only && !SKINS[only]) throw new Error(`no skin "${only}" - one of: ${Object.keys(SKINS).join(", ")}`);
+if (!only) {
+    WriteRindNormal();
+    WritePreview("default", `${MAT_DIR}/melon_default_color.png`, { normalPath: RIND_NORMAL });
+}
+for (const [name, make] of Object.entries(SKINS).filter(([name]) => !only || name === only)) {
     const vmat = make();
     WriteAddonFile(`${MAT_DIR}/melon_${name}.vmat`, vmat);
     const model = baseModel.replaceAll(`to = "${BASE_MATERIAL}"`, `to = "${MAT_DIR}/melon_${name}.vmat"`);
@@ -876,7 +1256,7 @@ for (const [name, make] of Object.entries(SKINS)) {
     // the flat default normal or the all-over glowwhite).
     const OwnTexture = key => { const path = vmat.match(new RegExp(`${key} "([^"]+)"`))?.[1]; return path?.startsWith(MAT_DIR) ? path : undefined; };
     WritePreview(name, `${MAT_DIR}/melon_${name}_color.png`, {
-        metal: name === "gold",
+        metal: name === "gold" || name === "disco",
         normalPath: OwnTexture("TextureNormal"),
         glowPath: OwnTexture("TextureSelfIllumMask"),
     });

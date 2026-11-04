@@ -1,0 +1,6 @@
+/* The test triggers page: its RUN rows in a narrower list. */
+.TriggersList {
+    width: 560px;
+    margin-top: 10px;
+    flow-children: down;
+}

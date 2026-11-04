@@ -4,7 +4,7 @@ import { GetKartXp } from "../race/level/level.js";
 import { XP_BAR_SEGMENTS, HUD_RESEND_SECONDS } from "../constants/index.js";
 
 /**
- * The XP notifier (xpgain_panel in speedometer.xml, top right): for
+ * The XP notifier (xpgain_panel in melon_racer.xml, top right): for
  * XP_GAIN_HUD_SECONDS after XP were earned (kart.xpGain, see ShowXpGain) the
  * XP gained ("+40 XP") and why ("TIME TRIAL FINISH · NEW BEST TIME"), the
  * level and the XP into it, and the bar — the fill from before green

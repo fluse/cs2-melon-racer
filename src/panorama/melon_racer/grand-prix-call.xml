@@ -1,0 +1,7 @@
+<!-- A Grand Prix about to start (GATHERING, UpdateGathering in
+     race/heat/race-flow.js): everyone outside the hub's start area is
+     called to join — R teleports them to the hub. -->
+<Panel id="grand_prix_call" class="GrandPrixCall Hidden">
+	<Label class="GrandPrixCallTitle" text="GRAND PRIX STARTS IN {s:seconds}" />
+	<Label class="GrandPrixCallHint" text="PRESS R TO JOIN" />
+</Panel>

@@ -1,0 +1,18 @@
+<!-- Key hints, bottom left: a keycap with the letter (.KeyCap) or a mouse
+     with the button marked (icons/mouse-*.png, tools/images/make-icons.mjs),
+     and what it does. One group per mode, the script toggles Hidden. -->
+<Panel class="KeyHints" hittest="false">
+	<!-- Spectating (race/spectate/, SetSpectateHud). A/D switch too. -->
+	<Panel id="spectate_hints" class="KeyHintGroup Hidden">
+		<module href="../components/key-hint.xml" mouse="left" text="NEXT PLAYER" />
+		<module href="../components/key-hint.xml" mouse="right" text="PREVIOUS PLAYER" />
+		<module href="../components/key-hint.xml" key="R" text="BACK TO YOUR MELON" />
+	</Panel>
+	<!-- Drone mode (dev/free-look.js, SetDroneHintHud); the jump line only
+	     while it's parked (landed), the duck line only in the air. -->
+	<Panel id="drone_hint" class="KeyHintGroup Hidden">
+		<module href="../components/key-hint.xml" id="drone_hint_takeoff" extra="Hidden" key="SPACE" wide="true" text="JUMP TO START" />
+		<module href="../components/key-hint.xml" id="drone_hint_descend" extra="Hidden" key="CTRL" wide="true" text="DESCEND" />
+		<module href="../components/key-hint.xml" key="R" text="EXIT DRONE MODE" />
+	</Panel>
+</Panel>

@@ -47,6 +47,9 @@ const SCRIPT_INPUTS = [
     "gravity_leave",
     "ball_pit_enter",
     "ball_pit_leave",
+    "tutorial_enter",
+    "tutorial_leave",
+    "tutorial_goal",
 ];
 
 test("every entity name the script looks up is in the Mapping API", () => {

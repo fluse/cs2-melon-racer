@@ -119,8 +119,10 @@ export const world = {
     entities: [],
     /** @type {Record<string, any[]>} everything registered through Instance.OnXxx/SetXxx, by method name */
     handlers: {},
-    /** @type {string[]} */
+    /** Every Console.Log line. @type {string[]} */
     messages: [],
+    /** Every Console.SetConvar value, by cvar name. @type {Record<string, any>} */
+    convars: {},
     /** Every EntFireAtTarget/EntFireAtName call's argument. @type {any[]} */
     fired: [],
     /** Every live Instance.ConnectOutput connection, by id. @type {Map<number, { target: Entity, output: string, callback: Function }>} */
@@ -145,7 +147,7 @@ export const world = {
     saveData: "",
     /** @template {Entity} T @param {T} e @returns {T} */
     add(e) { this.entities.push(e); return e; },
-    reset() { this.time = 0; this.entities = []; this.playerPawns = []; this.messages = []; this.fired = []; this.outputs = new Map(); this.delays = []; this.traceLine = undefined; this.traceSphere = undefined; this.traceBox = undefined; this.debugLines = []; this.saveData = ""; },
+    reset() { this.time = 0; this.entities = []; this.playerPawns = []; this.messages = []; this.convars = {}; this.fired = []; this.outputs = new Map(); this.delays = []; this.traceLine = undefined; this.traceSphere = undefined; this.traceBox = undefined; this.debugLines = []; this.saveData = ""; },
 };
 
 const noHit = (config) => ({ didHit: false, startedInSolid: false, end: clone(config.end), normal: { x: 0, y: 0, z: 1 }, fraction: 1 });
@@ -154,7 +156,6 @@ let nextOutputId = 1;
 
 const instanceMethods = {
     GetGameTime: () => world.time,
-    Msg: (text) => { world.messages.push(String(text)); },
     FindEntityByName: (name) => world.entities.find((e) => e.valid && e.name === name),
     FindEntitiesByName: (name) => world.entities.filter((e) => e.valid && e.name === name),
     FindEntityByClass: (cls) => world.entities.find((e) => e.valid && e.className === cls),
@@ -181,14 +182,25 @@ const instanceMethods = {
     })),
 };
 
-/** Known methods behave as above; anything else (OnScriptInput, SetThink, ...) just records its arguments. */
-export const Instance = new Proxy(instanceMethods, {
-    get(target, key) {
-        if (key in target) {
-            return target[key];
-        }
-        return (...args) => {
-            (world.handlers[key] ??= []).push(args);
-        };
-    },
+/** Known methods behave as given; anything else (OnScriptInput, SetThink, ...) just records its arguments. @param {Record<string, Function>} methods */
+function Recording(methods) {
+    return new Proxy(methods, {
+        get(target, key) {
+            if (key in target) {
+                return target[key];
+            }
+            return (...args) => {
+                (world.handlers[key] ??= []).push(args);
+            };
+        },
+    });
+}
+
+export const Instance = Recording(instanceMethods);
+
+export const Console = Recording({
+    Log: (text) => { world.messages.push(String(text)); },
+    SetConvar: (name, value) => { world.convars[name] = value; },
 });
+
+export const GameRules = Recording({});

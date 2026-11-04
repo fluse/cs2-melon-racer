@@ -1,0 +1,12 @@
+<!-- Big centered countdown, only visible to racers during COUNTDOWN.
+     The numbers sit stacked in the panel, collapsed until the script
+     gives one "In" (falls in from the top, stands in the middle) or
+     "Out" (knocked down out of the picture by the next one landing) —
+     ShowCountdown in race/heat/race-flow.js. GO doesn't fall: it grows from
+     small to huge, fading out, in the 1's place (.CountdownGo). -->
+<Panel id="countdown_panel" class="CountdownPanel Hidden">
+	<Label id="count_3" class="CountdownNumber" text="3" />
+	<Label id="count_2" class="CountdownNumber" text="2" />
+	<Label id="count_1" class="CountdownNumber" text="1" />
+	<Label id="count_go" class="CountdownNumber CountdownGo" text="GO" />
+</Panel>

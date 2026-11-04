@@ -18,6 +18,11 @@ import { predictionDotSet } from "./trace.js";
  *   lastRun?: { trackId: number, time: number, newBest: boolean, at: number }, // last finished run, for the HUD
  *   finishRestartAt?: number, // game time a free-roaming finish sent the melon back to the start — see FINISH_RESTART_START_GUARD
  *   breaking: boolean, breakTime?: number, // game time BreakMelon ran, for the break camera zoom
+ *   lastBreak?: { time: number, cause: import("../health/breaking/breaking.js").BreakCause }, // the last break and what caused it — see BreakMelon
+ *   tutorial?: import("../tutorial/logic.js").TutorialState, // where this player is in the tutorial stations — see tutorial/tutorial.js
+ *   tutorialSeen?: { wallJump?: number, bounce?: number, break?: number }, // the events the tutorial last saw (their times), to tell new ones — see TutorialSnapshotOf
+ *   tutorialGoals?: string[], // tutorial goals reached since the last tick — see the tutorial_goal input
+ *   tutorialShown?: Record<string, string>, tutorialNextUpdate?: number, tutorialResendAt?: number, // the tutorial card as last sent, its next rebuild and full resend — see UpdateTutorialHud
  *   paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
  *   settled: boolean,
  *   pawnAnchor: any, // where the frozen pawn is held — see HoldPawn
@@ -67,7 +72,7 @@ import { predictionDotSet } from "./trace.js";
  *   skinHudLevel?: number, // the level the skin grid's locks were last drawn for — see UpdateSkinHud
  *   profileNextUpdate?: number, profileResendAt?: number, profileShown?: Record<string, string>, // the user menu profile's next rebuild, next full resend, and what it last sent — see UpdateProfileHud
  *   droneHintShown?: boolean, droneHintParked?: boolean, droneHintResendAt?: number, // drone mode: the "R → EXIT DRONE MODE" hint (+ "SPACE → JUMP TO START" while parked) as last sent — see dev/free-look.js
- *   drone?: { entities: any[], parts: any[], body: any, laser: any[], position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number }, tilt: { pitch: number, roll: number }, yaw: number, landed: boolean, stillSeconds: number, takeoffUntil?: number }, // free look: the drone this player flies, where, how fast, how far it leans, which way it faces, how long it's stood still on the floor, whether it has landed there (rotors still) — see dev/free-look.js
+ *   drone?: { entities: any[], parts: any[], body: any, laser: any[], bounds?: { center: { x: number, y: number, z: number }, axes: { x: number, y: number, z: number }[], half: number[] }, position: { x: number, y: number, z: number }, velocity: { x: number, y: number, z: number }, tilt: { pitch: number, roll: number }, yaw: number, landed: boolean, stillSeconds: number, takeoffUntil?: number }, // free look: the drone this player flies, where, how fast, how far it leans, which way it faces, the info_visibility_box it stays in, how long it's stood still on the floor, whether it has landed there (rotors still) — see dev/free-look.js
  *   contactDebug?: import("../dev/collision-debug.js").ContactDebug, // what this tick's probes saw, for that view
  *   prevLastVelocity?: { x: number, y: number, z: number }, prevOrigin?: any, // one tick further back than lastVelocity, for wall-bounce angle measurement
  *   painted?: boolean, // paintColor was chosen (trigger or user menu), not the unpainted default — see kart/look.js

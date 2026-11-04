@@ -1,0 +1,52 @@
+<!-- Third column: the player's profile, then developer aids and test previews. -->
+<Panel class="UserMenuSettings">
+	<!-- PROFILE (hud/profile/): your melon big — one image per MELON_SKINS key, usermenu_profile_skin_<key>,
+	     all but your skin Hidden —, your name, level and skin, the XP to the next level, and one tile per STAT_SLIDES key
+	     (usermenu_profile_stat_<key>: all-time value and rank, like the leaderboards; STAT_SLIDES' label), two per row. -->
+	<Label class="UserMenuColumnTitle" text="PROFILE" />
+	<Panel id="usermenu_profile" class="UserMenuProfile">
+		<Panel class="ProfileHero">
+			<Panel class="ProfileMelon">
+				<each loop="skin in skins">
+				<Image id="usermenu_profile_skin_{{ skin.key }}" class="ProfileMelonImage{{ skin.key === MELON_SKIN_DEFAULT ? '' : ' Hidden' }}" src="file://{images}/custom_game/skins/skin_{{ skin.key }}.png" /></each>
+			</Panel>
+			<Panel class="ProfileIdentity">
+				<Label class="ProfileName" text="{s:profile_name}" />
+				<Panel class="ProfileLevelRow">
+					<Label class="ProfileLevel" text="{s:profile_level}" />
+					<Label class="ProfileSkin" text="{s:profile_skin}" />
+				</Panel>
+				<!-- XP towards the next level: XP_BAR_SEGMENTS (20) segments, the filled ones On. -->
+				<Panel class="ProfileXpBar">
+					<each loop="i in range(XP_BAR_SEGMENTS)">
+					<Panel id="usermenu_profile_xp_{{ i }}" class="ProfileXpSegment" /></each>
+				</Panel>
+				<Label class="ProfileXp" text="{s:profile_xp}" />
+			</Panel>
+		</Panel>
+		<each loop="row in statRows">
+		<Panel class="ProfileStatRow">
+			<each loop="slide in row">
+			<Panel id="usermenu_profile_stat_{{ slide.key }}" class="ProfileStat">
+				<Label class="ProfileStatLabel" text="{{ slide.label }}" />
+				<Panel class="ProfileStatLine">
+					<Label class="ProfileStatValue" text="{s:value}" />
+					<Label class="ProfileStatRank" text="{s:rank}" />
+				</Panel>
+			</Panel></each>
+		</Panel></each>
+	</Panel>
+
+	<Label class="UserMenuColumnTitle UserMenuColumnTitleLower" text="DEVELOPER" />
+	<!-- How ground/wall contact and jump presses are judged (dev/collision-debug.js); its drawing only shows in tools mode. -->
+	<module href="../../components/toggle.xml" id="usermenu_collisiondebug_button" name="Collision Debug" state="collisiondebug_state" />
+	<!-- Opens the camera page in place of these columns: distance and height
+	     of your own chase camera (dev/camera-tuning.js). -->
+	<module href="../../components/toggle.xml" id="usermenu_camera_button" name="Camera Settings" action="EDIT" />
+	<!-- Opens the physics page in place of these columns: every melon's
+	     top speed, acceleration, jump, boost and gravity in percent (dev/physics-tuning.js). -->
+	<module href="../../components/toggle.xml" id="usermenu_physics_button" name="Physics Settings" action="EDIT" />
+	<!-- Opens the test triggers page in place of these columns: previews of
+	     the podium, countdown, finish and intro (SetUserMenuPage in hud/user-menu.js). -->
+	<module href="../../components/toggle.xml" id="usermenu_triggers_button" name="Test Triggers" action="OPEN" />
+</Panel>

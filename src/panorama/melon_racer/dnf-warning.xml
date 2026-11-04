@@ -1,0 +1,4 @@
+<!-- A racer who's gone DNF_WARNING_SECONDS without a new checkpoint:
+     the seconds until they're out of the Grand Prix (DNF_NO_PROGRESS_SECONDS,
+     see UpdateDnf in race-flow.js). -->
+<Label id="dnf_warning" class="DnfWarning Hidden" text="NO CHECKPOINT · OUT IN {s:dnf}" />

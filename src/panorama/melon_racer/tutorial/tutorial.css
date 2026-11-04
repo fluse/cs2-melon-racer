@@ -1,0 +1,306 @@
+/* #tutorial_panel: the tutorial card (UpdateTutorialHud), left middle — the
+   speedometer, bounce panel and key hints keep the corners. A dark green
+   card like the user menu's, the station in gold. */
+.TutorialPanel {
+    width: 420px;
+    horizontal-align: left;
+    vertical-align: center;
+    margin-left: 30px;
+    padding: 14px 18px 16px 18px;
+    flow-children: down;
+    background-color: $(panel)e6;
+    border: 2px solid $panel-border;
+    border-radius: 6px;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.TutorialHead {
+    width: 100%;
+    flow-children: right;
+}
+
+.TutorialKicker {
+    vertical-align: center;
+    font-size: $font-kicker;
+    font-weight: bold;
+    letter-spacing: 4px;
+    color: $gold;
+}
+
+/* The row of stations, right of the kicker: a numbered square each. */
+.TutorialStations {
+    horizontal-align: right;
+    vertical-align: center;
+    flow-children: right;
+}
+
+.TutorialStation {
+    width: 20px;
+    height: 20px;
+    margin-left: 4px;
+    border: 1px solid $text-dim;
+    border-radius: 3px;
+
+    &.Done {
+        background-color: $gold;
+        border: 1px solid $gold;
+    }
+
+    &.Current {
+        border: 2px solid $white;
+    }
+}
+
+.TutorialStationNumber {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: $font-mini;
+    font-weight: bold;
+    color: $text-soft;
+
+    .Done > & {
+        color: $panel-deep;
+    }
+}
+
+.TutorialTitle {
+    margin-top: 2px;
+    font-size: $font-headline;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $white;
+    text-shadow: 2px 2px 3px $(black)cc;
+}
+
+.TutorialBody {
+    width: 100%;
+    flow-children: down;
+
+    .Complete > & {
+        visibility: collapse;
+    }
+}
+
+/* The steps: a box (empty: to come, white: now, gold: done) and the text. */
+.TutorialSteps {
+    width: 100%;
+    margin-top: 8px;
+    flow-children: down;
+}
+
+.TutorialStep {
+    width: 100%;
+    margin-top: 3px;
+    flow-children: right;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.TutorialStepBox {
+    width: 20px;
+    height: 20px;
+    vertical-align: center;
+    border: 1px solid $text-dim;
+    border-radius: 2px;
+
+    .Current > & {
+        border: 2px solid $white;
+        animation-name: TutorialPulse;
+        animation-duration: 1s;
+        animation-timing-function: ease-in-out;
+        animation-iteration-count: infinite;
+    }
+
+    .Done > & {
+        background-color: $gold;
+        border: 1px solid $gold;
+    }
+}
+
+/* The step's number, the same as its section's sign in the map. */
+.TutorialStepNumber {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: $font-mini;
+    font-weight: bold;
+    color: $text-dim;
+
+    .Current > .TutorialStepBox > & {
+        color: $white;
+    }
+
+    .Done > .TutorialStepBox > & {
+        color: $panel-deep;
+    }
+}
+
+.TutorialStepText {
+    vertical-align: center;
+    margin-left: 10px;
+    font-size: $font-text;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: $text-dim;
+
+    .Current > & {
+        color: $white;
+    }
+
+    .Done > & {
+        color: $gold;
+    }
+}
+
+/* How to do the current step. */
+.TutorialHow {
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px 12px 12px 12px;
+    flow-children: down;
+    background-color: $(panel-deep)cc;
+    border-radius: 4px;
+}
+
+.TutorialHelp {
+    width: 100%;
+    font-size: $font-text;
+    color: $mint;
+}
+
+/* The keys: every key of TUTORIAL_KEYS, only the lit ones shown. */
+.TutorialKeys {
+    margin-top: 10px;
+    flow-children: right;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.TutorialKey {
+    margin-right: 8px;
+    visibility: collapse;
+
+    &.Lit {
+        visibility: visible;
+        animation-name: TutorialKeyPress;
+        animation-duration: 1.2s;
+        animation-timing-function: ease-in-out;
+        animation-iteration-count: infinite;
+    }
+}
+
+.TutorialKeyCap {
+    width: 34px;
+    height: 34px;
+    border: 2px solid $gold;
+    border-radius: 5px;
+    background-color: $(gold)26;
+}
+
+.TutorialKeyCapWide {
+    width: 84px;
+}
+
+.TutorialKeyLetter {
+    horizontal-align: center;
+    vertical-align: center;
+    font-size: $font-strong;
+    font-weight: bold;
+    color: $white;
+}
+
+.TutorialKeyMouse {
+    width: 34px;
+    height: 34px;
+    wash-color: $gold;
+}
+
+/* The step's progress, a row of segments filling up. */
+.TutorialProgress {
+    width: 100%;
+    margin-top: 10px;
+    flow-children: right;
+}
+
+.TutorialProgressSegment {
+    width: 33px;
+    height: 6px;
+    margin-right: 3px;
+    background-color: $(white)22;
+
+    &.Lit {
+        background-color: $lime;
+    }
+}
+
+/* After the last step. */
+.TutorialComplete {
+    width: 100%;
+    margin-top: 8px;
+    flow-children: down;
+    visibility: collapse;
+
+    .Complete > & {
+        visibility: visible;
+    }
+}
+
+.TutorialCompleteTitle {
+    font-size: $font-title;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $gold;
+}
+
+.TutorialXp {
+    margin-top: 2px;
+    font-size: $font-strong;
+    font-weight: bold;
+    color: $lime;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+.TutorialMessage {
+    margin-top: 6px;
+    font-size: $font-text;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: $white;
+}
+
+@keyframes 'TutorialPulse' {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.35;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+/* A key being pressed: pushed down a little, then back up. */
+@keyframes 'TutorialKeyPress' {
+    0% {
+        transform: translateY(0px);
+    }
+    15% {
+        transform: translateY(3px);
+    }
+    35% {
+        transform: translateY(0px);
+    }
+    100% {
+        transform: translateY(0px);
+    }
+}

@@ -1,0 +1,49 @@
+<!-- Tutorial card (hud/tutorial-panel.js, UpdateTutorialHud), left middle, while
+     the melon is in a tutorial station (tutorial/): the station number and title,
+     a row with every station (finished ones gold: tutorial_station_<id>.Done, the
+     one it's in .Current), its steps (TUTORIAL_MAX_STEPS rows, .Done/.Current,
+     unused ones .Hidden; each numbered like its section's sign in the map), how to do the current one — help text, an animated
+     diagram (diagrams.xml), the keys to press lit on a small keyboard
+     (TUTORIAL_KEYS: tutorial_key_<key>.Lit) — and its progress bar
+     (TUTORIAL_PROGRESS_SEGMENTS). After a station's last step the card shows
+     "STATION COMPLETE" (.Complete), +XP the first time, and where to go next. -->
+<Panel id="tutorial_panel" class="TutorialPanel Hidden" hittest="false">
+	<Panel class="TutorialHead">
+		<Label class="TutorialKicker" text="{s:tutorial_kicker}" />
+		<Panel class="TutorialStations">
+		<each loop="station in TUTORIAL_STATIONS">
+		<Panel id="tutorial_station_{{ station.id }}" class="TutorialStation"><Label class="TutorialStationNumber" text="{{ station.id }}" /></Panel></each>
+		</Panel>
+	</Panel>
+	<Label class="TutorialTitle" text="{s:tutorial_title}" />
+	<Panel class="TutorialBody">
+		<Panel class="TutorialSteps">
+		<each loop="i in range(TUTORIAL_MAX_STEPS)">
+		<Panel id="tutorial_step_{{ i }}" class="TutorialStep Hidden"><Panel class="TutorialStepBox"><Label class="TutorialStepNumber" text="{{ i + 1 }}" /></Panel><Label class="TutorialStepText" text="{s:tutorial_step_{{ i }}_text}" /></Panel></each>
+		</Panel>
+		<Panel class="TutorialHow">
+			<Label class="TutorialHelp" text="{s:tutorial_help}" />
+			<module href="diagrams.xml" />
+			<Panel id="tutorial_keys" class="TutorialKeys">
+			<each loop="k in TUTORIAL_KEYS">
+			<Panel id="tutorial_key_{{ k.key }}" class="TutorialKey">
+			<if condition="k.mouse">
+			<Image class="TutorialKeyMouse" src="file://{images}/custom_game/icons/mouse-{{ k.mouse }}.png" />
+			</if>
+			<else>
+			<Panel class="TutorialKeyCap{{ k.wide ? ' TutorialKeyCapWide' : '' }}"><Label class="TutorialKeyLetter" text="{{ k.cap }}" /></Panel>
+			</else>
+			</Panel></each>
+			</Panel>
+			<Panel class="TutorialProgress">
+			<each loop="i in range(TUTORIAL_PROGRESS_SEGMENTS)">
+			<Panel id="tutorial_progress_{{ i }}" class="TutorialProgressSegment" /></each>
+			</Panel>
+		</Panel>
+	</Panel>
+	<Panel class="TutorialComplete">
+		<Label class="TutorialCompleteTitle" text="STATION COMPLETE" />
+		<Label id="tutorial_xp" class="TutorialXp Hidden" text="+{{ XP_TUTORIAL_STATION }} XP" />
+		<Label class="TutorialMessage" text="{s:tutorial_message}" />
+	</Panel>
+</Panel>

@@ -1,0 +1,13 @@
+<!-- A skin in the user menu's skin grid (.SkinButton): its preview, its
+     name, and while it's locked a padlock and the level it needs ({s:skin_lock},
+     UpdateSkinHud in hud/user-menu.js).
+       key   a MELON_SKINS key: usermenu_skin_<key>, skins/skin_<key>.png
+       name  its MELON_SKIN_NAMES name -->
+<Button id="usermenu_skin_{{ key }}" class="SkinButton">
+	<Panel class="SkinPreviewFrame">
+		<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_{{ key }}.png" />
+		<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+	</Panel>
+	<Label class="SkinName" text="{{ name }}" />
+	<Label class="SkinLock" text="{s:skin_lock}" />
+</Button>

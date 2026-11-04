@@ -1,4 +1,4 @@
-import { Instance } from "cs_script/point_script";
+import { Console } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { karts } from "../../core/kart-registry.js";
 import { GrantXp } from "./level.js";
@@ -9,7 +9,7 @@ import { XP_CHEAT_COMMAND, XP_REASON_CHEAT } from "../../constants/index.js";
 // button — anyone can open the user menu's DEVELOPER pages, and the XP
 // unlock skins.
 export function RegisterLevelInputs() {
-    Instance.RegisterCheatCommand(XP_CHEAT_COMMAND, (args) => {
+    Console.RegisterCheatCommand(XP_CHEAT_COMMAND, (args) => {
         const amount = Number(String(args).trim().split(/\s+/).pop());
         if (!(amount > 0)) {
             Debug(`${XP_CHEAT_COMMAND}: needs an amount, e.g. "${XP_CHEAT_COMMAND} 500"`);

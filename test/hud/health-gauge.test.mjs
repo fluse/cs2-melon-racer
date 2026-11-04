@@ -16,8 +16,8 @@ const { UpdateHealthHud, UpdateJumpHud } = await import("../../src/melon_drive/h
 const { HEALTH_BAR_SEGMENTS, HUD_RESEND_SECONDS, MELON_MAX_HEALTH, WALL_JUMP_CHARGES, JUMP_DOT_FILL_STEPS, SPEED_HUD_ENTITY_NAME } = await import("../../src/melon_drive/constants/index.js");
 
 const root = new URL("../../", import.meta.url);
-const xml = readFileSync(new URL("panorama/layout/custom_game/speedometer.xml", root), "utf8");
-const css = readFileSync(new URL("panorama/styles/custom_game/speedometer.css", root), "utf8");
+const xml = readFileSync(new URL("panorama/layout/custom_game/melon_racer.xml", root), "utf8");
+const css = readFileSync(new URL("panorama/styles/custom_game/melon_racer.css", root), "utf8");
 
 /** A custom_hud_layout that records every class call. */
 class FakeHud extends Entity {
@@ -45,7 +45,7 @@ beforeEach(() => {
     hud = world.add(new FakeHud());
 });
 
-test("speedometer.xml: the outline container with the fill bar inside, one piece per segment, no images, no class set up front", () => {
+test("melon_racer.xml: the outline container with the fill bar inside, one piece per segment, no images, no class set up front", () => {
     for (let i = 0; i < HEALTH_BAR_SEGMENTS; i++) {
         assert.ok(xml.includes(`<Panel id="health_seg_${i}" class="HealthSeg" />`), `health_seg_${i} missing`);
     }
@@ -54,14 +54,14 @@ test("speedometer.xml: the outline container with the fill bar inside, one piece
     assert.ok(!xml.includes("health_gauge/"), "health bar images are gone — CSS only");
 });
 
-test("speedometer.xml: every jump dot is an outline with one fill inside", () => {
+test("melon_racer.xml: every jump dot is an outline with one fill inside", () => {
     for (let i = 0; i < WALL_JUMP_CHARGES; i++) {
         assert.ok(xml.includes(`<Panel class="JumpDot"><Panel id="jump_dot_${i}" class="JumpDotFill" /></Panel>`), `jump_dot_${i} missing`);
     }
     assert.ok(!xml.includes(`id="jump_dot_${WALL_JUMP_CHARGES}"`), "no dot beyond WALL_JUMP_CHARGES");
 });
 
-test("speedometer.css: transparent by default, On makes white, no transitions or effects there", () => {
+test("melon_racer.css: transparent by default, On makes white, no transitions or effects there", () => {
     assert.ok(/\.HealthSeg \{\s*width: [^;]+;\s*height: [^;]+;\s*background-color: #00000000;/.test(css), ".HealthSeg must be transparent by default");
     assert.ok(/\.HealthSeg\.On \{\s*background-color: #ffffff;\s*\}/.test(css), ".HealthSeg.On missing");
     assert.ok(/\.JumpDotFill \{[^}]*background-color: #00000000;\s*&\.On \{\s*background-color: #ffffff;\s*\}/.test(css), ".JumpDotFill transparent + .On white missing");

@@ -1,4 +1,4 @@
-// Checks speedometer.xml against the script and the image folder: every
+// Checks melon_racer.xml against the script and the image folder: every
 // panel id the script drives by a fixed name exists in the layout, and
 // every image the layout shows exists on disk — a typo in either shows
 // nothing in-game, with no error.
@@ -8,7 +8,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const root = new URL("../../", import.meta.url);
-const layout = readFileSync(new URL("panorama/layout/custom_game/speedometer.xml", root), "utf8");
+const layout = readFileSync(new URL("panorama/layout/custom_game/melon_racer.xml", root), "utf8");
 const layoutIds = new Set([...layout.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
 
 const srcDir = new URL("src/melon_drive/", root);
@@ -17,7 +17,7 @@ const source = readdirSync(srcDir, { recursive: true })
     .map((f) => readFileSync(new URL(f.replaceAll("\\", "/"), srcDir), "utf8"))
     .join("\n");
 
-test("every HUD panel id the script sets classes/text on exists in speedometer.xml", () => {
+test("every HUD panel id the script sets classes/text on exists in melon_racer.xml", () => {
     const used = new Set(
         [...source.matchAll(/(?:SetHasClassForPlayer|SetDialogVariableStringForPlayer)\(\s*slot,\s*"([a-z0-9_]+)"/g)].map((m) => m[1])
     );
@@ -26,14 +26,14 @@ test("every HUD panel id the script sets classes/text on exists in speedometer.x
     assert.deepEqual(missing, []);
 });
 
-test("every image speedometer.xml shows exists in panorama/images", () => {
+test("every image melon_racer.xml shows exists in panorama/images", () => {
     const srcs = [...layout.matchAll(/src="file:\/\/\{images\}\/([^"]+)"/g)].map((m) => m[1]);
     assert.ok(srcs.includes("custom_game/word-finish.png"), "sanity: the finish image is in the layout");
     const missing = srcs.filter((p) => !existsSync(fileURLToPath(new URL(`panorama/images/${p}`, root))));
     assert.deepEqual(missing, []);
 });
 
-test("every button in speedometer.xml has a click handler in the script", async () => {
+test("every button in melon_racer.xml has a click handler in the script", async () => {
     await import("../helpers/register-cs-script.mjs");
     const { IsHandledButton } = await import("../../src/melon_drive/hud/inputs.js");
     const buttonIds = [...layout.matchAll(/<Button\s+id="([^"]+)"/g)].map((m) => m[1]);
@@ -44,7 +44,7 @@ test("every button in speedometer.xml has a click handler in the script", async 
 
 // The tables in hud/user-menu.js address panels by id from a variable, which
 // the literal-id check above can't see.
-test("every user menu toggle and developer page in hud/user-menu.js exists in speedometer.xml", async () => {
+test("every user menu toggle and developer page in hud/user-menu.js exists in melon_racer.xml", async () => {
     await import("../helpers/register-cs-script.mjs");
     const { USER_MENU_TOGGLES, USER_MENU_PAGES } = await import("../../src/melon_drive/hud/user-menu.js");
     const ids = [...Object.keys(USER_MENU_TOGGLES), ...Object.values(USER_MENU_PAGES).map((p) => p.panel), "usermenu_main_page"];
@@ -70,7 +70,7 @@ test("the checkpoint strip has CHECKPOINT_HUD_SLOTS slots, each with its line", 
 
 // Regression: a stray </Panel> made resourcecompiler reject the whole
 // layout ("Start-end tags mismatch") — and the HUD then stays the old one.
-test("speedometer.xml's tags are balanced", () => {
+test("melon_racer.xml's tags are balanced", () => {
     const stack = [];
     const xml = layout.replace(/<!--[\s\S]*?-->/g, "");
     for (const m of xml.matchAll(/<(\/?)([A-Za-z]+)\b[^>]*?(\/?)>/g)) {
@@ -90,7 +90,7 @@ test("speedometer.xml's tags are balanced", () => {
 
 // A misplaced closing tag can leave one button inside another and the XML
 // still well-formed: the inner one's clicks then go to the outer one.
-test("no button in speedometer.xml sits inside another", () => {
+test("no button in melon_racer.xml sits inside another", () => {
     const open = [];
     const nested = [];
     for (const m of layout.matchAll(/<(\/?)Button\b[^>]*?(?:id="([^"]*)")?[^>]*?(\/?)>/g)) {

@@ -1,0 +1,53 @@
+/* Big centered "FINISH" image, in the countdown's spot. */
+.FinishImage {
+    horizontal-align: center;
+    vertical-align: center;
+    margin-top: -140px;
+    width: 256px;
+    height: 256px;
+
+    transition-property: opacity;
+    transition-duration: .15s;
+    opacity: 1;
+
+    &.Hidden {
+        opacity: 0;
+    }
+}
+
+/* The place and Grand Prix points under the finish image, "1ST  ·  +10 PTS"
+   (finish_place, see FinishKart) — between it and the break countdown. */
+.FinishPlace {
+    horizontal-align: center;
+    vertical-align: center;
+    margin-top: 24px;
+    font-size: $font-headline;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $gold;
+    text-shadow: 3px 3px 4px $(black)cc;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}
+
+/* #finish_grace: the finish window's seconds left, top center under where
+   the DNF warning sits. */
+.FinishGrace {
+    horizontal-align: center;
+    vertical-align: top;
+    margin-top: 240px;
+    padding: 6px 20px;
+    font-size: $font-title;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $white;
+    background-color: $(panel)e6;
+    border: 2px solid $gold;
+    text-shadow: 2px 2px 3px $(black)cc;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}

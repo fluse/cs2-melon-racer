@@ -1,0 +1,19 @@
+/* #dnf_warning: a racer about to be out for making no progress (UpdateDnf),
+   top center under the checkpoint strip and lap counter. */
+.DnfWarning {
+    horizontal-align: center;
+    vertical-align: top;
+    margin-top: 190px;
+    padding: 8px 22px;
+    font-size: $font-headline;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: $white;
+    background-color: #c0262dcc;
+    border-radius: 6px;
+    text-shadow: 2px 2px 3px $(black)cc;
+
+    &.Hidden {
+        visibility: collapse;
+    }
+}

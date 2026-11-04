@@ -86,8 +86,18 @@ export function Wins(standing) {
 export function SortedStandings(gp) {
     const total = (/** @type {Standing} */ s) => Object.values(s.times).reduce((sum, t) => sum + t, 0);
     return Object.values(gp.standings).sort(
-        (a, b) => b.points - a.points || Wins(b) - Wins(a) || total(a) - total(b) || a.name.localeCompare(b.name)
+        (a, b) => b.points - a.points || Wins(b) - Wins(a) || total(a) - total(b) || CompareNames(a.name, b.name)
     );
+}
+
+/**
+ * Orders two player names by their UTF-16 code units — not localeCompare:
+ * a dedicated server's V8 runs without ICU data, and localeCompare threw
+ * "Internal error. Icu error." there on every call.
+ * @param {string} a @param {string} b
+ */
+export function CompareNames(a, b) {
+    return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /** "1ST", "2ND", "3RD", "4TH", … "11TH", "21ST". @param {number} place */
