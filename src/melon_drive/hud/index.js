@@ -4,7 +4,7 @@
 // (Tab: Grand Prix points, best times), leaderboards/ (the user menu's
 // page with every leaderboard), profile/ (the user menu's own melon and
 // stats), hub-modal/ ("Start Grand Prix": the heats
-// and who rides along) — the others are one file each: bounce-panel.js, level-up-panel.js, user-menu.js.
+// and who rides along) — the others are one file each: bounce-panel.js, level-up-panel.js, tutorial-panel.js, user-menu.js.
 // layout.js finds the custom_hud_layout entity; inputs.js handles every
 // button click.
 export { GetSpeedHud, ResetHudForPlayer } from "./layout.js";
@@ -12,6 +12,7 @@ export { UpdateSpeedHud, UpdateJumpHud, UpdateHealthHud } from "./speedometer/sp
 export { UpdateBounceHud } from "./bounce-panel.js";
 export { UpdateLevelUpHud } from "./level-up-panel.js";
 export { UpdateXpGainHud } from "./xp-gain-panel.js";
+export { UpdateTutorialHud } from "./tutorial-panel.js";
 export { UpdateCheckpointHud } from "./track/track.js";
 export { UpdateScoreboardHud, UpdateScoreboardInput } from "./scoreboard/scoreboard.js";
 export { ApplyHubModalState, ShowHubModal, HideHubModal } from "./hub-modal/hub-modal.js";

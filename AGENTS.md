@@ -31,7 +31,7 @@ docs/TRACK_CREATION.md                   # step-by-step Hammer guide for a new t
 docs/GAME_CI.md                          # the map's color palette (guide lines, heal, checkpoint, start gate) — use it for new materials/models/HUD
 docs/valve/scripting_api.html            # saved copy of Valve's cs_script API wiki page (the site blocks automated fetches)
 docs/mapping-api/*.md                    # Mapping API (map↔script contract): README.md = index of every input/name/pattern,
-                                          #   01-…21-*.md one page per topic, each with setup / name-variant / "Values" tables
+                                          #   01-…25-*.md one page per topic, each with setup / name-variant / "Values" tables
 maps/melon_racer.vmap                    # main map (binary DMX, Hammer-authoritative)
 maps/prefabs/*.vmap                      # prefabs placed in melon_racer.vmap (hub, routes, gates, jump pads); the start/checkpoint/finish gates and jump_pad are set up by a
                                           #   map variable per copy (docs/mapping-api/14-prefabs.md) — test/helpers/vmap.mjs reads prefabs, overrides resolved
@@ -45,7 +45,7 @@ sounds/*.wav                             # ambience: birds, interior, vent
 src/tsconfig.json                        # editor tooling config for src/**/*.js (references ../maps/scripts/point_script.d.ts)
 src/gamemode/index.js                    # gamemode entry: a single small file
 src/panorama/melon_racer/*.xml, *.css    # the HUD layout's parts, each part's styles next to it (melon_racer.xml/.css = the main files, one part per panel,
-                                          #   user-menu/ = the menu's columns and pages): build-panorama.mjs puts them together into
+                                          #   user-menu/ = the menu's columns and pages, tutorial/ = the tutorial card + its animated diagrams): build-panorama.mjs puts them together into
                                           #   panorama/layout/custom_game/melon_racer.xml and panorama/styles/custom_game/melon_racer.css;
                                           #   locals.mjs = the values they're built with (every constant by name + skinPages, statRows, … for loops;
                                           #   styleVariables: $rating-*, $color-* from the script for the CSS)
@@ -79,7 +79,7 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              track/ (time trial + checkpoint strip), scoreboard/ (Tab: Grand Prix standings / best times per track,
                                           #              in place of CS2's own), leaderboards/ (the user menu's page: one leaderboard per tab, top 20),
                                           #              profile/ (top of the user menu's right column: own melon big, own stats + ranks),
-                                          #              hub-modal/ ("Start Grand Prix": heat cards + who rides along; routes.js is generated); one file per panel without: bounce-panel.js, level-up-panel.js, xp-gain-panel.js (the XP notifier, top right), user-menu.js;
+                                          #              hub-modal/ ("Start Grand Prix": heat cards + who rides along; routes.js is generated); one file per panel without: bounce-panel.js, level-up-panel.js, xp-gain-panel.js (the XP notifier, top right), tutorial-panel.js (the tutorial card, left middle), user-menu.js;
                                           #              inputs.js (every button click: one table per kind of button, HandleHudClick dispatches)
                                           #   fx/        particles.js (spawning/placing/starting/stopping/removing every point_template particle effect),
                                           #              boost-trail/, prediction/ (the guide line)
@@ -95,6 +95,9 @@ src/melon_drive/<domain>/                # one folder per domain, each with an i
                                           #              balloon/ (every ball with the ball model floats like a balloon: sinks slowly, knocked far, slowed by air drag)
                                           #              bouncer/ (prop_dynamic with the bouncer model: "swing" loop started once, at a random time within one swing, on the script's clock — delayed inputs arrived all at once)
                                           #              catapult/ (base prop_physics + animated arm prop_dynamic, paired by model; a melon inside the bucket sits in it, jump fires: carried along the swing, thrown; roll.js (+ roll-logic.js): the base rolls on when bumped, kept upright)
+                                          #   tutorial/  the tutorial stations: constants.js (TUTORIAL_STATIONS: every station's steps, texts, keys, diagram, check), logic.js (the checks,
+                                          #              step flow, saved finished stations, the HUD card's view), tutorial.js (the per-tick snapshot, enter/leave/goal, save + XP),
+                                          #              ghost.js (+ ghost-logic.js: see-through melons driven along info_target paths), inputs.js (tutorial_enter/_leave/_goal)
 src/melon_drive/constants/index.js       # re-exports every folder's constants.js (tunables + Hammer names) — import constants from here
 test/<domain>/*.test.mjs                 # node:test tests (`npm test`), one folder per src/melon_drive/ domain (movement/, race/, …): unit tests
                                           #   for the pure files, engine-side tests against the fake engine (filed under the domain they're mainly about)
@@ -116,6 +119,11 @@ tools/lib/vmap.mjs                        # shared by the map generators (tools/
                                           #   polygon meshes (world or a trigger's), placed prefabs with map-variable overrides — as keyvalues2 text, converted to
                                           #   binary with the game's dmxconvert.exe (layout read off Hammer's own files: dmxconvert -i <vmap> -o <out> -oe keyvalues2)
 tools/maps/make-generator-test-prefab.mjs # maps/prefabs/generator_test.vmap: a floor, a corner trigger, an info_target, a prop_static, a checkpoint gate — checks Hammer opens generated prefabs
+tools/maps/make-tutorial-prefab.mjs       # the tutorial stations (tutorial/): six rooms in two halls in the old tutorial's look (walls 448 high in 512 panels: pillars, plinth,
+                                          #   cornice, blue glow; a section per step, its text on the floor), written as maps/prefabs/tutorial_stations_course.vmap
+                                          #   (overwritten every run: rooms, slalom gates, hurdle, heal gate prefab, 45-degree guide line, wall-jump climbing shaft + recharge zone + shelf,
+                                          #   crash wall, ramp + tower, exit to the hub; every station/goal trigger, spawn, ghost path, world text; non-solid glowing floor marks)
+                                          #   + once maps/prefabs/tutorial_stations.vmap (the hand-edited file placing it)
 tools/maps/make-glasshouse-prefab.mjs     # track 6, the Glasshouse: a 2.5D jump & run spiralling up round a tower (4 faces = side-view zones, 3 corner zones), written from its LAYOUT
                                           #   as maps/prefabs/glasshouse_course.vmap (overwritten every run: blockout, triggers, spawns) + once maps/prefabs/route_glasshouse.vmap (the hand-edited route file placing it)
 tools/lib/font.mjs                        # shared by the text-cutting model generators (logo, podiums, signs): a line of text in a font (Bungee) as 2D shapes, GrowShapes (clipper offset)
@@ -144,6 +152,11 @@ tools/models/make-kicker-model.mjs        # kicker ramps to place by hand (prop_
                                           #   its top (materials/glowgreen.vmat, not in the collision); 144 x 128, 48); ~60-200 triangles, collision the
                                           #   plain wedge; origin on the floor in the middle of the lip, rising towards +X: put it on a step's edge (48 up at MAX_SPEED clears a 96 gap
                                           #   onto +64 without a jump); materials/melon_racer/kicker/
+tools/models/make-signpost-model.mjs      # wayfinding signs for the routes, prop_statics all in the shared materials/glowgreen.vmat (no own materials):
+                                          #   models/melon_racer/signpost/signpost_arrow (an arrow board on a post pointing +X, read from +-Y; 48 triangles),
+                                          #   _chevrons (a curve board: 3 chevrons on a rail on two legs pointing +Y = a left turn driving along +X,
+                                          #   yaw 180 for a right one; 96) and _floor_arrow (flat on the floor pointing +X, 1 high, no collision; 24);
+                                          #   collision plain boxes; origin on the floor
 tools/models/make-basketball-hoop-model.mjs # a court's basketball hoop as models/melon_racer/basketball_hoop/basketball_hoop.vmdl (1.6k triangles): graphite post on a foot plate,
                                           #   navy pad, gooseneck arm + brace, white backboard with black frame and shooter's square, orange rim on a bracket, white cord
                                           #   net in diamonds; sized to the melon as the ball (rim RIM_HEIGHT 178 up = 3.05 m, 24 across inside, 94 in front of the post);
@@ -397,7 +410,7 @@ tools/materials/make-holo.mjs             # the gates' hologram textures (materi
                                           #   + the heal cross particle sprite (materials/melon_racer/particles/particle_heal_cross) — `node … <name>` writes only that one
 tools/materials/make-inflatable.mjs       # materials/melon_racer/surfaces/inflatable.vmat: the glossy vinyl of an inflatable pool mattress — no shapes, only
                                           #   how it reflects (a roughness map); plain white, so it can be tinted (g_vColorTint or an entity render color)
-tools/materials/make-melon-skins.mjs      # the melon skins (gold, football, golf — dimples as a tangent-space normal map —, honey (the yellow honey melon's net), camo, strawberry (seeds in pits, calyx), pumpkin (ribs, a carved face glowing through a self-illum mask), pineapple (fruitlets on the Fibonacci spiral, bracts), zebra (warped stripes, fur); SKINS list): recolors melon_default_color.png (same UVs, same stripes) or paints
+tools/materials/make-melon-skins.mjs      # the melon skins (gold, football, golf — dimples as a tangent-space normal map —, honey (the yellow honey melon's net), camo, strawberry (seeds in pits, calyx), pumpkin (ribs, a carved face glowing through a self-illum mask), pineapple (fruitlets on the Fibonacci spiral, bracts), zebra (warped stripes, fur), coconut (husk fibers, three eyes), kiwi (fuzz, the top end a painted cut), paprika (lobes, calyx), disco (silver mirror tiles as facets in the normal map, metal: sparkles by the light alone), bald (a bald head: shiny scalp, cartoon face, ears, stubble), eye (an eyeball: iris, cornea bulge, veins); SKINS list; `node … <skin>` writes only that one): recolors melon_default_color.png (same UVs, same stripes) or paints
                                           #   by place on the melon (`surface`: melon.dmx's triangles drawn into texture space, via test/helpers/vmap.mjs) into
                                           #   materials/melon_racer/melon/melon_<skin>.vmat (+ textures; tint 0, paint doesn't change them) and
                                           #   models/melon_racer/melon/melon_<skin>.vmdl (melon.vmdl, material remapped) — add a skin there, re-run, compile

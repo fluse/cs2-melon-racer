@@ -86,7 +86,7 @@ function UpdateSpikeSpring(spring, state, now) {
         }
         const p = kart.melon.GetAbsOrigin();
         if (IsOverSpikeSpring({ x: p.x - origin.x, y: p.y - origin.y, z: p.z - origin.z }, angles)) {
-            BreakKartNow(kart, `spike spring ${spring.GetEntityName()}`);
+            BreakKartNow(kart, `spike spring ${spring.GetEntityName()}`, "spikes");
         }
     }
 }

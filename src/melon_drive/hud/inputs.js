@@ -16,7 +16,7 @@ import { IsFreeLookOn, SetFreeLook } from "../dev/free-look.js";
 import { HandleCameraTuningClick } from "../dev/camera-tuning.js";
 import { HandlePhysicsTuningClick } from "../dev/physics-tuning.js";
 import { TestBreak, TestHeal, TestPerfectBounce, TestXpGain } from "../dev/test-effects.js";
-import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, TestCountdown, TestFinish, TestIntro, TestGrandPrixCall } from "../race/heat/race-flow.js";
+import { phase, TryStartRace, TryAbortRace, ReturnAllToHub, SendKartToTutorial, SendKartToTutorialStations, TestCountdown, TestFinish, TestIntro, TestGrandPrixCall } from "../race/heat/race-flow.js";
 import { RestartTimeTrial } from "../race/checkpoints/checkpoints.js";
 import { PlaceOnPodium, TestGrandPrix } from "../race/podium/podium.js";
 import { GetSpeedHud } from "./layout.js";
@@ -203,6 +203,9 @@ const TEST_TRIGGER_BUTTONS = {
     usermenu_testbounce_button: (slot, kart) => TestPerfectBounce(kart),
     usermenu_testheal_button: (slot, kart) => TestHeal(kart),
     usermenu_testxp_button: (slot, kart) => TestXpGain(kart),
+    // To the tutorial stations' entrance, like "Play Tutorial" (race/heat/race-flow.js)
+    // — while the new tutorial stands next to the old one.
+    usermenu_tutorialstations_button: (slot, kart) => SendKartToTutorialStations(kart),
 };
 
 /**

@@ -14,6 +14,8 @@
 @import "xp-gain.css";
 @import "speed-panel.css";
 @import "bounce-panel.css";
+@import "tutorial/tutorial.css";
+@import "tutorial/diagrams.css";
 @import "user-menu/user-menu.css";
 @import "../components/action-button.css";
 @import "user-menu/column-actions.css";

@@ -1,0 +1,11 @@
+<!-- The user menu, sketched for the tutorial's menu diagrams: ACTIONS on the
+     left, SETTINGS in the middle, the profile over DEVELOPER on the right.
+     The diagram's class (.DgMenuActions, …) outlines one part in gold. -->
+<Panel class="DgMenuFrame">
+	<Panel class="DgMenuColumn DgMenuColActions"><Label class="DgMenuLabel" text="ACTIONS" /></Panel>
+	<Panel class="DgMenuColumn DgMenuColSettings"><Label class="DgMenuLabel" text="SETTINGS" /></Panel>
+	<Panel class="DgMenuRight">
+		<Panel class="DgMenuColumn DgMenuColProfile"><Label class="DgMenuLabel" text="LEVEL · XP" /></Panel>
+		<Panel class="DgMenuColumn DgMenuColDev"><Label class="DgMenuLabel" text="DEVELOPER" /></Panel>
+	</Panel>
+</Panel>

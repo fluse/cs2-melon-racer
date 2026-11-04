@@ -1,4 +1,4 @@
-import { Instance, CSInputs } from "cs_script/point_script";
+import { Instance, CSInputs, Console } from "cs_script/point_script";
 import { Debug } from "../../core/debug.js";
 import { GetTrackConfig, GetTrackOrder } from "../track-config.js";
 import { karts } from "../../core/kart-registry.js";
@@ -18,9 +18,10 @@ import {
     DNF_WARNING_SECONDS,
     HUD_RESEND_SECONDS,
     XP_REASON_HEAT,
+    TUTORIAL_ENTRANCE_NAME,
 } from "../../constants/index.js";
 import { SetIntroLogoVisible } from "../../kart/spawn.js";
-import { GetHubSpawnPoint, GetIntroSpawnPoint, GetJoinGrandPrixSpawnPoint, GetStartSpawnPoint, FacePlayerView } from "../../kart/spawn-points.js";
+import { GetHubSpawnPoint, GetIntroSpawnPoint, GetJoinGrandPrixSpawnPoint, GetStartSpawnPoint, GetNamedSpawnPoint, FacePlayerView } from "../../kart/spawn-points.js";
 import { RestoreFullHealth } from "../../health/heal/index.js";
 import { StartRun, CancelRun } from "../time-trial/time-trial.js";
 import { BreakCountdownValue, BreakCountdownLabels, CountdownStep, CountdownNumberState, WatchProgress, DnfSecondsLeft, DnfWarningValue, GatherSecondsValue } from "./logic.js";
@@ -467,6 +468,22 @@ export function ReturnAllToHub(returning) {
  */
 export function SendKartToTutorial(kart) {
     SendKartsOutOfRace([kart], GetIntroSpawnPoint(), "tutorial");
+}
+
+/**
+ * The user menu's developer "Tutorial Stations": like "Play Tutorial", to the
+ * tutorial stations' entrance (TUTORIAL_ENTRANCE_NAME). Returns whether the
+ * map has one.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+export function SendKartToTutorialStations(kart) {
+    const spawn = GetNamedSpawnPoint(TUTORIAL_ENTRANCE_NAME);
+    if (!spawn) {
+        Console.Log(`[melon_drive] Tutorial Stations: no "${TUTORIAL_ENTRANCE_NAME}" in the map — place the tutorial_stations prefab`);
+        return false;
+    }
+    SendKartsOutOfRace([kart], spawn, "tutorial stations");
+    return true;
 }
 
 /**

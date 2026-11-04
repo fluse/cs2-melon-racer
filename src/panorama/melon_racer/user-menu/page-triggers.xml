@@ -33,5 +33,9 @@
 		<!-- The XP notifier as if XP_GAIN_TEST_AMOUNT XP were earned — only
 		     shown, nothing given (TestXpGain). -->
 		<module href="../../components/toggle.xml" id="usermenu_testxp_button" name="Test XP Gain" action="RUN" />
+		<!-- To the new tutorial stations (tutorial_entrance), like "Play Tutorial"
+		     (SendKartToTutorialStations in race/heat/race-flow.js) — while they
+		     stand next to the old tutorial. -->
+		<module href="../../components/toggle.xml" id="usermenu_tutorialstations_button" name="Tutorial Stations" action="GO" />
 	</Panel>
 </module>

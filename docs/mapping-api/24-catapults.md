@@ -1,4 +1,4 @@
-[Mapping API](README.md) › **24. Catapults** · [← Shopping carts](23-shopping-carts.md)
+[Mapping API](README.md) › **24. Catapults** · [← Shopping carts](23-shopping-carts.md) · [Tutorial stations →](25-tutorial-stations.md)
 
 # 24. Catapults
 
@@ -70,4 +70,4 @@ doesn't show it.
   checks it): a moving arm inside the base's collision would fling it away.
 
 ---
-[← Shopping carts](23-shopping-carts.md) · [Mapping API](README.md)
+[← Shopping carts](23-shopping-carts.md) · [Mapping API](README.md) · [Tutorial stations →](25-tutorial-stations.md)

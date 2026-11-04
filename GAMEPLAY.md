@@ -744,9 +744,11 @@ for anything before leveling existed** (decided): everyone starts at level 1.
 - **Slow on purpose** (decided): from level L to L+1 takes `LEVEL_XP_BASE` +
   `LEVEL_XP_STEP` × (L − 1) XP (150, 225, 300, …) — level 3 in about half an
   hour, level 25 (the last skin) after some 20–30 hours of racing.
-- **Skins by level** (`MELON_SKIN_LEVELS`, `kart/constants.js`): **three free
-  from the start** (decided) — Melon, Honey Melon, Camo —, then Strawberry 2,
-  Football 5, Golf 7, Pineapple 10, Zebra 14, Pumpkin 18, Gold 25. A locked
+- **Skins by level** (`MELON_SKIN_LEVELS`, `kart/constants.js`): **five free
+  from the start** (decided) — Melon, Honey Melon, Camo, Kiwi, Paprika —, then
+  Strawberry 2, Coconut 2, Bald Head 3, Eyeball 4, Football 5, Golf 7,
+  Pineapple 10, Zebra 14, Pumpkin 18, Disco Ball 22 (decided: a prize, next
+  to Gold), Gold 25. A locked
   skin shows in the grid dimmed under a padlock with "LV 12" in place of its
   name; clicking it does nothing. A saved skin that's locked (the levels
   were raised) drives as the default until it's reached again.
@@ -1320,10 +1322,14 @@ by `kart/look.js`.
 ## Melon skins (implemented)
 
 Each player picks a **skin** for their melon in the user menu (SETTINGS →
-MELON, decided): Melon (the default), Honey Melon, Camo, Strawberry,
-Football, Golf (dimples only in the normal map, so they show in the light
-and reflections), Pineapple, Zebra, Pumpkin (a carved face that glows from
-inside), Gold — **sorted by the level that unlocks them** (decided, the free
+MELON, decided): Melon (the default), Honey Melon, Camo, Kiwi (the top end
+cut off: green flesh, black seeds), Paprika (a glossy red bell pepper),
+Strawberry, Coconut (fibrous husk, three eyes), Bald Head (a shiny scalp, a
+cartoon face, ears, a stubble horseshoe), Eyeball (a blue iris under a
+bulging cornea, red veins round the back), Football, Golf (dimples only in
+the normal map, so they show in the light and reflections), Pineapple,
+Zebra, Pumpkin (a carved face that glows from inside), Disco Ball
+(silver mirror tiles, each a facet of its own: it sparkles in the light), Gold — **sorted by the level that unlocks them** (decided, the free
 ones first; `test/race/level.test.mjs`), three per row, a preview and a name per button, the current one
 outlined; most are **locked until a level** ("Leveling"). **Paged** (decided): `MELON_SKINS_PER_PAGE` (9, a 3 × 3 grid) per
 page in `MELON_SKINS` order, ◀ ▶ right-aligned next to the MELON title with
@@ -1629,6 +1635,73 @@ arm's geometry and timing shared with the generator); rules:
 `world/catapult/logic.js`, applied by `world/catapult/catapult.js` and
 `movement/driving/drive.js` (`test/world/catapult.test.mjs`). Details for
 mappers: [Mapping API: catapults](docs/mapping-api/24-catapults.md).
+
+## Tutorial stations (implemented, next to the old tutorial)
+
+A second tutorial, meant to replace the old one (`intro_spawn`) once it's
+approved (decided: **next to it** until then — reached through the user
+menu's DEVELOPER "Test Triggers" page, "Tutorial Stations", which sends the
+melon to `tutorial_entrance`). **Stations, not a forced path** (decided):
+six rooms in a row, `tutorial_station_<id>` triggers, visited freely in
+any order; **English** like the rest of the HUD (decided). Order (decided):
+
+1. **Driving** — W, S, round a post (W held, the view turned 360°: steering
+   by looking), a slalom through three gates, jumping (a hurdle). **No
+   strafing** (decided: A/D only push weakly sideways, `STRAFE_ACCEL` 0.4×
+   forward — not worth a step).
+2. **Boost & heal** — boost, its health cost, refilling in the heal gate, momentum.
+3. **Walls** — a wall jump (at a glowing spot on the wall), one rated GOOD
+   or better at 45° (a dashed guide line on the floor into the wall), then
+   climbing with wall jumps only (decided: no lift zone — one way up, not
+   two that look alike): a shaft 64 wide, a jump recharge zone, a shelf 224
+   up with the way on to station 4. Wall-bounce steps (in at 45°, a timed jump) are
+   put in front only while `WALL_BOUNCE_ENABLED`.
+4. **Crashes** — boosting until it breaks, a wall too fast, a fall too far
+   onto a flat floor (slopes are safe); then where it respawns.
+5. **Menu** — open it (E), pick a skin, the level, leaderboards, drone mode.
+6. **Races** — time trials, R and Tab, the Grand Prix, its rules; the exit
+   gate (`hub_teleport`) to the hub.
+
+**Every step is checked** (decided): a card on the left of the HUD
+(`tutorial_panel`) shows the station, its steps (done ones gold), how to do
+the current one — help text, the keys to press lit on a small keyboard and
+pressed in a loop, an animated diagram (look-to-steer slalom, the health
+bar draining/filling, momentum, wall jump, 45°, climbing, crash, fall, the
+menu with the column to look at) — and a progress bar. The script reads
+what the player does (inputs, speed, health, boost, heal zone, momentum
+steps, wall jumps and their rating, bounces, what broke the melon
+(`BreakCause`: boost, impact, wall, trigger, …), the user menu's state,
+skin and drone mode) and the station's goal triggers. Explanations no
+check can catch (Tab is CSS-only) are "read" steps on a timer. After the
+last step "STATION COMPLETE", `XP_TUTORIAL_STATION` XP the first time, and
+the next unfinished station. Finished stations are saved per player name
+(`SAVE_DATA_TUTORIAL_KEY`) and gold in the card's station row.
+
+**A section per step** (decided): every step has its own stretch of its
+room, in step order — a glowing line across the floor and, lying on the
+floor just past it, the step's number and text (the generator reads them from
+`TUTORIAL_STATIONS`), the same number as on the HUD card. A goal reached
+on an earlier step still counts. The rooms are in two halls side by side
+(1–3, 4–6), joined by teleporters. The climbing shaft is 64 wide: a
+wall jump (240 up, 160 off the wall) reaches the far wall at the top of its
+hop.
+
+**Two glow colors** (decided): green is guidance (floor marks, gates, the edges to land on), blue is architecture (the walls' plinth edges, pillar strips, doorways), so a glance tells what's an instruction.
+
+**Guides in the world:** non-solid glowing chevrons and the 45° dashed
+line on the floor, glowing gate posts, world text over every door, and
+**ghost melons** — see-through melons the script drives along a path of
+`info_target`s over and over (the slalom and hurdle, in at 45° and off the
+wall, into the crash wall). Entering a station makes its `tutorial_spawn_<id>`
+the respawn point, so a crash starts the station over there.
+
+Map side: `tools/maps/make-tutorial-prefab.mjs` →
+`maps/prefabs/tutorial_stations_course.vmap` (blockout, triggers, spawns,
+ghosts), placed in `maps/prefabs/tutorial_stations.vmap`. Constants and
+steps: `tutorial/constants.js`; rules: `tutorial/logic.js` (+ ghost path
+`tutorial/ghost-logic.js`), applied by `tutorial/tutorial.js`,
+`tutorial/ghost.js` and `hud/tutorial-panel.js` (`test/tutorial/tutorial.test.mjs`).
+Details for mappers: [Mapping API: tutorial stations](docs/mapping-api/25-tutorial-stations.md).
 
 ## Open design questions (not yet decided — ask before assuming)
 

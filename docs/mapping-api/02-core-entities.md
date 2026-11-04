@@ -49,6 +49,12 @@ by `SetModel`, and a map ships only the models its own entities use — so
 | Pineapple | `models/melon_racer/melon/melon_pineapple.vmdl` |
 | Zebra | `models/melon_racer/melon/melon_zebra.vmdl` |
 | Camo | `models/melon_racer/melon/melon_camo.vmdl` |
+| Kiwi | `models/melon_racer/melon/melon_kiwi.vmdl` |
+| Coconut | `models/melon_racer/melon/melon_coconut.vmdl` |
+| Paprika | `models/melon_racer/melon/melon_paprika.vmdl` |
+| Disco Ball | `models/melon_racer/melon/melon_disco.vmdl` |
+| Bald Head | `models/melon_racer/melon/melon_bald.vmdl` |
+| Eyeball | `models/melon_racer/melon/melon_eye.vmdl` |
 
 A new skin: add it to `SKINS` in `tools/materials/make-melon-skins.mjs` (run it,
 compile), to `MELON_SKINS`, `MELON_SKIN_NAMES` and `MELON_SKIN_LEVELS` (the user menu's

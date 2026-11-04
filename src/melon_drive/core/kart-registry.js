@@ -18,6 +18,11 @@ import { predictionDotSet } from "./trace.js";
  *   lastRun?: { trackId: number, time: number, newBest: boolean, at: number }, // last finished run, for the HUD
  *   finishRestartAt?: number, // game time a free-roaming finish sent the melon back to the start — see FINISH_RESTART_START_GUARD
  *   breaking: boolean, breakTime?: number, // game time BreakMelon ran, for the break camera zoom
+ *   lastBreak?: { time: number, cause: import("../health/breaking/breaking.js").BreakCause }, // the last break and what caused it — see BreakMelon
+ *   tutorial?: import("../tutorial/logic.js").TutorialState, // where this player is in the tutorial stations — see tutorial/tutorial.js
+ *   tutorialSeen?: { wallJump?: number, bounce?: number, break?: number }, // the events the tutorial last saw (their times), to tell new ones — see TutorialSnapshotOf
+ *   tutorialGoals?: string[], // tutorial goals reached since the last tick — see the tutorial_goal input
+ *   tutorialShown?: Record<string, string>, tutorialNextUpdate?: number, tutorialResendAt?: number, // the tutorial card as last sent, its next rebuild and full resend — see UpdateTutorialHud
  *   paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
  *   settled: boolean,
  *   pawnAnchor: any, // where the frozen pawn is held — see HoldPawn

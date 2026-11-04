@@ -85,6 +85,11 @@ function TraceBox(config) {
  *   lastRun?: { trackId: number, time: number, newBest: boolean, at: number }, // last finished run, for the HUD
  *   finishRestartAt?: number, // game time a free-roaming finish sent the melon back to the start — see FINISH_RESTART_START_GUARD
  *   breaking: boolean, breakTime?: number, // game time BreakMelon ran, for the break camera zoom
+ *   lastBreak?: { time: number, cause: import("../health/breaking/breaking.js").BreakCause }, // the last break and what caused it — see BreakMelon
+ *   tutorial?: import("../tutorial/logic.js").TutorialState, // where this player is in the tutorial stations — see tutorial/tutorial.js
+ *   tutorialSeen?: { wallJump?: number, bounce?: number, break?: number }, // the events the tutorial last saw (their times), to tell new ones — see TutorialSnapshotOf
+ *   tutorialGoals?: string[], // tutorial goals reached since the last tick — see the tutorial_goal input
+ *   tutorialShown?: Record<string, string>, tutorialNextUpdate?: number, tutorialResendAt?: number, // the tutorial card as last sent, its next rebuild and full resend — see UpdateTutorialHud
  *   paintColor: { r: number, g: number, b: number, a: number }, userMenuOpen: boolean, hubModalOpen: boolean,
  *   settled: boolean,
  *   pawnAnchor: any, // where the frozen pawn is held — see HoldPawn
@@ -1355,12 +1360,18 @@ const MELON_SKINS = {
     default: "models/melon_racer/melon/melon.vmdl",
     honey: "models/melon_racer/melon/melon_honey.vmdl",
     camo: "models/melon_racer/melon/melon_camo.vmdl",
+    kiwi: "models/melon_racer/melon/melon_kiwi.vmdl",
+    paprika: "models/melon_racer/melon/melon_paprika.vmdl",
     strawberry: "models/melon_racer/melon/melon_strawberry.vmdl",
+    coconut: "models/melon_racer/melon/melon_coconut.vmdl",
+    bald: "models/melon_racer/melon/melon_bald.vmdl",
+    eye: "models/melon_racer/melon/melon_eye.vmdl",
     football: "models/melon_racer/melon/melon_football.vmdl",
     golf: "models/melon_racer/melon/melon_golf.vmdl",
     pineapple: "models/melon_racer/melon/melon_pineapple.vmdl",
     zebra: "models/melon_racer/melon/melon_zebra.vmdl",
     pumpkin: "models/melon_racer/melon/melon_pumpkin.vmdl",
+    disco: "models/melon_racer/melon/melon_disco.vmdl",
     gold: "models/melon_racer/melon/melon_gold.vmdl",
 };
 const MELON_SKIN_DEFAULT = "default";
@@ -1372,12 +1383,18 @@ const MELON_SKIN_NAMES = {
     default: "Melon",
     honey: "Honey Melon",
     camo: "Camo",
+    kiwi: "Kiwi",
+    paprika: "Paprika",
     strawberry: "Strawberry",
+    coconut: "Coconut",
+    bald: "Bald Head",
+    eye: "Eyeball",
     football: "Football",
     golf: "Golf",
     pineapple: "Pineapple",
     zebra: "Zebra",
     pumpkin: "Pumpkin",
+    disco: "Disco Ball",
     gold: "Gold",
 };
 // The level (race/level/) a player needs before they can pick a skin; a
@@ -1388,12 +1405,18 @@ const MELON_SKIN_LEVELS = {
     default: 1,
     honey: 1,
     camo: 1,
+    kiwi: 1,
+    paprika: 1,
     strawberry: 2,
+    coconut: 2,
+    bald: 3,
+    eye: 4,
     football: 5,
     golf: 7,
     pineapple: 10,
     zebra: 14,
     pumpkin: 18,
+    disco: 22,
     gold: 25,
 };
 // Skins per page of the user menu's skin grid (3 x 3): with more, ◀ ▶ next to
@@ -2036,6 +2059,193 @@ const CATAPULT_ROLL_STEADY_TILT_SPEED = 1;
 const CATAPULT_ROLL_MAX_TILT = 25;
 // How fast a wobble (its pitch and roll turning) dies away (per second).
 const CATAPULT_ROLL_TILT_DAMPING = 8;
+
+// The tutorial stations (tools/maps/make-tutorial-prefab.mjs builds the map
+// side): six stations, each a trigger the melon drives into, with up to
+// TUTORIAL_MAX_STEPS steps the HUD explains one after the other and checks
+// (tutorial/logic.js). Visited freely, in any order — the HUD's station row
+// shows which are done (saved per player name). See "Tutorial stations" in
+// GAMEPLAY.md and docs/mapping-api/25-tutorial-stations.md.
+
+// --- Hammer names ---
+
+// A station: a trigger_multiple named tutorial_station_<id> (1..6), OnStartTouch
+// -> tutorial_enter, OnEndTouch -> tutorial_leave.
+const TUTORIAL_STATION_NAME_PATTERN = /^tutorial_station_(\d+)$/;
+// A goal inside a station ("drive through the gate", "reach the ledge"): a
+// trigger_multiple named tutorial_goal_<station>_<goal>, OnStartTouch -> tutorial_goal.
+const TUTORIAL_GOAL_NAME_PATTERN = /^tutorial_goal_(\d+)_([a-z0-9]+)$/;
+// Where a melon respawns while in station <id> (a break, the respawn button):
+// an info_target named tutorial_spawn_<id>, facing its yaw. Entering the
+// station makes it the respawn point.
+const TUTORIAL_SPAWN_NAME_PREFIX = "tutorial_spawn_";
+// Where the stations start: an info_target the user menu's developer
+// "Tutorial Stations" button (and any teleport_to_tutorial_entrance) sends a melon to.
+const TUTORIAL_ENTRANCE_NAME = "tutorial_entrance";
+// A ghost melon showing a station's move: a prop_dynamic named
+// tutorial_ghost_<id>, moved by the script along the info_targets
+// tutorial_ghost_<id>_<n> (n = 1, 2, … in order) and round again.
+const TUTORIAL_GHOST_NAME_PATTERN = /^tutorial_ghost_(\d+)$/;
+const TUTORIAL_GHOST_PATH_PREFIX = "tutorial_ghost_"; // + "<id>_<n>"
+
+// --- Tunables ---
+
+const TUTORIAL_MAX_STEPS = 5; // step rows on the HUD card (tutorial_step_<i>)
+const TUTORIAL_READ_SECONDS = 5; // a "read" step without its own seconds
+const TUTORIAL_STEP_DONE_SECONDS = 0.9; // a finished step shows its tick this long before the next one
+const TUTORIAL_COMPLETE_HUD_SECONDS = 5; // "STATION COMPLETE" after the last step
+const TUTORIAL_PROGRESS_SEGMENTS = 10; // the current step's progress bar (tutorial_progress_<i>)
+const TUTORIAL_HUD_UPDATE_SECONDS = 0.1; // the card is rebuilt this often while in a station
+const TUTORIAL_GHOST_SPEED = 420; // units/s along its path
+const TUTORIAL_GHOST_PAUSE = 1.2; // seconds it waits at the path's end before starting over
+const TUTORIAL_GHOST_SCAN_SECONDS = 2; // the map is searched for ghosts this often
+const TUTORIAL_GHOST_COLOR = { r: 140, g: 255, b: 170, a: 110 }; // see-through, so it reads as a demo, not a player
+// XP for finishing a station the first time (each one once per player name).
+const XP_TUTORIAL_STATION = 20;
+const XP_REASON_TUTORIAL = "TUTORIAL";
+// Key of the finished stations in the addon's save data: { [playerName]: number[] }.
+const SAVE_DATA_TUTORIAL_KEY = "tutorial";
+
+// --- The stations ---
+
+/**
+ * What a step checks (tutorial/logic.js, StepProgress):
+ *   hold      every one of `inputs` held, moving at least `minSpeed`, for `seconds` in all
+ *   each      each of `inputs` held (moving at least `minSpeed`) for `seconds`
+ *   turn      the view turned `degrees` in all while one of `inputs` is held, moving at least `minSpeed`
+ *   goals     every tutorial_goal_<station>_<id> in `goals` reached
+ *   boost     the attack boost on for `seconds` in all
+ *   healthLost  health at least `amount` below full
+ *   healFull  in a heal zone with full health
+ *   momentum  `steps` momentum steps
+ *   wallJump  `count` wall jumps, each rated at least `minRating` (if given)
+ *   bounce    `count` wall bounces rated at least `minRating`, the jump timed at least `minJump` (0..1)
+ *   break     the melon breaks by one of `causes` (BreakCause in health/breaking/breaking.js)
+ *   menuOpen  the user menu open
+ *   menuRead  the user menu open for `seconds`
+ *   menuPage  the user menu showing page `page`
+ *   skin      a different skin picked
+ *   drone     drone mode switched on and off again
+ *   read      `seconds` (default TUTORIAL_READ_SECONDS) — explanations only
+ * @typedef {{ kind: "hold" | "each", inputs: string[], seconds: number, minSpeed?: number }
+ *   | { kind: "turn", inputs: string[], degrees: number, minSpeed?: number }
+ *   | { kind: "goals", goals: string[] }
+ *   | { kind: "boost", seconds: number }
+ *   | { kind: "healthLost", amount: number }
+ *   | { kind: "healFull" }
+ *   | { kind: "momentum", steps: number }
+ *   | { kind: "wallJump", count: number, minRating?: string }
+ *   | { kind: "bounce", count: number, minRating?: string, minJump?: number }
+ *   | { kind: "break", causes: string[] }
+ *   | { kind: "menuOpen" } | { kind: "menuRead", seconds: number } | { kind: "menuPage", page: string }
+ *   | { kind: "skin" } | { kind: "drone" } | { kind: "read", seconds?: number }} TutorialCheck
+ * A step: what to do (`text`, the step list), how (`help`, under it), the
+ * keys lit on the HUD's keyboard (TUTORIAL_KEYS) and the animated diagram
+ * shown (TUTORIAL_DIAGRAMS), and its check.
+ * @typedef {{ text: string, help: string, keys?: string[], diagram?: string, check: TutorialCheck }} TutorialStep
+ * @typedef {{ id: number, title: string, steps: TutorialStep[] }} TutorialStation
+ */
+
+// The keys the HUD's keyboard has (tutorial_key_<key>), in its order, and their caps.
+const TUTORIAL_KEYS = [
+    { key: "w", cap: "W" },
+    { key: "a", cap: "A" },
+    { key: "s", cap: "S" },
+    { key: "d", cap: "D" },
+    { key: "space", cap: "SPACE", wide: true },
+    { key: "mouse1", mouse: "left" },
+    { key: "e", cap: "E" },
+    { key: "r", cap: "R" },
+    { key: "tab", cap: "TAB", wide: true },
+];
+
+// The animated diagrams (tutorial_diagram_<name>, src/panorama/melon_racer/tutorial/diagrams.xml).
+const TUTORIAL_DIAGRAMS = ["look", "circle", "drain", "heal", "momentum", "walljump", "angle", "climb", "crash", "fall", "menu-actions", "menu-settings", "menu-profile"];
+
+/** @type {TutorialStep[]} the wall bounce, while WALL_BOUNCE_ENABLED */
+const BOUNCE_STEPS = [
+    {
+        text: "WALL BOUNCE",
+        help: "Drive into the wall at 45° along the glowing line: you bounce off faster.",
+        keys: ["w"],
+        diagram: "angle",
+        check: { kind: "bounce", count: 1, minRating: "GOOD" },
+    },
+    {
+        text: "TIME THE JUMP",
+        help: "Press SPACE the moment you hit the wall — a timed jump adds even more speed.",
+        keys: ["space"],
+        diagram: "angle",
+        check: { kind: "bounce", count: 1, minRating: "GOOD", minJump: 0.5 },
+    },
+];
+
+/** @type {TutorialStation[]} */
+const TUTORIAL_STATIONS = [
+    {
+        id: 1,
+        title: "DRIVING",
+        steps: [
+            { text: "DRIVE FORWARD", help: "Hold W. Your melon rolls the way you look.", keys: ["w"], check: { kind: "hold", inputs: ["forward"], seconds: 1.5, minSpeed: 200 } },
+            { text: "BRAKE & REVERSE", help: "Hold S to brake — keep holding it to roll back.", keys: ["s"], check: { kind: "hold", inputs: ["back"], seconds: 1.2 } },
+            { text: "ROUND THE POST", help: "Hold W and keep turning the mouse: the melon follows your view. Drive once round the glowing post.", keys: ["w"], diagram: "circle", check: { kind: "turn", inputs: ["forward"], degrees: 360, minSpeed: 150 } },
+            { text: "STEER WITH THE MOUSE", help: "There's no turning key: look where you want to go. Drive through all 3 green gates.", keys: ["w"], diagram: "look", check: { kind: "goals", goals: ["a", "b", "c"] } },
+            { text: "JUMP", help: "Press SPACE to jump — only off the ground. Jump the hurdle.", keys: ["space"], check: { kind: "goals", goals: ["hurdle"] } },
+        ],
+    },
+    {
+        id: 2,
+        title: "BOOST & HEAL",
+        steps: [
+            { text: "BOOST", help: "Hold MOUSE1: more speed, past your normal top speed.", keys: ["mouse1"], check: { kind: "boost", seconds: 2 } },
+            { text: "BOOSTING COSTS HEALTH", help: "The bar under your speed drains while you boost. At zero your melon breaks!", keys: ["mouse1"], diagram: "drain", check: { kind: "healthLost", amount: 30 } },
+            { text: "HEAL UP", help: "Drive into the heal gate and stay until the bar is full again.", diagram: "heal", check: { kind: "healFull" } },
+            { text: "BUILD MOMENTUM", help: "Hit top speed, let go of W for a moment, hit it again — quickly, never below 30 km/h: your top speed grows.", keys: ["w"], diagram: "momentum", check: { kind: "momentum", steps: 2 } },
+        ],
+    },
+    {
+        id: 3,
+        title: "WALLS",
+        steps: [
+            ...(WALL_BOUNCE_ENABLED ? BOUNCE_STEPS : []),
+            { text: "WALL JUMP", help: "Jump at the glowing spot on the wall and press SPACE again the moment you touch it: you push off the wall and up.", keys: ["space"], diagram: "walljump", check: { kind: "wallJump", count: 1 } },
+            { text: "HIT IT AT 45°", help: "Come in along the glowing line, 45° to the wall: GOOD or PERFECT wall jumps boost you.", keys: ["space"], diagram: "angle", check: { kind: "wallJump", count: 1, minRating: "GOOD" } },
+            { text: "CLIMB WITH WALL JUMPS", help: "Drive into the narrow shaft, jump, then wall jump from side to side up onto the shelf. The dots next to your speed are your 3 charges — the blue zone keeps them full.", keys: ["space"], diagram: "climb", check: { kind: "goals", goals: ["climb"] } },
+        ].slice(0, TUTORIAL_MAX_STEPS),
+    },
+    {
+        id: 4,
+        title: "CRASHES",
+        steps: [
+            { text: "BOOST TOO LONG", help: "Hold MOUSE1 until your health runs out — circle round if you run out of room. Go on, break it!", keys: ["mouse1"], diagram: "drain", check: { kind: "break", causes: ["boost"] } },
+            { text: "HIT A WALL TOO FAST", help: "Boost head-on into the red wall. Hard hits cost health.", keys: ["w", "mouse1"], diagram: "crash", check: { kind: "break", causes: ["impact", "wall"] } },
+            { text: "FALL TOO FAR", help: "Jump off the tower onto the flat floor. Flat landings from high up hurt twice as much — slopes are safe.", keys: ["space"], diagram: "fall", check: { kind: "break", causes: ["impact", "trigger"] } },
+            { text: "RESPAWN", help: "You come back at your last checkpoint. Stuck? Menu (E) > Respawn at Checkpoint.", keys: ["e"], check: { kind: "read" } },
+        ],
+    },
+    {
+        id: 5,
+        title: "MENU",
+        steps: [
+            { text: "OPEN THE MENU", help: "Press E (USE) — the menu opens anywhere, also mid-race.", keys: ["e"], check: { kind: "menuOpen" } },
+            { text: "PICK A SKIN", help: "SETTINGS > MELON: click a skin. Locked ones unlock with your level.", keys: ["e", "mouse1"], diagram: "menu-settings", check: { kind: "skin" } },
+            { text: "YOUR LEVEL", help: "Top right: your level and XP. Races, best times and PERFECT hits earn XP.", keys: ["e"], diagram: "menu-profile", check: { kind: "menuRead", seconds: 4 } },
+            { text: "LEADERBOARDS", help: "ACTIONS > Leaderboards: everyone's best times and stats.", keys: ["e", "mouse1"], diagram: "menu-actions", check: { kind: "menuPage", page: "leaderboards" } },
+            { text: "DRONE MODE", help: "ACTIONS > Drone Mode: fly around the map. Press R to come back.", keys: ["e", "r"], diagram: "menu-actions", check: { kind: "drone" } },
+        ],
+    },
+    {
+        id: 6,
+        title: "RACES",
+        steps: [
+            { text: "TIME TRIALS", help: "Cross a route's start gate: the clock runs to the finish. Beat your best time!", check: { kind: "read", seconds: 6 } },
+            { text: "RESTART & BEST TIMES", help: "R restarts a time trial. Hold TAB for the best times, A / D page through the routes.", keys: ["r", "tab"], check: { kind: "read", seconds: 6 } },
+            { text: "GRAND PRIX", help: "In the hub, stand in the start zone and click Start Grand Prix. The others get 10 s to join with R.", keys: ["r"], check: { kind: "read", seconds: 6 } },
+            { text: "POINTS & RULES", help: "Points by place in every heat. After the winner, 30 s to finish. No checkpoint for 60 s = out.", check: { kind: "read", seconds: 7 } },
+            { text: "OFF TO THE HUB", help: "Drive through the exit gate. Have fun!", keys: ["w"], check: { kind: "goals", goals: ["exit"] } },
+        ],
+    },
+];
 
 // All tunable numbers and static/Hammer-naming-convention data for
 // melon_drive, one file per system they configure. Import from here, not
@@ -3521,6 +3731,15 @@ function FindSharedSpawnPoint(name, trigger, maxDistance) {
     };
 }
 
+/**
+ * Spawn point of the entity named `name` (on the floor under it, facing its
+ * yaw), undefined without one — e.g. a tutorial station's tutorial_spawn_<id>.
+ * @param {string} name
+ */
+function GetNamedSpawnPoint(name) {
+    return FindSpawnPoint(name);
+}
+
 /** Where karts go in the hub: the hub_spawn info_player_start, facing hub_spawn_facing. */
 function GetHubSpawnPoint() {
     const spawn = FindSpawnPoint(HUB_SPAWN_NAME, HUB_SPAWN_FACING_NAME);
@@ -4675,13 +4894,11 @@ const VISIBILITY_BOXES = [
     // maps/prefabs/route_tutorial.vmap
     { center: {x: -5178,y: 868,z: 142}, axes: [{x: 1,y: 0,z: 0},{x: 0,y: 1,z: 0},{x: 0,y: 0,z: 1}], half: [242,1920,322] },
     // maps/prefabs/route_bridge.vmap
-    { center: {x: -7952,y: 120,z: 718}, axes: [{x: 0,y: -1,z: 0},{x: 1,y: 0,z: 0},{x: 0,y: 0,z: 1}], half: [3056,880,722] },
+    { center: {x: 4080,y: 412,z: 710}, axes: [{x: 0,y: -1,z: 0},{x: 1,y: 0,z: 0},{x: 0,y: 0,z: 1}], half: [3056,880,722] },
     // maps/melon_racer.vmap
     { center: {x: -5800,y: -16827.332,z: 1088}, axes: [{x: 1,y: 0,z: 0},{x: 0,y: 1,z: 0},{x: 0,y: 0,z: 1}], half: [1528,1166.531,1440] },
     // maps/prefabs/route_lighthouse.vmap
     { center: {x: 1531.871,y: -5901.42,z: 1830.253}, axes: [{x: 1,y: 0,z: 0},{x: 0,y: 1,z: 0},{x: 0,y: 0,z: 1}], half: [2304,3073.42,2264] },
-    // maps/prefabs/route_motorcross.vmap
-    { center: {x: -80,y: 2879,z: 720}, axes: [{x: 1,y: 0,z: 0},{x: 0,y: 1,z: 0},{x: 0,y: 0,z: 1}], half: [3024,2064,816] },
 ];
 
 // Pure rules of the free-look drone (no engine calls) — see free-look.js.
@@ -6866,13 +7083,21 @@ function RespawnDestroyedMelon(slot, kart) {
 }
 
 /**
+ * What broke a melon: an impact (a crash, a hard landing), a wall bounce's
+ * damage, the attack boost running the health out, a kill trigger, a spike
+ * spring, the engine destroying it, the user menu's Test Break.
+ * @typedef {"impact" | "wall" | "boost" | "trigger" | "spikes" | "lost" | "test"} BreakCause
+ */
+
+/**
  * Breaks a melon on the spot, whatever its health — a kill trigger, a spike
  * spring. Broken or race-locked melons (countdown, finished) are left alone.
  * @param {import("../../core/kart-registry.js").Kart} kart
  * @param {string} reason for the debug log
+ * @param {BreakCause} [cause] what broke it (the tutorial's crash station asks)
  * @returns {boolean} whether it broke
  */
-function BreakKartNow(kart, reason) {
+function BreakKartNow(kart, reason, cause = "trigger") {
     if (kart.breaking || kart.locked) {
         return false;
     }
@@ -6881,19 +7106,21 @@ function BreakKartNow(kart, reason) {
     const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
     kart.health = 0;
     Debug(`BreakKartNow: slot ${slot} broken by ${reason}`);
-    BreakMelon(slot, kart, speed > 0 ? velocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+    BreakMelon(slot, kart, speed > 0 ? velocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1), true, cause);
     return true;
 }
 
 /**
  * @param {number} slot @param {import("../../core/kart-registry.js").Kart} kart @param {{ x: number, y: number, z: number }} impactDir @param {number} impactSpeed
  * @param {boolean} [crash] counts toward the player's crashes stat (not the user menu's "Test Break")
+ * @param {BreakCause} [cause] what broke it, left in kart.lastBreak (the tutorial's crash station asks)
  */
-function BreakMelon(slot, kart, impactDir, impactSpeed, crash = true) {
+function BreakMelon(slot, kart, impactDir, impactSpeed, crash = true, cause = "impact") {
     if (kart.breaking) {
         return; // already broken and counting down to its respawn
     }
     kart.breaking = true;
+    kart.lastBreak = { time: Instance.GetGameTime(), cause };
     if (crash) {
         CountStat(kart, "crashes");
     }
@@ -6944,6 +7171,7 @@ function HandleMelonLost(slot, kart) {
         return; // already mid-break/respawn over this same loss
     }
     kart.breaking = true;
+    kart.lastBreak = { time: Instance.GetGameTime(), cause: "lost" };
     kart.health = 0;
     CountStat(kart, "crashes");
     const breakPosition = kart.lastKnownPosition ?? kart.checkpointPosition;
@@ -7147,7 +7375,7 @@ function SettleWallBounceDamage(slot, kart) {
         `impact ${p.impactSpeed.toFixed(0)} u/s, gained ${p.speedGain.toFixed(0)} u/s`
     );
     if (kart.health <= 0) {
-        BreakMelon(slot, kart, p.impactDir, p.impactSpeed);
+        BreakMelon(slot, kart, p.impactDir, p.impactSpeed, true, "wall");
         return true;
     }
     return false;
@@ -8001,6 +8229,565 @@ function UpdateXpGainHud(slot, kart, now) {
     hud.SetHasClassForPlayer(slot, "xpgain_panel", "Hidden", !view);
 }
 
+// The tutorial stations' rules: what each step checks, moving on from step
+// to step, the finished stations in the save data, and what the HUD card
+// shows. Pure — tutorial/tutorial.js feeds it a snapshot of the kart every
+// tick (TutorialSnapshot) and does the side effects.
+
+/**
+ * What the kart did and is doing this tick, built by tutorial/tutorial.js.
+ * `events` are what happened since the last tick.
+ * @typedef {{
+ *   speed: number, health: number, maxHealth: number,
+ *   inputs: Record<string, boolean>, // forward, back, left, right, jump, attack: held now
+ *   viewYaw: number, // where the player looks (degrees)
+ *   boosting: boolean, inHeal: boolean, momentumSteps: number,
+ *   menuOpen: boolean, menuPage: string | undefined, skin: string, freeLook: boolean,
+ *   events: { wallJump?: { rating: string | undefined }, bounce?: { rating: string, jump: number }, break?: string, goals: string[] },
+ * }} TutorialSnapshot
+ * Where a player is in the stations: the station they're in (undefined:
+ * none), its step, that step's tally (StepProgress), when it was done, the
+ * goals reached in the station so far, and the "STATION COMPLETE" message.
+ * @typedef {{
+ *   station: number | undefined, step: number, tally: Record<string, any>, progress: number, goals: string[],
+ *   doneAt: number | undefined, complete: { station: number, until: number, firstTime: boolean } | undefined,
+ * }} TutorialState
+ */
+
+/** @returns {TutorialState} */
+function NewTutorialState() {
+    return { station: undefined, step: 0, tally: {}, progress: 0, goals: [], doneAt: undefined, complete: undefined };
+}
+
+/** @param {number | undefined} id */
+function StationById(id) {
+    return TUTORIAL_STATIONS.find((s) => s.id === id);
+}
+
+/** The station id in a station trigger's name, or undefined. @param {string} name */
+function StationFromTriggerName(name) {
+    const match = TUTORIAL_STATION_NAME_PATTERN.exec(name);
+    return match && StationById(Number(match[1])) ? Number(match[1]) : undefined;
+}
+
+/** The station and goal in a goal trigger's name, or undefined. @param {string} name */
+function GoalFromTriggerName(name) {
+    const match = TUTORIAL_GOAL_NAME_PATTERN.exec(name);
+    return match ? { station: Number(match[1]), goal: match[2] } : undefined;
+}
+
+/** How good a rating is: 0 = the best (PERFECT). @param {string | undefined} label */
+function RatingRank(label) {
+    const i = BOUNCE_RATINGS.findIndex((r) => r.label === label);
+    return i < 0 ? BOUNCE_RATINGS.length : i;
+}
+
+/** @param {string | undefined} label @param {string | undefined} min */
+function AtLeast(label, min) {
+    return min === undefined || RatingRank(label) <= RatingRank(min);
+}
+
+/**
+ * How far a step is, 0..1, from this tick's snapshot. `tally` is the step's
+ * own running count (kept from tick to tick, fresh for every step) — it's
+ * changed in place. `dt` seconds since the last tick.
+ * @param {import("./constants.js").TutorialCheck} check @param {Record<string, any>} tally
+ * @param {TutorialSnapshot} snap @param {number} dt
+ * @returns {number}
+ */
+function StepProgress(check, tally, snap, dt) {
+    switch (check.kind) {
+        case "hold": {
+            if (check.inputs.every((i) => snap.inputs[i]) && snap.speed >= (check.minSpeed ?? 0)) {
+                tally.seconds = (tally.seconds ?? 0) + dt;
+            }
+            return Fraction(tally.seconds ?? 0, check.seconds);
+        }
+        case "each": {
+            let sum = 0;
+            for (const input of check.inputs) {
+                if (snap.inputs[input] && snap.speed >= (check.minSpeed ?? 0)) {
+                    tally[input] = (tally[input] ?? 0) + dt;
+                }
+                sum += Fraction(tally[input] ?? 0, check.seconds);
+            }
+            return sum / check.inputs.length;
+        }
+        case "turn": {
+            // How far the view turned since last tick, the short way round.
+            const turn = tally.lastYaw === undefined ? 0 : Math.abs(((snap.viewYaw - tally.lastYaw + 540) % 360) - 180);
+            tally.lastYaw = snap.viewYaw;
+            if (check.inputs.some((i) => snap.inputs[i]) && snap.speed >= (check.minSpeed ?? 0)) {
+                tally.degrees = (tally.degrees ?? 0) + turn;
+            }
+            return Fraction(tally.degrees ?? 0, check.degrees);
+        }
+        case "goals": {
+            tally.reached ??= [];
+            for (const goal of snap.events.goals) {
+                if (check.goals.includes(goal) && !tally.reached.includes(goal)) {
+                    tally.reached.push(goal);
+                }
+            }
+            return tally.reached.length / check.goals.length;
+        }
+        case "boost":
+            if (snap.boosting) {
+                tally.seconds = (tally.seconds ?? 0) + dt;
+            }
+            return Fraction(tally.seconds ?? 0, check.seconds);
+        case "healthLost":
+            tally.best = Math.max(tally.best ?? 0, Fraction(snap.maxHealth - snap.health, check.amount));
+            return tally.best;
+        case "healFull":
+            return snap.inHeal ? Fraction(snap.health, snap.maxHealth) : 0;
+        case "momentum":
+            tally.best = Math.max(tally.best ?? 0, Fraction(snap.momentumSteps, check.steps));
+            return tally.best;
+        case "wallJump": {
+            const jump = snap.events.wallJump;
+            if (jump && AtLeast(jump.rating, check.minRating)) {
+                tally.count = (tally.count ?? 0) + 1;
+            }
+            return Fraction(tally.count ?? 0, check.count);
+        }
+        case "bounce": {
+            const bounce = snap.events.bounce;
+            if (bounce && AtLeast(bounce.rating, check.minRating) && bounce.jump >= (check.minJump ?? 0)) {
+                tally.count = (tally.count ?? 0) + 1;
+            }
+            return Fraction(tally.count ?? 0, check.count);
+        }
+        case "break":
+            if (snap.events.break !== undefined && check.causes.includes(snap.events.break)) {
+                tally.done = true;
+            }
+            return tally.done ? 1 : 0;
+        case "menuOpen":
+            return snap.menuOpen ? 1 : 0;
+        case "menuRead":
+            if (snap.menuOpen) {
+                tally.seconds = (tally.seconds ?? 0) + dt;
+            }
+            return Fraction(tally.seconds ?? 0, check.seconds);
+        case "menuPage":
+            return snap.menuOpen && snap.menuPage === check.page ? 1 : 0;
+        case "skin":
+            tally.from ??= snap.skin;
+            return snap.skin !== tally.from ? 1 : 0;
+        case "drone":
+            if (snap.freeLook) {
+                tally.on = true;
+            }
+            return tally.on ? (snap.freeLook ? 0.5 : 1) : 0;
+        case "read":
+            tally.seconds = (tally.seconds ?? 0) + dt;
+            return Fraction(tally.seconds, check.seconds ?? TUTORIAL_READ_SECONDS);
+    }
+    return 0;
+}
+
+/** @param {number} value @param {number} of */
+function Fraction(value, of) {
+    return of > 0 ? Math.max(0, Math.min(1, value / of)) : 1;
+}
+
+/**
+ * Into station `id` (its trigger touched): from its first step, whether it
+ * was finished before or not — a "STATION COMPLETE" still showing stays.
+ * Driving back into the station it's already in changes nothing.
+ * @param {TutorialState} state @param {number} id
+ */
+function EnterStation(state, id) {
+    if (state.station === id) {
+        return;
+    }
+    state.station = id;
+    state.step = 0;
+    state.tally = {};
+    state.progress = 0;
+    state.goals = [];
+    state.doneAt = undefined;
+}
+
+/** Out of station `id` (its trigger left). @param {TutorialState} state @param {number} id */
+function LeaveStation(state, id) {
+    if (state.station === id) {
+        state.station = undefined;
+    }
+}
+
+/**
+ * One tick in the station: checks the current step, moves on to the next
+ * TUTORIAL_STEP_DONE_SECONDS after it's done, and after the last one leaves
+ * the station finished. Returns the station id when it was just finished.
+ * @param {TutorialState} state @param {TutorialSnapshot} snap @param {number} now @param {number} dt
+ * @param {(id: number) => boolean} finishedBefore whether this player had finished that station before
+ * @returns {number | undefined}
+ */
+function StepTutorial(state, snap, now, dt, finishedBefore) {
+    if (state.complete && now >= state.complete.until) {
+        state.complete = undefined;
+    }
+    const station = StationById(state.station);
+    if (!station) {
+        return undefined;
+    }
+    const step = station.steps[state.step];
+    if (!step) {
+        return undefined;
+    }
+    // Goals count for the whole visit: a gate driven through while still on
+    // an earlier step isn't lost (the way back to it may be long).
+    state.goals ??= [];
+    for (const goal of snap.events.goals) {
+        if (!state.goals.includes(goal)) {
+            state.goals.push(goal);
+        }
+    }
+    if (state.doneAt === undefined) {
+        state.progress = StepProgress(step.check, state.tally, { ...snap, events: { ...snap.events, goals: state.goals } }, dt);
+        if (state.progress >= 1) {
+            state.doneAt = now;
+        }
+        return undefined;
+    }
+    if (now - state.doneAt < TUTORIAL_STEP_DONE_SECONDS) {
+        return undefined;
+    }
+    if (state.step + 1 < station.steps.length) {
+        state.step += 1;
+        state.tally = {};
+        state.progress = 0;
+        state.doneAt = undefined;
+        return undefined;
+    }
+    // The last step: the station is done. Out of it until its trigger is entered again.
+    state.complete = { station: station.id, until: now + TUTORIAL_COMPLETE_HUD_SECONDS, firstTime: !finishedBefore(station.id) };
+    state.station = undefined;
+    return station.id;
+}
+
+/**
+ * Every player's finished stations from the save data: { [playerName]: number[] }.
+ * @param {Record<string, any>} saveData parsed, see ParseSaveData
+ * @returns {Record<string, number[]>}
+ */
+function GetFinishedStations(saveData) {
+    const raw = saveData[SAVE_DATA_TUTORIAL_KEY];
+    /** @type {Record<string, number[]>} */
+    const all = {};
+    if (raw && typeof raw === "object") {
+        for (const [name, list] of Object.entries(raw)) {
+            if (Array.isArray(list)) {
+                all[name] = list.filter((id) => typeof id === "number" && StationById(id));
+            }
+        }
+    }
+    return all;
+}
+
+/**
+ * Adds station `id` to a player's finished ones. Returns whether it's new.
+ * @param {Record<string, number[]>} finished @param {string} name @param {number} id
+ */
+function MarkStationFinished(finished, name, id) {
+    const list = finished[name] ?? [];
+    if (list.includes(id)) {
+        return false;
+    }
+    finished[name] = [...list, id].sort((a, b) => a - b);
+    return true;
+}
+
+/**
+ * What the HUD card shows (hud/tutorial-panel.js), or undefined to hide it:
+ * the station's title and number, each step's text and state (done, the
+ * current one, still to come), the current step's help, keys, diagram and
+ * progress bar, the station row (done = finished before or just now) — or,
+ * just after the last step, "STATION COMPLETE" with the next station to visit.
+ * @param {TutorialState} state @param {number[]} finished this player's finished stations
+ */
+function TutorialView(state, finished) {
+    const stationRow = TUTORIAL_STATIONS.map((s) => ({
+        id: s.id,
+        done: finished.includes(s.id),
+        current: s.id === (state.station ?? state.complete?.station),
+    }));
+    if (state.station === undefined && state.complete) {
+        const next = TUTORIAL_STATIONS.find((s) => !finished.includes(s.id));
+        const station = StationById(state.complete.station);
+        return {
+            complete: true,
+            title: station?.title ?? "",
+            kicker: `STATION ${state.complete.station} / ${TUTORIAL_STATIONS.length}`,
+            message: next ? `NEXT: STATION ${next.id} · ${next.title}` : "ALL STATIONS DONE · OFF TO THE HUB!",
+            firstTime: state.complete.firstTime,
+            stationRow,
+            steps: [],
+            help: "",
+            keys: [],
+            diagram: undefined,
+            segments: 0,
+        };
+    }
+    const station = StationById(state.station);
+    if (!station) {
+        return undefined;
+    }
+    const step = station.steps[state.step];
+    const done = state.doneAt !== undefined;
+    return {
+        complete: false,
+        title: station.title,
+        kicker: `STATION ${station.id} / ${TUTORIAL_STATIONS.length}`,
+        message: "",
+        firstTime: false,
+        stationRow,
+        steps: station.steps.slice(0, TUTORIAL_MAX_STEPS).map((s, i) => ({
+            text: s.text,
+            state: i < state.step || (i === state.step && done) ? "done" : i === state.step ? "current" : "todo",
+        })),
+        help: step?.help ?? "",
+        keys: step?.keys ?? [],
+        diagram: step?.diagram,
+        segments: Math.round((done ? 1 : state.progress) * TUTORIAL_PROGRESS_SEGMENTS),
+    };
+}
+
+// The tutorial stations, engine side: which station a melon is in (its
+// trigger's tutorial_enter/tutorial_leave), what it does each tick (a
+// TutorialSnapshot for the rules in logic.js), the finished stations kept per
+// player name in the save data, the XP for a station's first finish, and the
+// respawn point moving to the station's tutorial_spawn_<id>.
+
+/** @typedef {import("../core/kart-registry.js").Kart} Kart */
+
+// Every player's finished stations, read from the save data once.
+/** @type {Record<string, number[]> | undefined} */
+let finished = undefined;
+
+function Finished() {
+    finished ??= GetFinishedStations(ParseSaveData(Instance.GetSaveData()));
+    return finished;
+}
+
+/** This kart's player's finished stations. @param {Kart} kart */
+function GetKartFinishedStations(kart) {
+    return Finished()[PlayerName$4(kart)] ?? [];
+}
+
+/** @param {Kart} kart */
+function State(kart) {
+    kart.tutorial ??= NewTutorialState();
+    return kart.tutorial;
+}
+
+/**
+ * Into station `id`: its steps from the first, and its tutorial_spawn_<id>
+ * the respawn point (not on a track: a race keeps its checkpoints).
+ * @param {Kart} kart @param {number} id
+ */
+function EnterTutorialStation(kart, id) {
+    const state = State(kart);
+    if (state.station === id) {
+        return;
+    }
+    EnterStation(state, id);
+    kart.tutorialSeen = undefined; // events from before the station don't count
+    kart.tutorialGoals = [];
+    const spawn = GetNamedSpawnPoint(`${TUTORIAL_SPAWN_NAME_PREFIX}${id}`);
+    if (spawn && kart.trackId === undefined) {
+        kart.checkpointPosition = spawn.position;
+        kart.checkpointAngles = spawn.angles;
+    }
+    Debug(`tutorial: "${PlayerName$4(kart)}" in station ${id}${spawn ? "" : ` (no ${TUTORIAL_SPAWN_NAME_PREFIX}${id}: respawn point unchanged)`}`);
+}
+
+/** Out of station `id`. @param {Kart} kart @param {number} id */
+function LeaveTutorialStation(kart, id) {
+    if (kart.tutorial) {
+        LeaveStation(kart.tutorial, id);
+    }
+}
+
+/** A goal of station `station` reached. @param {Kart} kart @param {number} station @param {string} goal */
+function ReachTutorialGoal(kart, station, goal) {
+    if (kart.tutorial?.station === station) {
+        (kart.tutorialGoals ??= []).push(goal);
+    }
+}
+
+/**
+ * This tick's snapshot of the kart for the rules (logic.js). The events —
+ * a wall jump, a wall bounce, a break — are told from the times the kart
+ * keeps, against the ones seen last tick (kart.tutorialSeen). A bounce counts
+ * once its jump window has closed, so a jump just after the hit is in it.
+ * @param {Kart} kart @param {number} now
+ * @returns {import("./logic.js").TutorialSnapshot}
+ */
+function TutorialSnapshotOf(kart, now) {
+    const seen = (kart.tutorialSeen ??= { wallJump: kart.lastWallJump?.time, bounce: kart.lastBounceTime, break: kart.lastBreak?.time });
+    const pawn = kart.pawn;
+    const velocity = kart.melon.GetAbsVelocity();
+    /** @type {import("./logic.js").TutorialSnapshot["events"]} */
+    const events = { goals: kart.tutorialGoals ?? [] };
+    kart.tutorialGoals = [];
+
+    const wallJumpTime = kart.lastWallJump?.time;
+    if (wallJumpTime !== undefined && wallJumpTime !== seen.wallJump) {
+        seen.wallJump = wallJumpTime;
+        const rated = kart.lastBounceTime === wallJumpTime && kart.lastBounceInfo;
+        events.wallJump = { rating: rated ? GetBounceRating(rated.angleFactor).label : undefined };
+    }
+    const bounceTime = kart.lastBounceTime;
+    if (
+        bounceTime !== undefined &&
+        bounceTime !== seen.bounce &&
+        bounceTime !== wallJumpTime &&
+        now - bounceTime > WALL_BOUNCE_PERFECT_JUMP_WINDOW &&
+        kart.lastBounceInfo
+    ) {
+        seen.bounce = bounceTime;
+        events.bounce = { rating: GetBounceRating(kart.lastBounceInfo.angleFactor).label, jump: kart.lastBounceInfo.jumpFactor };
+    }
+    const breakTime = kart.lastBreak?.time;
+    if (breakTime !== undefined && breakTime !== seen.break) {
+        seen.break = breakTime;
+        events.break = kart.lastBreak?.cause;
+    }
+
+    return {
+        speed: Math.hypot(velocity.x, velocity.y),
+        health: kart.health,
+        maxHealth: MELON_MAX_HEALTH,
+        inputs: {
+            forward: pawn.IsInputPressed(CSInputs.FORWARD),
+            back: pawn.IsInputPressed(CSInputs.BACK),
+            left: pawn.IsInputPressed(CSInputs.LEFT),
+            right: pawn.IsInputPressed(CSInputs.RIGHT),
+            jump: pawn.IsInputPressed(CSInputs.JUMP),
+            attack: pawn.IsInputPressed(CSInputs.ATTACK),
+        },
+        viewYaw: pawn.GetEyeAngles().yaw,
+        boosting: Boolean(kart.attackBoosting),
+        inHeal: (kart.healZones?.size ?? 0) > 0,
+        momentumSteps: kart.momentum?.steps ?? 0,
+        menuOpen: kart.userMenuOpen,
+        menuPage: kart.userMenuPage,
+        skin: GetMelonSkin(kart),
+        freeLook: Boolean(kart.freeLook),
+        events,
+    };
+}
+
+/**
+ * Per tick for every kart (core/think.js): checks the step of the station
+ * it's in, and on a station's last step saves it as finished — with XP the
+ * first time.
+ * @param {Kart} kart @param {number} now @param {number} dt
+ */
+function UpdateTutorial(kart, now, dt) {
+    const state = kart.tutorial;
+    if (!state || (state.station === undefined && !state.complete)) {
+        return;
+    }
+    if (state.station === undefined) {
+        StepTutorial(state, TutorialSnapshotOf(kart, now), now, dt, () => true); // only lets the "STATION COMPLETE" run out
+        return;
+    }
+    const name = PlayerName$4(kart);
+    const done = StepTutorial(state, TutorialSnapshotOf(kart, now), now, dt, (id) => (Finished()[name] ?? []).includes(id));
+    if (done === undefined) {
+        return;
+    }
+    if (MarkStationFinished(Finished(), name, done)) {
+        const data = ParseSaveData(Instance.GetSaveData()); // re-read: keeps what other systems keep there
+        data[SAVE_DATA_TUTORIAL_KEY] = Finished();
+        Instance.SetSaveData(JSON.stringify(data));
+        GrantXp(kart, XP_TUTORIAL_STATION, `${XP_REASON_TUTORIAL} STATION ${done}`);
+    }
+    Debug(`tutorial: "${name}" finished station ${done}`);
+}
+
+/**
+ * The tutorial card (tutorial_panel in melon_racer.xml, left middle) while a
+ * melon is in a tutorial station: the station's title, its steps with the
+ * current one lit and the finished ones ticked, how to do the current one
+ * (help text, the keys lit on the keyboard, an animated diagram) and its
+ * progress bar, the row of all stations (finished ones gold) — then "STATION
+ * COMPLETE" for a moment. Rebuilt every TUTORIAL_HUD_UPDATE_SECONDS, each
+ * class/variable sent on change and all of them again every HUD_RESEND_SECONDS.
+ * @param {number} slot @param {import("../core/kart-registry.js").Kart} kart @param {number} now
+ */
+function UpdateTutorialHud(slot, kart, now) {
+    if (now < (kart.tutorialNextUpdate ?? 0)) {
+        return;
+    }
+    kart.tutorialNextUpdate = now + TUTORIAL_HUD_UPDATE_SECONDS;
+    const hud = GetSpeedHud();
+    if (!hud) {
+        return;
+    }
+    const resend = now >= (kart.tutorialResendAt ?? 0);
+    if (resend) {
+        kart.tutorialResendAt = now + HUD_RESEND_SECONDS;
+        kart.tutorialShown = {};
+    }
+    const shown = (kart.tutorialShown ??= {});
+    /** @param {string} panel @param {string} cls @param {boolean} on */
+    const Class = (panel, cls, on) => {
+        const key = `${panel}.${cls}`;
+        if (shown[key] !== String(on)) {
+            shown[key] = String(on);
+            hud.SetHasClassForPlayer(slot, panel, cls, on);
+        }
+    };
+    /** @param {string} variable @param {string} value */
+    const Text = (variable, value) => {
+        if (shown[variable] !== value) {
+            shown[variable] = value;
+            hud.SetDialogVariableStringForPlayer(slot, "tutorial_panel", variable, value);
+        }
+    };
+
+    const view = kart.tutorial ? TutorialView(kart.tutorial, GetKartFinishedStations(kart)) : undefined;
+    Class("tutorial_panel", "Hidden", !view);
+    if (!view) {
+        return;
+    }
+    Class("tutorial_panel", "Complete", view.complete);
+    Text("tutorial_kicker", view.kicker);
+    Text("tutorial_title", view.title);
+    Text("tutorial_help", view.help);
+    Text("tutorial_message", view.message);
+    Class("tutorial_xp", "Hidden", !view.firstTime);
+    for (const station of view.stationRow) {
+        Class(`tutorial_station_${station.id}`, "Done", station.done);
+        Class(`tutorial_station_${station.id}`, "Current", station.current);
+    }
+    for (let i = 0; i < TUTORIAL_MAX_STEPS; i++) {
+        const step = view.steps[i];
+        Class(`tutorial_step_${i}`, "Hidden", !step);
+        Class(`tutorial_step_${i}`, "Done", step?.state === "done");
+        Class(`tutorial_step_${i}`, "Current", step?.state === "current");
+        if (step) {
+            Text(`tutorial_step_${i}_text`, step.text);
+        }
+    }
+    Class("tutorial_keys", "Hidden", view.keys.length === 0);
+    for (const { key } of TUTORIAL_KEYS) {
+        Class(`tutorial_key_${key}`, "Lit", view.keys.includes(key));
+    }
+    for (const diagram of TUTORIAL_DIAGRAMS) {
+        Class(`tutorial_diagram_${diagram}`, "Hidden", view.diagram !== diagram);
+    }
+    Class("tutorial_diagrams", "Hidden", view.diagram === undefined);
+    for (let i = 0; i < TUTORIAL_PROGRESS_SEGMENTS; i++) {
+        Class(`tutorial_progress_${i}`, "Lit", i < view.segments);
+    }
+}
+
 // Per-track config comes straight from Hammer instead of a hand-maintained
 // lookup: each track has one trigger_multiple named "start_<trackId>" or
 // "start_<trackId>_laps<lapsToWin>" (e.g. "start_1_laps3"; without _laps
@@ -8547,7 +9334,8 @@ function BuildStatBoard({ slide, totals, players, self, maxRows }) {
 const ROUTE_NAMES = {
     1: "Canals",
     2: "Bridge",
-    3: "Side Slice"
+    3: "Side Slice",
+    4: "Lighthouse"
 };
 
 // Pure rules of the hub's "Start Grand Prix" window
@@ -9670,6 +10458,22 @@ function ReturnAllToHub(returning) {
  */
 function SendKartToTutorial(kart) {
     SendKartsOutOfRace([kart], GetIntroSpawnPoint(), "tutorial");
+}
+
+/**
+ * The user menu's developer "Tutorial Stations": like "Play Tutorial", to the
+ * tutorial stations' entrance (TUTORIAL_ENTRANCE_NAME). Returns whether the
+ * map has one.
+ * @param {import("../../core/kart-registry.js").Kart} kart
+ */
+function SendKartToTutorialStations(kart) {
+    const spawn = GetNamedSpawnPoint(TUTORIAL_ENTRANCE_NAME);
+    if (!spawn) {
+        Console.Log(`[melon_drive] Tutorial Stations: no "${TUTORIAL_ENTRANCE_NAME}" in the map — place the tutorial_stations prefab`);
+        return false;
+    }
+    SendKartsOutOfRace([kart], spawn, "tutorial stations");
+    return true;
 }
 
 /**
@@ -11781,7 +12585,7 @@ function TestBreak(slot, kart) {
     const v = kart.melon.GetAbsVelocity();
     const speed = Math.hypot(v.x, v.y, v.z);
     // Standing still the pieces still need a direction to fly out along.
-    BreakMelon(slot, kart, speed > 1 ? v : { x: 1, y: 0, z: 0 }, Math.max(speed, 1), false); // not a crash for the stats
+    BreakMelon(slot, kart, speed > 1 ? v : { x: 1, y: 0, z: 0 }, Math.max(speed, 1), false, "test"); // not a crash for the stats
     return true;
 }
 
@@ -12009,6 +12813,9 @@ const TEST_TRIGGER_BUTTONS = {
     usermenu_testbounce_button: (slot, kart) => TestPerfectBounce(kart),
     usermenu_testheal_button: (slot, kart) => TestHeal(kart),
     usermenu_testxp_button: (slot, kart) => TestXpGain(kart),
+    // To the tutorial stations' entrance, like "Play Tutorial" (race/heat/race-flow.js)
+    // — while the new tutorial stands next to the old one.
+    usermenu_tutorialstations_button: (slot, kart) => SendKartToTutorialStations(kart),
 };
 
 /**
@@ -12117,9 +12924,143 @@ function RegisterHudInputs() {
 // (Tab: Grand Prix points, best times), leaderboards/ (the user menu's
 // page with every leaderboard), profile/ (the user menu's own melon and
 // stats), hub-modal/ ("Start Grand Prix": the heats
-// and who rides along) — the others are one file each: bounce-panel.js, level-up-panel.js, user-menu.js.
+// and who rides along) — the others are one file each: bounce-panel.js, level-up-panel.js, tutorial-panel.js, user-menu.js.
 // layout.js finds the custom_hud_layout entity; inputs.js handles every
 // button click.
+
+// A ghost melon's place on its path (tutorial/ghost.js): along the points at
+// a steady speed, a pause at the end, then from the start again.
+
+/** @typedef {{ x: number, y: number, z: number }} Vec */
+
+/** The path's length. @param {Vec[]} path */
+function GhostPathLength(path) {
+    let length = 0;
+    for (let i = 1; i < path.length; i++) {
+        length += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y, path[i].z - path[i - 1].z);
+    }
+    return length;
+}
+
+/**
+ * Where the ghost is at `time`, and which way it's heading (a unit vector).
+ * @param {Vec[]} path at least two points @param {number} length GhostPathLength(path)
+ * @param {number} time @param {number} speed units/s @param {number} pause seconds at the end
+ */
+function GhostPositionAt(path, length, time, speed, pause) {
+    const lap = length / speed + pause;
+    let distance = Math.min(((time % lap) + lap) % lap, length / speed) * speed;
+    for (let i = 1; i < path.length; i++) {
+        const a = path[i - 1], b = path[i];
+        const segment = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+        if (distance <= segment || i === path.length - 1) {
+            const t = segment > 0 ? Math.min(1, distance / segment) : 0;
+            const direction = segment > 0 ? { x: (b.x - a.x) / segment, y: (b.y - a.y) / segment, z: (b.z - a.z) / segment } : { x: 1, y: 0, z: 0 };
+            return { position: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t }, direction };
+        }
+        distance -= segment;
+    }
+    return { position: path[0], direction: { x: 1, y: 0, z: 0 } };
+}
+
+// Ghost melons: a see-through melon per station (prop_dynamic
+// tutorial_ghost_<id>) driving the move the station teaches, round and round
+// along its path (info_targets tutorial_ghost_<id>_1, _2, …) — e.g. into the
+// wall at 45° and off it. Moved by the script on its own clock; seen by
+// everyone. The path math is in ghost-logic.js.
+
+/** @type {{ entity: any, path: { x: number, y: number, z: number }[], length: number }[]} */
+let ghosts = [];
+let nextScanTime$4 = 0;
+
+/** Every tutorial_ghost_<id> with a path of at least two points. */
+function FindGhosts() {
+    /** @type {typeof ghosts} */
+    const found = [];
+    for (const entity of Instance.FindEntitiesByClass("prop_dynamic")) {
+        const match = TUTORIAL_GHOST_NAME_PATTERN.exec(entity.GetEntityName());
+        if (!match) {
+            continue;
+        }
+        const path = [];
+        for (let n = 1; ; n++) {
+            const point = Instance.FindEntityByName(`${TUTORIAL_GHOST_PATH_PREFIX}${match[1]}_${n}`);
+            if (!point) {
+                break;
+            }
+            path.push(point.GetAbsOrigin());
+        }
+        if (path.length < 2) {
+            Debug(`tutorial ghost ${entity.GetEntityName()}: needs ${TUTORIAL_GHOST_PATH_PREFIX}${match[1]}_1 and _2 at least, has ${path.length}`);
+            continue;
+        }
+        entity.SetColor(TUTORIAL_GHOST_COLOR);
+        found.push({ entity, path, length: GhostPathLength(path) });
+    }
+    return found;
+}
+
+/** Per tick (core/think.js): every ghost one step further along its path. @param {number} now */
+function UpdateTutorialGhosts(now) {
+    if (now >= nextScanTime$4) {
+        nextScanTime$4 = now + TUTORIAL_GHOST_SCAN_SECONDS;
+        ghosts = FindGhosts();
+    }
+    for (const ghost of ghosts) {
+        if (!ghost.entity.IsValid()) {
+            continue;
+        }
+        const { position, direction } = GhostPositionAt(ghost.path, ghost.length, now, TUTORIAL_GHOST_SPEED, TUTORIAL_GHOST_PAUSE);
+        // Rolling: pitch turns with the distance (a 14-unit melon: ~4 degrees per unit).
+        // Move, not Teleport: keeps the client's interpolation, so it glides.
+        const yaw = (Math.atan2(direction.y, direction.x) * 180) / Math.PI;
+        const pitch = (now * TUTORIAL_GHOST_SPEED * 4) % 360;
+        ghost.entity.Move({ position, angles: { pitch, yaw, roll: 0 } });
+    }
+}
+
+// Script inputs of the tutorial stations: tutorial_enter/tutorial_leave on a
+// station trigger (tutorial_station_<id>), tutorial_goal on a goal trigger
+// (tutorial_goal_<id>_<goal>). Which one comes from the trigger's name.
+
+/** @param {string} input @param {(kart: any, name: string) => void} handle */
+function OnMelonInput(input, handle) {
+    Instance.OnScriptInput(input, ({ caller, activator }) => {
+        const kart = activator && FindKartByMelon(activator);
+        if (kart && caller) {
+            handle(kart, caller.GetEntityName());
+        }
+    });
+}
+
+function RegisterTutorialInputs() {
+    OnMelonInput("tutorial_enter", (kart, name) => {
+        const id = StationFromTriggerName(name);
+        if (id === undefined) {
+            Console.Log(`[melon_drive] tutorial_enter: trigger "${name}" isn't named tutorial_station_<1..6>, ignoring`);
+            return;
+        }
+        EnterTutorialStation(kart, id);
+    });
+    OnMelonInput("tutorial_leave", (kart, name) => {
+        const id = StationFromTriggerName(name);
+        if (id !== undefined) {
+            LeaveTutorialStation(kart, id);
+        }
+    });
+    OnMelonInput("tutorial_goal", (kart, name) => {
+        const goal = GoalFromTriggerName(name);
+        if (!goal) {
+            Console.Log(`[melon_drive] tutorial_goal: trigger "${name}" isn't named tutorial_goal_<station>_<goal>, ignoring`);
+            return;
+        }
+        ReachTutorialGoal(kart, goal.station, goal.goal);
+    });
+}
+
+// The tutorial stations: six stations explaining the game step by step, each
+// step checked (logic.js), ghost melons showing the moves (ghost.js). The HUD
+// card is hud/tutorial-panel.js.
 
 // Steering grip (see STEER_GRIP_* in movement/driving/constants.js): turning the
 // melon's velocity towards where the player looks. Pure math, no engine.
@@ -13201,7 +14142,7 @@ function UpdateKart(slot, kart, dt) {
     if (boost.boosting && kart.health <= 0) {
         Debug(`slot ${slot}: boosted until the health ran out`);
         const speed = Math.hypot(currentVelocity.x, currentVelocity.y, currentVelocity.z);
-        BreakMelon(slot, kart, speed > 0 ? currentVelocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+        BreakMelon(slot, kart, speed > 0 ? currentVelocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1), true, "boost");
         return;
     }
 
@@ -13742,7 +14683,7 @@ function UpdateSpikeSpring(spring, state, now) {
         }
         const p = kart.melon.GetAbsOrigin();
         if (IsOverSpikeSpring({ x: p.x - origin.x, y: p.y - origin.y, z: p.z - origin.z }, angles)) {
-            BreakKartNow(kart, `spike spring ${spring.GetEntityName()}`);
+            BreakKartNow(kart, `spike spring ${spring.GetEntityName()}`, "spikes");
         }
     }
 }
@@ -14238,6 +15179,8 @@ function Think() {
             UpdateScoreboardHud(slot, kart);
             UpdateLevelUpHud(slot, kart, now);
             UpdateXpGainHud(slot, kart, now);
+            UpdateTutorial(kart, now, dt);
+            UpdateTutorialHud(slot, kart, now);
             if (kart.inHub) {
                 ApplyHubModalState(slot, phase);
             }
@@ -14306,6 +15249,11 @@ function Think() {
         UpdateBallSpawner(now);
     } catch (err) {
         Debug(`Think: UpdateBallSpawner threw: ${err}`);
+    }
+    try {
+        UpdateTutorialGhosts(now);
+    } catch (err) {
+        Debug(`Think: UpdateTutorialGhosts threw: ${err}`);
     }
     try {
         UpdateBouncers(now);
@@ -14685,3 +15633,4 @@ RegisterSpikeSpringInputs(); // OnRoundStart: look the spike springs up again
 RegisterBallPitInputs(); // ball_pit_enter/ball_pit_leave
 RegisterBallSpawnerInputs(); // OnRoundStart: the spawned balls are gone
 RegisterBouncerInputs(); // OnRoundStart: start the bouncers again, at new random points
+RegisterTutorialInputs(); // tutorial_enter/tutorial_leave/tutorial_goal

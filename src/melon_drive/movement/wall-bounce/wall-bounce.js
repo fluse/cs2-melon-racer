@@ -220,7 +220,7 @@ export function SettleWallBounceDamage(slot, kart) {
         `impact ${p.impactSpeed.toFixed(0)} u/s, gained ${p.speedGain.toFixed(0)} u/s`
     );
     if (kart.health <= 0) {
-        BreakMelon(slot, kart, p.impactDir, p.impactSpeed);
+        BreakMelon(slot, kart, p.impactDir, p.impactSpeed, true, "wall");
         return true;
     }
     return false;

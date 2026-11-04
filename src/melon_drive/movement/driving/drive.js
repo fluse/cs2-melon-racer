@@ -264,7 +264,7 @@ export function UpdateKart(slot, kart, dt) {
     if (boost.boosting && kart.health <= 0) {
         Debug(`slot ${slot}: boosted until the health ran out`);
         const speed = Math.hypot(currentVelocity.x, currentVelocity.y, currentVelocity.z);
-        BreakMelon(slot, kart, speed > 0 ? currentVelocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1));
+        BreakMelon(slot, kart, speed > 0 ? currentVelocity : { x: 1, y: 0, z: 0 }, Math.max(speed, 1), true, "boost");
         return;
     }
 

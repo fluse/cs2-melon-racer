@@ -1,0 +1,91 @@
+<!-- The tutorial card's animated diagrams (TUTORIAL_DIAGRAMS in
+     tutorial/constants.js; the script shows one: tutorial_diagram_<name>, the
+     others .Hidden). Each is a small looping scene of plain panels moved by CSS
+     animations (diagrams.css): the melon is the lime dot (.DgMelon), walls and
+     floors are bars. Top-down unless it says side view. -->
+<Panel id="tutorial_diagrams" class="TutorialDiagrams Hidden">
+	<!-- Steer by looking: the melon weaves through three gates, the mouse below sliding the way it turns. -->
+	<Panel id="tutorial_diagram_look" class="TutorialDiagram Hidden">
+		<Panel class="DgGate DgGate1" /><Panel class="DgGate DgGate2" /><Panel class="DgGate DgGate3" />
+		<Panel class="DgMelon DgLookMelon" />
+		<Image class="DgMouse DgLookMouse" src="file://{images}/custom_game/icons/mouse-left.png" />
+		<Label class="DgCaption" text="LOOK = STEER" />
+	</Panel>
+	<!-- Round the post: W held, the mouse turning right, the melon circling a post. -->
+	<Panel id="tutorial_diagram_circle" class="TutorialDiagram Hidden">
+		<Panel class="DgPost" />
+		<Panel class="DgMelon DgCircleMelon" />
+		<Image class="DgMouse DgCircleMouse" src="file://{images}/custom_game/icons/mouse-left.png" />
+		<Label class="DgCaption" text="W + TURN THE MOUSE" />
+	</Panel>
+	<!-- Boosting drains the health bar, segment by segment. -->
+	<Panel id="tutorial_diagram_drain" class="TutorialDiagram Hidden">
+		<Panel class="DgBar">
+		<each loop="i in range(10)">
+		<Panel class="DgBarSegment DgDrain{{ i }}" /></each>
+		</Panel>
+		<Label class="DgCaption" text="HEALTH" />
+	</Panel>
+	<!-- Healing fills it again, a cross pulsing. -->
+	<Panel id="tutorial_diagram_heal" class="TutorialDiagram Hidden">
+		<Panel class="DgBar">
+		<each loop="i in range(10)">
+		<Panel class="DgBarSegment DgFill{{ i }}" /></each>
+		</Panel>
+		<Panel class="DgCross"><Panel class="DgCrossH" /><Panel class="DgCrossV" /></Panel>
+		<Label class="DgCaption" text="HEAL GATE" />
+	</Panel>
+	<!-- Momentum: the speed needle hits the top, dips, hits it again — the top mark moving up each time. -->
+	<Panel id="tutorial_diagram_momentum" class="TutorialDiagram Hidden">
+		<Panel class="DgTrack" />
+		<Panel class="DgTopMark" />
+		<Panel class="DgNeedle" />
+		<Label class="DgCaption" text="TOP SPEED GROWS" />
+	</Panel>
+	<!-- Wall jump, side view: a jump at the wall, touch, off it and up. -->
+	<Panel id="tutorial_diagram_walljump" class="TutorialDiagram Hidden">
+		<Panel class="DgFloor" /><Panel class="DgWallRight" />
+		<Panel class="DgMelon DgWallJumpMelon" />
+		<Panel class="DgSpark DgWallJumpSpark" />
+		<Label class="DgCaption" text="TOUCH + SPACE" />
+	</Panel>
+	<!-- 45 degrees, top-down: in along the guide line, off the wall the other way. -->
+	<Panel id="tutorial_diagram_angle" class="TutorialDiagram Hidden">
+		<Panel class="DgWallTop" />
+		<each loop="i in range(6)">
+		<Panel class="DgGuide DgGuideIn{{ i }}" /></each>
+		<Panel class="DgMelon DgAngleMelon" />
+		<Label class="DgAngleLabel" text="45°" />
+		<Label class="DgCaption" text="PERFECT AT 45°" />
+	</Panel>
+	<!-- Climbing, side view: from wall to wall up the corridor. -->
+	<Panel id="tutorial_diagram_climb" class="TutorialDiagram Hidden">
+		<Panel class="DgClimbWallLeft" /><Panel class="DgClimbWallRight" /><Panel class="DgLedge" />
+		<Panel class="DgMelon DgClimbMelon" />
+		<Label class="DgCaption" text="LEFT · RIGHT · UP" />
+	</Panel>
+	<!-- Crash, side view: too fast into the wall, the melon bursts. -->
+	<Panel id="tutorial_diagram_crash" class="TutorialDiagram Hidden">
+		<Panel class="DgFloor" /><Panel class="DgWallRight DgWallRed" />
+		<Panel class="DgMelon DgCrashMelon" />
+		<Panel class="DgPiece DgCrashPiece0" /><Panel class="DgPiece DgCrashPiece1" /><Panel class="DgPiece DgCrashPiece2" />
+		<Label class="DgCaption" text="TOO FAST = BREAK" />
+	</Panel>
+	<!-- Fall, side view: off the tower onto the flat floor, burst. -->
+	<Panel id="tutorial_diagram_fall" class="TutorialDiagram Hidden">
+		<Panel class="DgFloor" /><Panel class="DgTower" />
+		<Panel class="DgMelon DgFallMelon" />
+		<Panel class="DgPiece DgFallPiece0" /><Panel class="DgPiece DgFallPiece1" /><Panel class="DgPiece DgFallPiece2" />
+		<Label class="DgCaption" text="HIGH + FLAT = BREAK" />
+	</Panel>
+	<!-- The user menu, small: its columns, the one to look at outlined in gold. -->
+	<Panel id="tutorial_diagram_menu-actions" class="TutorialDiagram DgMenu DgMenuActions Hidden">
+		<module href="menu-sketch.xml" />
+	</Panel>
+	<Panel id="tutorial_diagram_menu-settings" class="TutorialDiagram DgMenu DgMenuSettings Hidden">
+		<module href="menu-sketch.xml" />
+	</Panel>
+	<Panel id="tutorial_diagram_menu-profile" class="TutorialDiagram DgMenu DgMenuProfile Hidden">
+		<module href="menu-sketch.xml" />
+	</Panel>
+</Panel>

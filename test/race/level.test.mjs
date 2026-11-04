@@ -71,10 +71,10 @@ test("a Grand Prix earns clearly more than time trials: every heat finish beats 
     assert.ok(GrandPrixXp(99) > XP_TIME_TRIAL_FINISH + XP_NEW_BEST);
 });
 
-test("skins: three free from the start, the default among them; each locked one needs a level", () => {
+test("skins: five free from the start, the default among them; each locked one needs a level", () => {
     assert.deepEqual(Object.keys(MELON_SKIN_LEVELS).sort(), Object.keys(MELON_SKINS).sort(), "a level for every skin, no other");
     const free = Object.keys(MELON_SKINS).filter((skin) => IsSkinUnlocked(skin, 1));
-    assert.equal(free.length, 3);
+    assert.equal(free.length, 5);
     assert.ok(free.includes(MELON_SKIN_DEFAULT));
     for (const skin of Object.keys(MELON_SKINS)) {
         if (SkinUnlockLevel(skin) > 1) {

@@ -5,5 +5,6 @@
 export const ROUTE_NAMES = {
     1: "Canals",
     2: "Bridge",
-    3: "Side Slice"
+    3: "Side Slice",
+    4: "Lighthouse"
 };

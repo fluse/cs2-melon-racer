@@ -392,6 +392,229 @@
 			</Panel>
 		</Panel>
 
+		<!-- Tutorial card (hud/tutorial-panel.js, UpdateTutorialHud), left middle, while
+		     the melon is in a tutorial station (tutorial/): the station number and title,
+		     a row with every station (finished ones gold: tutorial_station_<id>.Done, the
+		     one it's in .Current), its steps (TUTORIAL_MAX_STEPS rows, .Done/.Current,
+		     unused ones .Hidden; each numbered like its section's sign in the map), how to do the current one — help text, an animated
+		     diagram (diagrams.xml), the keys to press lit on a small keyboard
+		     (TUTORIAL_KEYS: tutorial_key_<key>.Lit) — and its progress bar
+		     (TUTORIAL_PROGRESS_SEGMENTS). After a station's last step the card shows
+		     "STATION COMPLETE" (.Complete), +XP the first time, and where to go next. -->
+		<Panel id="tutorial_panel" class="TutorialPanel Hidden" hittest="false">
+			<Panel class="TutorialHead">
+				<Label class="TutorialKicker" text="{s:tutorial_kicker}" />
+				<Panel class="TutorialStations">
+					<Panel id="tutorial_station_1" class="TutorialStation"><Label class="TutorialStationNumber" text="1" /></Panel>
+					<Panel id="tutorial_station_2" class="TutorialStation"><Label class="TutorialStationNumber" text="2" /></Panel>
+					<Panel id="tutorial_station_3" class="TutorialStation"><Label class="TutorialStationNumber" text="3" /></Panel>
+					<Panel id="tutorial_station_4" class="TutorialStation"><Label class="TutorialStationNumber" text="4" /></Panel>
+					<Panel id="tutorial_station_5" class="TutorialStation"><Label class="TutorialStationNumber" text="5" /></Panel>
+					<Panel id="tutorial_station_6" class="TutorialStation"><Label class="TutorialStationNumber" text="6" /></Panel>
+				</Panel>
+			</Panel>
+			<Label class="TutorialTitle" text="{s:tutorial_title}" />
+			<Panel class="TutorialBody">
+				<Panel class="TutorialSteps">
+					<Panel id="tutorial_step_0" class="TutorialStep Hidden"><Panel class="TutorialStepBox"><Label class="TutorialStepNumber" text="1" /></Panel><Label class="TutorialStepText" text="{s:tutorial_step_0_text}" /></Panel>
+					<Panel id="tutorial_step_1" class="TutorialStep Hidden"><Panel class="TutorialStepBox"><Label class="TutorialStepNumber" text="2" /></Panel><Label class="TutorialStepText" text="{s:tutorial_step_1_text}" /></Panel>
+					<Panel id="tutorial_step_2" class="TutorialStep Hidden"><Panel class="TutorialStepBox"><Label class="TutorialStepNumber" text="3" /></Panel><Label class="TutorialStepText" text="{s:tutorial_step_2_text}" /></Panel>
+					<Panel id="tutorial_step_3" class="TutorialStep Hidden"><Panel class="TutorialStepBox"><Label class="TutorialStepNumber" text="4" /></Panel><Label class="TutorialStepText" text="{s:tutorial_step_3_text}" /></Panel>
+					<Panel id="tutorial_step_4" class="TutorialStep Hidden"><Panel class="TutorialStepBox"><Label class="TutorialStepNumber" text="5" /></Panel><Label class="TutorialStepText" text="{s:tutorial_step_4_text}" /></Panel>
+				</Panel>
+				<Panel class="TutorialHow">
+					<Label class="TutorialHelp" text="{s:tutorial_help}" />
+					<!-- The tutorial card's animated diagrams (TUTORIAL_DIAGRAMS in
+					     tutorial/constants.js; the script shows one: tutorial_diagram_<name>, the
+					     others .Hidden). Each is a small looping scene of plain panels moved by CSS
+					     animations (diagrams.css): the melon is the lime dot (.DgMelon), walls and
+					     floors are bars. Top-down unless it says side view. -->
+					<Panel id="tutorial_diagrams" class="TutorialDiagrams Hidden">
+						<!-- Steer by looking: the melon weaves through three gates, the mouse below sliding the way it turns. -->
+						<Panel id="tutorial_diagram_look" class="TutorialDiagram Hidden">
+							<Panel class="DgGate DgGate1" /><Panel class="DgGate DgGate2" /><Panel class="DgGate DgGate3" />
+							<Panel class="DgMelon DgLookMelon" />
+							<Image class="DgMouse DgLookMouse" src="file://{images}/custom_game/icons/mouse-left.png" />
+							<Label class="DgCaption" text="LOOK = STEER" />
+						</Panel>
+						<!-- Round the post: W held, the mouse turning right, the melon circling a post. -->
+						<Panel id="tutorial_diagram_circle" class="TutorialDiagram Hidden">
+							<Panel class="DgPost" />
+							<Panel class="DgMelon DgCircleMelon" />
+							<Image class="DgMouse DgCircleMouse" src="file://{images}/custom_game/icons/mouse-left.png" />
+							<Label class="DgCaption" text="W + TURN THE MOUSE" />
+						</Panel>
+						<!-- Boosting drains the health bar, segment by segment. -->
+						<Panel id="tutorial_diagram_drain" class="TutorialDiagram Hidden">
+							<Panel class="DgBar">
+								<Panel class="DgBarSegment DgDrain0" />
+								<Panel class="DgBarSegment DgDrain1" />
+								<Panel class="DgBarSegment DgDrain2" />
+								<Panel class="DgBarSegment DgDrain3" />
+								<Panel class="DgBarSegment DgDrain4" />
+								<Panel class="DgBarSegment DgDrain5" />
+								<Panel class="DgBarSegment DgDrain6" />
+								<Panel class="DgBarSegment DgDrain7" />
+								<Panel class="DgBarSegment DgDrain8" />
+								<Panel class="DgBarSegment DgDrain9" />
+							</Panel>
+							<Label class="DgCaption" text="HEALTH" />
+						</Panel>
+						<!-- Healing fills it again, a cross pulsing. -->
+						<Panel id="tutorial_diagram_heal" class="TutorialDiagram Hidden">
+							<Panel class="DgBar">
+								<Panel class="DgBarSegment DgFill0" />
+								<Panel class="DgBarSegment DgFill1" />
+								<Panel class="DgBarSegment DgFill2" />
+								<Panel class="DgBarSegment DgFill3" />
+								<Panel class="DgBarSegment DgFill4" />
+								<Panel class="DgBarSegment DgFill5" />
+								<Panel class="DgBarSegment DgFill6" />
+								<Panel class="DgBarSegment DgFill7" />
+								<Panel class="DgBarSegment DgFill8" />
+								<Panel class="DgBarSegment DgFill9" />
+							</Panel>
+							<Panel class="DgCross"><Panel class="DgCrossH" /><Panel class="DgCrossV" /></Panel>
+							<Label class="DgCaption" text="HEAL GATE" />
+						</Panel>
+						<!-- Momentum: the speed needle hits the top, dips, hits it again — the top mark moving up each time. -->
+						<Panel id="tutorial_diagram_momentum" class="TutorialDiagram Hidden">
+							<Panel class="DgTrack" />
+							<Panel class="DgTopMark" />
+							<Panel class="DgNeedle" />
+							<Label class="DgCaption" text="TOP SPEED GROWS" />
+						</Panel>
+						<!-- Wall jump, side view: a jump at the wall, touch, off it and up. -->
+						<Panel id="tutorial_diagram_walljump" class="TutorialDiagram Hidden">
+							<Panel class="DgFloor" /><Panel class="DgWallRight" />
+							<Panel class="DgMelon DgWallJumpMelon" />
+							<Panel class="DgSpark DgWallJumpSpark" />
+							<Label class="DgCaption" text="TOUCH + SPACE" />
+						</Panel>
+						<!-- 45 degrees, top-down: in along the guide line, off the wall the other way. -->
+						<Panel id="tutorial_diagram_angle" class="TutorialDiagram Hidden">
+							<Panel class="DgWallTop" />
+							<Panel class="DgGuide DgGuideIn0" />
+							<Panel class="DgGuide DgGuideIn1" />
+							<Panel class="DgGuide DgGuideIn2" />
+							<Panel class="DgGuide DgGuideIn3" />
+							<Panel class="DgGuide DgGuideIn4" />
+							<Panel class="DgGuide DgGuideIn5" />
+							<Panel class="DgMelon DgAngleMelon" />
+							<Label class="DgAngleLabel" text="45°" />
+							<Label class="DgCaption" text="PERFECT AT 45°" />
+						</Panel>
+						<!-- Climbing, side view: from wall to wall up the corridor. -->
+						<Panel id="tutorial_diagram_climb" class="TutorialDiagram Hidden">
+							<Panel class="DgClimbWallLeft" /><Panel class="DgClimbWallRight" /><Panel class="DgLedge" />
+							<Panel class="DgMelon DgClimbMelon" />
+							<Label class="DgCaption" text="LEFT · RIGHT · UP" />
+						</Panel>
+						<!-- Crash, side view: too fast into the wall, the melon bursts. -->
+						<Panel id="tutorial_diagram_crash" class="TutorialDiagram Hidden">
+							<Panel class="DgFloor" /><Panel class="DgWallRight DgWallRed" />
+							<Panel class="DgMelon DgCrashMelon" />
+							<Panel class="DgPiece DgCrashPiece0" /><Panel class="DgPiece DgCrashPiece1" /><Panel class="DgPiece DgCrashPiece2" />
+							<Label class="DgCaption" text="TOO FAST = BREAK" />
+						</Panel>
+						<!-- Fall, side view: off the tower onto the flat floor, burst. -->
+						<Panel id="tutorial_diagram_fall" class="TutorialDiagram Hidden">
+							<Panel class="DgFloor" /><Panel class="DgTower" />
+							<Panel class="DgMelon DgFallMelon" />
+							<Panel class="DgPiece DgFallPiece0" /><Panel class="DgPiece DgFallPiece1" /><Panel class="DgPiece DgFallPiece2" />
+							<Label class="DgCaption" text="HIGH + FLAT = BREAK" />
+						</Panel>
+						<!-- The user menu, small: its columns, the one to look at outlined in gold. -->
+						<Panel id="tutorial_diagram_menu-actions" class="TutorialDiagram DgMenu DgMenuActions Hidden">
+							<!-- The user menu, sketched for the tutorial's menu diagrams: ACTIONS on the
+							     left, SETTINGS in the middle, the profile over DEVELOPER on the right.
+							     The diagram's class (.DgMenuActions, …) outlines one part in gold. -->
+							<Panel class="DgMenuFrame">
+								<Panel class="DgMenuColumn DgMenuColActions"><Label class="DgMenuLabel" text="ACTIONS" /></Panel>
+								<Panel class="DgMenuColumn DgMenuColSettings"><Label class="DgMenuLabel" text="SETTINGS" /></Panel>
+								<Panel class="DgMenuRight">
+									<Panel class="DgMenuColumn DgMenuColProfile"><Label class="DgMenuLabel" text="LEVEL · XP" /></Panel>
+									<Panel class="DgMenuColumn DgMenuColDev"><Label class="DgMenuLabel" text="DEVELOPER" /></Panel>
+								</Panel>
+							</Panel>
+						</Panel>
+						<Panel id="tutorial_diagram_menu-settings" class="TutorialDiagram DgMenu DgMenuSettings Hidden">
+							<!-- The user menu, sketched for the tutorial's menu diagrams: ACTIONS on the
+							     left, SETTINGS in the middle, the profile over DEVELOPER on the right.
+							     The diagram's class (.DgMenuActions, …) outlines one part in gold. -->
+							<Panel class="DgMenuFrame">
+								<Panel class="DgMenuColumn DgMenuColActions"><Label class="DgMenuLabel" text="ACTIONS" /></Panel>
+								<Panel class="DgMenuColumn DgMenuColSettings"><Label class="DgMenuLabel" text="SETTINGS" /></Panel>
+								<Panel class="DgMenuRight">
+									<Panel class="DgMenuColumn DgMenuColProfile"><Label class="DgMenuLabel" text="LEVEL · XP" /></Panel>
+									<Panel class="DgMenuColumn DgMenuColDev"><Label class="DgMenuLabel" text="DEVELOPER" /></Panel>
+								</Panel>
+							</Panel>
+						</Panel>
+						<Panel id="tutorial_diagram_menu-profile" class="TutorialDiagram DgMenu DgMenuProfile Hidden">
+							<!-- The user menu, sketched for the tutorial's menu diagrams: ACTIONS on the
+							     left, SETTINGS in the middle, the profile over DEVELOPER on the right.
+							     The diagram's class (.DgMenuActions, …) outlines one part in gold. -->
+							<Panel class="DgMenuFrame">
+								<Panel class="DgMenuColumn DgMenuColActions"><Label class="DgMenuLabel" text="ACTIONS" /></Panel>
+								<Panel class="DgMenuColumn DgMenuColSettings"><Label class="DgMenuLabel" text="SETTINGS" /></Panel>
+								<Panel class="DgMenuRight">
+									<Panel class="DgMenuColumn DgMenuColProfile"><Label class="DgMenuLabel" text="LEVEL · XP" /></Panel>
+									<Panel class="DgMenuColumn DgMenuColDev"><Label class="DgMenuLabel" text="DEVELOPER" /></Panel>
+								</Panel>
+							</Panel>
+						</Panel>
+					</Panel>
+					<Panel id="tutorial_keys" class="TutorialKeys">
+						<Panel id="tutorial_key_w" class="TutorialKey">
+							<Panel class="TutorialKeyCap"><Label class="TutorialKeyLetter" text="W" /></Panel>
+						</Panel>
+						<Panel id="tutorial_key_a" class="TutorialKey">
+							<Panel class="TutorialKeyCap"><Label class="TutorialKeyLetter" text="A" /></Panel>
+						</Panel>
+						<Panel id="tutorial_key_s" class="TutorialKey">
+							<Panel class="TutorialKeyCap"><Label class="TutorialKeyLetter" text="S" /></Panel>
+						</Panel>
+						<Panel id="tutorial_key_d" class="TutorialKey">
+							<Panel class="TutorialKeyCap"><Label class="TutorialKeyLetter" text="D" /></Panel>
+						</Panel>
+						<Panel id="tutorial_key_space" class="TutorialKey">
+							<Panel class="TutorialKeyCap TutorialKeyCapWide"><Label class="TutorialKeyLetter" text="SPACE" /></Panel>
+						</Panel>
+						<Panel id="tutorial_key_mouse1" class="TutorialKey">
+							<Image class="TutorialKeyMouse" src="file://{images}/custom_game/icons/mouse-left.png" />
+						</Panel>
+						<Panel id="tutorial_key_e" class="TutorialKey">
+							<Panel class="TutorialKeyCap"><Label class="TutorialKeyLetter" text="E" /></Panel>
+						</Panel>
+						<Panel id="tutorial_key_r" class="TutorialKey">
+							<Panel class="TutorialKeyCap"><Label class="TutorialKeyLetter" text="R" /></Panel>
+						</Panel>
+						<Panel id="tutorial_key_tab" class="TutorialKey">
+							<Panel class="TutorialKeyCap TutorialKeyCapWide"><Label class="TutorialKeyLetter" text="TAB" /></Panel>
+						</Panel>
+					</Panel>
+					<Panel class="TutorialProgress">
+						<Panel id="tutorial_progress_0" class="TutorialProgressSegment" />
+						<Panel id="tutorial_progress_1" class="TutorialProgressSegment" />
+						<Panel id="tutorial_progress_2" class="TutorialProgressSegment" />
+						<Panel id="tutorial_progress_3" class="TutorialProgressSegment" />
+						<Panel id="tutorial_progress_4" class="TutorialProgressSegment" />
+						<Panel id="tutorial_progress_5" class="TutorialProgressSegment" />
+						<Panel id="tutorial_progress_6" class="TutorialProgressSegment" />
+						<Panel id="tutorial_progress_7" class="TutorialProgressSegment" />
+						<Panel id="tutorial_progress_8" class="TutorialProgressSegment" />
+						<Panel id="tutorial_progress_9" class="TutorialProgressSegment" />
+					</Panel>
+				</Panel>
+			</Panel>
+			<Panel class="TutorialComplete">
+				<Label class="TutorialCompleteTitle" text="STATION COMPLETE" />
+				<Label id="tutorial_xp" class="TutorialXp Hidden" text="+20 XP" />
+				<Label class="TutorialMessage" text="{s:tutorial_message}" />
+			</Panel>
+		</Panel>
+
 		<!-- Speed panel, bottom center: the km/h readout over the health bar —
 		     pure CSS, no images: a container that is only a white outline, inside
 		     it the fill bar of HEALTH_BAR_SEGMENTS white pieces in a row, emptying
@@ -641,6 +864,22 @@
 									</Button>
 								</Panel>
 								<Panel class="UserMenuSkinRow">
+									<Button id="usermenu_skin_kiwi" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_kiwi.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Kiwi" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
+									</Button>
+									<Button id="usermenu_skin_paprika" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_paprika.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Paprika" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
+									</Button>
 									<Button id="usermenu_skin_strawberry" class="SkinButton">
 										<Panel class="SkinPreviewFrame">
 											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_strawberry.png" />
@@ -649,6 +888,36 @@
 										<Label class="SkinName" text="Strawberry" />
 										<Label class="SkinLock" text="{s:skin_lock}" />
 									</Button>
+								</Panel>
+								<Panel class="UserMenuSkinRow">
+									<Button id="usermenu_skin_coconut" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_coconut.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Coconut" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
+									</Button>
+									<Button id="usermenu_skin_bald" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_bald.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Bald Head" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
+									</Button>
+									<Button id="usermenu_skin_eye" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_eye.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Eyeball" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
+									</Button>
+								</Panel>
+							</Panel>
+							<Panel id="usermenu_skinpage_1" class="UserMenuSkinPage Hidden">
+								<Panel class="UserMenuSkinRow">
 									<Button id="usermenu_skin_football" class="SkinButton">
 										<Panel class="SkinPreviewFrame">
 											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_football.png" />
@@ -665,8 +934,6 @@
 										<Label class="SkinName" text="Golf" />
 										<Label class="SkinLock" text="{s:skin_lock}" />
 									</Button>
-								</Panel>
-								<Panel class="UserMenuSkinRow">
 									<Button id="usermenu_skin_pineapple" class="SkinButton">
 										<Panel class="SkinPreviewFrame">
 											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_pineapple.png" />
@@ -675,6 +942,8 @@
 										<Label class="SkinName" text="Pineapple" />
 										<Label class="SkinLock" text="{s:skin_lock}" />
 									</Button>
+								</Panel>
+								<Panel class="UserMenuSkinRow">
 									<Button id="usermenu_skin_zebra" class="SkinButton">
 										<Panel class="SkinPreviewFrame">
 											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_zebra.png" />
@@ -691,9 +960,15 @@
 										<Label class="SkinName" text="Pumpkin" />
 										<Label class="SkinLock" text="{s:skin_lock}" />
 									</Button>
+									<Button id="usermenu_skin_disco" class="SkinButton">
+										<Panel class="SkinPreviewFrame">
+											<Image class="SkinPreview" src="file://{images}/custom_game/skins/skin_disco.png" />
+											<Image class="SkinLockIcon" src="file://{images}/custom_game/icons/lock.png" />
+										</Panel>
+										<Label class="SkinName" text="Disco Ball" />
+										<Label class="SkinLock" text="{s:skin_lock}" />
+									</Button>
 								</Panel>
-							</Panel>
-							<Panel id="usermenu_skinpage_1" class="UserMenuSkinPage Hidden">
 								<Panel class="UserMenuSkinRow">
 									<Button id="usermenu_skin_gold" class="SkinButton">
 										<Panel class="SkinPreviewFrame">
@@ -703,16 +978,6 @@
 										<Label class="SkinName" text="Gold" />
 										<Label class="SkinLock" text="{s:skin_lock}" />
 									</Button>
-									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
-									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
-								</Panel>
-								<Panel class="UserMenuSkinRow">
-									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
-									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
-									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
-								</Panel>
-								<Panel class="UserMenuSkinRow">
-									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
 									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
 									<Panel class="SkinButton SkinSlotEmpty" hittest="false" />
 								</Panel>
@@ -771,12 +1036,18 @@
 										<Image id="usermenu_profile_skin_default" class="ProfileMelonImage" src="file://{images}/custom_game/skins/skin_default.png" />
 										<Image id="usermenu_profile_skin_honey" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_honey.png" />
 										<Image id="usermenu_profile_skin_camo" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_camo.png" />
+										<Image id="usermenu_profile_skin_kiwi" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_kiwi.png" />
+										<Image id="usermenu_profile_skin_paprika" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_paprika.png" />
 										<Image id="usermenu_profile_skin_strawberry" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_strawberry.png" />
+										<Image id="usermenu_profile_skin_coconut" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_coconut.png" />
+										<Image id="usermenu_profile_skin_bald" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_bald.png" />
+										<Image id="usermenu_profile_skin_eye" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_eye.png" />
 										<Image id="usermenu_profile_skin_football" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_football.png" />
 										<Image id="usermenu_profile_skin_golf" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_golf.png" />
 										<Image id="usermenu_profile_skin_pineapple" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_pineapple.png" />
 										<Image id="usermenu_profile_skin_zebra" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_zebra.png" />
 										<Image id="usermenu_profile_skin_pumpkin" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_pumpkin.png" />
+										<Image id="usermenu_profile_skin_disco" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_disco.png" />
 										<Image id="usermenu_profile_skin_gold" class="ProfileMelonImage Hidden" src="file://{images}/custom_game/skins/skin_gold.png" />
 									</Panel>
 									<Panel class="ProfileIdentity">
@@ -1340,6 +1611,13 @@
 							<Button id="usermenu_testxp_button" class="UserMenuToggle">
 								<Label class="UserMenuToggleName" text="Test XP Gain" />
 								<Label class="UserMenuTogglePill UserMenuRunPill" text="RUN" />
+							</Button>
+							<!-- To the new tutorial stations (tutorial_entrance), like "Play Tutorial"
+							     (SendKartToTutorialStations in race/heat/race-flow.js) — while they
+							     stand next to the old tutorial. -->
+							<Button id="usermenu_tutorialstations_button" class="UserMenuToggle">
+								<Label class="UserMenuToggleName" text="Tutorial Stations" />
+								<Label class="UserMenuTogglePill UserMenuRunPill" text="GO" />
 							</Button>
 						</Panel>
 						<Panel class="TuningFooter">

@@ -34,6 +34,8 @@
 
 		<module href="bounce-panel.xml" />
 
+		<module href="tutorial/tutorial.xml" />
+
 		<module href="speed-panel.xml" />
 
 		<module href="user-menu/user-menu.xml" />

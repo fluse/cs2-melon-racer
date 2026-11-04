@@ -41,6 +41,7 @@ this folder, the script doesn't know about it.
 | 22 | [Bouncers](22-bouncers.md) | Foam paddles swinging on a spring, each started at a random point |
 | 23 | [Shopping carts](23-shopping-carts.md) | A cart a melon rides in, pushed when another bumps it (plain physics) |
 | 24 | [Catapults](24-catapults.md) | A melon gets in, jump throws it; bumped to aim |
+| 25 | [Tutorial stations](25-tutorial-stations.md) | The tutorial's six stations: steps explained and checked on the HUD, goals, ghost melons |
 
 ## All script inputs
 
@@ -83,6 +84,9 @@ script, and `npm test` fails on it.
 | `gravity_leave` | **End** | the same gravity trigger | — | [Gravity zones](21-gravity-zones.md) |
 | `ball_pit_enter` | Start | the trigger around a ball pit | origin (the pit's middle) | [Ball pits](19-ball-pits.md) |
 | `ball_pit_leave` | **End** | the same ball pit trigger | — | [Ball pits](19-ball-pits.md) |
+| `tutorial_enter` | Start | `tutorial_station_<id>` | name (station) | [Tutorial stations](25-tutorial-stations.md#station) |
+| `tutorial_leave` | **End** | the same station trigger | name (station) | [Tutorial stations](25-tutorial-stations.md#station) |
+| `tutorial_goal` | Start | `tutorial_goal_<id>_<goal>` | name (station, goal) | [Tutorial stations](25-tutorial-stations.md#goals) |
 
 ## All entity names
 
@@ -115,6 +119,7 @@ names once, when the script first needs the track list.
 | `particle_podium_confetti` | `info_particle_system` | — | [Hub](05-hub.md#confetti) |
 | `template_ball` | `point_template` | — | [Ball spawner](20-ball-spawner.md) |
 | `spawn_ball` | `info_target` | — | [Ball spawner](20-ball-spawner.md) |
+| `tutorial_entrance` | `info_target` | for the tutorial stations | [Tutorial stations](25-tutorial-stations.md#entrance) |
 
 ## All name patterns
 
@@ -138,6 +143,10 @@ Names the script parses — the name carries the config.
 | `side_view_corner_<from>_<to>[_<distance>[_<height>]]` | `side_view_corner_180_270_300_40` | `trigger_multiple` (origin on the corner) | [Camera zones](11-camera-zones.md#corner-zones) |
 | `jump_pad_<up>[_<forward>]` | `jump_pad_1000_400` | `trigger_multiple` | [Jump pads](12-jump-pads.md) |
 | `catapult_<forward>_<up>` | `catapult_1500_500` | `prop_physics` (its base) | [Catapults](24-catapults.md) |
+| `tutorial_station_<id>` | `tutorial_station_1` | `trigger_multiple` | [Tutorial stations](25-tutorial-stations.md#station) |
+| `tutorial_goal_<id>_<goal>` | `tutorial_goal_1_hurdle` | `trigger_multiple` | [Tutorial stations](25-tutorial-stations.md#goals) |
+| `tutorial_spawn_<id>` | `tutorial_spawn_1` | `info_target` | [Tutorial stations](25-tutorial-stations.md#respawn-spot) |
+| `tutorial_ghost_<id>` (+ `_<n>` path) | `tutorial_ghost_3` | `prop_dynamic` (+ `info_target`s) | [Tutorial stations](25-tutorial-stations.md#ghost-melons) |
 | `gravity_zone_<gravity>[_roll<roll>]` | `gravity_zone_100_roll20` | `trigger_multiple` | [Gravity zones](21-gravity-zones.md) |
 | `mover[_wait<seconds>][_<anything>]` | `mover_wait1.5_left` | `func_movelinear` | [Movers](16-movers.md) |
 | `spike_spring[_<words>][_<down>_<up>][_offset<seconds>]` | `spike_spring_downtime_uptime_2_0.5` | `prop_dynamic` | [Spike springs](18-spike-springs.md) |

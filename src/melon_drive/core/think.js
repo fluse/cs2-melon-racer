@@ -3,7 +3,8 @@ import { DEBUG, Debug, LogError } from "./debug.js";
 import { HEARTBEAT_INTERVAL } from "../constants/index.js";
 import { karts, EnsureModerator, DropKart } from "./kart-registry.js";
 import { EnsurePlayerKarts, HoldPawn, DelayKartRebuild } from "../kart/spawn.js";
-import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud, UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, UpdateScoreboardHud, UpdateScoreboardInput, ApplyHubModalState, UpdateLevelUpHud, UpdateXpGainHud } from "../hud/index.js";
+import { UpdateUserMenu, UpdateSpeedHud, UpdateBounceHud, UpdateJumpHud, UpdateHealthHud, UpdateCheckpointHud, UpdateScoreboardHud, UpdateScoreboardInput, ApplyHubModalState, UpdateLevelUpHud, UpdateXpGainHud, UpdateTutorialHud } from "../hud/index.js";
+import { UpdateTutorial, UpdateTutorialGhosts } from "../tutorial/index.js";
 import { UpdateKart } from "../movement/index.js";
 import { HandleMelonLost } from "../health/index.js";
 import { phase, UpdateRaceFlow } from "../race/heat/race-flow.js";
@@ -90,6 +91,8 @@ export function Think() {
             UpdateScoreboardHud(slot, kart);
             UpdateLevelUpHud(slot, kart, now);
             UpdateXpGainHud(slot, kart, now);
+            UpdateTutorial(kart, now, dt);
+            UpdateTutorialHud(slot, kart, now);
             if (kart.inHub) {
                 ApplyHubModalState(slot, phase);
             }
@@ -158,6 +161,11 @@ export function Think() {
         UpdateBallSpawner(now);
     } catch (err) {
         Debug(`Think: UpdateBallSpawner threw: ${err}`);
+    }
+    try {
+        UpdateTutorialGhosts(now);
+    } catch (err) {
+        Debug(`Think: UpdateTutorialGhosts threw: ${err}`);
     }
     try {
         UpdateBouncers(now);
