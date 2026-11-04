@@ -35,7 +35,9 @@ export function SpawnFromTemplate(templateName, position, angles, { warn = false
         report(`SpawnFromTemplate: "${templateName}" is a ${template.GetClassName()}, not a point_template`);
         return [];
     }
-    const spawned = template.ForceSpawn(position, angles) ?? [];
+    // No angles given: the template's own (zero) — passing undefined makes
+    // the engine log "bad value for argument 1 (angle)" on every spawn.
+    const spawned = template.ForceSpawn(position, angles ?? { pitch: 0, yaw: 0, roll: 0 }) ?? [];
     if (spawned.length === 0) {
         report(`SpawnFromTemplate: ForceSpawn of "${templateName}" returned nothing — check its Template01.. entries in Hammer`);
     }

@@ -94,6 +94,21 @@ test("time trial board: saved best times (players who left too), fastest first, 
     ]);
 });
 
+test("both boards sort names without localeCompare (it throws on a dedicated server: no ICU data)", (t) => {
+    t.mock.method(String.prototype, "localeCompare", () => {
+        throw new RangeError("Internal error. Icu error.");
+    });
+    const players = [C, A, B];
+    const timeTrial = BuildScoreboard({
+        grandPrix: undefined, grandPrixMode: false, boardTrackId: 1,
+        players, self: C, bestTimes: { Ben: 31, Anna: 31 }, maxRows: SCOREBOARD_ROWS,
+    });
+    assert.deepEqual(timeTrial.rows.map((r) => r.name), ["Anna", "Ben", "Cleo"]);
+    const gp = NewGrandPrix([C, A, B], 1);
+    const grandPrix = BuildScoreboard({ grandPrix: gp, grandPrixMode: true, boardTrackId: 1, players, self: C, bestTimes: {}, maxRows: SCOREBOARD_ROWS });
+    assert.deepEqual(grandPrix.rows.map((r) => r.name), ["Anna", "Ben", "Cleo"]);
+});
+
 test("more players than rows: the viewer's own row takes the last one", () => {
     /** @type {Record<string, number>} */
     const bestTimes = {};
